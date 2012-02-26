@@ -2,8 +2,10 @@ import sublime, sublime_plugin
 
 class HaskellErrorChecker(sublime_plugin.EventListener):
     def on_post_save(self, view):
-        print 'error checker online!'
-        self.write_output(view, 'Your program has lots of errors!')
+        syntax_file_for_view = view.settings().get('syntax').lower()
+        is_haskell_file = 'haskell' in syntax_file_for_view
+        if is_haskell_file:
+            self.write_output(view, 'Your program has lots of errors!')
 
     def write_output(self, view, text):
         PANEL_NAME = 'haskell_error_checker'
