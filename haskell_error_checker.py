@@ -2,6 +2,7 @@ import fnmatch
 import os
 import sublime
 import sublime_plugin
+import subprocess
 
 class HaskellErrorChecker(sublime_plugin.EventListener):
     def on_post_save(self, view):
@@ -9,8 +10,12 @@ class HaskellErrorChecker(sublime_plugin.EventListener):
         log('view is Haskell? ' + str(is_haskell_file))
         cabal_file_path = get_cabal_file_of_view(view)
         log('path of cabal file of view: ' + str(cabal_file_path))
+        # If the edited file was Haskell code within a cabal project, try to 
+        # compile it.
         if is_haskell_file and cabal_file_path is not None:
-            self.write_output(view, 'Your program has lots of errors!')
+            project_dir = os.path.dirname(cabal_file_path)
+            error_messages = cabal_build(project_dir)
+            self.write_output(view, error_messages)
 
     def write_output(self, view, text):
         PANEL_NAME = 'haskell_error_checker'
@@ -50,6 +55,17 @@ def find_file_in_parent_dir(subdirectory, filename_pattern):
         # Check to see if we have reached the root directory:
         if last_dir == current_dir:
             return None
+
+def cabal_build(dir):
+    "Run 'cabal build' in the specified directory and return the error output."
+    process = subprocess.Popen(
+        ['cabal', 'build'],
+        cwd=dir,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
+    stdout, stderr = process.communicate()
+    exit_code = process.wait()
+    return stderr
 
 def log(message):
     print('[hs-errcheck] ' + message)
