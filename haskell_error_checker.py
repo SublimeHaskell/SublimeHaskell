@@ -1,9 +1,12 @@
 import fnmatch
+import functools
 import os
 import re
 import sublime
 import sublime_plugin
 import subprocess
+from threading import Thread
+import time
 
 # This regex matches an unindented line, followed by zero or more
 # indented, non-empty lines.
@@ -22,17 +25,11 @@ class HaskellErrorChecker(sublime_plugin.EventListener):
         # compile it.
         if is_haskell_file and cabal_file_path is not None:
             project_dir = os.path.dirname(cabal_file_path)
-            error_messages = cabal_build(project_dir)
-            error_messages_as_string = '\n'.join([str(x) for x in error_messages])
-            self.write_output(view, error_messages_as_string)
-
-    def write_output(self, view, text):
-        PANEL_NAME = 'haskell_error_checker'
-        output_view = view.window().get_output_panel(PANEL_NAME)
-        edit = output_view.begin_edit()
-        output_view.insert(edit, 0, text)
-        output_view.end_edit(edit)
-        view.window().run_command('show_panel', {'panel': 'output.' + PANEL_NAME})
+            cabal_process = cabal_build(project_dir)
+            # On another thread, wait for the build to finish.
+            write_output(view, 'Rebuilding...')
+            thread_run = functools.partial(wait_for_build_to_complete, view, cabal_process)
+            Thread(target=thread_run).start()
 
 class ErrorMessage(object):
     "Describe an error or warning message produced by GHC."
@@ -48,6 +45,24 @@ class ErrorMessage(object):
             self.line,
             self.column,
             self.message)
+
+def wait_for_build_to_complete(view, proc):
+    "Wait for the build to complete, then parse and diplay the resulting errors."
+    stdout, stderr = proc.communicate()
+    # The process has terminated; parse and display the output:
+    error_messages = '\n'.join([str(x) for x in parse_error_messages(stderr)])
+    # Use set_timeout() so that the call occurs on the main Sublime thread:
+    callback = functools.partial(write_output, view, error_messages)
+    sublime.set_timeout(callback, 0)
+
+def write_output(view, text):
+    "Write text to Sublime's output panel."
+    PANEL_NAME = 'haskell_error_checker'
+    output_view = view.window().get_output_panel(PANEL_NAME)
+    edit = output_view.begin_edit()
+    output_view.insert(edit, 0, text)
+    output_view.end_edit(edit)
+    view.window().run_command('show_panel', {'panel': 'output.' + PANEL_NAME})
 
 def does_view_contain_haskell_source(view):
     "Return True if the specified view is displaying Haskell source code."
@@ -81,7 +96,7 @@ def find_file_in_parent_dir(subdirectory, filename_pattern):
             return None
 
 def cabal_build(dir):
-    "Run 'cabal build' in the specified directory and return the error output."
+    "Start 'cabal build' in the specified directory and return the running process."
     startupinfo = subprocess.STARTUPINFO()
     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
     process = subprocess.Popen(
@@ -90,9 +105,7 @@ def cabal_build(dir):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         startupinfo=startupinfo)
-    stdout, stderr = process.communicate()
-    exit_code = process.wait()
-    return parse_error_messages(stderr)
+    return process
 
 def parse_error_messages(text):
     "Parse text into a list of ErrorMessage objects."
