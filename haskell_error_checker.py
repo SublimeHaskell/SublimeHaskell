@@ -82,11 +82,14 @@ def find_file_in_parent_dir(subdirectory, filename_pattern):
 
 def cabal_build(dir):
     "Run 'cabal build' in the specified directory and return the error output."
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
     process = subprocess.Popen(
         ['cabal', 'build'],
         cwd=dir,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE)
+        stderr=subprocess.PIPE,
+        startupinfo=startupinfo)
     stdout, stderr = process.communicate()
     exit_code = process.wait()
     return parse_error_messages(stderr)
