@@ -15,11 +15,8 @@ error_output_regex = re.compile(
     r'^(\S*):(\d+):(\d+):(.*$(?:\n^[ \t].*$)*)',
     re.MULTILINE)
 
-# Extract the filename from an error message:
-result_file_regex = r'^(\S*?):'
-
-# Extract the line number from an error message:
-result_line_regex = r'^\S*?: line (\d+)'
+# Extract the filename, line, column, and description from an error message:
+result_file_regex = r'^(\S*?): line (\d+), column (\d+): (.*)$'
 
 class HaskellErrorChecker(sublime_plugin.EventListener):
     def on_post_save(self, view):
@@ -66,7 +63,6 @@ def write_output(view, text, cabal_project_dir):
     output_view = view.window().get_output_panel(PANEL_NAME)
     # Configure Sublime's error message parsing:
     output_view.settings().set("result_file_regex", result_file_regex)
-    output_view.settings().set("result_line_regex", result_line_regex)
     output_view.settings().set("result_base_dir", cabal_project_dir)
     # Write to the output buffer:
     edit = output_view.begin_edit()
