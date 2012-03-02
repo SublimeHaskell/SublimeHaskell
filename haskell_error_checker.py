@@ -24,9 +24,7 @@ result_line_regex = r'^\S*?: line (\d+)'
 class HaskellErrorChecker(sublime_plugin.EventListener):
     def on_post_save(self, view):
         is_haskell_file = does_view_contain_haskell_source(view)
-        log('view is Haskell? ' + str(is_haskell_file))
         cabal_file_path = get_cabal_file_of_view(view)
-        log('path of cabal file of view: ' + str(cabal_file_path))
         # If the edited file was Haskell code within a cabal project, try to 
         # compile it.
         if is_haskell_file and cabal_file_path is not None:
