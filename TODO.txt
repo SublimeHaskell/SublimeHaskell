@@ -1,5 +1,9 @@
 TODO
 ====
 
-* Only run the plugin when the file is a Haskell source file.
-* Only run the plugin when the file being edited has a .cabal file in a parent directory.
+* Implement smarter auto-complete, based on module export lists
+* Underline errors in red
+* Add "go to definition" (alt-click)
+* Show function type/docs (in status bar?)
+* Add "find all references"
+* Add HLint support
