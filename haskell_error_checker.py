@@ -12,8 +12,14 @@ import time
 # indented, non-empty lines.
 # The first line is divided into a filename, a line number, and a column.
 error_output_regex = re.compile(
-    '^(\S*):(\d+):(\d+):(.*$(?:\n^[ \t].*$)*)',
+    r'^(\S*):(\d+):(\d+):(.*$(?:\n^[ \t].*$)*)',
     re.MULTILINE)
+
+# Extract the filename from an error message:
+result_file_regex = r'^(\S*?):'
+
+# Extract the line number from an error message:
+result_line_regex = r'^\S*?: line (\d+)'
 
 class HaskellErrorChecker(sublime_plugin.EventListener):
     def on_post_save(self, view):
@@ -27,8 +33,9 @@ class HaskellErrorChecker(sublime_plugin.EventListener):
             project_dir = os.path.dirname(cabal_file_path)
             cabal_process = cabal_build(project_dir)
             # On another thread, wait for the build to finish.
-            write_output(view, 'Rebuilding...')
-            thread_run = functools.partial(wait_for_build_to_complete, view, cabal_process)
+            write_output(view, 'Rebuilding...', project_dir)
+            thread_run = functools.partial(wait_for_build_to_complete,
+                view, cabal_process, project_dir)
             Thread(target=thread_run).start()
 
 class ErrorMessage(object):
@@ -46,22 +53,31 @@ class ErrorMessage(object):
             self.column,
             self.message)
 
-def wait_for_build_to_complete(view, proc):
+def wait_for_build_to_complete(view, proc, cabal_project_dir):
     "Wait for the build to complete, then parse and diplay the resulting errors."
     stdout, stderr = proc.communicate()
     # The process has terminated; parse and display the output:
     error_messages = '\n'.join([str(x) for x in parse_error_messages(stderr)])
     # Use set_timeout() so that the call occurs on the main Sublime thread:
-    callback = functools.partial(write_output, view, error_messages)
+    callback = functools.partial(write_output, view, error_messages, cabal_project_dir)
     sublime.set_timeout(callback, 0)
 
-def write_output(view, text):
+def write_output(view, text, cabal_project_dir):
     "Write text to Sublime's output panel."
     PANEL_NAME = 'haskell_error_checker'
     output_view = view.window().get_output_panel(PANEL_NAME)
+    # Configure Sublime's error message parsing:
+    output_view.settings().set("result_file_regex", result_file_regex)
+    output_view.settings().set("result_line_regex", result_line_regex)
+    output_view.settings().set("result_base_dir", cabal_project_dir)
+    # Write to the output buffer:
     edit = output_view.begin_edit()
     output_view.insert(edit, 0, text)
+    # Set the selection to the beginning of the view so that "next result" works:
+    output_view.sel().clear()
+    output_view.sel().add(sublime.Region(0))
     output_view.end_edit(edit)
+    # Show the results panel:
     view.window().run_command('show_panel', {'panel': 'output.' + PANEL_NAME})
 
 def does_view_contain_haskell_source(view):
