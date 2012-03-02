@@ -51,10 +51,13 @@ class ErrorMessage(object):
 def wait_for_build_to_complete(view, proc, cabal_project_dir):
     "Wait for the build to complete, then parse and diplay the resulting errors."
     stdout, stderr = proc.communicate()
+    exit_code = proc.wait()
     # The process has terminated; parse and display the output:
     error_messages = '\n'.join([str(x) for x in parse_error_messages(stderr)])
+    success_message = 'SUCCEEDED' if exit_code == 0 else 'FAILED'
+    output = '{0}\n\nBuild {1}'.format(error_messages, success_message)
     # Use set_timeout() so that the call occurs on the main Sublime thread:
-    callback = functools.partial(write_output, view, error_messages, cabal_project_dir)
+    callback = functools.partial(write_output, view, output, cabal_project_dir)
     sublime.set_timeout(callback, 0)
 
 def write_output(view, text, cabal_project_dir):
