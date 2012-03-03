@@ -40,6 +40,7 @@ class ErrorMessage(object):
         self.line = line
         self.column = column
         self.message = message
+        self.is_warning = 'warning' in message.lower()
 
     def __str__(self):
         return '{0}: line {1}, column {2}: {3}'.format(
