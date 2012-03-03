@@ -37,8 +37,8 @@ class ErrorMessage(object):
     "Describe an error or warning message produced by GHC."
     def __init__(self, filename, line, column, message):
         self.filename = filename
-        self.line = line
-        self.column = column
+        self.line = int(line)
+        self.column = int(column)
         self.message = message
         self.is_warning = 'warning' in message.lower()
 
@@ -54,12 +54,53 @@ def wait_for_build_to_complete(view, proc, cabal_project_dir):
     stdout, stderr = proc.communicate()
     exit_code = proc.wait()
     # The process has terminated; parse and display the output:
-    error_messages = '\n'.join([str(x) for x in parse_error_messages(stderr)])
+    parsed_messages = parse_error_messages(stderr)
+    error_messages = '\n'.join([str(x) for x in parsed_messages])
     success_message = 'SUCCEEDED' if exit_code == 0 else 'FAILED'
     output = '{0}\n\nBuild {1}'.format(error_messages, success_message)
     # Use set_timeout() so that the call occurs on the main Sublime thread:
     callback = functools.partial(write_output, view, output, cabal_project_dir)
     sublime.set_timeout(callback, 0)
+    callback = functools.partial(mark_errors_in_views, parsed_messages)
+    sublime.set_timeout(callback, 0)
+
+def mark_errors_in_views(errors):
+    "Mark the regions in open views where errors were found."
+    WARNING_REGION_KEY = 'subhs-warnings'
+    ERROR_REGION_KEY = 'subhs-errors'
+    active_view = sublime.active_window().active_view()
+    # Clear old regions:
+    active_view.erase_regions(WARNING_REGION_KEY)
+    active_view.erase_regions(ERROR_REGION_KEY)
+    # Add all error and warning regions in this view.
+    # TODO: Mark all views that are open in any window.
+    error_regions = []
+    warning_regions = []
+    log('processing {0} messages...'.format(len(errors)))
+    for e in errors:
+        # Convert line and column count to zero-based indices:
+        point = active_view.text_point(e.line - 1, e.column - 1)
+        region = active_view.full_line(point)
+        if (e.is_warning):
+            warning_regions.append(region)
+        else:
+            error_regions.append(region)
+    # Mark warnings:
+    log('marking {0} warnings...'.format(len(warning_regions)))
+    active_view.add_regions(
+        WARNING_REGION_KEY,
+        warning_regions,
+        'invalid.warning',
+        'grey_x',
+        sublime.DRAW_OUTLINED)
+    # Mark errors:
+    log('marking {0} errors...'.format(len(error_regions)))
+    active_view.add_regions(
+        ERROR_REGION_KEY,
+        error_regions,
+        'invalid',
+        'grey_x',
+        sublime.DRAW_OUTLINED)
 
 def write_output(view, text, cabal_project_dir):
     "Write text to Sublime's output panel."
