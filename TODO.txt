@@ -7,3 +7,9 @@ TODO
 * Show function type/docs (in status bar?)
 * Add "find all references"
 * Add HLint support
+* Add a syntax definition for the error panel format, so that error messages are highlighted
+
+Syntax problems
+---------------
+* Most of the types in type signatures (except the first one) are incorrectly classified as "storage.type" -- should be something like "user-defined class"
+* "Just" and "Nothing" are classified as "support.constant" -- should probably be either "support.type" or "support class"
