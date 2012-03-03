@@ -250,11 +250,22 @@
             <key>settings</key>
             <dict>
                 <key>background</key>
-                <string>#F92672</string>
-                <key>fontStyle</key>
-                <string></string>
+                <string>#FF0000</string>
                 <key>foreground</key>
-                <string>#F8F8F0</string>
+                <string>#000000</string>
+            </dict>
+        </dict>
+        <dict>
+            <key>name</key>
+            <string>Invalid warning</string>
+            <key>scope</key>
+            <string>invalid.warning</string>
+            <key>settings</key>
+            <dict>
+                <key>background</key>
+                <string>#008800</string>
+                <key>foreground</key>
+                <string>#000000</string>
             </dict>
         </dict>
         <dict>
@@ -265,9 +276,9 @@
             <key>settings</key>
             <dict>
                 <key>background</key>
-                <string>#AE81FF</string>
+                <string>#FF0000</string>
                 <key>foreground</key>
-                <string>#F8F8F0</string>
+                <string>#000000</string>
             </dict>
         </dict>
     </array>
