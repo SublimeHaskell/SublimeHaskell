@@ -18,7 +18,7 @@ error_output_regex = re.compile(
 # Extract the filename, line, column, and description from an error message:
 result_file_regex = r'^(\S*?): line (\d+), column (\d+): (.*)$'
 
-class HaskellErrorChecker(sublime_plugin.EventListener):
+class SublimeHaskellAutobuild(sublime_plugin.EventListener):
     def on_post_save(self, view):
         is_haskell_file = does_view_contain_haskell_source(view)
         cabal_file_path = get_cabal_file_of_view(view)
