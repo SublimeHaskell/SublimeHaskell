@@ -1,3 +1,4 @@
+from common import *
 import fnmatch
 import functools
 import os
@@ -26,12 +27,12 @@ class SublimeHaskellAutobuild(sublime_plugin.EventListener):
         # compile it.
         if is_haskell_file and cabal_file_path is not None:
             project_dir = os.path.dirname(cabal_file_path)
-            cabal_process = cabal_build(project_dir)
             # On another thread, wait for the build to finish.
             write_output(view, 'Rebuilding...', project_dir)
-            thread_run = functools.partial(wait_for_build_to_complete,
-                view, cabal_process, project_dir)
-            Thread(target=thread_run).start()
+            thread = Thread(
+                target=wait_for_build_to_complete,
+                args=(view, project_dir))
+            thread.start()
 
 class ErrorMessage(object):
     "Describe an error or warning message produced by GHC."
@@ -49,10 +50,12 @@ class ErrorMessage(object):
             self.column,
             self.message)
 
-def wait_for_build_to_complete(view, proc, cabal_project_dir):
-    "Wait for the build to complete, then parse and diplay the resulting errors."
-    stdout, stderr = proc.communicate()
-    exit_code = proc.wait()
+def wait_for_build_to_complete(view, cabal_project_dir):
+    """Start 'cabal build', wait for it to complete, then parse and diplay
+    the resulting errors."""
+    exit_code, stdout, stderr = call_and_wait(
+        ['cabal', 'build'],
+        cwd=cabal_project_dir)
     # The process has terminated; parse and display the output:
     parsed_messages = parse_error_messages(stderr)
     error_messages = '\n'.join([str(x) for x in parsed_messages])
@@ -152,18 +155,6 @@ def find_file_in_parent_dir(subdirectory, filename_pattern):
         if last_dir == current_dir:
             return None
 
-def cabal_build(dir):
-    "Start 'cabal build' in the specified directory and return the running process."
-    startupinfo = subprocess.STARTUPINFO()
-    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-    process = subprocess.Popen(
-        ['cabal', 'build'],
-        cwd=dir,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        startupinfo=startupinfo)
-    return process
-
 def parse_error_messages(text):
     "Parse text into a list of ErrorMessage objects."
     matches = error_output_regex.finditer(text)
@@ -183,6 +174,3 @@ def clean_whitespace(text):
     text = text.strip()
     text = re.sub('\s+', ' ', text)
     return text
-
-def log(message):
-    print('[hs-errcheck] ' + message)
