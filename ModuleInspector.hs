@@ -1,7 +1,11 @@
+{-# LANGUAGE OverloadedStrings #-}
 module ModuleInspector where
 
 import           Control.Arrow (first, second)
 import           Control.Monad (forM_)
+import qualified Data.Aeson as Json
+import           Data.Aeson ((.=))
+import qualified Data.ByteString.Lazy as LazyByteString
 import qualified Data.Either as Either
 import qualified Data.List as List
 import           Data.Map (Map)
@@ -21,14 +25,26 @@ data ModuleInfo = ModuleInfo
     }
     deriving (Show)
 
+instance Json.ToJSON ModuleInfo where
+    toJSON info = Json.object
+        [ "moduleName" .= _moduleName info
+        , "exportList" .= Json.Null
+        , "importList" .= Json.Null
+        , "declarations" .= _declarations info
+        ]
+
+-- | Information about a single type or function declaration.
 data DeclarationInfo = DeclarationInfo
     { _nameOfDeclaration :: String
     , _typeInfo :: String
     }
     deriving (Show)
 
--- | A fully-qualified name.
-type QualifiedName = String
+instance Json.ToJSON DeclarationInfo where
+    toJSON (DeclarationInfo name typeInfo) = Json.object
+        [ "info" .= typeInfo
+        , "identifier" .= name
+        ]
 
 -- | Process a single file's contents.
 analyzeModule :: String -> Either String ModuleInfo
@@ -62,14 +78,6 @@ identOfName name = case name of
     H.Ident s -> s
     H.Symbol s -> s
 
-dumpModuleInfo :: ModuleInfo -> IO ()
-dumpModuleInfo info = do
-    putStrLn ("Module: " ++ _moduleName info)
-    putStrLn ""
-    putStrLn "Declarations:"
-    forM_ (_declarations info) $ \(DeclarationInfo name typeInfo) ->
-        putStrLn (name ++ " " ++ typeInfo)
-
 -- | Analyze the specified file and dump the collected information to stdout.
 main :: IO ()
 main = do
@@ -78,7 +86,8 @@ main = do
     case args of
         [filename] -> do
             source <- readFile filename
-            case analyzeModule source of
-                Left excuse -> putStrLn ("Error: " ++ excuse)
-                Right info -> dumpModuleInfo info
+            let output = case analyzeModule source of
+                    Left excuse -> Json.toJSON $ Json.object ["error" .= excuse]
+                    Right info -> Json.toJSON info
+            LazyByteString.putStrLn . Json.encode $ output
         _ -> putStrLn ("Usage: " ++ programName ++ " FILENAME")
