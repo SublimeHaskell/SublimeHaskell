@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module ModuleInspector where
+module Main where
 
 import           Control.Arrow (first, second)
 import           Control.Monad (forM_)
