@@ -1,6 +1,7 @@
 TODO
 ====
 
+* Write README file describing prerequisites and features
 * Check that external binaries exist (cabal, ghc, HLint, ...) before trying to run them
 * Add "go to definition" (alt-click)
 * Add "find all references"
@@ -11,7 +12,8 @@ Error checking
 * Add a syntax definition for the error panel format, so that error messages are highlighted
 * Highlight errors and warnings in the view showing that file instead of all in the current view
 * Run "cabal configure" when necessary
-* Highlight partial functions and "bottom"-valued functions: head, undefined, error, etc.
+* Highlight partial, "bottom"-valued, and unsafe functions: head, undefined, error, etc.
+* Trim highlighting to exclude leading and trailing whitespace on lines
 
 Autocomplete
 ------------
@@ -34,3 +36,4 @@ Syntax highlighting
 * It would be nice to draw modules names (in fully-qualified names) in a light gray color to be less distracting
   * At a minimum, they should not be colored like types and constructors
 * User-defined operators should not be keyword-colored, they should be colored like other user-defined functions
+* Add theme rules for XML scopes (compare with Monokai's supported scopes)
