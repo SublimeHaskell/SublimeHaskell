@@ -1,73 +1,77 @@
-import re
+from common import *
+import json
+import os
 import sublime
 import sublime_plugin
+import subprocess
+import threading
+import time
 
 # Completion text longer than this is ellipsized:
 MAX_COMPLETION_LENGTH = 37
 
-# Match a module's name, not followed by an export list:
-module_name_regex = re.compile(
-    r'^module\w+([\w.])+\s+where',
-    re.DOTALL | re.MULTILINE)
-
-# Match a module's name and its explicit export list:
-export_list_regex = re.compile(
-    r'^module\w+([\w.])+\s*\((.*)\)\s*where',
-    re.DOTALL | re.MULTILINE)
-
-# Match a function declaration's name and type:
-# TODO: This only matches type declarations that fit on one line.
-function_declaration_regex = re.compile(
-    r'^([\w\']+)\s*::\s*(.+?)\s*$',
-    re.MULTILINE)
-
-# Match a type declaration's name and type:
-# TODO: This does not capture type parameters or type constructors.
-type_declaration_regex = re.compile(
-    r'^(data|type|newtype)\s+([\w\']+)',
-    re.MULTILINE)
-
 class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
+    def __init__(self):
+        # TODO: Recompile the ModuleInspector:
+        # call_and_wait(['ghc', '--make', 'ModuleInspector.hs', '-outputdir', 'obj'])
+        self.info_lock = threading.Lock()
+        self.info = {}
+
     def on_query_completions(self, view, prefix, locations):
+        return self.get_completion_list(view.file_name())
+
+    def on_post_save(self, view):
+        # TODO: Update the module info once per second, at most.
+        # TODO: Make sure the entire project's module info is up-to-date.
+        self.refresh_module_info(view.file_name())
+
+    def refresh_all_module_info(self, base_dir):
+        "Rebuild module information for all files under the specified directory."
+        files_in_dir = list_files_in_dir_recursively(base_dir)
+        haskell_source_files = [x for x in files_in_dir if x.endswith('.hs')]
+        for filename in haskell_source_files:
+            self.refresh_module_info(filename)
+
+    def refresh_module_info(self, filename):
+        "Rebuild module information for the specified file."
         # TODO: Only do this within Haskell files in Cabal projects.
-        info = analyze_file(view.file_name())
-        completions = [(str(x), x.name) for x in info.declarations]
+        # TODO: Skip this file if it hasn't changed since it was last inspected.
+        print('Inspecting "{0}"...'.format(filename))
+        exit_code, stdout, stderr = call_and_wait(
+            ['runhaskell', 'ModuleInspector.hs', filename])
+        new_info = json.loads(stdout)
+        # Remember when this info was collected.
+        new_info['collectedAt'] = time.time()
+        # Dump the currently-known module info to disk:
+        formatted_json = json.dumps(self.info, indent=2)
+        with open('module_info.cache', 'w') as f:
+            f.write(formatted_json)
+        with self.info_lock:
+            self.info[filename] = new_info
+
+    def get_completion_list(self, current_file_name):
+        "Get all the completions that apply to the current file."
+        # TODO: Filter according to what names the current file has in scope.
+        completions = []
+        with self.info_lock:
+            for file_name, file_info in self.info.items():
+                if 'error' in file_info:
+                    # There was an error parsing this file; skip it.
+                    log('skip!')
+                    continue
+                for d in file_info['declarations']:
+                    identifier = d['identifier']
+                    declaration_info = d['info']
+                    # TODO: Show the declaration info somewhere.
+                    completions.append(
+                        (identifier[:MAX_COMPLETION_LENGTH], identifier))
         return completions
 
-class ModuleCompletionInfo(object):
-    """Describe a file's module name, imports, exports, and declarations.
-    name :: String or None -- name of the module, if present
-    export_list :: [String] or None -- list of explicit exports, if present
-    import_list :: [String] -- list of imported modules
-    declarations :: [(String, String)] -- names and descriptions of 
-        declarations in the file
-    """
-    def __init__(self, name, export_list, import_list, declarations):
-        self.name = name
-        self.export_list = export_list
-        self.import_list = import_list
-        self.declarations = declarations
-
-class ModuleDefinition(object):
-    """Describe a single type or function definition.
-    """
-    def __init__(self, name, type_info):
-        self.name = name
-        self.type_info = type_info
-
-    def __str__(self):
-        s = '{0} :: {1}'.format(self.name, self.type_info)
-        return s[:MAX_COMPLETION_LENGTH]
-
-def analyze_file(filename):
-    "Extract ModuleCompletionInfo from a file."
-    content = ''
-    with open(filename) as f:
-        content = f.read()
-    # Find the declared functions:
-    matches = function_declaration_regex.finditer(content)
-    functions = []
-    for m in matches:
-        name, type_info = m.groups()
-        functions.append(ModuleDefinition(name, type_info))
-    return ModuleCompletionInfo('Unknown', [], [], functions)
+def list_files_in_dir_recursively(base_dir):
+    """Return a list of a all files in a directory, recursively.
+    The files will be specified by full paths."""
+    files = []
+    for dirname, dirnames, filenames in os.walk(base_dir):
+        for filename in filenames:
+            files.append(os.path.join(base_dir, dirname, filename))
+    return files
