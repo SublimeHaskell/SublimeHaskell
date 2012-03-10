@@ -57,7 +57,6 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             for file_name, file_info in self.info.items():
                 if 'error' in file_info:
                     # There was an error parsing this file; skip it.
-                    log('skip!')
                     continue
                 for d in file_info['declarations']:
                     identifier = d['identifier']
