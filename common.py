@@ -1,6 +1,10 @@
 import fnmatch
 import os
+import sublime
 import subprocess
+
+# The path to where this package is installed:
+PACKAGE_PATH = os.path.join(sublime.packages_path(), 'SublimeHaskell')
 
 def call_and_wait(command, **popen_kwargs):
     """Run the specified command, block until it completes, and return
@@ -19,7 +23,7 @@ def call_and_wait(command, **popen_kwargs):
     return (exit_code, stdout, stderr)
 
 def log(message):
-    print('Sublime Haskell: ' + message)
+    print('Sublime Haskell: {0}'.format(message))
 
 def get_cabal_project_dir_of_view(view):
     """Return the path to the .cabal file project for the source file in the
