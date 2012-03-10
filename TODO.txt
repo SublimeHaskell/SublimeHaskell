@@ -25,7 +25,6 @@ Autocomplete
   * Details: namespace, type, ...
 * Inspect modules asynchronously
 * Automatically inspect Haskell source files when they are opened
-* Do not re-inspect a file if it hasn't changed since its "collectedAt" time
 
 Syntax highlighting
 -------------------

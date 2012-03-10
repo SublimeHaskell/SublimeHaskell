@@ -10,6 +10,12 @@ import time
 # Completion text longer than this is ellipsized:
 MAX_COMPLETION_LENGTH = 37
 
+# If true, files that have not changed will not be re-inspected.
+CHECK_MTIME = True
+
+MODULE_INSPECTOR_PATH = os.path.join(PACKAGE_PATH, 'ModuleInspector.hs')
+OUTPUT_PATH = os.path.join(PACKAGE_PATH, 'module_info.cache')
+
 class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
     def __init__(self):
         # TODO: Recompile the ModuleInspector:
@@ -23,7 +29,12 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
     def on_post_save(self, view):
         # TODO: Update the module info once per second, at most.
         # TODO: Make sure the entire project's module info is up-to-date.
-        self.refresh_module_info(view.file_name())
+        cabal_dir = get_cabal_project_dir_of_view(view)
+        if cabal_dir is not None:
+            log('reinspecting project ({0})'.format(cabal_dir))
+            self.refresh_all_module_info(cabal_dir)
+        else:
+            log('no inspection; file is not in a Cabal project')
 
     def refresh_all_module_info(self, base_dir):
         "Rebuild module information for all files under the specified directory."
@@ -36,18 +47,35 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         "Rebuild module information for the specified file."
         # TODO: Only do this within Haskell files in Cabal projects.
         # TODO: Skip this file if it hasn't changed since it was last inspected.
-        print('Inspecting "{0}"...'.format(filename))
+        # If the file hasn't changed since it was last inspected, do nothing:
+        modificationTime = os.stat(filename).st_mtime
+        if CHECK_MTIME:
+            inspectionTime = self.get_inspection_time_of_file(filename)
+            if modificationTime <= inspectionTime:
+                log('skipping inspection; module info is up to date ({0})'.format(
+                    filename))
+                return
+        log('inspecting module ({0})'.format(filename))
         exit_code, stdout, stderr = call_and_wait(
-            ['runhaskell', 'ModuleInspector.hs', filename])
+            ['runhaskell', MODULE_INSPECTOR_PATH, filename])
         new_info = json.loads(stdout)
         # Remember when this info was collected.
-        new_info['collectedAt'] = time.time()
+        new_info['inspectedAt'] = modificationTime
         # Dump the currently-known module info to disk:
         formatted_json = json.dumps(self.info, indent=2)
-        with open('module_info.cache', 'w') as f:
+        with open(OUTPUT_PATH, 'w') as f:
             f.write(formatted_json)
         with self.info_lock:
             self.info[filename] = new_info
+
+    def get_inspection_time_of_file(self, filename):
+        """Return the time that a file was last inspected.
+        Return zero if it has never been inspected."""
+        with self.info_lock:
+            try:
+                return self.info[filename]['inspectedAt']
+            except KeyError:
+                return 0.0
 
     def get_completion_list(self, current_file_name):
         "Get all the completions that apply to the current file."
