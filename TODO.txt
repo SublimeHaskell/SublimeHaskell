@@ -20,11 +20,12 @@ Autocomplete
 * Get all the modules imported into the current file
 * Somehow include Prelude and library functions
   * Hard-coded? (.sublime-completions file)
-* List type (a -> b, data, newtype, class, ...) after each suggestion
-* Cache information extracted from each file
-  * Create some general utility for caching and auto-updating per-file information in a directory tree
 * Feature request: multiline tooltip next to the autocomplete list that shows details of the selected completion
+  * List type (a -> b, data, newtype, class, ...) for each suggestion
   * Details: namespace, type, ...
+* Inspect modules asynchronously
+* Automatically inspect Haskell source files when they are opened
+* Do not re-inspect a file if it hasn't changed since its "collectedAt" time
 
 Syntax highlighting
 -------------------
