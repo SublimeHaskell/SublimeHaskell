@@ -13,13 +13,17 @@ MAX_COMPLETION_LENGTH = 37
 # If true, files that have not changed will not be re-inspected.
 CHECK_MTIME = True
 
-MODULE_INSPECTOR_PATH = os.path.join(PACKAGE_PATH, 'ModuleInspector.hs')
+MODULE_INSPECTOR_SOURCE_PATH = os.path.join(PACKAGE_PATH, 'ModuleInspector.hs')
+MODULE_INSPECTOR_EXE_PATH = os.path.join(PACKAGE_PATH, 'ModuleInspector')
+MODULE_INSPECTOR_OBJ_DIR = os.path.join(PACKAGE_PATH, 'obj')
+
 OUTPUT_PATH = os.path.join(PACKAGE_PATH, 'module_info.cache')
 
 class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
     def __init__(self):
-        # TODO: Recompile the ModuleInspector:
-        # call_and_wait(['ghc', '--make', 'ModuleInspector.hs', '-outputdir', 'obj'])
+        # TODO: Start the InspectorAgent as a separate thread.
+        self.inspector = InspectorAgent()
+        self.inspector.run()
         self.info_lock = threading.Lock()
         self.info = {}
 
@@ -38,10 +42,13 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 
     def refresh_all_module_info(self, base_dir):
         "Rebuild module information for all files under the specified directory."
+        begin_time = time.clock()
         files_in_dir = list_files_in_dir_recursively(base_dir)
         haskell_source_files = [x for x in files_in_dir if x.endswith('.hs')]
         for filename in haskell_source_files:
             self.refresh_module_info(filename)
+        end_time = time.clock()
+        log('total inspection time: {0} seconds'.format(end_time - begin_time))
 
     def refresh_module_info(self, filename):
         "Rebuild module information for the specified file."
@@ -57,7 +64,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
                 return
         log('inspecting module ({0})'.format(filename))
         exit_code, stdout, stderr = call_and_wait(
-            ['runhaskell', MODULE_INSPECTOR_PATH, filename])
+            [MODULE_INSPECTOR_EXE_PATH, filename])
         new_info = json.loads(stdout)
         # Remember when this info was collected.
         new_info['inspectedAt'] = modificationTime
@@ -93,6 +100,24 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
                     completions.append(
                         (identifier[:MAX_COMPLETION_LENGTH], identifier))
         return completions
+
+class InspectorAgent(threading.Thread):
+    def __init__(self):
+        self.dirty_files_lock = threading.Lock()
+        self.dirty_files = []
+
+    def run(self):
+        # Compile the ModuleInspector:
+        exit_code, out, err = call_and_wait(['ghc',
+            '--make', MODULE_INSPECTOR_SOURCE_PATH,
+            '-o', MODULE_INSPECTOR_EXE_PATH,
+            '-outputdir', MODULE_INSPECTOR_OBJ_DIR])
+        # TODO: If compilation failed, we can't proceed; handle this.
+        # TODO: Once per second, reinspect any projects marked dirty.
+
+    def mark_file_dirty(self, filename):
+        with self.dirty_files_lock:
+            self.dirty_files.append(filename)
 
 def list_files_in_dir_recursively(base_dir):
     """Return a list of a all files in a directory, recursively.
