@@ -21,17 +21,15 @@ result_file_regex = r'^(\S*?): line (\d+), column (\d+): (.*)$'
 
 class SublimeHaskellAutobuild(sublime_plugin.EventListener):
     def on_post_save(self, view):
-        is_haskell_file = does_view_contain_haskell_source(view)
-        cabal_file_path = get_cabal_file_of_view(view)
         # If the edited file was Haskell code within a cabal project, try to 
         # compile it.
-        if is_haskell_file and cabal_file_path is not None:
-            project_dir = os.path.dirname(cabal_file_path)
+        cabal_project_dir = get_cabal_project_dir_of_view(view)
+        if cabal_project_dir is not None:
             # On another thread, wait for the build to finish.
-            write_output(view, 'Rebuilding...', project_dir)
+            write_output(view, 'Rebuilding...', cabal_project_dir)
             thread = Thread(
                 target=wait_for_build_to_complete,
-                args=(view, project_dir))
+                args=(view, cabal_project_dir))
             thread.start()
 
 class ErrorMessage(object):
@@ -124,17 +122,25 @@ def write_output(view, text, cabal_project_dir):
     # Show the results panel:
     view.window().run_command('show_panel', {'panel': 'output.' + PANEL_NAME})
 
-def does_view_contain_haskell_source(view):
-    "Return True if the specified view is displaying Haskell source code."
-    syntax_file_for_view = view.settings().get('syntax').lower()
-    return ('haskell' in syntax_file_for_view)
-
-def get_cabal_file_of_view(view):
-    "Return the path to the .cabal file above the file shown by the specified view."
+def get_cabal_project_dir_of_view(view):
+    """Return the path to the .cabal file project for the source file in the
+    specified view. The view must show a saved file, the file must be Haskell
+    source code, and the file must be under a directory containing a .cabal file.
+    Otherwise, return None.
+    """
+    # Check that the view is showing a saved file:
     file_shown_in_view = view.file_name()
     if file_shown_in_view is None:
         return None
-    return find_file_in_parent_dir(os.path.dirname(file_shown_in_view), '*.cabal')
+    # Check that the file is Haskell source code:
+    syntax_file_for_view = view.settings().get('syntax').lower()
+    if  'haskell' not in syntax_file_for_view:
+        return None
+    # Check that a .cabal file is present:
+    cabal_file_path = find_file_in_parent_dir(
+        os.path.dirname(file_shown_in_view), '*.cabal')
+    # Return the directory containing the .cabal file:
+    return os.path.dirname(cabal_file_path)
 
 def find_file_in_parent_dir(subdirectory, filename_pattern):
     """Look for a file with the specified name in a parent directory of the
