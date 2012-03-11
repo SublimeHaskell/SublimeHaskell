@@ -28,7 +28,13 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         self.info = {}
 
     def on_query_completions(self, view, prefix, locations):
-        return self.get_completion_list(view.file_name())
+        # Only suggest symbols if the current file is part of a Cabal project.
+        # TODO: Only suggest symbols from within this project.
+        cabal_dir = get_cabal_project_dir_of_view(view)
+        if cabal_dir is not None:
+            return self.get_completion_list(view.file_name())
+        else:
+            return []
 
     def on_post_save(self, view):
         # TODO: Update the module info once per second, at most.
