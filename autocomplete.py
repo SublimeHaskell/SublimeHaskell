@@ -55,10 +55,10 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         # TODO: Only do this within Haskell files in Cabal projects.
         # TODO: Skip this file if it hasn't changed since it was last inspected.
         # If the file hasn't changed since it was last inspected, do nothing:
-        modificationTime = os.stat(filename).st_mtime
+        modification_time = os.stat(filename).st_mtime
         if CHECK_MTIME:
-            inspectionTime = self.get_inspection_time_of_file(filename)
-            if modificationTime <= inspectionTime:
+            inspection_time = self.get_inspection_time_of_file(filename)
+            if modification_time <= inspection_time:
                 log('skipping inspection; module info is up to date ({0})'.format(
                     filename))
                 return
@@ -67,7 +67,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             [MODULE_INSPECTOR_EXE_PATH, filename])
         new_info = json.loads(stdout)
         # Remember when this info was collected.
-        new_info['inspectedAt'] = modificationTime
+        new_info['inspectedAt'] = modification_time
         # Dump the currently-known module info to disk:
         formatted_json = json.dumps(self.info, indent=2)
         with open(OUTPUT_PATH, 'w') as f:
