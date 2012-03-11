@@ -19,11 +19,14 @@ MODULE_INSPECTOR_OBJ_DIR = os.path.join(PACKAGE_PATH, 'obj')
 
 OUTPUT_PATH = os.path.join(PACKAGE_PATH, 'module_info.cache')
 
+# The agent sleeps this long between inspections.
+AGENT_SLEEP_DURATION = 5.0
+
 class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
     def __init__(self):
         # TODO: Start the InspectorAgent as a separate thread.
         self.inspector = InspectorAgent()
-        #self.inspector.run()
+        self.inspector.start()
 
     def on_query_completions(self, view, prefix, locations):
         begin_time = time.clock()
@@ -42,10 +45,14 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         filename = view.file_name()
         if filename is not None:
             self.inspector.mark_file_dirty(filename)
-            self.inspector.run()
 
 class InspectorAgent(threading.Thread):
     def __init__(self):
+        # Call the superclass constructor:
+        super(InspectorAgent, self).__init__()
+        # Make this thread daemonic so that it won't prevent the program 
+        # from exiting.
+        self.daemon = True
         # Module info:
         self.info_lock = threading.Lock()
         self.info = {}
@@ -60,14 +67,17 @@ class InspectorAgent(threading.Thread):
             '-o', MODULE_INSPECTOR_EXE_PATH,
             '-outputdir', MODULE_INSPECTOR_OBJ_DIR])
         # TODO: If compilation failed, we can't proceed; handle this.
-        # TODO: Once per second, reinspect any projects marked dirty.
-        # TODO: Do this in a loop instead of once:
-        files_to_reinspect = []
-        with self.dirty_files_lock:
-            files_to_reinspect = self.dirty_files
-            self.dirty_files = []
-        for filename in files_to_reinspect:
-            self._refresh_all_module_info(filename)
+        # Periodically wake up and see if there is anything to inspect.
+        while True:
+            files_to_reinspect = []
+            with self.dirty_files_lock:
+                files_to_reinspect = self.dirty_files
+                self.dirty_files = []
+            # TODO: Eliminate duplicates in the list before inspecting.
+            log('agent: files to inspect: ' + str(files_to_reinspect))
+            for filename in files_to_reinspect:
+                self._refresh_all_module_info(filename)
+            time.sleep(AGENT_SLEEP_DURATION)
 
     def mark_file_dirty(self, filename):
         "Report that a file should be reinspected."
