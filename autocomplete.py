@@ -71,7 +71,11 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         log('inspecting module ({0})'.format(filename))
         exit_code, stdout, stderr = call_and_wait(
             [MODULE_INSPECTOR_EXE_PATH, filename])
-        new_info = json.loads(stdout)
+        if exit_code == 0:
+            new_info = json.loads(stdout)
+        else:
+            # There was a problem parsing the file; create an error entry.
+            new_info = {'error': 'ModuleInspector failed'}
         # Remember when this info was collected.
         new_info['inspectedAt'] = modification_time
         # Dump the currently-known module info to disk:
