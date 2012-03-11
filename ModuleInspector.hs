@@ -1,20 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import           Control.Arrow (first, second)
-import           Control.Monad (forM_)
 import qualified Data.Aeson as Json
 import           Data.Aeson ((.=))
 import qualified Data.ByteString.Lazy as LazyByteString
-import qualified Data.Either as Either
-import qualified Data.List as List
-import           Data.Map (Map)
-import qualified Data.Map as Map
-import qualified Data.Maybe as Maybe
-import qualified Data.Generics.Uniplate.Data as Uniplate
 import qualified Language.Haskell.Exts as H
 import qualified System.Environment as Environment
-import qualified System.FilePath as FilePath
 
 -- | All the information extracted from a codebase.
 data ModuleInfo = ModuleInfo
