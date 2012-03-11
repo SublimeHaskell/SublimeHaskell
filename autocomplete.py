@@ -73,10 +73,18 @@ class InspectorAgent(threading.Thread):
             with self.dirty_files_lock:
                 files_to_reinspect = self.dirty_files
                 self.dirty_files = []
-            # TODO: Eliminate duplicates in the list before inspecting.
-            log('agent: files to inspect: ' + str(files_to_reinspect))
+            # Find the cabal project corresponding to each "dirty" file:
+            cabal_dirs = []
             for filename in files_to_reinspect:
-                self._refresh_all_module_info(filename)
+                d = get_cabal_project_dir_of_file(filename)
+                if d is not None:
+                    cabal_dirs.append(d)
+            # Eliminate duplicate project directories:
+            cabal_dirs = list(set(cabal_dirs))
+            log('agent: files to inspect: ' + str(files_to_reinspect))
+            log('agent: dirs to inspect: ' + str(cabal_dirs))
+            for d in cabal_dirs:
+                self._refresh_all_module_info(d)
             time.sleep(AGENT_SLEEP_DURATION)
 
     def mark_file_dirty(self, filename):
@@ -101,14 +109,9 @@ class InspectorAgent(threading.Thread):
                         (identifier[:MAX_COMPLETION_LENGTH], identifier))
         return completions
 
-    def _refresh_all_module_info(self, filename):
+    def _refresh_all_module_info(self, cabal_dir):
         "Rebuild module information for all files under the specified directory."
         begin_time = time.clock()
-        # Only process files within a Cabal project:
-        cabal_dir = get_cabal_project_dir_of_file(filename)
-        if cabal_dir is None:
-            log('no inspection; file is not in a Cabal project')
-            return
         log('reinspecting project ({0})'.format(cabal_dir))
         # Process all files within the Cabal project:
         # TODO: Only process files within the .cabal file's "src" directory.
