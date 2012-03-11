@@ -39,9 +39,13 @@ def get_cabal_project_dir_of_view(view):
     syntax_file_for_view = view.settings().get('syntax').lower()
     if 'haskell' not in syntax_file_for_view:
         return None
+    return get_cabal_project_dir_of_file(file_shown_in_view)
+
+def get_cabal_project_dir_of_file(filename):
+    """Return the path to the .cabal file project for the specified file."""
     # Check that a .cabal file is present:
-    cabal_file_path = find_file_in_parent_dir(
-        os.path.dirname(file_shown_in_view), '*.cabal')
+    directory_of_file = os.path.dirname(filename)
+    cabal_file_path = find_file_in_parent_dir(directory_of_file, '*.cabal')
     if cabal_file_path is None:
         return None
     # Return the directory containing the .cabal file:
