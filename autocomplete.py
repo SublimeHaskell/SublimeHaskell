@@ -81,8 +81,6 @@ class InspectorAgent(threading.Thread):
                     cabal_dirs.append(d)
             # Eliminate duplicate project directories:
             cabal_dirs = list(set(cabal_dirs))
-            log('agent: files to inspect: ' + str(files_to_reinspect))
-            log('agent: dirs to inspect: ' + str(cabal_dirs))
             for d in cabal_dirs:
                 self._refresh_all_module_info(d)
             time.sleep(AGENT_SLEEP_DURATION)
@@ -131,10 +129,7 @@ class InspectorAgent(threading.Thread):
         if CHECK_MTIME:
             inspection_time = self._get_inspection_time_of_file(filename)
             if modification_time <= inspection_time:
-                log('skipping inspection; module info is up to date ({0})'.format(
-                    filename))
                 return
-        log('inspecting module ({0})'.format(filename))
         exit_code, stdout, stderr = call_and_wait(
             [MODULE_INSPECTOR_EXE_PATH, filename])
         if exit_code == 0:
