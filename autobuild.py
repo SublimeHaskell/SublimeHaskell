@@ -81,7 +81,8 @@ def mark_errors_in_views(errors):
     for e in errors:
         # Convert line and column count to zero-based indices:
         point = active_view.text_point(e.line - 1, e.column - 1)
-        region = active_view.full_line(point)
+        region = active_view.line(point)
+        region = trim_region(active_view, region)
         if (e.is_warning):
             warning_regions.append(region)
         else:
@@ -134,6 +135,23 @@ def parse_error_messages(text):
             column,
             clean_whitespace(messy_details)))
     return messages
+
+def trim_region(view, region):
+    "Return the specified Region, but without leading or trailing whitespace."
+    text = view.substr(region)
+    # Regions may be selected backwards, so b could be less than a.
+    a = min(region.a, region.b)
+    b = max(region.a, region.b)
+    # Figure out how much to move the endpoints to lose the space.
+    # If the region is entirely whitespace, give up and return it unchanged.
+    if text.isspace():
+        return region
+    else:
+        text_trimmed_on_left = text.lstrip()
+        text_trimmed = text_trimmed_on_left.rstrip()
+        a += len(text) - len(text_trimmed_on_left)
+        b -= len(text_trimmed_on_left) - len(text_trimmed)
+        return sublime.Region(a, b)
 
 def clean_whitespace(text):
     """Remove leading and trailing whitespace, plus replaces any interior 
