@@ -48,6 +48,15 @@ class ErrorMessage(object):
             self.column,
             self.message)
 
+    def find_region_in_view(self, view):
+        "Return the Region referred to by this error message."
+        # Convert line and column count to zero-based indices:
+        point = view.text_point(self.line - 1, self.column - 1)
+        # Return the whole line:
+        region = view.line(point)
+        region = trim_region(view, region)
+        return region
+
 def wait_for_build_to_complete(view, cabal_project_dir):
     """Start 'cabal build', wait for it to complete, then parse and diplay
     the resulting errors."""
@@ -79,10 +88,7 @@ def mark_errors_in_views(errors):
     warning_regions = []
     log('processing {0} messages...'.format(len(errors)))
     for e in errors:
-        # Convert line and column count to zero-based indices:
-        point = active_view.text_point(e.line - 1, e.column - 1)
-        region = active_view.line(point)
-        region = trim_region(active_view, region)
+        region = e.find_region_in_view(active_view)
         if (e.is_warning):
             warning_regions.append(region)
         else:
