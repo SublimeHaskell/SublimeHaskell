@@ -1,19 +1,18 @@
 TODO
 ====
 
-* Write README file describing prerequisites and features
 * Check that external binaries exist (cabal, ghc, HLint, ...) before trying to run them
 * Add "go to definition" (alt-click)
 * Add "find all references"
 * Add HLint support
 
-Error checking
---------------
+Autobuild (error checking)
+---------
+* Check for syntax errors in the current file before trying to build (use the ModuleInspector)
 * Add a syntax definition for the error panel format, so that error messages are highlighted
 * Highlight errors and warnings in the view showing that file instead of all in the current view
 * Run "cabal configure" when necessary
 * Highlight partial, "bottom"-valued, and unsafe functions: head, undefined, error, etc.
-* Trim highlighting to exclude leading and trailing whitespace on lines
 
 Autocomplete
 ------------
@@ -22,11 +21,12 @@ Autocomplete
 * Get all the modules imported into the current file
 * Somehow include Prelude and library functions
   * Hard-coded? (.sublime-completions file)
-* Feature request: multiline tooltip next to the autocomplete list that shows details of the selected completion
+* Feature request: multiline tooltip next to the autocomplete list to show details of the selected completion
   * List type (a -> b, data, newtype, class, ...) for each suggestion
-  * Details: namespace, type, ...
-* Inspect modules asynchronously
+  * Namespace
+  * Docstring
 * Automatically inspect Haskell source files when they are opened
+* Delete entries from the module info cache when files are deleted
 
 Syntax highlighting
 -------------------
