@@ -5,6 +5,12 @@ TODO
 * Add "go to definition" (alt-click)
 * Add "find all references"
 * Add HLint support
+* Make ModuleInspector an uploaded Cabal package
+  * Give it a better name
+  * Add useful command-line options:
+    * version: mostly to make sure it exists
+    * inspect: produce summary of a module's declarations as JSON
+  * See if the buildwrapper package could be used instead
 
 Autobuild (error checking)
 ---------
@@ -19,6 +25,7 @@ Autocomplete
 * Get export list of each module:
   * Either read explicit export list, or, if implicit, include all the declarations
 * Get all the modules imported into the current file
+* Find the declarations of constructors, record fields, class functions, and other non-top-level declarations
 * Somehow include Prelude and library functions
   * Hard-coded? (.sublime-completions file)
 * Feature request: multiline tooltip next to the autocomplete list to show details of the selected completion
