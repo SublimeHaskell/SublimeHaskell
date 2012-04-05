@@ -3,3 +3,5 @@ syntax: glob
 *.cache
 obj/
 *.exe
+*.sublime-workspace
+*.sublime-project
