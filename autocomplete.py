@@ -1,12 +1,13 @@
 import json
 import os
+import re
 import sublime
 import sublime_plugin
 import subprocess
 import threading
 import time
 
-from sublime_haskell_common import PACKAGE_PATH, get_cabal_project_dir_of_file, get_cabal_project_dir_of_view, call_and_wait, log
+from sublime_haskell_common import PACKAGE_PATH, get_cabal_project_dir_of_file, get_cabal_project_dir_of_view, call_and_wait, call_ghcmod_and_wait, log
 
 # Completion text longer than this is ellipsized:
 MAX_COMPLETION_LENGTH = 37
@@ -23,24 +24,86 @@ OUTPUT_PATH = os.path.join(PACKAGE_PATH, 'module_info.cache')
 # The agent sleeps this long between inspections.
 AGENT_SLEEP_DURATION = 5.0
 
+# Checks if we are in a LANGUAGE pragma.
+LANGUAGE_RE = re.compile(r'.*{-#\s+LANGUAGE.*')
+
+# Checks if we are in an import statement.
+IMPORT_RE = re.compile(r'.*import(\s+qualified)?\s+')
+IMPORT_QUALIFIED_POSSIBLE_RE = re.compile(r'.*import\s+(?P<qualifiedprefix>\S*)$')
+
+
+def get_line_contents(view, location):
+    """
+    Returns the contents of the line at the given location.
+    """
+    return view.substr(sublime.Region(view.line(location).a, location))
+
+
 class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
     def __init__(self):
         # TODO: Start the InspectorAgent as a separate thread.
         self.inspector = InspectorAgent()
         self.inspector.start()
 
+        self.language_completions = []
+
+        self.init_ghcmod_completions()
+
+    # Gets available LANGUAGE options and import modules from ghc-mod
+    def init_ghcmod_completions(self):
+        # Init LANGUAGE completions
+        self.language_completions = call_ghcmod_and_wait(['lang']).split('\n')
+        log("Read LANGUAGE completions from ghc-mod")
+
+        # Init import module completion
+        self.module_completions = call_ghcmod_and_wait(['list']).split('\n')
+
+    def get_special_completions(self, view, prefix, locations):
+
+        # Contents of the current line up to the cursor
+        line_contents = get_line_contents(view, locations[0])
+
+        # Autocompletion for LANGUAGE pragmas
+        # TODO handle multiple selections
+        match_language = LANGUAGE_RE.match(line_contents)
+        if match_language:
+            return [ (unicode(c),) * 2 for c in self.language_completions ]
+
+        # Autocompletion for import statements
+        match_import = IMPORT_RE.match(line_contents)
+        if match_import:
+            import_completions = [ (unicode(c),) * 2 for c in self.module_completions ]
+
+            # Right after "import "? Propose "qualified" as well!
+            qualified_match = IMPORT_QUALIFIED_POSSIBLE_RE.match(line_contents)
+            if qualified_match:
+                qualified_prefix = qualified_match.group('qualifiedprefix')
+                if qualified_prefix == "" or "qualified".startswith(qualified_prefix):
+                    import_completions.insert(0, (u"qualified", "qualified "))
+
+            return import_completions
+
+        return None
+
     def on_query_completions(self, view, prefix, locations):
         begin_time = time.clock()
         # Only suggest symbols if the current file is part of a Cabal project.
         # TODO: Only suggest symbols from within this project.
-        completions = []
+
         cabal_dir = get_cabal_project_dir_of_view(view)
         if cabal_dir is not None:
-            completions = self.inspector.get_completions(view.file_name())
+
+            completions = self.get_special_completions(view, prefix, locations)
+
+            if not completions:
+                completions = self.inspector.get_completions(view.file_name())
+
             # Only report the performance if completions are actually provided:
             end_time = time.clock()
             log('time to get completions: {0} seconds'.format(end_time - begin_time))
-        return completions
+            return completions
+
+        return []
 
     def on_post_save(self, view):
         filename = view.file_name()
@@ -51,7 +114,7 @@ class InspectorAgent(threading.Thread):
     def __init__(self):
         # Call the superclass constructor:
         super(InspectorAgent, self).__init__()
-        # Make this thread daemonic so that it won't prevent the program 
+        # Make this thread daemonic so that it won't prevent the program
         # from exiting.
         self.daemon = True
         # Module info:
