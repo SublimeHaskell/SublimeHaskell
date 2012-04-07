@@ -98,7 +98,6 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             if not completions:
                 completions = self.inspector.get_completions(view.file_name())
 
-            # Only report the performance if completions are actually provided:
             end_time = time.clock()
             log('time to get completions: {0} seconds'.format(end_time - begin_time))
             return completions
