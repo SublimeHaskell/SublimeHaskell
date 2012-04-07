@@ -63,10 +63,14 @@ def wait_for_build_to_complete(view, cabal_project_dir):
     exit_code, stdout, stderr = call_and_wait(
         ['cabal', 'build'],
         cwd=cabal_project_dir)
+    success = exit_code == 0
     # The process has terminated; parse and display the output:
     parsed_messages = parse_error_messages(cabal_project_dir, stderr)
-    error_messages = '\n'.join([str(x) for x in parsed_messages])
-    success_message = 'SUCCEEDED' if exit_code == 0 else 'FAILED'
+    if parsed_messages:
+        error_messages = '\n'.join([str(x) for x in parsed_messages])
+    else:
+        error_messages = stderr
+    success_message = 'SUCCEEDED' if success else 'FAILED'
     output = '{0}\n\nBuild {1}'.format(error_messages, success_message)
     # Use set_timeout() so that the call occurs on the main Sublime thread:
     callback = functools.partial(write_output, view, output, cabal_project_dir)
