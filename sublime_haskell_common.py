@@ -9,15 +9,24 @@ PACKAGE_PATH = os.path.join(sublime.packages_path(), 'SublimeHaskell')
 def call_and_wait(command, **popen_kwargs):
     """Run the specified command, block until it completes, and return
     the exit code, stdout, and stderr.
+    Extends os.environment['PATH'] with the 'add_to_PATH' setting.
     Additional parameters to Popen can be specified as keyword parameters."""
     if subprocess.mswindows:
         startupinfo = subprocess.STARTUPINFO()
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         popen_kwargs['startupinfo'] = startupinfo
+
+    # For the subprocess, extend the env PATH to include the 'add_to_PATH' setting.
+    extended_env = dict(os.environ)
+    PATH = os.getenv('PATH') or ""
+    add_to_path = get_setting('add_to_PATH', [])
+    extended_env['PATH'] = ':'.join(add_to_path + [PATH])
+
     process = subprocess.Popen(
         command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        env=extended_env,
         **popen_kwargs)
     stdout, stderr = process.communicate()
     exit_code = process.wait()

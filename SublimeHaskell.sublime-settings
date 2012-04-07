@@ -1,2 +1,5 @@
 {
+	// Extra directories to be added to the front of the PATH environment variable.
+	// Specify this for using custom ghc, cabal, and ghc-mod
+	"add_to_PATH": []
 }
