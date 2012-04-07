@@ -12,5 +12,13 @@
         {
             "file": "${packages}/User/SublimeHaskell.sublime-settings"
         }
+    },
+    {
+        "caption": "SublimeHaskell: Show type",
+        "command": "haskell_show_type"
+    },
+    {
+        "caption": "SublimeHaskell: Insert type",
+        "command": "haskell_insert_type"
     }
 ]

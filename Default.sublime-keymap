@@ -1,2 +1,12 @@
 [
+	{
+		"command": "haskell_show_type",
+		"context": "source.haskell",
+		"keys": ["ctrl+h", "ctrl+t"]
+	},
+	{
+		"command": "haskell_insert_type",
+		"context": "source.haskell",
+		"keys": ["ctrl+h", "ctrl+i"]
+	}
 ]
