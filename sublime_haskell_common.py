@@ -76,3 +76,9 @@ def are_paths_equal(path, other_path):
     path = os.path.abspath(path)
     other_path = os.path.abspath(other_path)
     return path == other_path
+
+def get_settings():
+    return sublime.load_settings("SublimeHaskell.sublime-settings")
+
+def get_setting(key, default=None):
+    return get_settings().get(key, default)

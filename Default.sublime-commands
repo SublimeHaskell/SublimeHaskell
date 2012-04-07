@@ -1,0 +1,16 @@
+[
+    {
+        "caption": "Preferences: SublimeHaskell Settings – Default",
+        "command": "open_file", "args":
+        {
+            "file": "${packages}/SublimeHaskell/SublimeHaskell.sublime-settings"
+        }
+    },
+    {
+        "caption": "Preferences: SublimeHaskell Settings – User",
+        "command": "open_file", "args":
+        {
+            "file": "${packages}/User/SublimeHaskell.sublime-settings"
+        }
+    }
+]
