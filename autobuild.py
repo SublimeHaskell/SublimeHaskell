@@ -85,6 +85,9 @@ def mark_errors_in_views(errors):
     for w in sublime.windows():
         for v in w.views():
             view_filename = v.file_name()
+            # Unsaved files have no file name
+            if view_filename is None:
+                continue
             errors_in_view = filter(
                 lambda x: are_paths_equal(view_filename, x.filename),
                 errors)
