@@ -64,7 +64,7 @@ def wait_for_build_to_complete(view, cabal_project_dir):
         ['cabal', 'build'],
         cwd=cabal_project_dir)
     # The process has terminated; parse and display the output:
-    parsed_messages = parse_error_messages(stderr)
+    parsed_messages = parse_error_messages(cabal_project_dir, stderr)
     error_messages = '\n'.join([str(x) for x in parsed_messages])
     success_message = 'SUCCEEDED' if exit_code == 0 else 'FAILED'
     output = '{0}\n\nBuild {1}'.format(error_messages, success_message)
@@ -76,34 +76,43 @@ def wait_for_build_to_complete(view, cabal_project_dir):
 
 def mark_errors_in_views(errors):
     "Mark the regions in open views where errors were found."
+    begin_time = time.clock()
+    # Mark each diagnostic in each open view in all windows:
+    for w in sublime.windows():
+        for v in w.views():
+            view_filename = v.file_name()
+            errors_in_view = filter(
+                lambda x: are_paths_equal(view_filename, x.filename),
+                errors)
+            mark_errors_in_this_view(errors_in_view, v)
+    end_time = time.clock()
+    log('total time to mark {0} diagnostics: {1} seconds'.format(
+        len(errors), end_time - begin_time))
+    
+def mark_errors_in_this_view(errors, view):
     WARNING_REGION_KEY = 'subhs-warnings'
     ERROR_REGION_KEY = 'subhs-errors'
-    active_view = sublime.active_window().active_view()
     # Clear old regions:
-    active_view.erase_regions(WARNING_REGION_KEY)
-    active_view.erase_regions(ERROR_REGION_KEY)
+    view.erase_regions(WARNING_REGION_KEY)
+    view.erase_regions(ERROR_REGION_KEY)
     # Add all error and warning regions in this view.
-    # TODO: Mark all views that are open in any window.
     error_regions = []
     warning_regions = []
-    log('processing {0} messages...'.format(len(errors)))
     for e in errors:
-        region = e.find_region_in_view(active_view)
+        region = e.find_region_in_view(view)
         if (e.is_warning):
             warning_regions.append(region)
         else:
             error_regions.append(region)
     # Mark warnings:
-    log('marking {0} warnings...'.format(len(warning_regions)))
-    active_view.add_regions(
+    view.add_regions(
         WARNING_REGION_KEY,
         warning_regions,
         'invalid.warning',
         'grey_x',
         sublime.DRAW_OUTLINED)
     # Mark errors:
-    log('marking {0} errors...'.format(len(error_regions)))
-    active_view.add_regions(
+    view.add_regions(
         ERROR_REGION_KEY,
         error_regions,
         'invalid',
@@ -129,14 +138,15 @@ def write_output(view, text, cabal_project_dir):
     # Show the results panel:
     view.window().run_command('show_panel', {'panel': 'output.' + PANEL_NAME})
 
-def parse_error_messages(text):
+def parse_error_messages(base_dir, text):
     "Parse text into a list of ErrorMessage objects."
     matches = error_output_regex.finditer(text)
     messages = []
     for m in matches:
         filename, line, column, messy_details = m.groups()
         messages.append(ErrorMessage(
-            filename,
+            # Record the absolute, normalized path.
+            os.path.normpath(os.path.join(base_dir, filename)),
             line,
             column,
             clean_whitespace(messy_details)))
