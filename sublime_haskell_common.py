@@ -108,4 +108,5 @@ def call_ghcmod_and_wait(arg_list):
 
     except OSError, e:
         if e.errno == errno.ENOENT:
-            sublime.error_message("SublimeHaskell: ghc-mod was not found!")
+            sublime.error_message("SublimeHaskell: ghc-mod was not found!\n"
+                + "Try adjusting the 'add_to_PATH' setting.")
