@@ -7,7 +7,7 @@ import subprocess
 import threading
 import time
 
-from sublime_haskell_common import PACKAGE_PATH, get_cabal_project_dir_of_file, get_cabal_project_dir_of_view, call_and_wait, call_ghcmod_and_wait, log
+from sublime_haskell_common import PACKAGE_PATH, get_setting, get_cabal_project_dir_of_file, get_cabal_project_dir_of_view, call_and_wait, call_ghcmod_and_wait, log
 
 # Completion text longer than this is ellipsized:
 MAX_COMPLETION_LENGTH = 37
@@ -64,24 +64,26 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         line_contents = get_line_contents(view, locations[0])
 
         # Autocompletion for LANGUAGE pragmas
-        # TODO handle multiple selections
-        match_language = LANGUAGE_RE.match(line_contents)
-        if match_language:
-            return [ (unicode(c),) * 2 for c in self.language_completions ]
+        if get_setting('auto_complete_language_pragmas'):
+            # TODO handle multiple selections
+            match_language = LANGUAGE_RE.match(line_contents)
+            if match_language:
+                return [ (unicode(c),) * 2 for c in self.language_completions ]
 
         # Autocompletion for import statements
-        match_import = IMPORT_RE.match(line_contents)
-        if match_import:
-            import_completions = [ (unicode(c),) * 2 for c in self.module_completions ]
+        if get_setting('auto_complete_imports'):
+            match_import = IMPORT_RE.match(line_contents)
+            if match_import:
+                import_completions = [ (unicode(c),) * 2 for c in self.module_completions ]
 
-            # Right after "import "? Propose "qualified" as well!
-            qualified_match = IMPORT_QUALIFIED_POSSIBLE_RE.match(line_contents)
-            if qualified_match:
-                qualified_prefix = qualified_match.group('qualifiedprefix')
-                if qualified_prefix == "" or "qualified".startswith(qualified_prefix):
-                    import_completions.insert(0, (u"qualified", "qualified "))
+                # Right after "import "? Propose "qualified" as well!
+                qualified_match = IMPORT_QUALIFIED_POSSIBLE_RE.match(line_contents)
+                if qualified_match:
+                    qualified_prefix = qualified_match.group('qualifiedprefix')
+                    if qualified_prefix == "" or "qualified".startswith(qualified_prefix):
+                        import_completions.insert(0, (u"qualified", "qualified "))
 
-            return import_completions
+                return import_completions
 
         return None
 

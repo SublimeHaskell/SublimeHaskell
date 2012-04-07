@@ -1,4 +1,10 @@
 {
+	// Enable auto completion of module imports
+	"auto_complete_imports": true,
+
+	// Enable auto completion of LANGUAGE pragmas
+	"auto_complete_language_pragmas": true,
+
 	// Extra directories to be added to the front of the PATH environment variable.
 	// Specify this for using custom ghc, cabal, and ghc-mod
 	"add_to_PATH": []
