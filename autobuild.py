@@ -10,6 +10,8 @@ import time
 
 from sublime_haskell_common import get_cabal_project_dir_of_view, call_and_wait, log, are_paths_equal
 
+ERROR_PANEL_NAME = 'haskell_error_checker'
+
 # This regex matches an unindented line, followed by zero or more
 # indented, non-empty lines.
 # The first line is divided into a filename, a line number, and a column.
@@ -27,7 +29,8 @@ class SublimeHaskellAutobuild(sublime_plugin.EventListener):
         cabal_project_dir = get_cabal_project_dir_of_view(view)
         if cabal_project_dir is not None:
             # On another thread, wait for the build to finish.
-            write_output(view, 'Rebuilding...', cabal_project_dir)
+            # write_output(view, 'Rebuilding...', cabal_project_dir)
+            sublime.status_message('Rebuilding Haskell...')
             thread = Thread(
                 target=wait_for_build_to_complete,
                 args=(view, cabal_project_dir))
@@ -79,6 +82,12 @@ def wait_for_build_to_complete(view, cabal_project_dir):
     callback = functools.partial(mark_errors_in_views, parsed_messages)
     sublime.set_timeout(callback, 0)
 
+    # Hide output panel on success
+    # TODO make this an option
+    if success:
+        sublime.set_timeout(lambda: hide_output(view), 0)
+        sublime.status_message("Rebuilding Haskell successful")
+
 def mark_errors_in_views(errors):
     "Mark the regions in open views where errors were found."
     begin_time = time.clock()
@@ -129,8 +138,7 @@ def mark_errors_in_this_view(errors, view):
 
 def write_output(view, text, cabal_project_dir):
     "Write text to Sublime's output panel."
-    PANEL_NAME = 'haskell_error_checker'
-    output_view = view.window().get_output_panel(PANEL_NAME)
+    output_view = view.window().get_output_panel(ERROR_PANEL_NAME)
     output_view.set_read_only(False)
     # Configure Sublime's error message parsing:
     output_view.settings().set("result_file_regex", result_file_regex)
@@ -144,7 +152,10 @@ def write_output(view, text, cabal_project_dir):
     output_view.sel().add(sublime.Region(0))
     output_view.set_read_only(True)
     # Show the results panel:
-    view.window().run_command('show_panel', {'panel': 'output.' + PANEL_NAME})
+    view.window().run_command('show_panel', {'panel': 'output.' + ERROR_PANEL_NAME})
+
+def hide_output(view):
+    view.window().run_command('hide_panel', {'panel': 'output.' + ERROR_PANEL_NAME})
 
 def parse_error_messages(base_dir, text):
     "Parse text into a list of ErrorMessage objects."
