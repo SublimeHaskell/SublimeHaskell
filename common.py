@@ -70,3 +70,9 @@ def find_file_in_parent_dir(subdirectory, filename_pattern):
         # Check to see if we have reached the root directory:
         if last_dir == current_dir:
             return None
+
+def are_paths_equal(path, other_path):
+    "Test whether filesystem paths are equal."
+    path = os.path.abspath(path)
+    other_path = os.path.abspath(other_path)
+    return path == other_path
