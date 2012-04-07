@@ -1,4 +1,3 @@
-from common import *
 import json
 import os
 import sublime
@@ -6,6 +5,8 @@ import sublime_plugin
 import subprocess
 import threading
 import time
+
+from sublime_haskell_common import PACKAGE_PATH, get_cabal_project_dir_of_file, get_cabal_project_dir_of_view, call_and_wait, log
 
 # Completion text longer than this is ellipsized:
 MAX_COMPLETION_LENGTH = 37

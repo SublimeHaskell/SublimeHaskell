@@ -1,4 +1,3 @@
-from common import *
 import fnmatch
 import functools
 import os
@@ -8,6 +7,8 @@ import sublime_plugin
 import subprocess
 from threading import Thread
 import time
+
+from sublime_haskell_common import get_cabal_project_dir_of_view, call_and_wait, log, are_paths_equal
 
 # This regex matches an unindented line, followed by zero or more
 # indented, non-empty lines.
