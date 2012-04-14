@@ -1,0 +1,18 @@
+{
+	"scope": "source.haskell",
+
+	"completions":
+	[
+		"class",
+		"deriving",
+		"instance",
+		"LANGUAGE",
+		"module",
+		"newtype",
+		"qualified",
+		"type",
+		"undefined",
+		"where",
+		{ "trigger": "import", "contents": "import $0" }
+	]
+}
