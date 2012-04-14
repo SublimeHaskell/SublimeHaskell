@@ -20,7 +20,7 @@ error_output_regex = re.compile(
     re.MULTILINE)
 
 # Extract the filename, line, column, and description from an error message:
-result_file_regex = r'^(\S*?): line (\d+), column (\d+): (.*)$'
+result_file_regex = r'^(\S*?): line (\d+), column (\d+):$'
 
 class SublimeHaskellAutobuild(sublime_plugin.EventListener):
     def on_post_save(self, view):
@@ -46,7 +46,8 @@ class ErrorMessage(object):
         self.is_warning = 'warning' in message.lower()
 
     def __str__(self):
-        return '{0}: line {1}, column {2}: {3}'.format(
+        # must match result_file_regex
+        return '{0}: line {1}, column {2}:\n  {3}'.format(
             self.filename,
             self.line,
             self.column,
@@ -160,16 +161,17 @@ def hide_output(view):
 def parse_error_messages(base_dir, text):
     "Parse text into a list of ErrorMessage objects."
     matches = error_output_regex.finditer(text)
-    messages = []
-    for m in matches:
+
+    def to_error(m):
         filename, line, column, messy_details = m.groups()
-        messages.append(ErrorMessage(
+        return ErrorMessage(
             # Record the absolute, normalized path.
             os.path.normpath(os.path.join(base_dir, filename)),
             line,
             column,
-            clean_whitespace(messy_details)))
-    return messages
+            messy_details.strip())
+
+    return map(to_error, matches)
 
 def trim_region(view, region):
     "Return the specified Region, but without leading or trailing whitespace."
@@ -187,10 +189,3 @@ def trim_region(view, region):
         a += len(text) - len(text_trimmed_on_left)
         b -= len(text_trimmed_on_left) - len(text_trimmed)
         return sublime.Region(a, b)
-
-def clean_whitespace(text):
-    """Remove leading and trailing whitespace, plus replaces any interior 
-    whitespace with a single space."""
-    text = text.strip()
-    text = re.sub('\s+', ' ', text)
-    return text
