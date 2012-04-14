@@ -24,7 +24,7 @@ def parse_ghc_mod_type_line(l):
     match = GHCMOD_TYPE_LINE_RE.match(l)
     return match and match.groupdict()
 
-
+# TODO rename to SublimeHaskellShowTypeCommand
 class HaskellShowTypeCommand(sublime_plugin.TextCommand):
     def ghcmod_get_type_of_cursor(self):
         view = self.view
