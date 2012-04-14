@@ -29,7 +29,6 @@ class SublimeHaskellAutobuild(sublime_plugin.EventListener):
         cabal_project_dir = get_cabal_project_dir_of_view(view)
         if cabal_project_dir is not None:
             # On another thread, wait for the build to finish.
-            # write_output(view, 'Rebuilding...', cabal_project_dir)
             sublime.status_message('Rebuilding Haskell...')
             thread = Thread(
                 target=wait_for_build_to_complete,
