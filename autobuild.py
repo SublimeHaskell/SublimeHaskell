@@ -24,7 +24,7 @@ result_file_regex = r'^(\S*?): line (\d+), column (\d+):$'
 
 class SublimeHaskellAutobuild(sublime_plugin.EventListener):
     def on_post_save(self, view):
-        # If the edited file was Haskell code within a cabal project, try to 
+        # If the edited file was Haskell code within a cabal project, try to
         # compile it.
         cabal_project_dir = get_cabal_project_dir_of_view(view)
         if cabal_project_dir is not None:
@@ -44,9 +44,9 @@ class ErrorMessage(object):
         self.message = message
         self.is_warning = 'warning' in message.lower()
 
-    def __str__(self):
+    def __unicode__(self):
         # must match result_file_regex
-        return '{0}: line {1}, column {2}:\n  {3}'.format(
+        return u'{0}: line {1}, column {2}:\n  {3}'.format(
             self.filename,
             self.line,
             self.column,
@@ -67,15 +67,20 @@ def wait_for_build_to_complete(view, cabal_project_dir):
     exit_code, stdout, stderr = call_and_wait(
         ['cabal', 'build'],
         cwd=cabal_project_dir)
+
+    # stderr/stdout can contain unicode characters
+    stdout = stderr.decode('utf-8')
+    stderr = stderr.decode('utf-8')
+
     success = exit_code == 0
     # The process has terminated; parse and display the output:
     parsed_messages = parse_error_messages(cabal_project_dir, stderr)
     if parsed_messages:
-        error_messages = '\n'.join([str(x) for x in parsed_messages])
+        error_messages = u'\n'.join(unicode(x) for x in parsed_messages)
     else:
         error_messages = stderr
     success_message = 'SUCCEEDED' if success else 'FAILED'
-    output = '{0}\n\nBuild {1}'.format(error_messages, success_message)
+    output = u'{0}\n\nBuild {1}'.format(error_messages, success_message)
     # Use set_timeout() so that the call occurs on the main Sublime thread:
     callback = functools.partial(write_output, view, output, cabal_project_dir)
     sublime.set_timeout(callback, 0)
@@ -105,7 +110,7 @@ def mark_errors_in_views(errors):
     end_time = time.clock()
     log('total time to mark {0} diagnostics: {1} seconds'.format(
         len(errors), end_time - begin_time))
-    
+
 def mark_errors_in_this_view(errors, view):
     WARNING_REGION_KEY = 'subhs-warnings'
     ERROR_REGION_KEY = 'subhs-errors'
