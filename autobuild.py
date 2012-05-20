@@ -64,6 +64,10 @@ class ErrorMessage(object):
 def wait_for_build_to_complete(view, cabal_project_dir):
     """Start 'cabal build', wait for it to complete, then parse and diplay
     the resulting errors."""
+
+    # First hide error panel to show that something is going on
+    sublime.set_timeout(lambda: hide_output(view), 0)
+
     exit_code, stdout, stderr = call_and_wait(
         ['cabal', 'build'],
         cwd=cabal_project_dir)
@@ -73,6 +77,7 @@ def wait_for_build_to_complete(view, cabal_project_dir):
     stderr = stderr.decode('utf-8')
 
     success = exit_code == 0
+
     # The process has terminated; parse and display the output:
     parsed_messages = parse_error_messages(cabal_project_dir, stderr)
     if parsed_messages:
@@ -82,16 +87,16 @@ def wait_for_build_to_complete(view, cabal_project_dir):
     success_message = 'SUCCEEDED' if success else 'FAILED'
     output = u'{0}\n\nBuild {1}'.format(error_messages, success_message)
     # Use set_timeout() so that the call occurs on the main Sublime thread:
-    callback = functools.partial(write_output, view, output, cabal_project_dir)
-    sublime.set_timeout(callback, 0)
     callback = functools.partial(mark_errors_in_views, parsed_messages)
     sublime.set_timeout(callback, 0)
 
-    # Hide output panel on success
     # TODO make this an option
     if success:
-        sublime.set_timeout(lambda: hide_output(view), 0)
         sublime.status_message("Rebuilding Haskell successful")
+    else:
+        callback = functools.partial(write_output, view, output, cabal_project_dir)
+        sublime.set_timeout(callback, 0)
+
 
 def mark_errors_in_views(errors):
     "Mark the regions in open views where errors were found."
