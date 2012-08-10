@@ -189,6 +189,8 @@ class InspectorAgent(threading.Thread):
         "Rebuild module information for the specified file."
         # TODO: Only do this within Haskell files in Cabal projects.
         # TODO: Skip this file if it hasn't changed since it was last inspected.
+        # TODO: Currently the ModuleInspector only delivers top-level functions
+        #       with hand-written type signatures. This code should make that clear.
         # If the file hasn't changed since it was last inspected, do nothing:
         modification_time = os.stat(filename).st_mtime
         if CHECK_MTIME:

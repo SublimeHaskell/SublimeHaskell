@@ -1,4 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
+
+-- Currently only exports top-level functions with handwritten
+-- type signature.
 module Main where
 
 import qualified Data.Aeson as Json
