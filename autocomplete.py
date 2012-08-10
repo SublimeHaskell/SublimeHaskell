@@ -134,6 +134,7 @@ class InspectorAgent(threading.Thread):
 
     def run(self):
         # Compile the ModuleInspector:
+        sublime.status_message('Compiling Haskell ModuleInspector...')
         exit_code, out, err = call_and_wait(['ghc',
             '--make', MODULE_INSPECTOR_SOURCE_PATH,
             '-o', MODULE_INSPECTOR_EXE_PATH,
