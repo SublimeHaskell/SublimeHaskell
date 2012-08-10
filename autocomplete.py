@@ -31,6 +31,9 @@ LANGUAGE_RE = re.compile(r'.*{-#\s+LANGUAGE.*')
 IMPORT_RE = re.compile(r'.*import(\s+qualified)?\s+')
 IMPORT_QUALIFIED_POSSIBLE_RE = re.compile(r'.*import\s+(?P<qualifiedprefix>\S*)$')
 
+# Checks if a word contains only alhanums, -, and _
+NO_SPECIAL_CHARS_RE = re.compile(r'^(\w|[\-])*$')
+
 
 def get_line_contents(view, location):
     """
@@ -102,7 +105,11 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 
             end_time = time.clock()
             log('time to get completions: {0} seconds'.format(end_time - begin_time))
-            return completions
+            # Don't put completions with special characters (?, !, ==, etc.)
+            # into completion because that wipes all default Sublime completions:
+            # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
+            # TODO: work around this
+            return [ c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0]) ]
 
         return []
 
