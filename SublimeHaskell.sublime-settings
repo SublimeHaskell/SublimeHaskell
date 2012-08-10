@@ -1,4 +1,9 @@
 {
+	// Enables ghc-mod (you should have it installed,
+	// e.g. via cabal install ghc-mod).
+	// See the add_to_PATH settings to specify a custom location.
+	"enable_ghc_mod": true,
+
 	// Enable auto completion of module imports
 	"auto_complete_imports": true,
 
@@ -7,5 +12,6 @@
 
 	// Extra directories to be added to the front of the PATH environment variable.
 	// Specify this for using custom ghc, cabal, and ghc-mod
+	// Example: /home/user/.cabal/bin
 	"add_to_PATH": []
 }
