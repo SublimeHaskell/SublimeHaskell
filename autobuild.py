@@ -8,7 +8,7 @@ import subprocess
 from threading import Thread
 import time
 
-from sublime_haskell_common import get_cabal_project_dir_of_view, call_and_wait, log, are_paths_equal
+from sublime_haskell_common import get_cabal_project_dir_of_view, call_and_wait, log, are_paths_equal, get_setting
 
 ERROR_PANEL_NAME = 'haskell_error_checker'
 
@@ -30,9 +30,10 @@ class SublimeHaskellAutobuild(sublime_plugin.EventListener):
         if cabal_project_dir is not None:
             # On another thread, wait for the build to finish.
             sublime.status_message('Rebuilding Haskell...')
+            add_to_path = get_setting('add_to_PATH', [])
             thread = Thread(
                 target=wait_for_build_to_complete,
-                args=(view, cabal_project_dir))
+                args=(add_to_path, view, cabal_project_dir))
             thread.start()
 
 class ErrorMessage(object):
@@ -61,7 +62,7 @@ class ErrorMessage(object):
         region = trim_region(view, region)
         return region
 
-def wait_for_build_to_complete(view, cabal_project_dir):
+def wait_for_build_to_complete(add_to_path, view, cabal_project_dir):
     """Start 'cabal build', wait for it to complete, then parse and diplay
     the resulting errors."""
 
@@ -69,6 +70,7 @@ def wait_for_build_to_complete(view, cabal_project_dir):
     sublime.set_timeout(lambda: hide_output(view), 0)
 
     exit_code, stdout, stderr = call_and_wait(
+        add_to_path,
         ['cabal', 'build'],
         cwd=cabal_project_dir)
 
