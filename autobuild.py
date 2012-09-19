@@ -68,7 +68,7 @@ def wait_for_build_to_complete(add_to_path, view, cabal_project_dir):
 
     # First hide error panel to show that something is going on
     sublime.set_timeout(lambda: hide_output(view), 0)
-
+    sublime.set_timeout(lambda: sublime.status_message("Rebuilding Haskell with Cabal"), 0)
     exit_code, stdout, stderr = call_and_wait(
         add_to_path,
         ['cabal', 'build'],
@@ -94,7 +94,7 @@ def wait_for_build_to_complete(add_to_path, view, cabal_project_dir):
 
     # TODO make this an option
     if success:
-        sublime.status_message("Rebuilding Haskell successful")
+        sublime.set_timeout(lambda: sublime.status_message("Rebuilding Haskell successful"), 0);
     else:
         callback = functools.partial(write_output, view, output, cabal_project_dir)
         sublime.set_timeout(callback, 0)
