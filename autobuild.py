@@ -91,7 +91,7 @@ def wait_for_build_to_complete(view, cabal_project_dir):
 
     # TODO make this an option
     if success:
-        sublime.status_message("Rebuilding Haskell successful")
+        sublime.status_message(u"Rebuilding Haskell \u2714")
     else:
         write_output_cb = lambda: write_output(view, output, cabal_project_dir)
         sublime.set_timeout(write_output_cb, 0)
