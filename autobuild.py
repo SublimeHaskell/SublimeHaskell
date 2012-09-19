@@ -64,7 +64,7 @@ class SublimeHaskellAutobuild(sublime_plugin.EventListener):
                 vid = view.id()
 
                 # Only deal with warnings if there are no errors
-                if not ERRORS[vid]:
+                if not ERRORS.get(vid):
                     hide_output(view)
                     warning = WARNINGS.get(vid, {}).get(lineno)
                     if warning:
