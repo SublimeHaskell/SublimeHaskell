@@ -65,7 +65,10 @@ class SublimeHaskellAutobuild(sublime_plugin.EventListener):
 
                 # Only deal with warnings if there are no errors
                 if not ERRORS.get(vid):
-                    hide_output(view)
+                    # We would like to close the panel here when moving away from a warning region,
+                    #     hide_output(view)
+                    # but does not seem to work as it closes *the active panel* (e.g. also find).
+                    # So the user has to close it manually with ESC for now.
                     warning = WARNINGS.get(vid, {}).get(lineno)
                     if warning:
                         write_output(view, unicode(warning), cabal_project_dir)
@@ -207,8 +210,16 @@ def write_output(view, text, cabal_project_dir):
     output_view.set_read_only(True)
     # Show the results panel:
     view.window().run_command('show_panel', {'panel': 'output.' + ERROR_PANEL_NAME})
+    print "  show view", view
+    # view.window().run_command('show_panel', {'panel': 'output.gaga'})
 
 def hide_output(view):
+    # TODO The 'panel' key doesn't appear in the API; most probably, it is ignored,
+    #      and simply the current panel is hidden.
+    # In theory, this should work:
+    #     run_command('show_panel', {'panel': 'output.' + ERROR_PANEL_NAME, 'toggle': True})
+    # but 'toggle' doesn't seem to work on output panels (it works on the 'console' panel).
+    # There doesn't currently seem to be a way to close a panel by name.
     view.window().run_command('hide_panel', {'panel': 'output.' + ERROR_PANEL_NAME})
 
 def parse_error_messages(base_dir, text):
