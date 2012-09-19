@@ -7,7 +7,7 @@ import subprocess
 # The path to where this package is installed:
 PACKAGE_PATH = os.path.join(sublime.packages_path(), 'SublimeHaskell')
 
-def call_and_wait(command, **popen_kwargs):
+def call_and_wait(add_to_path, command, **popen_kwargs):
     """Run the specified command, block until it completes, and return
     the exit code, stdout, and stderr.
     Extends os.environment['PATH'] with the 'add_to_PATH' setting.
@@ -20,7 +20,8 @@ def call_and_wait(command, **popen_kwargs):
     # For the subprocess, extend the env PATH to include the 'add_to_PATH' setting.
     extended_env = dict(os.environ)
     PATH = os.getenv('PATH') or ""
-    add_to_path = get_setting('add_to_PATH', [])
+    # Only the main thread can call 'get_setting'. Call has been hoisted out.
+    # add_to_path = get_setting('add_to_PATH', [])
     extended_env['PATH'] = ':'.join(add_to_path + [PATH])
 
     process = subprocess.Popen(
@@ -99,7 +100,7 @@ def call_ghcmod_and_wait(arg_list):
     Shows a sublime error message if ghc-mod is not available.
     """
     try:
-        exit_code, out, err = call_and_wait(['ghc-mod'] + arg_list)
+        exit_code, out, err = call_and_wait(get_setting('add_to_PATH', []),['ghc-mod'] + arg_list)
 
         if exit_code != 0:
             raise Exception("ghc-mod exited with status %d and stderr: %s" % (exit_code, err))
