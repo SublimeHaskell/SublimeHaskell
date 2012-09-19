@@ -1,5 +1,4 @@
 import fnmatch
-import functools
 import os
 import re
 import sublime
@@ -87,15 +86,15 @@ def wait_for_build_to_complete(view, cabal_project_dir):
     success_message = 'SUCCEEDED' if success else 'FAILED'
     output = u'{0}\n\nBuild {1}'.format(error_messages, success_message)
     # Use set_timeout() so that the call occurs on the main Sublime thread:
-    callback = functools.partial(mark_errors_in_views, parsed_messages)
-    sublime.set_timeout(callback, 0)
+    mark_errors_cb = lambda: mark_errors_in_views(parsed_messages)
+    sublime.set_timeout(mark_errors_cb, 0)
 
     # TODO make this an option
     if success:
         sublime.status_message("Rebuilding Haskell successful")
     else:
-        callback = functools.partial(write_output, view, output, cabal_project_dir)
-        sublime.set_timeout(callback, 0)
+        write_output_cb = lambda: write_output(view, output, cabal_project_dir)
+        sublime.set_timeout(write_output_cb, 0)
 
 
 def mark_errors_in_views(errors):
