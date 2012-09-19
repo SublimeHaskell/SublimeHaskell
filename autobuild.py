@@ -134,8 +134,8 @@ def mark_errors_in_this_view(errors, view):
     view.add_regions(
         WARNING_REGION_KEY,
         warning_regions,
-        'invalid.warning',
-        'grey_x',
+        'comment.warning',
+        'grey_x_light_shadow',
         sublime.DRAW_OUTLINED)
     # Mark errors:
     view.add_regions(
