@@ -56,7 +56,9 @@ class SublimeHaskellAutobuild(sublime_plugin.EventListener):
     def on_selection_modified(self, view):
         cabal_project_dir = get_cabal_project_dir_of_view(view)
 
-        if cabal_project_dir is not None:
+        this_view_has_a_warning = view.id() in WARNINGS
+
+        if cabal_project_dir is not None and this_view_has_a_warning:
             lineno = last_selected_lineno(view)
             if lineno != self.last_selected_lineno:
                 self.last_selected_lineno = lineno
