@@ -11,6 +11,11 @@ from sublime_haskell_common import get_cabal_project_dir_of_view, call_and_wait,
 
 ERROR_PANEL_NAME = 'haskell_error_checker'
 
+# Global mappings { view_id -> { lineno -> error } }, lineno is 0-indexed
+# (inspired by SublimeLinter)
+ERRORS = {}
+WARNINGS = {}
+
 # This regex matches an unindented line, followed by zero or more
 # indented, non-empty lines.
 # The first line is divided into a filename, a line number, and a column.
@@ -21,7 +26,21 @@ error_output_regex = re.compile(
 # Extract the filename, line, column, and description from an error message:
 result_file_regex = r'^(\S*?): line (\d+), column (\d+):$'
 
+
+# From SublineLinter
+def last_selected_lineno(view):
+    viewSel = view.sel()
+    if not viewSel:
+        return None
+    return view.rowcol(viewSel[0].end())[0]
+
+
 class SublimeHaskellAutobuild(sublime_plugin.EventListener):
+
+    def __init__(self):
+        super(SublimeHaskellAutobuild, self).__init__()
+        self.last_selected_lineno = None
+
     def on_post_save(self, view):
         # If the edited file was Haskell code within a cabal project, try to
         # compile it.
@@ -33,6 +52,29 @@ class SublimeHaskellAutobuild(sublime_plugin.EventListener):
                 target=wait_for_build_to_complete,
                 args=(view, cabal_project_dir))
             thread.start()
+
+    def on_selection_modified(self, view):
+        cabal_project_dir = get_cabal_project_dir_of_view(view)
+
+        this_view_has_a_warning = view.id() in WARNINGS
+
+        if cabal_project_dir is not None and this_view_has_a_warning:
+            lineno = last_selected_lineno(view)
+            if lineno != self.last_selected_lineno:
+                self.last_selected_lineno = lineno
+
+                vid = view.id()
+
+                # Only deal with warnings if there are no errors
+                if not ERRORS.get(vid):
+                    # We would like to close the panel here when moving away from a warning region,
+                    #     hide_output(view)
+                    # but does not seem to work as it closes *the active panel* (e.g. also find).
+                    # So the user has to close it manually with ESC for now.
+                    warning = WARNINGS.get(vid, {}).get(lineno)
+                    if warning:
+                        write_output(view, unicode(warning), cabal_project_dir)
+
 
 class ErrorMessage(object):
     "Describe an error or warning message produced by GHC."
@@ -124,6 +166,14 @@ def mark_errors_in_this_view(errors, view):
     # Add all error and warning regions in this view.
     error_regions = []
     warning_regions = []
+
+    # Update global error/warning dicts
+    # TODO this is redundant with the other error lists
+    vid = view.id()
+    # ERRORS, WARNINGS store lines 0-indexed
+    ERRORS[vid] = dict( (e.line - 1, e) for e in errors if not e.is_warning )
+    WARNINGS[vid] = dict( (e.line - 1, e) for e in errors if e.is_warning )
+
     for e in errors:
         region = e.find_region_in_view(view)
         if (e.is_warning):
@@ -162,8 +212,16 @@ def write_output(view, text, cabal_project_dir):
     output_view.set_read_only(True)
     # Show the results panel:
     view.window().run_command('show_panel', {'panel': 'output.' + ERROR_PANEL_NAME})
+    print "  show view", view
+    # view.window().run_command('show_panel', {'panel': 'output.gaga'})
 
 def hide_output(view):
+    # TODO The 'panel' key doesn't appear in the API; most probably, it is ignored,
+    #      and simply the current panel is hidden.
+    # In theory, this should work:
+    #     run_command('show_panel', {'panel': 'output.' + ERROR_PANEL_NAME, 'toggle': True})
+    # but 'toggle' doesn't seem to work on output panels (it works on the 'console' panel).
+    # There doesn't currently seem to be a way to close a panel by name.
     view.window().run_command('hide_panel', {'panel': 'output.' + ERROR_PANEL_NAME})
 
 def parse_error_messages(base_dir, text):
