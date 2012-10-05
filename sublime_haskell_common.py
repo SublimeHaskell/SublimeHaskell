@@ -93,14 +93,14 @@ def get_settings():
 def get_setting(key, default=None):
     return get_settings().get(key, default)
 
-def call_ghcmod_and_wait(arg_list, view):
+def call_ghcmod_and_wait(arg_list, view=None):
     """
     Calls ghc-mod with the given arguments, using the given view for context.
     Shows a sublime error message if ghc-mod is not available.
     """
     try:
-        if view.file_name() and get_cabal_project_dir_of_file(view.file_name()):
-            cwd = get_cabal_project_dir_of_file(view.file_name())
+        if view and view.file_name() and get_cabal_project_dir_of_view(view):
+            cwd = get_cabal_project_dir_of_view(view)
         else:
             cwd = None
 
