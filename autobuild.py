@@ -7,7 +7,7 @@ import subprocess
 from threading import Thread
 import time
 
-from sublime_haskell_common import get_cabal_project_dir_of_view, call_and_wait, log, are_paths_equal
+from sublime_haskell_common import get_cabal_project_dir_of_view, call_and_wait, log, are_paths_equal, get_setting
 
 ERROR_PANEL_NAME = 'haskell_error_checker'
 
@@ -67,8 +67,20 @@ def wait_for_build_to_complete(view, cabal_project_dir):
     # First hide error panel to show that something is going on
     sublime.set_timeout(lambda: hide_output(view), 0)
 
+    args = []
+    if get_setting('use_cabal_dev'):
+        args += ['cabal-dev']
+    else:
+        args += ['cabal']
+
+    args += ['build']
+
+    sand = get_setting('cabal_dev_sandbox')
+    if len(sand) > 0:
+        args += ['-s', sand]
+
     exit_code, stdout, stderr = call_and_wait(
-        ['cabal', 'build'],
+        args,
         cwd=cabal_project_dir)
 
     # stderr/stdout can contain unicode characters

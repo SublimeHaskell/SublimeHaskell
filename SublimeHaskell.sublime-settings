@@ -13,5 +13,11 @@
 	// Extra directories to be added to the front of the PATH environment variable.
 	// Specify this for using custom ghc, cabal, and ghc-mod
 	// Example: /home/user/.cabal/bin
-	"add_to_PATH": []
+	"add_to_PATH": [],
+
+	// Use cabal-dev
+	"use_cabal_dev": false,
+
+	// Sandbox for cabal-dev
+	"cabal_dev_sandbox": ""
 }
