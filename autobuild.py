@@ -77,7 +77,7 @@ def wait_for_build_to_complete(view, cabal_project_dir):
 
     sand = get_setting('cabal_dev_sandbox')
     if len(sand) > 0:
-        args += ['-s=' + sand]
+        args += ['-s', sand]
 
     exit_code, stdout, stderr = call_and_wait(
         args,
