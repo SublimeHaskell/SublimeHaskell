@@ -3,6 +3,7 @@ import sublime_plugin
 import re
 
 from sublime_haskell_common import call_ghcmod_and_wait
+from cabalbuild import is_enabled_haskell_command
 
 # Used to find out the module name.
 MODULE_RE_STR = r'module\s+([^\s\(]*)' # "module" followed by everything that is neither " " nor "("
@@ -78,6 +79,9 @@ class HaskellShowTypeCommand(sublime_plugin.TextCommand):
         output_view.set_read_only(True)
         # Show the results panel:
         view.window().run_command('show_panel', {'panel': 'output.' + TYPE_PANEL_NAME})
+
+    def is_enabled(self):
+        return is_enabled_haskell_command()
 
 
 # Works only with the cursor being in the name of a toplevel function so far.

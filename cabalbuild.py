@@ -82,6 +82,39 @@ class SublimeHaskellCabalDevRebuild(sublime_plugin.WindowCommand):
 	def is_enabled(self):
 		return is_enabled_build_command()
 
+def is_enabled_haskell_command():
+	window = sublime.active_window()
+	if not window:
+		return False
+	view = window.active_view()
+	if view is None:
+		return False
+	file_shown_in_view = view.file_name()
+	if file_shown_in_view is None:
+		return False
+	syntax_file_for_view = view.settings().get('syntax').lower()
+	if 'haskell' not in syntax_file_for_view:
+		return False
+	return True
+
+def is_enabled_build_command():
+	window = sublime.active_window()
+	if not window:
+		return False
+	view = window.active_view()
+	if view is None:
+		return False
+	file_shown_in_view = view.file_name()
+	if file_shown_in_view is None:
+		return False
+	syntax_file_for_view = view.settings().get('syntax').lower()
+	if 'haskell' not in syntax_file_for_view:
+		return False
+	cabal_project_dir = get_cabal_project_dir_of_view(view)
+	if cabal_project_dir is None:
+		return False
+	return True
+
 def run_build_commands_with(msg, cmds):
 	"""Run general build commands"""
 	window = sublime.active_window()
@@ -105,21 +138,3 @@ def run_build_commands_with(msg, cmds):
 def run_build_command_with(msg, cmd):
 	"""Run one command"""
 	run_build_command_with(msg, [cmd])
-
-def is_enabled_build_command():
-	window = sublime.active_window()
-	if not window:
-		return False
-	view = window.active_view()
-	if view is None:
-		return False
-	file_shown_in_view = view.file_name()
-	if file_shown_in_view is None:
-		return False
-	syntax_file_for_view = view.settings().get('syntax').lower()
-	if 'haskell' not in syntax_file_for_view:
-		return False
-	cabal_project_dir = get_cabal_project_dir_of_view(view)
-	if cabal_project_dir is None:
-		return False
-	return True
