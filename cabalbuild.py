@@ -76,7 +76,7 @@ class SublimeHaskellCabalDevConfigure(sublime_plugin.WindowCommand):
 class SublimeHaskellCabalDevRebuild(sublime_plugin.WindowCommand):
 	def run(self):
 		run_build_commands_with(
-			'Cabal: Rebuilding Haskell',
+			'Cabal-Dev: Rebuilding Haskell',
 			[attach_sandbox(s) for s in [['cabal-dev', 'clean'], ['cabal-dev', 'configure'], ['cabal-dev', 'build']]])
 
 	def is_enabled(self):
