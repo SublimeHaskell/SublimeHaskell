@@ -46,6 +46,15 @@ class SublimeHaskellCabalRebuild(sublime_plugin.WindowCommand):
 	def is_enabled(self):
 		return is_enabled_build_command()
 
+class SublimeHaskellCabalInstall(sublime_plugin.WindowCommand):
+	def run(self):
+		run_build_command_with(
+			'Cabal: Installing Haskell',
+			['cabal', 'install'])
+
+	def is_enabled(self):
+		return is_enabled_build_command()
+
 class SublimeHaskellCabalDevBuild(sublime_plugin.WindowCommand):
 	def run(self):
 		run_build_command_with(
@@ -78,6 +87,15 @@ class SublimeHaskellCabalDevRebuild(sublime_plugin.WindowCommand):
 		run_build_commands_with(
 			'Cabal-Dev: Rebuilding Haskell',
 			[attach_sandbox(s) for s in [['cabal-dev', 'clean'], ['cabal-dev', 'configure'], ['cabal-dev', 'build']]])
+
+	def is_enabled(self):
+		return is_enabled_build_command()
+
+class SublimeHaskellCabalDevInstall(sublime_plugin.WindowCommand):
+	def run(self):
+		run_build_command_with(
+			'Cabal-Dev: Installing Haskell',
+			attach_sandbox(['cabal-dev', 'install']))
 
 	def is_enabled(self):
 		return is_enabled_build_command()

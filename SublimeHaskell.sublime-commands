@@ -16,6 +16,10 @@
     "command": "sublime_haskell_cabal_rebuild"
   },
   {
+    "caption": "Cabal: Install",
+    "command": "sublime_haskell_cabal_install"
+  },
+  {
     "caption": "Cabal-Dev: Build",
     "command": "sublime_haskell_cabal_dev_build"
   },
@@ -30,6 +34,10 @@
   {
     "caption": "Cabal-Dev: Rebuild",
     "command": "sublime_haskell_cabal_dev_rebuild"
+  },
+  {
+    "caption": "Cabal-Dev: Install",
+    "command": "sublime_haskell_cabal_dev_install"
   },
   {
     "caption": "SublimeHaskell: Show type",
