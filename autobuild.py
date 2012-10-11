@@ -64,9 +64,10 @@ def run_build_thread(view, cabal_project_dir, msg, cmd):
 
 def run_chain_build_thread(view, cabal_project_dir, msg, cmds):
     sublime.status_message(msg + '...')
+    add_to_path = get_setting('add_to_PATH', [])
     thread = Thread(
         target=wait_for_chain_to_complete,
-        args=(view, cabal_project_dir, msg + u" \u2714", cmds))
+        args=(view, add_to_path, cabal_project_dir, msg + u" \u2714", cmds))
     thread.start()
 
 def current_cabal_build():
@@ -87,13 +88,13 @@ def attach_sandbox(cmd):
         return cmd + ['-s', sand]
     return cmd
 
-def wait_for_build_to_complete(view, cabal_project_dir, msg, cmd):
+def wait_for_build_to_complete(view, add_to_path, cabal_project_dir, msg, cmd):
     """Start 'cabal build', wait for it to complete, then parse and diplay
     the resulting errors."""
 
-    wait_for_chain_to_complete(view, cabal_project_dir, msg, [cmd])
+    wait_for_chain_to_complete(view, add_to_path, cabal_project_dir, msg, [cmd])
 
-def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds):
+def wait_for_chain_to_complete(view, add_to_path, cabal_project_dir, msg, cmds):
     """Chains several commands, wait for them to complete, then parse and display
     the resulting errors."""
 
@@ -103,6 +104,7 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds):
     # run and wait commands, fail on first fail
     for cmd in cmds:
         exit_code, stdout, stderr = call_and_wait(
+            add_to_path,
             cmd,
             cwd=cabal_project_dir)
         if exit_code != 0:
