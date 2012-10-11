@@ -130,7 +130,7 @@ def wait_for_chain_to_complete(view, add_to_path, cabal_project_dir, msg, cmds):
 
     # TODO make this an option
     if success:
-        sublime.status_message(msg)
+        sublime.set_timeout(lambda: sublime.status_message(msg), 0)
     else:
         write_output_cb = lambda: write_output(view, output, cabal_project_dir)
         sublime.set_timeout(write_output_cb, 0)
