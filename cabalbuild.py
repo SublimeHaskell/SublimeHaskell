@@ -137,4 +137,4 @@ def run_build_commands_with(msg, cmds):
 
 def run_build_command_with(msg, cmd):
 	"""Run one command"""
-	run_build_command_with(msg, [cmd])
+	run_build_commands_with(msg, [cmd])
