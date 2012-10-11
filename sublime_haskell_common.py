@@ -35,7 +35,7 @@ def call_and_wait(add_to_path, command, **popen_kwargs):
 def log(message):
     print('Sublime Haskell: {0}'.format(message))
 
-def get_cabal_project_dir_of_view(view):
+def get_cabal_project_dir_and_name_of_view(view):
     """Return the path to the .cabal file project for the source file in the
     specified view. The view must show a saved file, the file must be Haskell
     source code, and the file must be under a directory containing a .cabal file.
@@ -49,17 +49,26 @@ def get_cabal_project_dir_of_view(view):
     syntax_file_for_view = view.settings().get('syntax').lower()
     if 'haskell' not in syntax_file_for_view:
         return None
-    return get_cabal_project_dir_of_file(file_shown_in_view)
+    return get_cabal_project_dir_and_name_of_file(file_shown_in_view)
 
-def get_cabal_project_dir_of_file(filename):
-    """Return the path to the .cabal file project for the specified file."""
+def get_cabal_project_dir_of_view(view):
+    return get_cabal_project_dir_and_name_of_view(view)[0]
+
+def get_cabal_project_dir_and_name_of_file(filename):
+    """Return the path to the .cabal file and name of project for the specified file."""
     # Check that a .cabal file is present:
     directory_of_file = os.path.dirname(filename)
     cabal_file_path = find_file_in_parent_dir(directory_of_file, '*.cabal')
     if cabal_file_path is None:
         return None
     # Return the directory containing the .cabal file:
-    return os.path.dirname(cabal_file_path)
+    project_path, cabal_file = os.path.split(cabal_file_path)
+    project_name = os.path.splitext(cabal_file)[0]
+    return project_path, project_name
+
+def get_cabal_project_dir_of_file(filename):
+    """Return the path to the .cabal file project for the specified file."""
+    return get_cabal_project_dir_and_name_of_file(filename)[0]
 
 def find_file_in_parent_dir(subdirectory, filename_pattern):
     """Look for a file with the specified name in a parent directory of the

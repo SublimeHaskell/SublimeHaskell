@@ -7,7 +7,7 @@ import subprocess
 from threading import Thread
 import time
 
-from sublime_haskell_common import get_cabal_project_dir_of_view, call_and_wait, log, are_paths_equal, get_setting
+from sublime_haskell_common import get_cabal_project_dir_of_view, get_cabal_project_dir_and_name_of_view, call_and_wait, log, are_paths_equal, get_setting
 
 ERROR_PANEL_NAME = 'haskell_error_checker'
 
@@ -28,10 +28,10 @@ class SublimeHaskellAutobuild(sublime_plugin.EventListener):
             return
         # If the edited file was Haskell code within a cabal project, try to
         # compile it.
-        cabal_project_dir = get_cabal_project_dir_of_view(view)
+        cabal_project_dir, cabal_project_name = get_cabal_project_dir_and_name_of_view(view)
         if cabal_project_dir is not None:
             # On another thread, wait for the build to finish.
-            run_build_thread(view, cabal_project_dir, 'Rebuilding Haskell', current_cabal_build())
+            run_build_thread(view, cabal_project_dir, 'Rebuilding ' + cabal_project_name, current_cabal_build())
 
 class ErrorMessage(object):
     "Describe an error or warning message produced by GHC."

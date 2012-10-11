@@ -7,13 +7,13 @@ import subprocess
 from threading import Thread
 import time
 
-from sublime_haskell_common import get_cabal_project_dir_of_view, call_and_wait, log, are_paths_equal, get_setting
+from sublime_haskell_common import get_cabal_project_dir_of_view, get_cabal_project_dir_and_name_of_view, call_and_wait, log, are_paths_equal, get_setting
 from autobuild import attach_sandbox, wait_for_build_to_complete, run_build_thread, run_chain_build_thread
 
 class SublimeHaskellCabalBuild(sublime_plugin.WindowCommand):
 	def run(self):
 		run_build_command_with(
-			'Cabal: Building Haskell',
+			lambda name: 'Cabal: Building ' + name,
 			['cabal', 'build'])
 
 	def is_enabled(self):
@@ -22,7 +22,7 @@ class SublimeHaskellCabalBuild(sublime_plugin.WindowCommand):
 class SublimeHaskellCabalClean(sublime_plugin.WindowCommand):
 	def run(self):
 		run_build_command_with(
-			'Cabal: Cleaning Haskell',
+			lambda name: 'Cabal: Cleaning ' + name,
 			['cabal', 'clean'])
 
 	def is_enabled(self):
@@ -31,7 +31,7 @@ class SublimeHaskellCabalClean(sublime_plugin.WindowCommand):
 class SublimeHaskellCabalConfigure(sublime_plugin.WindowCommand):
 	def run(self):
 		run_build_command_with(
-			'Cabal: Configuring Haskell',
+			lambda name: 'Cabal: Configuring ' + name,
 			['cabal', 'configure'])
 
 	def is_enabled(self):
@@ -40,7 +40,7 @@ class SublimeHaskellCabalConfigure(sublime_plugin.WindowCommand):
 class SublimeHaskellCabalRebuild(sublime_plugin.WindowCommand):
 	def run(self):
 		run_build_commands_with(
-			'Cabal: Rebuilding Haskell',
+			lambda name: 'Cabal: Rebuilding ' + name,
 			[['cabal', 'clean'], ['cabal', 'configure'], ['cabal', 'build']])
 
 	def is_enabled(self):
@@ -49,7 +49,7 @@ class SublimeHaskellCabalRebuild(sublime_plugin.WindowCommand):
 class SublimeHaskellCabalInstall(sublime_plugin.WindowCommand):
 	def run(self):
 		run_build_command_with(
-			'Cabal: Installing Haskell',
+			lambda name: 'Cabal: Installing ' + name,
 			['cabal', 'install'])
 
 	def is_enabled(self):
@@ -58,7 +58,7 @@ class SublimeHaskellCabalInstall(sublime_plugin.WindowCommand):
 class SublimeHaskellCabalDevBuild(sublime_plugin.WindowCommand):
 	def run(self):
 		run_build_command_with(
-			'Cabal-Dev: Building Haskell',
+			lambda name: 'Cabal-Dev: Building ' + name,
 			attach_sandbox(['cabal-dev', 'build']))
 
 	def is_enabled(self):
@@ -67,7 +67,7 @@ class SublimeHaskellCabalDevBuild(sublime_plugin.WindowCommand):
 class SublimeHaskellCabalDevClean(sublime_plugin.WindowCommand):
 	def run(self):
 		run_build_command_with(
-			'Cabal-Dev: Cleaning Haskell',
+			lambda name: 'Cabal-Dev: Cleaning ' + name,
 			attach_sandbox(['cabal-dev', 'clean']))
 
 	def is_enabled(self):
@@ -76,7 +76,7 @@ class SublimeHaskellCabalDevClean(sublime_plugin.WindowCommand):
 class SublimeHaskellCabalDevConfigure(sublime_plugin.WindowCommand):
 	def run(self):
 		run_build_command_with(
-			'Cabal-Dev: Configuring Haskell',
+			'Cabal-Dev: Configuring ',
 			attach_sandbox(['cabal-dev', 'configure']))
 
 	def is_enabled(self):
@@ -85,7 +85,7 @@ class SublimeHaskellCabalDevConfigure(sublime_plugin.WindowCommand):
 class SublimeHaskellCabalDevRebuild(sublime_plugin.WindowCommand):
 	def run(self):
 		run_build_commands_with(
-			'Cabal-Dev: Rebuilding Haskell',
+			lambda name: 'Cabal-Dev: Rebuilding ' + name,
 			[attach_sandbox(s) for s in [['cabal-dev', 'clean'], ['cabal-dev', 'configure'], ['cabal-dev', 'build']]])
 
 	def is_enabled(self):
@@ -94,7 +94,7 @@ class SublimeHaskellCabalDevRebuild(sublime_plugin.WindowCommand):
 class SublimeHaskellCabalDevInstall(sublime_plugin.WindowCommand):
 	def run(self):
 		run_build_command_with(
-			'Cabal-Dev: Installing Haskell',
+			lambda name: 'Cabal-Dev: Installing ' + name,
 			attach_sandbox(['cabal-dev', 'install']))
 
 	def is_enabled(self):
@@ -147,11 +147,11 @@ def run_build_commands_with(msg, cmds):
 	syntax_file_for_view = view.settings().get('syntax').lower()
 	if 'haskell' not in syntax_file_for_view:
 		return
-	cabal_project_dir = get_cabal_project_dir_of_view(view)
+	cabal_project_dir, cabal_project_name = get_cabal_project_dir_and_name_of_view(view)
 	if cabal_project_dir is None:
 		return
 
-	run_chain_build_thread(view, cabal_project_dir, msg, cmds)
+	run_chain_build_thread(view, cabal_project_dir, msg(cabal_project_name), cmds)
 
 def run_build_command_with(msg, cmd):
 	"""Run one command"""
