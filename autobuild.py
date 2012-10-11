@@ -23,16 +23,15 @@ result_file_regex = r'^(\S*?): line (\d+), column (\d+):$'
 
 class SublimeHaskellAutobuild(sublime_plugin.EventListener):
     def on_post_save(self, view):
+        # if auto build is not enable, return
+        if not get_setting('enable_auto_build'):
+            return
         # If the edited file was Haskell code within a cabal project, try to
         # compile it.
         cabal_project_dir = get_cabal_project_dir_of_view(view)
         if cabal_project_dir is not None:
             # On another thread, wait for the build to finish.
-            sublime.status_message('Rebuilding Haskell...')
-            thread = Thread(
-                target=wait_for_build_to_complete,
-                args=(view, cabal_project_dir))
-            thread.start()
+            run_build_thread(view, cabal_project_dir, 'Rebuilding Haskell', current_cabal_build())
 
 class ErrorMessage(object):
     "Describe an error or warning message produced by GHC."
@@ -60,13 +59,17 @@ class ErrorMessage(object):
         region = trim_region(view, region)
         return region
 
-def wait_for_build_to_complete(view, cabal_project_dir):
-    """Start 'cabal build', wait for it to complete, then parse and diplay
-    the resulting errors."""
+def run_build_thread(view, cabal_project_dir, msg, cmd):
+    run_chain_build_thread(view, cabal_project_dir, msg, [cmd])
 
-    # First hide error panel to show that something is going on
-    sublime.set_timeout(lambda: hide_output(view), 0)
+def run_chain_build_thread(view, cabal_project_dir, msg, cmds):
+    sublime.status_message(msg + '...')
+    thread = Thread(
+        target=wait_for_chain_to_complete,
+        args=(view, cabal_project_dir, msg + u" \u2714", cmds))
+    thread.start()
 
+def current_cabal_build():
     args = []
     if get_setting('use_cabal_dev'):
         args += ['cabal-dev']
@@ -75,16 +78,38 @@ def wait_for_build_to_complete(view, cabal_project_dir):
 
     args += ['build']
 
+    return attach_sandbox(args)
+
+def attach_sandbox(cmd):
+    """Attach sandbox arguments to command"""
     sand = get_setting('cabal_dev_sandbox')
     if len(sand) > 0:
-        args += ['-s', sand]
+        return cmd + ['-s', sand]
+    return cmd
 
-    exit_code, stdout, stderr = call_and_wait(
-        args,
-        cwd=cabal_project_dir)
+def wait_for_build_to_complete(view, cabal_project_dir, msg, cmd):
+    """Start 'cabal build', wait for it to complete, then parse and diplay
+    the resulting errors."""
+
+    wait_for_chain_to_complete(view, cabal_project_dir, msg, [cmd])
+
+def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds):
+    """Chains several commands, wait for them to complete, then parse and display
+    the resulting errors."""
+
+    # First hide error panel to show that something is going on
+    sublime.set_timeout(lambda: hide_output(view), 0)
+
+    # run and wait commands, fail on first fail
+    for cmd in cmds:
+        exit_code, stdout, stderr = call_and_wait(
+            cmd,
+            cwd=cabal_project_dir)
+        if exit_code != 0:
+            break;
 
     # stderr/stdout can contain unicode characters
-    stdout = stderr.decode('utf-8')
+    stdout = stdout.decode('utf-8')
     stderr = stderr.decode('utf-8')
 
     success = exit_code == 0
@@ -103,11 +128,10 @@ def wait_for_build_to_complete(view, cabal_project_dir):
 
     # TODO make this an option
     if success:
-        sublime.status_message(u"Rebuilding Haskell \u2714")
+        sublime.status_message(msg)
     else:
         write_output_cb = lambda: write_output(view, output, cabal_project_dir)
         sublime.set_timeout(write_output_cb, 0)
-
 
 def mark_errors_in_views(errors):
     "Mark the regions in open views where errors were found."
