@@ -167,18 +167,21 @@ def call_ghcmod_and_wait(arg_list):
                 + "Try adjusting the 'add_to_PATH' setting.\n"
                 + "You can also turn this off using the 'enable_ghc_mod' setting.")
 
-def wait_for_window(on_appear, seconds_to_wait = MAX_WAIT_FOR_WINDOW):
-    """
-    Wait for window to appear on startup
-    It's dirty hack, but I have no idea how to make it better
-    """
+def wait_for_window_callback(on_appear, seconds_to_wait):
     window = sublime.active_window()
     if window:
         on_appear(window)
         return
     if seconds_to_wait == 0:
         return
-    sublime.set_timeout(lambda: wait_for_window(on_appear, seconds_to_wait - 1), 1000)
+    sublime.set_timeout(lambda: wait_for_window_callback(on_appear, seconds_to_wait - 1), 1000)    
+
+def wait_for_window(on_appear, seconds_to_wait = MAX_WAIT_FOR_WINDOW):
+    """
+    Wait for window to appear on startup
+    It's dirty hack, but I have no idea how to make it better
+    """
+    sublime.set_timeout(lambda: wait_for_window_callback(on_appear, seconds_to_wait), 0)
 
 def output_error(window, text):
     "Write text to Sublime's output panel with important information about SublimeHaskell error during load"
