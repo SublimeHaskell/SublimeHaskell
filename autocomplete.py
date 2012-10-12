@@ -7,7 +7,7 @@ import subprocess
 import threading
 import time
 
-from sublime_haskell_common import PACKAGE_PATH, get_setting, get_cabal_project_dir_of_file, get_cabal_project_dir_of_view, call_and_wait, call_ghcmod_and_wait, log, wait_for_window, output_error
+from sublime_haskell_common import PACKAGE_PATH, get_setting, get_setting_async, get_cabal_project_dir_of_file, get_cabal_project_dir_of_view, call_and_wait, call_ghcmod_and_wait, log, wait_for_window, output_error, get_settings
 
 # Completion text longer than this is ellipsized:
 MAX_COMPLETION_LENGTH = 37
@@ -50,17 +50,45 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 
         self.language_completions = []
 
-        if get_setting('enable_ghc_mod'):
+        self.local_settings = {
+            'enable_ghc_mod' : None,
+            'use_cabal_dev' : None,
+            'cabal_dev_sandbox' : None }
+
+        for s in self.local_settings.keys():
+            self.local_settings[s] = get_setting(s)
+
+        self.init_ghcmod_completions()
+
+        # Subscribe to settings changes to update data
+        get_settings().add_on_change('enable_ghc_mod', lambda: self.on_setting_changed())
+
+    def on_setting_changed(self):
+        same = True
+        for k, v in self.local_settings.iteritems():
+            r = get_setting(k)
+            same = same and v == r
+            self.local_settings[k] = r
+
+        if not same:
             self.init_ghcmod_completions()
 
     # Gets available LANGUAGE options and import modules from ghc-mod
     def init_ghcmod_completions(self):
+
+        if not get_setting('enable_ghc_mod'):
+            return
+
+        sublime.status_message('SublimeHaskell: Updating ghc_mod completions...')
+
         # Init LANGUAGE completions
         self.language_completions = call_ghcmod_and_wait(['lang']).split('\n')
         log("Reading LANGUAGE completions from ghc-mod")
 
         # Init import module completion
         self.module_completions = call_ghcmod_and_wait(['list']).split('\n')
+
+        sublime.status_message('SublimeHaskell: Updating ghc_mod completions ' + u" \u2714")
 
     def get_special_completions(self, view, prefix, locations):
 
@@ -146,6 +174,8 @@ class InspectorAgent(threading.Thread):
             error_msg = u"SublimeHaskell: Failed to compile ModuleInspector\n{0}".format(err)
             wait_for_window(lambda w: self.show_errors(w, error_msg))
             return
+
+        sublime.set_timeout(lambda: sublime.status_message('Compiling Haskell ModuleInspector' + u" \u2714"), 0)
 
         # TODO: If compilation failed, we can't proceed; handle this.
         # Periodically wake up and see if there is anything to inspect.

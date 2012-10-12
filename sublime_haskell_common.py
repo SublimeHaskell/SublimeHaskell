@@ -25,6 +25,8 @@ class SublimeHaskellSettingsLoader:
     def __init__(self):
         # Now we can use get_setting_async for 'add_to_PATH' safely
         get_setting('add_to_PATH')
+        get_setting('use_cabal_dev')
+        get_setting('cabal_dev_sandbox')
 
 # SublimeHaskell settings dictionary
 # used to retrieve it async from any thread
@@ -118,8 +120,20 @@ def are_paths_equal(path, other_path):
     other_path = os.path.abspath(other_path)
     return path == other_path
 
+def attach_sandbox(cmd):
+    """Attach sandbox arguments to command"""
+    if not get_setting_async('use_cabal_dev'):
+        return cmd
+    sand = get_setting_async('cabal_dev_sandbox')
+    if len(sand) > 0:
+        return cmd + ['-s', sand]
+    return cmd
+
 def get_settings():
     return sublime.load_settings("SublimeHaskell.sublime-settings")
+
+def save_settings():
+    sublime.save_settings("SublimeHaskell.sublime-settings")
 
 def get_setting(key, default=None):
     "This should be used only from main thread"
@@ -146,13 +160,18 @@ def get_setting_async(key, default=None):
         return default
     return sublime_haskell_settings[key]
 
+def set_setting(key, value):
+    """Set setting and update dictionary"""
+    sublime_haskell_settings[key] = value
+    get_settings().set(key, value)
+
 def call_ghcmod_and_wait(arg_list):
     """
     Calls ghc-mod with the given arguments.
     Shows a sublime error message if ghc-mod is not available.
     """
     try:
-        exit_code, out, err = call_and_wait(['ghc-mod'] + arg_list)
+        exit_code, out, err = call_and_wait(attach_sandbox(['ghc-mod'] + arg_list))
 
         if exit_code != 0:
             raise Exception("ghc-mod exited with status %d and stderr: %s" % (exit_code, err))

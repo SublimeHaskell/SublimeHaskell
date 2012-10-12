@@ -7,7 +7,7 @@ import subprocess
 from threading import Thread
 import time
 
-from sublime_haskell_common import get_cabal_project_dir_of_view, get_cabal_project_dir_and_name_of_view, call_and_wait, log, are_paths_equal, get_setting
+from sublime_haskell_common import attach_sandbox, get_cabal_project_dir_of_view, get_cabal_project_dir_and_name_of_view, call_and_wait, log, are_paths_equal, get_setting
 
 ERROR_PANEL_NAME = 'haskell_error_checker'
 
@@ -59,17 +59,8 @@ class ErrorMessage(object):
         region = trim_region(view, region)
         return region
 
-def run_build_thread(view, cabal_project_dir, msg, cmd):
-    run_chain_build_thread(view, cabal_project_dir, msg, [cmd])
-
-def run_chain_build_thread(view, cabal_project_dir, msg, cmds):
-    sublime.status_message(msg + '...')
-    thread = Thread(
-        target=wait_for_chain_to_complete,
-        args=(view, cabal_project_dir, msg + u" \u2714", cmds))
-    thread.start()
-
 def current_cabal_build():
+    """Current cabal build command"""
     args = []
     if get_setting('use_cabal_dev'):
         args += ['cabal-dev']
@@ -80,12 +71,15 @@ def current_cabal_build():
 
     return attach_sandbox(args)
 
-def attach_sandbox(cmd):
-    """Attach sandbox arguments to command"""
-    sand = get_setting('cabal_dev_sandbox')
-    if len(sand) > 0:
-        return cmd + ['-s', sand]
-    return cmd
+def run_build_thread(view, cabal_project_dir, msg, cmd):
+    run_chain_build_thread(view, cabal_project_dir, msg, [cmd])
+
+def run_chain_build_thread(view, cabal_project_dir, msg, cmds):
+    sublime.status_message(msg + '...')
+    thread = Thread(
+        target=wait_for_chain_to_complete,
+        args=(view, cabal_project_dir, msg + u" \u2714", cmds))
+    thread.start()
 
 def wait_for_build_to_complete(view, cabal_project_dir, msg, cmd):
     """Start 'cabal build', wait for it to complete, then parse and diplay
