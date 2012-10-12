@@ -23,7 +23,7 @@ instance Json.ToJSON ModuleInfo where
     toJSON info = Json.object
         [ "moduleName" .= _moduleName info
         , "exportList" .= Json.Null
-        , "importList" .= Json.Null
+        , "importList" .= _importList info
         , "declarations" .= _declarations info
         ]
 
@@ -49,9 +49,13 @@ analyzeModule source = case H.parseFileContents source of
         ModuleInfo
             { _moduleName = moduleName
             , _exportList = Nothing
-            , _importList = []
+            , _importList = map nameOfModule imports
             , _declarations = concatMap nameOfDecl declarations
             }
+
+-- | Get module name for import
+nameOfModule :: H.ImportDecl -> String
+nameOfModule = (\(H.ModuleName n) -> n) . H.importModule
 
 -- | Get the relevant information about of a top-level declaration.
 -- Return Nothing if the declaration is not interesting.

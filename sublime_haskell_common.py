@@ -2,6 +2,7 @@ import errno
 import fnmatch
 import os
 import sublime
+import sublime_plugin
 import subprocess
 
 # Maximum seconds to wait for window to appear
@@ -21,12 +22,13 @@ SUBLIME_ERROR_PANEL_NAME = 'haskell_sublime_load'
 # And then setting can be get from any thread with get_setting_async
 # But setting must be loaded at least once from main thread
 # Some settings are loaded only from secondary threads, so we loading them here for first time
-class SublimeHaskellSettingsLoader:
+class SublimeHaskellSettingsLoader(sublime_plugin.EventListener):
     def __init__(self):
         # Now we can use get_setting_async for 'add_to_PATH' safely
         get_setting('add_to_PATH')
         get_setting('use_cabal_dev')
         get_setting('cabal_dev_sandbox')
+        get_setting('enable_auto_build')
 
 # SublimeHaskell settings dictionary
 # used to retrieve it async from any thread

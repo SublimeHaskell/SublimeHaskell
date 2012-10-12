@@ -7,7 +7,7 @@ import subprocess
 import threading
 import time
 
-from sublime_haskell_common import PACKAGE_PATH, get_setting, get_setting_async, get_cabal_project_dir_of_file, get_cabal_project_dir_of_view, call_and_wait, call_ghcmod_and_wait, log, wait_for_window, output_error, get_settings
+from sublime_haskell_common import PACKAGE_PATH, get_setting, get_setting_async, get_cabal_project_dir_of_file, get_cabal_project_dir_of_view, call_and_wait, call_ghcmod_and_wait, log, wait_for_window, output_error, get_settings, attach_sandbox
 
 # Completion text longer than this is ellipsized:
 MAX_COMPLETION_LENGTH = 37
@@ -49,6 +49,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         self.inspector.start()
 
         self.language_completions = []
+        self.module_completions = []
 
         self.local_settings = {
             'enable_ghc_mod' : None,
@@ -65,7 +66,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 
     def on_setting_changed(self):
         same = True
-        for k, v in self.local_settings.iteritems():
+        for k, v in self.local_settings.items():
             r = get_setting(k)
             same = same and v == r
             self.local_settings[k] = r
@@ -125,20 +126,20 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         # TODO: Only suggest symbols from within this project.
 
         cabal_dir = get_cabal_project_dir_of_view(view)
-        if cabal_dir is not None:
+        # if cabal_dir is not None:
 
-            completions = self.get_special_completions(view, prefix, locations)
+        completions = self.get_special_completions(view, prefix, locations)
 
-            if not completions:
-                completions = self.inspector.get_completions(view.file_name())
+        if not completions:
+            completions = self.inspector.get_completions(view.file_name())
 
-            end_time = time.clock()
-            log('time to get completions: {0} seconds'.format(end_time - begin_time))
-            # Don't put completions with special characters (?, !, ==, etc.)
-            # into completion because that wipes all default Sublime completions:
-            # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
-            # TODO: work around this
-            return [ c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0]) ]
+        end_time = time.clock()
+        log('time to get completions: {0} seconds'.format(end_time - begin_time))
+        # Don't put completions with special characters (?, !, ==, etc.)
+        # into completion because that wipes all default Sublime completions:
+        # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
+        # TODO: work around this
+        return [ c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0]) ]
 
         return []
 
@@ -154,9 +155,12 @@ class InspectorAgent(threading.Thread):
         # Make this thread daemonic so that it won't prevent the program
         # from exiting.
         self.daemon = True
-        # Module info:
+        # Module info (dictionary: filename => info):
         self.info_lock = threading.Lock()
         self.info = {}
+        # Standard module completions (dictionary: module name => completions):
+        self.std_info_lock = threading.Lock()
+        self.std_info = {}
         # Files that need to be re-inspected:
         self.dirty_files_lock = threading.Lock()
         self.dirty_files = []
@@ -186,14 +190,20 @@ class InspectorAgent(threading.Thread):
                 self.dirty_files = []
             # Find the cabal project corresponding to each "dirty" file:
             cabal_dirs = []
+            standalone_files = []
             for filename in files_to_reinspect:
                 d = get_cabal_project_dir_of_file(filename)
                 if d is not None:
                     cabal_dirs.append(d)
+                else:
+                    standalone_files.append(filename)
             # Eliminate duplicate project directories:
             cabal_dirs = list(set(cabal_dirs))
+            standalone_files = list(set(standalone_files))
             for d in cabal_dirs:
                 self._refresh_all_module_info(d)
+            for f in standalone_files:
+                self._refresh_module_info(f)
             time.sleep(AGENT_SLEEP_DURATION)
 
     def show_errors(self, window, error_text):
@@ -208,18 +218,41 @@ class InspectorAgent(threading.Thread):
     def get_completions(self, current_file_name):
         "Get all the completions that apply to the current file."
         # TODO: Filter according to what names the current file has in scope.
+
         completions = []
+
         with self.info_lock:
+            # File not processed yet
+            if current_file_name not in self.info:
+                return
+
+            moduleImports = self.info[current_file_name]['importList']
+
             for file_name, file_info in self.info.items():
                 if 'error' in file_info:
-                    # There was an error parsing this file; skip it.
+                    # There was an error parsing this file; skip it
                     continue
-                for d in file_info['declarations']:
-                    identifier = d['identifier']
-                    declaration_info = d['info']
-                    # TODO: Show the declaration info somewhere.
-                    completions.append(
-                        (identifier[:MAX_COMPLETION_LENGTH], identifier))
+
+                # File is imported, add to completion list
+                if file_info['moduleName'] in moduleImports:
+                    for d in file_info['declarations']:
+                        identifier = d['identifier']
+                        declaration_info = d['info']
+                        # TODO: Show the declaration info somewhere.
+                        completions.append((identifier[:MAX_COMPLETION_LENGTH], identifier))
+
+            # Completion for modules by ghc-mod browse
+            with self.std_info_lock:
+                for mi in moduleImports:
+                    if mi not in self.std_info:
+                        # Module not imported, skip it
+                        continue
+
+                    std_module = self.std_info[mi]
+
+                    for v in std_module:
+                        completions.append((v[:MAX_COMPLETION_LENGTH], v))
+
         return completions
 
     def _refresh_all_module_info(self, cabal_dir):
@@ -242,6 +275,9 @@ class InspectorAgent(threading.Thread):
         # TODO: Currently the ModuleInspector only delivers top-level functions
         #       with hand-written type signatures. This code should make that clear.
         # If the file hasn't changed since it was last inspected, do nothing:
+        if not filename.endswith('.hs'):
+            return
+
         modification_time = os.stat(filename).st_mtime
         if CHECK_MTIME:
             inspection_time = self._get_inspection_time_of_file(filename)
@@ -251,6 +287,11 @@ class InspectorAgent(threading.Thread):
             [MODULE_INSPECTOR_EXE_PATH, filename])
         if exit_code == 0:
             new_info = json.loads(stdout)
+            # Load standard modules
+            log(stdout)
+            if 'importList' in new_info:
+                for mi in new_info['importList']:
+                    self._load_standard_module(mi)
         else:
             # There was a problem parsing the file; create an error entry.
             new_info = {'error': 'ModuleInspector failed'}
@@ -262,6 +303,12 @@ class InspectorAgent(threading.Thread):
             f.write(formatted_json)
         with self.info_lock:
             self.info[filename] = new_info
+
+    def _load_standard_module(self, module_name):
+        if module_name not in self.std_info:
+            module_contents = call_ghcmod_and_wait(['browse', module_name]).split('\n')
+            with self.std_info_lock:
+                self.std_info[module_name] = module_contents
 
     def _get_inspection_time_of_file(self, filename):
         """Return the time that a file was last inspected.
