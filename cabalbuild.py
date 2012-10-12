@@ -7,7 +7,7 @@ import subprocess
 from threading import Thread
 import time
 
-from sublime_haskell_common import get_cabal_project_dir_of_view, get_cabal_project_dir_and_name_of_view, call_and_wait, log, are_paths_equal, get_setting
+from sublime_haskell_common import get_cabal_project_dir_of_view, get_cabal_project_dir_and_name_of_view, call_and_wait, log, are_paths_equal
 from autobuild import attach_sandbox, wait_for_build_to_complete, run_build_thread, run_chain_build_thread
 
 class SublimeHaskellCabalBuild(sublime_plugin.WindowCommand):

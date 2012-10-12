@@ -7,7 +7,23 @@ import subprocess
 # The path to where this package is installed:
 PACKAGE_PATH = os.path.join(sublime.packages_path(), 'SublimeHaskell')
 
-def call_and_wait(add_to_path, command, **popen_kwargs):
+# Setting can't be get from not main threads
+# So we using a trick:
+# Once setting loaded from main thread, it also stored in sublime_haskell_settings dictionary
+# and callback attached to update its value
+# And then setting can be get from any thread with get_setting_async
+# But setting must be loaded at least once from main thread
+# Some settings are loaded only from secondary threads, so we loading them here for first time
+class SublimeHaskellSettingsLoader:
+    def __init__(self):
+        # Now we can use get_setting_async for 'add_to_PATH' safely
+        get_setting('add_to_PATH')
+
+# SublimeHaskell settings dictionary
+# used to retrieve it async from any thread
+sublime_haskell_settings = {}
+
+def call_and_wait(command, **popen_kwargs):
     """Run the specified command, block until it completes, and return
     the exit code, stdout, and stderr.
     Extends os.environment['PATH'] with the 'add_to_PATH' setting.
@@ -20,7 +36,7 @@ def call_and_wait(add_to_path, command, **popen_kwargs):
     # For the subprocess, extend the env PATH to include the 'add_to_PATH' setting.
     extended_env = dict(os.environ)
     PATH = os.getenv('PATH') or ""
-    extended_env['PATH'] = ':'.join(add_to_path + [PATH])
+    extended_env['PATH'] = ':'.join(get_setting_async('add_to_PATH', []) + [PATH])
 
     process = subprocess.Popen(
         command,
@@ -99,7 +115,29 @@ def get_settings():
     return sublime.load_settings("SublimeHaskell.sublime-settings")
 
 def get_setting(key, default=None):
-    return get_settings().get(key, default)
+    "This should be used only from main thread"
+    # Get setting
+    result = get_settings().get(key, default)
+    # Key was not retrieved, save its value and add callback to auto-update
+    if key not in sublime_haskell_settings:
+        sublime_haskell_settings[key] = result
+        get_settings().add_on_change(key, lambda: update_setting(key))
+    return result
+
+def update_setting(key):
+    "Updates setting as it was changed"
+    sublime_haskell_settings[key] = get_setting(key)
+
+def get_setting_async(key, default=None):
+    """
+    Get setting from any thread
+    Note, that setting must be loaded before by get_setting from main thread
+    """
+    if key not in sublime_haskell_settings:
+        # Load it in main thread, but for now all we can do is result default
+        sublime.set_timeout(lambda: update_setting(key), 0)
+        return default
+    return sublime_haskell_settings[key]
 
 def call_ghcmod_and_wait(arg_list):
     """
@@ -107,8 +145,7 @@ def call_ghcmod_and_wait(arg_list):
     Shows a sublime error message if ghc-mod is not available.
     """
     try:
-        add_to_path = get_setting('add_to_PATH', [])
-        exit_code, out, err = call_and_wait(add_to_path, ['ghc-mod'] + arg_list)
+        exit_code, out, err = call_and_wait(['ghc-mod'] + arg_list)
 
         if exit_code != 0:
             raise Exception("ghc-mod exited with status %d and stderr: %s" % (exit_code, err))
