@@ -124,12 +124,16 @@ def are_paths_equal(path, other_path):
 
 def attach_sandbox(cmd):
     """Attach sandbox arguments to command"""
-    if not get_setting_async('use_cabal_dev'):
-        return cmd
     sand = get_setting_async('cabal_dev_sandbox')
     if len(sand) > 0:
         return cmd + ['-s', sand]
     return cmd
+
+def try_attach_sandbox(cmd):
+    """Attach sandbox if use_cabal_dev enabled"""
+    if not get_setting_async('use_cabal_dev'):
+        return cmd
+    return attach_sandbox(cmd)
 
 def get_settings():
     return sublime.load_settings("SublimeHaskell.sublime-settings")
@@ -173,7 +177,7 @@ def call_ghcmod_and_wait(arg_list):
     Shows a sublime error message if ghc-mod is not available.
     """
     try:
-        exit_code, out, err = call_and_wait(attach_sandbox(['ghc-mod'] + arg_list))
+        exit_code, out, err = call_and_wait(try_attach_sandbox(['ghc-mod'] + arg_list))
 
         if exit_code != 0:
             raise Exception("ghc-mod exited with status %d and stderr: %s" % (exit_code, err))

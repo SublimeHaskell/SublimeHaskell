@@ -23,15 +23,32 @@ result_file_regex = r'^(\S*?): line (\d+), column (\d+):$'
 
 class SublimeHaskellAutobuild(sublime_plugin.EventListener):
     def on_post_save(self, view):
-        # if auto build is not enable, return
-        if not get_setting('enable_auto_build'):
-            return
-        # If the edited file was Haskell code within a cabal project, try to
-        # compile it.
+        auto_build_enabled = get_setting('enable_auto_build')
+        auto_check_enabled = get_setting('enable_auto_check')
         cabal_project_dir, cabal_project_name = get_cabal_project_dir_and_name_of_view(view)
-        if cabal_project_dir is not None:
-            # On another thread, wait for the build to finish.
-            run_build_thread(view, cabal_project_dir, 'Rebuilding ' + cabal_project_name, current_cabal_build())
+
+        # auto build enabled and file within a cabal project
+        if auto_build_enabled and cabal_project_dir is not None:
+            view.window().run_command('sublime_haskell_build')
+        # try to ghc-mod check
+        elif auto_check_enabled:
+            return
+
+        # # if auto build is not enable, return
+        # if not get_setting('enable_auto_build'):
+        #     return
+        # # If the edited file was Haskell code within a cabal project, try to
+        # # compile it.
+        # cabal_project_dir, cabal_project_name = get_cabal_project_dir_and_name_of_view(view)
+        # if cabal_project_dir is not None:
+        #     # On another thread, wait for the build to finish.
+        #     run_build_thread(view, cabal_project_dir, 'Rebuilding ' + cabal_project_name, current_cabal_build())
+
+    def autobuild_project(self, view):
+        pass
+
+    def autobuild_check(self, view):
+        pass
 
 class ErrorMessage(object):
     "Describe an error or warning message produced by GHC."

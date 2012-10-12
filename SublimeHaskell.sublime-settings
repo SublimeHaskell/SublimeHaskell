@@ -13,6 +13,9 @@
 	// Enable auto build on save
 	"enable_auto_build": true,
 
+	// Enable auto check on save
+	"enable_auto_check": true,
+
 	// Extra directories to be added to the front of the PATH environment variable.
 	// Specify this for using custom ghc, cabal, and ghc-mod
 	// Example: /home/user/.cabal/bin

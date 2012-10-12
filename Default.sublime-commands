@@ -22,6 +22,26 @@
         "command": "haskell_insert_type_command"
     },
     {
+        "caption": "SublimeHaskell: Build",
+        "command": "sublime_haskell_build"
+    },
+    {
+        "caption": "SublimeHaskell: Clean",
+        "command": "sublime_haskell_clean"
+    },
+    {
+        "caption": "SublimeHaskell: Configure",
+        "command": "sublime_haskell_configure"
+    },
+    {
+        "caption": "SublimeHaskell: Rebuild",
+        "command": "sublime_haskell_rebuild"
+    },
+    {
+        "caption": "SublimeHaskell: Install",
+        "command": "sublime_haskell_install"
+    },
+    {
         "caption": "SublimeHaskell: Switch Cabal/Cabal-Dev",
         "command": "sublime_haskell_switch_cabal_dev"
     }
