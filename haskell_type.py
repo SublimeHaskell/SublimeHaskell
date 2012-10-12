@@ -52,7 +52,7 @@ class HaskellShowTypeCommand(sublime_plugin.TextCommand):
         # ghc-mod type returns the type of the expression at at the given row/col.
         # It can return multiple lines, extending the expression scope by one level each.
         # The last line belongs to the toplevel expression.
-        types = map(parse_ghc_mod_type_line, out.strip().split('\n'))
+        types = map(parse_ghc_mod_type_line, out.strip().splitlines())
         result_type = types[0]['type']  # innermost expression's type
 
         if not result_type:

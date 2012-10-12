@@ -83,11 +83,11 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         sublime.status_message('SublimeHaskell: Updating ghc_mod completions...')
 
         # Init LANGUAGE completions
-        self.language_completions = call_ghcmod_and_wait(['lang']).split('\n')
+        self.language_completions = call_ghcmod_and_wait(['lang']).splitlines()
         log("Reading LANGUAGE completions from ghc-mod")
 
         # Init import module completion
-        self.module_completions = call_ghcmod_and_wait(['list']).split('\n')
+        self.module_completions = call_ghcmod_and_wait(['list']).splitlines()
 
         sublime.status_message('SublimeHaskell: Updating ghc_mod completions ' + u" \u2714")
 
@@ -288,7 +288,6 @@ class InspectorAgent(threading.Thread):
         if exit_code == 0:
             new_info = json.loads(stdout)
             # Load standard modules
-            log(stdout)
             if 'importList' in new_info:
                 for mi in new_info['importList']:
                     self._load_standard_module(mi)
@@ -306,7 +305,7 @@ class InspectorAgent(threading.Thread):
 
     def _load_standard_module(self, module_name):
         if module_name not in self.std_info:
-            module_contents = call_ghcmod_and_wait(['browse', module_name]).split('\n')
+            module_contents = call_ghcmod_and_wait(['browse', module_name]).splitlines()
             with self.std_info_lock:
                 self.std_info[module_name] = module_contents
 
