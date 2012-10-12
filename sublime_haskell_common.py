@@ -4,8 +4,15 @@ import os
 import sublime
 import subprocess
 
+# Maximum seconds to wait for window to appear
+# This dirty hack is used in wait_for_window function
+MAX_WAIT_FOR_WINDOW = 10
+
 # The path to where this package is installed:
 PACKAGE_PATH = os.path.join(sublime.packages_path(), 'SublimeHaskell')
+
+# Panel for SublimeHaskell errors
+SUBLIME_ERROR_PANEL_NAME = 'haskell_sublime_load'
 
 # Setting can't be get from not main threads
 # So we using a trick:
@@ -60,11 +67,11 @@ def get_cabal_project_dir_and_name_of_view(view):
     # Check that the view is showing a saved file:
     file_shown_in_view = view.file_name()
     if file_shown_in_view is None:
-        return None
+        return None, None
     # Check that the file is Haskell source code:
     syntax_file_for_view = view.settings().get('syntax').lower()
     if 'haskell' not in syntax_file_for_view:
-        return None
+        return None, None
     return get_cabal_project_dir_and_name_of_file(file_shown_in_view)
 
 def get_cabal_project_dir_of_view(view):
@@ -76,7 +83,7 @@ def get_cabal_project_dir_and_name_of_file(filename):
     directory_of_file = os.path.dirname(filename)
     cabal_file_path = find_file_in_parent_dir(directory_of_file, '*.cabal')
     if cabal_file_path is None:
-        return None
+        return None, None
     # Return the directory containing the .cabal file:
     project_path, cabal_file = os.path.split(cabal_file_path)
     project_name = os.path.splitext(cabal_file)[0]
@@ -159,3 +166,31 @@ def call_ghcmod_and_wait(arg_list):
                 + "and type inference.\n"
                 + "Try adjusting the 'add_to_PATH' setting.\n"
                 + "You can also turn this off using the 'enable_ghc_mod' setting.")
+
+def wait_for_window(on_appear, seconds_to_wait = MAX_WAIT_FOR_WINDOW):
+    """
+    Wait for window to appear on startup
+    It's dirty hack, but I have no idea how to make it better
+    """
+    window = sublime.active_window()
+    if window:
+        on_appear(window)
+        return
+    if seconds_to_wait == 0:
+        return
+    sublime.set_timeout(lambda: wait_for_window(on_appear, seconds_to_wait - 1), 1000)
+
+def output_error(window, text):
+    "Write text to Sublime's output panel with important information about SublimeHaskell error during load"
+    output_view = window.get_output_panel(SUBLIME_ERROR_PANEL_NAME)
+    output_view.set_read_only(False)
+
+    edit = output_view.begin_edit()
+    output_view.insert(edit, 0, text)
+    output_view.end_edit(edit)
+
+    output_view.sel().clear()
+    output_view.sel().add(sublime.Region(0))
+    output_view.set_read_only(True)
+
+    window.run_command('show_panel', {'panel': 'output.' + SUBLIME_ERROR_PANEL_NAME})

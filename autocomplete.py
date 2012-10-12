@@ -7,7 +7,7 @@ import subprocess
 import threading
 import time
 
-from sublime_haskell_common import PACKAGE_PATH, get_setting, get_cabal_project_dir_of_file, get_cabal_project_dir_of_view, call_and_wait, call_ghcmod_and_wait, log
+from sublime_haskell_common import PACKAGE_PATH, get_setting, get_cabal_project_dir_of_file, get_cabal_project_dir_of_view, call_and_wait, call_ghcmod_and_wait, log, wait_for_window, output_error
 
 # Completion text longer than this is ellipsized:
 MAX_COMPLETION_LENGTH = 37
@@ -135,11 +135,18 @@ class InspectorAgent(threading.Thread):
 
     def run(self):
         # Compile the ModuleInspector:
-        sublime.status_message('Compiling Haskell ModuleInspector...')
+        sublime.set_timeout(lambda: sublime.status_message('Compiling Haskell ModuleInspector...'), 0)
+
         exit_code, out, err = call_and_wait(['ghc',
             '--make', MODULE_INSPECTOR_SOURCE_PATH,
             '-o', MODULE_INSPECTOR_EXE_PATH,
             '-outputdir', MODULE_INSPECTOR_OBJ_DIR])
+
+        if exit_code != 0:
+            error_msg = u"SublimeHaskell: Failed to compile ModuleInspector\n{0}".format(err)
+            wait_for_window(lambda w: self.show_errors(w, error_msg))
+            return
+
         # TODO: If compilation failed, we can't proceed; handle this.
         # Periodically wake up and see if there is anything to inspect.
         while True:
@@ -158,6 +165,10 @@ class InspectorAgent(threading.Thread):
             for d in cabal_dirs:
                 self._refresh_all_module_info(d)
             time.sleep(AGENT_SLEEP_DURATION)
+
+    def show_errors(self, window, error_text):
+        sublime.set_timeout(lambda: sublime.status_message('Compiling Haskell ModuleInspector' + u" \u2717"), 0)
+        sublime.set_timeout(lambda: output_error(window, error_text), 0)
 
     def mark_file_dirty(self, filename):
         "Report that a file should be reinspected."
