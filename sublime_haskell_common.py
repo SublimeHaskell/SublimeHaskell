@@ -75,6 +75,9 @@ def get_haskell_command_window_view_file_project():
     return window, view, file_name
 
 def call_and_wait(command, **popen_kwargs):
+    return call_and_wait_with_input(command, None, **popen_kwargs)
+
+def call_and_wait_with_input(command, input_string, **popen_kwargs):
     """Run the specified command, block until it completes, and return
     the exit code, stdout, and stderr.
     Extends os.environment['PATH'] with the 'add_to_PATH' setting.
@@ -93,14 +96,15 @@ def call_and_wait(command, **popen_kwargs):
         command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        stdin=subprocess.PIPE,
         env=extended_env,
         **popen_kwargs)
-    stdout, stderr = process.communicate()
+    stdout, stderr = process.communicate(input_string)
     exit_code = process.wait()
     return (exit_code, stdout, stderr)
 
 def log(message):
-    print('Sublime Haskell: {0}'.format(message))
+    print(u'Sublime Haskell: {0}'.format(message))
 
 def get_cabal_project_dir_and_name_of_view(view):
     """Return the path to the .cabal file project for the source file in the
