@@ -14,10 +14,11 @@ class SublimeHaskellStylish(sublime_plugin.TextCommand):
                     selection = sublime.Region(0, self.view.size())
                 else:
                     selection = region
-                sel_str = self.view.substr(selection)
+                sel_str = self.view.substr(selection).replace('\r\n', '\n')
                 exit_code, out, err = call_and_wait_with_input(['stylish-haskell'], sel_str)
-                if exit_code == 0 and out != sel_str:
-                    self.view.replace(edit, selection, out)
+                out_str = out.replace('\r\n', '\n')
+                if exit_code == 0 and out_str != sel_str:
+                    self.view.replace(edit, selection, out_str)
 
             self.view.sel().clear()
             for region in regions:
