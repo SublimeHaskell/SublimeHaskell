@@ -76,7 +76,7 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds):
         if exit_code != 0:
             break
 
-    parse_output_messages_and_show(view, msg, cabal_project_dir, exit_code, stdout, stderr)
+    parse_output_messages_and_show(view, msg, cabal_project_dir, exit_code, stderr)
 
 def format_output_messages(messages):
     """Formats list of messages"""
@@ -97,11 +97,10 @@ def show_output_result_text(view, msg, text, exit_code, base_dir):
         if get_setting_async('show_output_window'):
             sublime.set_timeout(lambda: write_output(view, output, base_dir), 0)
 
-def parse_output_messages_and_show(view, msg, base_dir, exit_code, stdout, stderr):
+def parse_output_messages_and_show(view, msg, base_dir, exit_code, stderr):
     """Parse errors and display resulting errors"""
 
     # stderr/stdout can contain unicode characters
-    stdout = stdout.decode('utf-8')
     stderr = stderr.decode('utf-8')
 
     # The process has terminated; parse and display the output:
@@ -175,7 +174,9 @@ def write_output(view, text, cabal_project_dir):
     output_view.settings().set("result_base_dir", cabal_project_dir)
     # Write to the output buffer:
     edit = output_view.begin_edit()
-    output_view.insert(edit, 0, text)
+    #output_view.insert(edit, 0, text)
+    log(output_view.size())
+    output_view.insert(edit, output_view.size(), text)
     output_view.end_edit(edit)
     # Set the selection to the beginning of the view so that "next result" works:
     output_view.sel().clear()
