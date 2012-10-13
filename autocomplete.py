@@ -224,7 +224,7 @@ class InspectorAgent(threading.Thread):
         with self.info_lock:
             # File not processed yet
             if current_file_name not in self.info:
-                return
+                return completions
 
             moduleImports = self.info[current_file_name]['importList']
 

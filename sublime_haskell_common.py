@@ -29,10 +29,50 @@ class SublimeHaskellSettingsLoader(sublime_plugin.EventListener):
         get_setting('use_cabal_dev')
         get_setting('cabal_dev_sandbox')
         get_setting('enable_auto_build')
+        get_setting('show_output_window')
 
 # SublimeHaskell settings dictionary
 # used to retrieve it async from any thread
 sublime_haskell_settings = {}
+
+# Base command
+class SublimeHaskellBaseCommand(sublime_plugin.WindowCommand):
+    def is_enabled(self):
+        return is_enabled_haskell_command(True)
+
+def is_enabled_haskell_command(must_be_project = True, must_be_main = False):
+    """Returns True if command for .hs can be invoked"""
+    window = sublime.active_window()
+    if not window:
+        return False
+    view = window.active_view()
+    if not view:
+        return False
+    file_shown_in_view = view.file_name()
+    if not file_shown_in_view:
+        return False
+    syntax_file_for_view = view.settings().get('syntax').lower()
+    if 'haskell' not in syntax_file_for_view:
+        return False
+
+    if not must_be_project:
+        return True
+
+    cabal_project_dir = get_cabal_project_dir_of_view(view)
+    if not cabal_project_dir:
+        return False
+    return True
+
+def get_haskell_command_window_view_file_project():
+    """Returns window, view and file"""
+    window = sublime.active_window()
+    view = None
+    if window:
+        view = window.active_view()
+    file_name = None
+    if view:
+        file_name = view.file_name()
+    return window, view, file_name
 
 def call_and_wait(command, **popen_kwargs):
     """Run the specified command, block until it completes, and return
@@ -160,9 +200,10 @@ def get_setting_async(key, default=None):
     Get setting from any thread
     Note, that setting must be loaded before by get_setting from main thread
     """
+    # Reload it in main thread for future calls of get_setting_async
+    sublime.set_timeout(lambda: update_setting(key), 0)
     if key not in sublime_haskell_settings:
         # Load it in main thread, but for now all we can do is result default
-        sublime.set_timeout(lambda: update_setting(key), 0)
         return default
     return sublime_haskell_settings[key]
 
@@ -171,13 +212,15 @@ def set_setting(key, value):
     sublime_haskell_settings[key] = value
     get_settings().set(key, value)
 
-def call_ghcmod_and_wait(arg_list):
+def call_ghcmod_and_wait(arg_list, file_dir = None):
     """
     Calls ghc-mod with the given arguments.
     Shows a sublime error message if ghc-mod is not available.
     """
     try:
-        exit_code, out, err = call_and_wait(try_attach_sandbox(['ghc-mod'] + arg_list))
+        exit_code, out, err = call_and_wait(
+            try_attach_sandbox(['ghc-mod'] + arg_list),
+            cwd = file_dir)
 
         if exit_code != 0:
             raise Exception("ghc-mod exited with status %d and stderr: %s" % (exit_code, err))

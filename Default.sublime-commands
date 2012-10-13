@@ -42,6 +42,14 @@
         "command": "sublime_haskell_install"
     },
     {
+        "caption": "SublimeHaskell: Check",
+        "command": "sublime_haskell_ghc_mod_check"
+    },
+    {
+        "caption": "SublimeHaskell: Lint",
+        "command": "sublime_haskell_ghc_mod_lint"
+    },
+    {
         "caption": "SublimeHaskell: Switch Cabal/Cabal-Dev",
         "command": "sublime_haskell_switch_cabal_dev"
     }
