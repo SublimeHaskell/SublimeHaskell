@@ -54,6 +54,14 @@
         "command": "sublime_haskell_stylish"
     },
     {
+        "caption": "SublimeHaskell: Go To Any Definition",
+        "command": "sublime_haskell_go_to_any_definition"
+    },
+    {
+        "caption": "SublimeHaskell: Go To Definition",
+        "command": "sublime_haskell_go_to_definition"
+    },
+    {
         "caption": "SublimeHaskell: Switch Cabal/Cabal-Dev",
         "command": "sublime_haskell_switch_cabal_dev"
     }

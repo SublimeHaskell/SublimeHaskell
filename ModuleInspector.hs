@@ -29,15 +29,18 @@ instance Json.ToJSON ModuleInfo where
 
 -- | Information about a single type or function declaration.
 data DeclarationInfo = DeclarationInfo
-    { _nameOfDeclaration :: String
+    { _declLocation :: H.SrcLoc
+    , _nameOfDeclaration :: String
     , _typeInfo :: String
     }
     deriving (Show)
 
 instance Json.ToJSON DeclarationInfo where
-    toJSON (DeclarationInfo name typeInfo) = Json.object
+    toJSON (DeclarationInfo (H.SrcLoc _ l c) name typeInfo) = Json.object
         [ "info" .= typeInfo
         , "identifier" .= name
+        , "line" .= l
+        , "column" .= c
         ]
 
 -- | Process a single file's contents.
@@ -61,14 +64,15 @@ nameOfModule = (\(H.ModuleName n) -> n) . H.importModule
 -- Return Nothing if the declaration is not interesting.
 nameOfDecl :: H.Decl -> [DeclarationInfo]
 nameOfDecl decl = case decl of
-    H.TypeSig _ names typeSignature -> map
+    H.TypeSig loc names typeSignature -> map
         (\n -> DeclarationInfo
+            loc
             (identOfName n)
             (":: " ++ H.prettyPrint typeSignature))
         names
-    H.TypeDecl _ n _ _ -> [DeclarationInfo (identOfName n) "(type)"]
-    H.DataDecl _ _ _ n _ _ _ -> [DeclarationInfo (identOfName n) "(data)"]
-    H.ClassDecl _ _ n _ _ _ -> [DeclarationInfo (identOfName n) "(class)"]
+    H.TypeDecl loc n _ _ -> [DeclarationInfo loc (identOfName n) "(type)"]
+    H.DataDecl loc _ _ n _ _ _ -> [DeclarationInfo loc (identOfName n) "(data)"]
+    H.ClassDecl loc _ n _ _ _ -> [DeclarationInfo loc (identOfName n) "(class)"]
     _ -> []
 
 identOfName :: H.Name -> String

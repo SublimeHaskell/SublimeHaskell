@@ -72,7 +72,6 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds):
         exit_code, stdout, stderr = call_and_wait(
             cmd,
             cwd=cabal_project_dir)
-        #log("STDERR: " + stderr)
         if exit_code != 0:
             break
 
@@ -175,7 +174,6 @@ def write_output(view, text, cabal_project_dir):
     # Write to the output buffer:
     edit = output_view.begin_edit()
     #output_view.insert(edit, 0, text)
-    log(output_view.size())
     output_view.insert(edit, output_view.size(), text)
     output_view.end_edit(edit)
     # Set the selection to the beginning of the view so that "next result" works:
