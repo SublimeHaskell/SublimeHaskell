@@ -75,6 +75,8 @@ class SublimeHaskellGoToAnyDefinition(sublime_plugin.WindowCommand):
         self.window.show_quick_panel(self.definitions, self.on_done)
 
     def on_done(self, idx):
+        if idx == -1:
+            return
         self.window.open_file(':'.join(self.files[idx]), sublime.ENCODED_POSITION)
 
     def is_enabled(self):
@@ -322,7 +324,7 @@ class InspectorAgent(threading.Thread):
         # Process all files within the Cabal project:
         # TODO: Only process files within the .cabal file's "src" directory.
         files_in_dir = list_files_in_dir_recursively(cabal_dir)
-        haskell_source_files = [x for x in files_in_dir if x.endswith('.hs')]
+        haskell_source_files = [x for x in files_in_dir if x.endswith('.hs') and ('dist/build/autogen' not in x)]
         for filename in haskell_source_files:
             self._refresh_module_info(filename)
         end_time = time.clock()
