@@ -75,7 +75,6 @@ class SublimeHaskellGoToAnyDefinition(sublime_plugin.WindowCommand):
         self.window.show_quick_panel(self.definitions, self.on_done)
 
     def on_done(self, idx):
-        log(self.window.folders())
         self.window.open_file(':'.join(self.files[idx]), sublime.ENCODED_POSITION)
 
     def is_enabled(self):
