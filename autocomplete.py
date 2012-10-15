@@ -29,6 +29,7 @@ LANGUAGE_RE = re.compile(r'.*{-#\s+LANGUAGE.*')
 
 # Checks if we are in an import statement.
 IMPORT_RE = re.compile(r'.*import(\s+qualified)?\s+')
+IMPORT_RE_PREFIX = re.compile(r'^\s*import(\s+qualified)?\s+(.*)$')
 IMPORT_QUALIFIED_POSSIBLE_RE = re.compile(r'.*import\s+(?P<qualifiedprefix>\S*)$')
 
 # Checks if a word contains only alhanums, -, and _
@@ -51,7 +52,10 @@ class AutoCompletion(object):
         # info is:
         #   moduleName - name of module
         #   exportList - list of export (strings)
-        #   importList - list of import (strings)
+        #   imports - list of import (strings), where import is:
+        #     importName - name of imported module
+        #     qualified - is import qualified?
+        #     as - alias of module (string or null)
         #   declarations - list of declarations, where declaration is:
         #     info - type info (string "(data)", "(type)" or "(class)")
         #     identifier - declaration identifier
@@ -60,6 +64,113 @@ class AutoCompletion(object):
         # Standard module completions (dictionary: module name => completions):
         self.std_info_lock = threading.Lock()
         self.std_info = {}
+
+    def get_completions(self, view, prefix, locations):
+        "Get all the completions that apply to the current file."
+
+        line_contents = get_line_contents(view, locations[0])
+
+        # 'bla bla bla Data.List.fo' -> ('Data.List', 'Data.List.fo')
+        def get_qualify(s):
+            if len(s) == 0:
+                return ('', '')
+            quals = s.split()[-1].split('.')
+            filtered = map(lambda s: filter(lambda c: c.isalpha(), s), quals)
+            return ('.'.join(filtered[0:len(filtered) - 1]), '.'.join(filtered))
+
+        current_file_name = view.file_name()
+
+        (qualified_module, qualified_prefix) = get_qualify(line_contents)
+        has_q = len(qualified_module) != 0
+
+        completions = []
+
+        # Complete with modules too
+        if has_q:
+            completions.extend(self.get_module_completions_for(qualified_prefix))
+
+        with self.info_lock:
+            # File not processed yet
+            if current_file_name not in self.info:
+                return completions
+
+            moduleImports = []
+            # Use completion only from qualified_module
+            if has_q:
+                # if qualified_module is alias, find its original name
+                # e.g. for 'import Data.Text as T' return 'Data.Text' for 'T'
+                moduleImports = [m['importName'] for m in self.info[current_file_name]['imports'] if m['as'] == qualified_module]
+                moduleImports.append(qualified_module)
+            else:
+                # list of imports, imported unqualified
+                moduleImports = [m['importName'] for m in self.info[current_file_name]['imports'] if not m['qualified']]
+
+            for file_name, file_info in self.info.items():
+                if 'error' in file_info:
+                    # There was an error parsing this file; skip it
+                    continue
+
+                # File is imported, add to completion list
+                if file_info['moduleName'] in moduleImports:
+                    for d in file_info['declarations']:
+                        identifier = d['identifier']
+                        declaration_info = d['info']
+                        # TODO: Show the declaration info somewhere.
+                        completions.append((identifier[:MAX_COMPLETION_LENGTH], identifier))
+
+            # Completion for modules by ghc-mod browse
+            with self.std_info_lock:
+                for mi in moduleImports:
+                    if mi not in self.std_info:
+                        # Module not imported, skip it
+                        continue
+
+                    std_module = self.std_info[mi]
+
+                    for v in std_module:
+                        completions.append((v[:MAX_COMPLETION_LENGTH], v))
+
+        return list(set(completions))
+
+    def get_import_completions(self, view, prefix, locations):
+
+        # Contents of the current line up to the cursor
+        line_contents = get_line_contents(view, locations[0])
+
+        # Autocompletion for LANGUAGE pragmas
+        if get_setting('auto_complete_language_pragmas'):
+            # TODO handle multiple selections
+            match_language = LANGUAGE_RE.match(line_contents)
+            if match_language:
+                return [ (unicode(c),) * 2 for c in self.language_completions ]
+
+        # Autocompletion for import statements
+        if get_setting('auto_complete_imports'):
+            match_import = IMPORT_RE_PREFIX.match(line_contents)
+            if match_import:
+                (qualified, pref) = match_import.groups()
+                import_completions = self.get_module_completions_for(pref)
+
+                # Right after "import "? Propose "qualified" as well!
+                qualified_match = IMPORT_QUALIFIED_POSSIBLE_RE.match(line_contents)
+                if qualified_match:
+                    qualified_prefix = qualified_match.group('qualifiedprefix')
+                    if qualified_prefix == "" or "qualified".startswith(qualified_prefix):
+                        import_completions.insert(0, (u"qualified", "qualified "))
+
+                return list(set(import_completions))
+
+        return None
+
+    def get_module_completions_for(self, qualified_prefix):
+        def module_next_name(mname):
+            """
+            Returns next name for prefix
+            pref = Control.Con, mname = Control.Concurrent.MVar, result = Concurrent
+            """
+            return mname.split('.')[len(qualified_prefix.split('.')) - 1]
+        return list(set([ (unicode(module_next_name(m)),) * 2 for m in self.module_completions if m.startswith(qualified_prefix) ]))
+
 
 autocompletion = AutoCompletion()
 
@@ -181,10 +292,10 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         cabal_dir = get_cabal_project_dir_of_view(view)
         # if cabal_dir is not None:
 
-        completions = self.get_special_completions(view, prefix, locations)
+        completions = autocompletion.get_import_completions(view, prefix, locations)
 
         if not completions:
-            completions = self.inspector.get_completions(view.file_name())
+            completions = autocompletion.get_completions(view, prefix, locations)
 
         end_time = time.clock()
         log('time to get completions: {0} seconds'.format(end_time - begin_time))
@@ -277,46 +388,6 @@ class InspectorAgent(threading.Thread):
         with self.dirty_files_lock:
             self.dirty_files.append(filename)
 
-    def get_completions(self, current_file_name):
-        "Get all the completions that apply to the current file."
-        # TODO: Filter according to what names the current file has in scope.
-
-        completions = []
-
-        with autocompletion.info_lock:
-            # File not processed yet
-            if current_file_name not in autocompletion.info:
-                return completions
-
-            moduleImports = autocompletion.info[current_file_name]['importList']
-
-            for file_name, file_info in autocompletion.info.items():
-                if 'error' in file_info:
-                    # There was an error parsing this file; skip it
-                    continue
-
-                # File is imported, add to completion list
-                if file_info['moduleName'] in moduleImports:
-                    for d in file_info['declarations']:
-                        identifier = d['identifier']
-                        declaration_info = d['info']
-                        # TODO: Show the declaration info somewhere.
-                        completions.append((identifier[:MAX_COMPLETION_LENGTH], identifier))
-
-            # Completion for modules by ghc-mod browse
-            with autocompletion.std_info_lock:
-                for mi in moduleImports:
-                    if mi not in autocompletion.std_info:
-                        # Module not imported, skip it
-                        continue
-
-                    std_module = autocompletion.std_info[mi]
-
-                    for v in std_module:
-                        completions.append((v[:MAX_COMPLETION_LENGTH], v))
-
-        return completions
-
     def _refresh_all_module_info(self, cabal_dir):
         "Rebuild module information for all files under the specified directory."
         begin_time = time.clock()
@@ -350,9 +421,10 @@ class InspectorAgent(threading.Thread):
         if exit_code == 0:
             new_info = json.loads(stdout)
             # Load standard modules
-            if 'importList' in new_info:
-                for mi in new_info['importList']:
-                    self._load_standard_module(mi)
+            if 'imports' in new_info:
+                for mi in new_info['imports']:
+                    if 'importName' in mi:
+                        self._load_standard_module(mi['importName'])
         else:
             # There was a problem parsing the file; create an error entry.
             new_info = {'error': 'ModuleInspector failed'}

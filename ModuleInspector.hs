@@ -14,7 +14,7 @@ import qualified System.Environment as Environment
 data ModuleInfo = ModuleInfo
     { _moduleName :: String
     , _exportList :: Maybe [String]
-    , _importList :: [String]
+    , _imports :: [ImportInfo]
     , _declarations :: [DeclarationInfo]
     }
     deriving (Show)
@@ -23,8 +23,23 @@ instance Json.ToJSON ModuleInfo where
     toJSON info = Json.object
         [ "moduleName" .= _moduleName info
         , "exportList" .= Json.Null
-        , "importList" .= _importList info
+        , "imports" .= _imports info
         , "declarations" .= _declarations info
+        ]
+
+-- | Information about import
+data ImportInfo = ImportInfo
+    { _importName :: String
+    , _importQualified :: Bool
+    , _importAs :: Maybe String
+    }
+    deriving (Show)
+
+instance Json.ToJSON ImportInfo where
+    toJSON info = Json.object
+        [ "importName" .= _importName info
+        , "qualified" .= _importQualified info
+        , "as" .= _importAs info
         ]
 
 -- | Information about a single type or function declaration.
@@ -52,13 +67,14 @@ analyzeModule source = case H.parseFileContents source of
         ModuleInfo
             { _moduleName = moduleName
             , _exportList = Nothing
-            , _importList = map nameOfModule imports
+            , _imports = map infoOfImport imports
             , _declarations = concatMap nameOfDecl declarations
             }
 
 -- | Get module name for import
-nameOfModule :: H.ImportDecl -> String
-nameOfModule = (\(H.ModuleName n) -> n) . H.importModule
+infoOfImport :: H.ImportDecl -> ImportInfo
+infoOfImport d = ImportInfo (mname (H.importModule d)) (H.importQualified d) (fmap mname $ H.importAs d) where
+    mname (H.ModuleName n) = n
 
 -- | Get the relevant information about of a top-level declaration.
 -- Return Nothing if the declaration is not interesting.
