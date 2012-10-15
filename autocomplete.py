@@ -194,9 +194,14 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 
         return []
 
+    def on_new(self, view):
+        filename = view.file_name();
+        if filename:
+            self.inspector.mark_file_dirty(filename)
+
     def on_post_save(self, view):
         filename = view.file_name()
-        if filename is not None:
+        if filename:
             self.inspector.mark_file_dirty(filename)
 
 class InspectorAgent(threading.Thread):
