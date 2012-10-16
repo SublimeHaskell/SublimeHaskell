@@ -5,7 +5,8 @@ module Main where
 import Control.Arrow
 import qualified Data.Aeson as Json
 import Data.Aeson ((.=))
-import qualified Data.ByteString.Lazy.Char8 as LazyByteString
+import qualified Data.Text.Lazy.Encoding as T
+import qualified Data.Text.Lazy.IO as T
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
 import qualified System.Environment as Environment
@@ -44,5 +45,5 @@ main = do
                 output = case analyzeCabal source of
                     Left excuse -> Json.toJSON $ Json.object ["error" .= excuse]
                     Right info -> Json.toJSON info
-            LazyByteString.putStrLn . Json.encode $ output
+            T.putStrLn . T.decodeUtf8 . Json.encode $ output
         _ -> putStrLn ("Usage: " ++ programName ++ " FILENAME")
