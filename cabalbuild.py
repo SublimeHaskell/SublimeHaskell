@@ -135,6 +135,11 @@ class SublimeHaskellRun(SublimeHaskellBaseCommand):
                     'dir': info['dir'],
                     'name': e['name'] }))
 
+        # Nothing to run
+        if len(ps) == 0:
+            sublime.status_message('SublimeHaskell: Nothing to run')
+            return
+
         cabal_project_dir, cabal_project_name = get_cabal_project_dir_and_name_of_view(self.window.active_view())
 
         # Show current project first
