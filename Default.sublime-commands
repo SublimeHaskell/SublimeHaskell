@@ -42,6 +42,10 @@
         "command": "sublime_haskell_install"
     },
     {
+        "caption": "SublimeHaskell: Run",
+        "command": "sublime_haskell_run"
+    },
+    {
         "caption": "SublimeHaskell: Check",
         "command": "sublime_haskell_ghc_mod_check"
     },

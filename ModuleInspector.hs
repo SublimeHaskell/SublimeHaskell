@@ -6,7 +6,7 @@ module Main where
 
 import qualified Data.Aeson as Json
 import           Data.Aeson ((.=))
-import qualified Data.ByteString.Lazy as LazyByteString
+import qualified Data.ByteString.Lazy.Char8 as LazyByteString
 import qualified Language.Haskell.Exts as H
 import qualified System.Environment as Environment
 
@@ -63,7 +63,7 @@ analyzeModule :: String -> Either String ModuleInfo
 analyzeModule source = case H.parseFileContents source of
     H.ParseFailed location reason -> Left
         ("Parse failed at " ++ show location ++ ": " ++ reason)
-    H.ParseOk (H.Module _ (H.ModuleName moduleName) _ _ exports imports declarations) -> Right $
+    H.ParseOk (H.Module _ (H.ModuleName moduleName) _ _ _ imports declarations) -> Right
         ModuleInfo
             { _moduleName = moduleName
             , _exportList = Nothing

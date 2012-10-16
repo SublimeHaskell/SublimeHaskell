@@ -10,6 +10,9 @@ import time
 from sublime_haskell_common import get_cabal_project_dir_of_view, get_cabal_project_dir_and_name_of_view, call_and_wait, log, are_paths_equal, get_setting, get_setting_async, set_setting, save_settings, is_enabled_haskell_command, get_haskell_command_window_view_file_project, SublimeHaskellBaseCommand
 from parseoutput import run_chain_build_thread
 from autobuild import attach_sandbox
+from autocomplete import autocompletion
+
+OUTPUT_PANEL_NAME = "haskell_run_output"
 
 cabal_tool = {
     True: { 'command': 'cabal-dev', 'message': 'Cabal-Dev', 'extra': lambda cmd: attach_sandbox(cmd) },
@@ -121,6 +124,81 @@ class SublimeHaskellRebuild(SublimeHaskellBaseCommand):
 class SublimeHaskellInstall(SublimeHaskellBaseCommand):
     def run(self):
         run_build('install')
+
+class SublimeHaskellRun(SublimeHaskellBaseCommand):
+    def run(self):
+        self.executables = []
+        ps = []
+        for p, info in autocompletion.projects.items():
+            for e in info['executables']:
+                ps.append((p + ": " + e['name'], {
+                    'dir': info['dir'],
+                    'name': e['name'] }))
+
+        cabal_project_dir, cabal_project_name = get_cabal_project_dir_and_name_of_view(self.window.active_view())
+
+        # Show current project first
+        def compare(l, r):
+            res = cmp(not l[0].startswith(cabal_project_name), not r[0].startswith(cabal_project_name))
+            if res == 0:
+                res = cmp(l[0], r[0])
+            return res
+
+        ps.sort(compare)
+
+        self.executables = map(lambda m: m[1], ps)
+        self.window.show_quick_panel(map(lambda m: m[0], ps), self.on_done)
+
+    def on_done(self, idx):
+        if idx == -1:
+            return
+        selected = self.executables[idx]
+        name = selected['name']
+        base_dir = selected['dir']
+        bin_file = os.path.join(selected['dir'], 'dist', 'build', name, name)
+
+        hide_output(self.window)
+
+        sublime.status_message('SublimeHaskell: Running ' + name + "...")
+
+        # Run in thread
+        thread = Thread(
+            target=run_binary,
+            args=(name, bin_file, base_dir))
+        thread.start()
+
+def run_binary(name, bin_file, base_dir):
+    exit_code, out, err = call_and_wait(bin_file, cwd = base_dir)
+    window = sublime.active_window()
+    if not window:
+        return
+    if exit_code == 0:
+        sublime.set_timeout(lambda: sublime.status_message('SublimeHaskell: Running ' + name + u" \u2714"), 0)
+        sublime.set_timeout(lambda: write_output(window, out, base_dir), 0)
+    else:
+        sublime.set_timeout(lambda: sublime.status_message('SublimeHaskell: Running ' + name + u" \u2717"), 0)
+        sublime.set_timeout(lambda: write_output(window, err, base_dir), 0)
+
+def write_output(window, text, base_dir):
+    "Write text to Sublime's output panel."
+    output_view = window.get_output_panel(OUTPUT_PANEL_NAME)
+    output_view.set_read_only(False)
+    # Configure Sublime's error message parsing:
+    output_view.settings().set("result_base_dir", base_dir)
+    # Write to the output buffer:
+    edit = output_view.begin_edit()
+    #output_view.insert(edit, 0, text)
+    output_view.insert(edit, 0, text)
+    output_view.end_edit(edit)
+    # Set the selection to the beginning of the view so that "next result" works:
+    output_view.sel().clear()
+    output_view.sel().add(sublime.Region(0))
+    output_view.set_read_only(True)
+    # Show the results panel:
+    window.run_command('show_panel', {'panel': 'output.' + OUTPUT_PANEL_NAME})
+
+def hide_output(window):
+    window.run_command('hide_panel', {'panel': 'output.' + OUTPUT_PANEL_NAME})
 
 # Cabal build system
 

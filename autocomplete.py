@@ -7,7 +7,7 @@ import subprocess
 import threading
 import time
 
-from sublime_haskell_common import PACKAGE_PATH, get_setting, get_setting_async, get_cabal_project_dir_of_file, get_cabal_project_dir_of_view, call_and_wait, call_ghcmod_and_wait, log, wait_for_window, output_error, get_settings, attach_sandbox, is_enabled_haskell_command
+from sublime_haskell_common import PACKAGE_PATH, get_setting, get_setting_async, get_cabal_project_dir_of_file, get_cabal_project_dir_of_view, call_and_wait, call_ghcmod_and_wait, log, wait_for_window, output_error, get_settings, attach_sandbox, is_enabled_haskell_command, get_cabal_in_dir
 
 # Completion text longer than this is ellipsized:
 MAX_COMPLETION_LENGTH = 37
@@ -18,6 +18,9 @@ CHECK_MTIME = True
 MODULE_INSPECTOR_SOURCE_PATH = os.path.join(PACKAGE_PATH, 'ModuleInspector.hs')
 MODULE_INSPECTOR_EXE_PATH = os.path.join(PACKAGE_PATH, 'ModuleInspector')
 MODULE_INSPECTOR_OBJ_DIR = os.path.join(PACKAGE_PATH, 'obj')
+CABAL_INSPECTOR_SOURCE_PATH = os.path.join(PACKAGE_PATH, 'CabalInspector.hs')
+CABAL_INSPECTOR_EXE_PATH = os.path.join(PACKAGE_PATH, 'CabalInspector')
+CABAL_INSPECTOR_OBJ_DIR = os.path.join(PACKAGE_PATH, 'obj')
 
 OUTPUT_PATH = os.path.join(PACKAGE_PATH, 'module_info.cache')
 
@@ -46,7 +49,7 @@ def get_line_contents(view, location):
 class AutoCompletion(object):
     """Information for completion"""
     def __init__(self):
-        self.language_completions = ["123"]
+        self.language_completions = []
         self.module_completions = []
         # Module info (dictionary: filename => info)
         # info is:
@@ -64,6 +67,15 @@ class AutoCompletion(object):
         # Standard module completions (dictionary: module name => completions):
         self.std_info_lock = threading.Lock()
         self.std_info = {}
+
+        # Currently used projects
+        # name => project where project is:
+        #   dir - project dir
+        #   cabal - cabal file
+        #   executables - list of executables where executable is
+        #     name - name of executable
+        self.projects_lock = threading.Lock()
+        self.projects = {}
 
     def get_completions(self, view, prefix, locations):
         "Get all the completions that apply to the current file."
@@ -362,6 +374,22 @@ class InspectorAgent(threading.Thread):
         self.dirty_files = []
 
     def run(self):
+        # Compile the CabalInspector:
+        # TODO: Where to compile it?
+        sublime.set_timeout(lambda: sublime.status_message('Compiling Haskell CabalInspector...'), 0)
+
+        exit_code, out, err = call_and_wait(['ghc',
+            '--make', CABAL_INSPECTOR_SOURCE_PATH,
+            '-o', CABAL_INSPECTOR_EXE_PATH,
+            '-outputdir', CABAL_INSPECTOR_OBJ_DIR])
+
+        if exit_code != 0:
+            error_msg = u"SublimeHaskell: Failed to compile CabalInspector\n{0}".format(err)
+            wait_for_window(lambda w: self.show_errors(w, error_msg))
+        else:
+            sublime.set_timeout(lambda: sublime.status_message('Compiling Haskell CabalInspector' + u" \u2714"), 0)
+        # Continue anyway
+
         # Compile the ModuleInspector:
         sublime.set_timeout(lambda: sublime.status_message('Compiling Haskell ModuleInspector...'), 0)
 
@@ -427,12 +455,32 @@ class InspectorAgent(threading.Thread):
         log('reinspecting project ({0})'.format(cabal_dir))
         # Process all files within the Cabal project:
         # TODO: Only process files within the .cabal file's "src" directory.
+        (project_name, cabal_file) = get_cabal_in_dir(cabal_dir)
+        # set project and read cabal
+        if cabal_file and project_name:
+            self._refresh_project_info(cabal_dir, project_name, cabal_file)
+
         files_in_dir = list_files_in_dir_recursively(cabal_dir)
         haskell_source_files = [x for x in files_in_dir if x.endswith('.hs') and ('dist/build/autogen' not in x)]
         for filename in haskell_source_files:
             self._refresh_module_info(filename)
         end_time = time.clock()
         log('total inspection time: {0} seconds'.format(end_time - begin_time))
+
+    def _refresh_project_info(self, cabal_dir, project_name, cabal_file):
+        exit_code, out, err = call_and_wait(
+            [CABAL_INSPECTOR_EXE_PATH, cabal_file])
+
+        if exit_code == 0:
+            new_info = json.loads(out)
+
+            if 'error' not in new_info:
+                if 'executables' in new_info:
+                    with autocompletion.projects_lock:
+                        autocompletion.projects[project_name] = {
+                            'dir': cabal_dir,
+                            'cabal': os.path.basename(cabal_file),
+                            'executables': new_info['executables'] }
 
     def _refresh_module_info(self, filename):
         "Rebuild module information for the specified file."

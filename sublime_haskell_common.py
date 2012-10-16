@@ -142,6 +142,14 @@ def get_cabal_project_dir_of_file(filename):
     """Return the path to the .cabal file project for the specified file."""
     return get_cabal_project_dir_and_name_of_file(filename)[0]
 
+def get_cabal_in_dir(cabal_dir):
+    """Return .cabal file for cabal directory"""
+    for entry in os.listdir(cabal_dir):
+        if entry.endswith(".cabal"):
+            project_name = os.path.splitext(entry)[0]
+            return (project_name, os.path.join(cabal_dir, entry))
+    return (None, None)
+
 def find_file_in_parent_dir(subdirectory, filename_pattern):
     """Look for a file with the specified name in a parent directory of the
     specified directory. If found, return the file's full path. Otherwise,
