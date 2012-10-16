@@ -421,20 +421,22 @@ class InspectorAgent(threading.Thread):
         # Update only when module is ok
         if exit_code == 0:
             new_info = json.loads(stdout)
-            # Load standard modules
-            if 'imports' in new_info:
-                for mi in new_info['imports']:
-                    if 'importName' in mi:
-                        self._load_standard_module(mi['importName'])
 
-            # Remember when this info was collected.
-            new_info['inspectedAt'] = modification_time
-            # Dump the currently-known module info to disk:
-            formatted_json = json.dumps(autocompletion.info, indent=2)
-            with open(OUTPUT_PATH, 'w') as f:
-                f.write(formatted_json)
-            with autocompletion.info_lock:
-                autocompletion.info[filename] = new_info
+            if 'error' not in new_info:
+                # Load standard modules
+                if 'imports' in new_info:
+                    for mi in new_info['imports']:
+                        if 'importName' in mi:
+                            self._load_standard_module(mi['importName'])
+
+                # Remember when this info was collected.
+                new_info['inspectedAt'] = modification_time
+                # Dump the currently-known module info to disk:
+                formatted_json = json.dumps(autocompletion.info, indent=2)
+                with open(OUTPUT_PATH, 'w') as f:
+                    f.write(formatted_json)
+                with autocompletion.info_lock:
+                    autocompletion.info[filename] = new_info
 
     def _load_standard_module(self, module_name):
         if module_name not in autocompletion.std_info:
