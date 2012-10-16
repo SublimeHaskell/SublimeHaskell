@@ -50,12 +50,54 @@ def run_build(command, use_cabal_dev = None):
 class SublimeHaskellSwitchCabalDev(sublime_plugin.WindowCommand):
     def run(self):
         use_cabal_dev = get_setting('use_cabal_dev')
-        set_setting('use_cabal_dev', not use_cabal_dev)
+        sandbox = get_setting('cabal_dev_sandbox')
+        sandboxes = get_setting('cabal_dev_sandbox_list')
+
+        sandboxes.append(sandbox)
+        sandboxes = list(set(sandboxes))
+        set_setting('cabal_dev_sandbox_list', sandboxes)
+
+        # No candboxes
+        if len(sandboxes) == 0:
+            sublime.status_message('SublimeHaskell: There is nothing to switch to')
+            set_setting('use_cabal_dev', False)
+            save_settings()
+            return
+
+        # One sandbox, just switch
+        if len(sandboxes) == 1:
+            set_setting('use_cabal_dev', not use_cabal_dev)
+            if use_cabal_dev:
+                now_using = 'Cabal'
+            else:
+                now_using = 'Cabal-Dev'
+            sublime.status_message('SublimeHaskell: Switched to ' + now_using)
+            save_settings()
+            return
+
+        # Many sandboxes, show list
+        self.sorted_sands = sandboxes
+        # Move previously used sandbox (or cabal) on top
+        self.sorted_sands.remove(sandbox)
         if use_cabal_dev:
-            now_using = 'Cabal'
+            self.sorted_sands.insert(0, sandbox)
+            self.sorted_sands.insert(0, "<Cabal>")
         else:
-            now_using = 'Cabal-Dev'
-        sublime.status_message('SublimeHaskell: Switched to ' + now_using)
+            self.sorted_sands.insert(0, "<Cabal>")
+            self.sorted_sands.insert(0, sandbox)
+
+        self.window.show_quick_panel(self.sorted_sands, self.on_done)
+
+    def on_done(self, idx):
+        if idx == -1:
+            return
+        selected = self.sorted_sands[idx]
+        if selected == "<Cabal>":
+            set_setting('use_cabal_dev', False)
+        else:
+            set_setting('use_cabal_dev', True)
+            set_setting('cabal_dev_sandbox', selected)
+
         save_settings()
 
 # Default build system (cabal or cabal-dev)

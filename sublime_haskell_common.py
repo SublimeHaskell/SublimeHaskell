@@ -28,6 +28,7 @@ class SublimeHaskellSettingsLoader(sublime_plugin.EventListener):
         get_setting('add_to_PATH')
         get_setting('use_cabal_dev')
         get_setting('cabal_dev_sandbox')
+        get_setting('cabal_dev_sandbox_list')
         get_setting('enable_auto_build')
         get_setting('show_output_window')
 
