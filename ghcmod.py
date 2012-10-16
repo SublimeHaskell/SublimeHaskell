@@ -53,17 +53,20 @@ def run_ghcmods(cmds, msg, alter_messages_cb = None):
         if alter_messages_cb:
             alter_messages_cb(msgs)
         def compare(l, r):
-            # sort by file
-            res = cmp(l[1].filename != file_name, r[1].filename != file_name)
+            # sort by file equality to file_name
+            res = cmp(l[1].filename != file_shown_in_view, r[1].filename != file_shown_in_view)
             if res == 0:
-                # then by line
-                res = cmp(l[1].line, r[1].line)
+                # then by file
+                res = cmp(l[1].filename, r[1].filename)
                 if res == 0:
-                    # then by column
-                    res = cmp(l[1].column, r[1].column)
+                    # then by line
+                    res = cmp(l[1].line, r[1].line)
+                    if res == 0:
+                        # then by column
+                        res = cmp(l[1].column, r[1].column)
             return res
 
-        msgs.sort(cmp)
+        msgs.sort(compare)
 
     run_ghcmods_thread(view, file_dir, 'Ghc-Mod: ' + msg + ' ' + file_name, ghc_mod_args, show_current_file_first_and_alter)
 
