@@ -90,20 +90,25 @@ class AutoCompletion(object):
             completions.extend(self.get_module_completions_for(qualified_prefix))
 
         with self.info_lock:
-            # File not processed yet
-            if current_file_name not in self.info:
-                return completions
 
             moduleImports = []
             # Use completion only from qualified_module
             if has_q:
-                # if qualified_module is alias, find its original name
-                # e.g. for 'import Data.Text as T' return 'Data.Text' for 'T'
-                moduleImports = [m['importName'] for m in self.info[current_file_name]['imports'] if m['as'] == qualified_module]
+                if current_file_name in self.info:
+                    current_info = self.info[current_file_name]
+                    if 'imports' in current_info:
+                        # if qualified_module is alias, find its original name
+                        # e.g. for 'import Data.Text as T' return 'Data.Text' for 'T'
+                        moduleImports.extend([m['importName'] for m in self.info[current_file_name]['imports'] if m['as'] == qualified_module])
                 moduleImports.append(qualified_module)
             else:
                 # list of imports, imported unqualified
-                moduleImports = [m['importName'] for m in self.info[current_file_name]['imports'] if not m['qualified']]
+                if current_file_name in self.info:
+                    current_info = self.info[current_file_name]
+                    if 'imports' in current_info:
+                        moduleImports.extend([m['importName'] for m in self.info[current_file_name]['imports'] if not m['qualified']])
+
+            log("QUAL: " + qualified_module)
 
             for file_name, file_info in self.info.items():
                 if 'error' in file_info:
@@ -292,11 +297,14 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         cabal_dir = get_cabal_project_dir_of_view(view)
         # if cabal_dir is not None:
 
+        log("PREFIX: " + prefix)
         completions = autocompletion.get_import_completions(view, prefix, locations)
 
+        log("imports got")
         if not completions:
             completions = autocompletion.get_completions(view, prefix, locations)
 
+        log("completions got")
         end_time = time.clock()
         log('time to get completions: {0} seconds'.format(end_time - begin_time))
         # Don't put completions with special characters (?, !, ==, etc.)
