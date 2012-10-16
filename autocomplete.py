@@ -327,14 +327,11 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         cabal_dir = get_cabal_project_dir_of_view(view)
         # if cabal_dir is not None:
 
-        log("PREFIX: " + prefix)
         completions = autocompletion.get_import_completions(view, prefix, locations)
 
-        log("imports got")
         if not completions:
             completions = autocompletion.get_completions(view, prefix, locations)
 
-        log("completions got")
         end_time = time.clock()
         log('time to get completions: {0} seconds'.format(end_time - begin_time))
         # Don't put completions with special characters (?, !, ==, etc.)
