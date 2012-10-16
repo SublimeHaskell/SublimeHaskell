@@ -179,16 +179,46 @@ class AutoCompletion(object):
 
 autocompletion = AutoCompletion()
 
-class SublimeHaskellGoToAnyDefinition(sublime_plugin.WindowCommand):
+class SublimeHaskellBrowseDeclarations(sublime_plugin.WindowCommand):
+    def run(self):
+        self.names = []
+        self.declarations = []
+        for f, v in autocompletion.info.items():
+            if 'declarations' in v:
+                for d in v['declarations']:
+                    self.names.append(d['identifier'])
+                    self.declarations.append(v['moduleName'] + ': '  + d['identifier'] + ' ' + d['info'])
+        for m, decls in autocompletion.std_info.items():
+            for decl in decls:
+                self.names.append(decl)
+                self.declarations.append(m + ': ' + decl)
+
+        self.window.show_quick_panel(self.declarations, self.on_done)
+
+    def on_done(self, idx):
+        if idx == -1:
+            return
+        view = self.window.active_view()
+        if not view:
+            return
+        edit = view.begin_edit()
+        for r in view.sel():
+            view.replace(edit, r, self.names[idx])
+        view.end_edit(edit)
+
+    def is_enabled(self):
+        return is_enabled_haskell_command(False)
+
+class SublimeHaskellGoToAnyDeclaration(sublime_plugin.WindowCommand):
     def run(self):
         self.files = []
-        self.definitions = []
+        self.declarations = []
         for f, v in autocompletion.info.items():
             if 'declarations' in v:
                 for d in v['declarations']:
                     self.files.append([f, str(d['line']), str(d['column'])])
-                    self.definitions.append([d['identifier'] + ' ' + d['info'], v['moduleName'] + ':' + str(d['line']) + ':' + str(d['column'])])
-        self.window.show_quick_panel(self.definitions, self.on_done)
+                    self.declarations.append([d['identifier'] + ' ' + d['info'], v['moduleName'] + ':' + str(d['line']) + ':' + str(d['column'])])
+        self.window.show_quick_panel(self.declarations, self.on_done)
 
     def on_done(self, idx):
         if idx == -1:
@@ -198,7 +228,7 @@ class SublimeHaskellGoToAnyDefinition(sublime_plugin.WindowCommand):
     def is_enabled(self):
         return is_enabled_haskell_command(False)
 
-class SublimeHaskellGoToDefinition(sublime_plugin.TextCommand):
+class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
     def run(self, edit):
         ident = self.view.substr(self.view.word(self.view.sel()[0]))
         for f, v in autocompletion.info.items():

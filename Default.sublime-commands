@@ -54,12 +54,16 @@
         "command": "sublime_haskell_stylish"
     },
     {
-        "caption": "SublimeHaskell: Go To Any Definition",
-        "command": "sublime_haskell_go_to_any_definition"
+        "caption": "SublimeHaskell: Go To Any Declaration",
+        "command": "sublime_haskell_go_to_any_declaration"
     },
     {
-        "caption": "SublimeHaskell: Go To Definition",
-        "command": "sublime_haskell_go_to_definition"
+        "caption": "SublimeHaskell: Go To Declaration",
+        "command": "sublime_haskell_go_to_declaration"
+    },
+    {
+        "caption": "SublimeHaskell: Browse Declarations",
+        "command": "sublime_haskell_browse_declarations"
     },
     {
         "caption": "SublimeHaskell: Switch Cabal/Cabal-Dev",
