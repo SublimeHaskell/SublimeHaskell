@@ -25,8 +25,9 @@ class SublimeHaskellGhcModLint(sublime_plugin.WindowCommand):
 class SublimeHaskellGhcModCheckAndLint(sublime_plugin.WindowCommand):
     def run(self):
         def lint_as_hints(msgs):
-            for m in msgs['lint']:
-                m.level = 'hint'
+            for m in msgs:
+                if m[0] == 'lint':
+                    m[1].level = 'hint'
         run_ghcmods(['check', 'lint'], 'Checking and Lintind', lint_as_hints)
 
     def is_enabled(self):
@@ -48,12 +49,26 @@ def run_ghcmods(cmds, msg, alter_messages_cb = None):
     for cmd in cmds:
         ghc_mod_args.append((cmd, [cmd, file_name]))
 
-    run_ghcmods_thread(view, file_dir, 'Ghc-Mod: ' + msg + ' ' + file_name, ghc_mod_args, alter_messages_cb)
+    def show_current_file_first_and_alter(msgs):
+        if alter_messages_cb:
+            alter_messages_cb(msgs)
+        def compare(l, r):
+            # sort by file
+            res = cmp(l[1].filename != file_name, r[1].filename != file_name)
+            if res == 0:
+                # then by line
+                res = cmp(l[1].line, r[1].line)
+                if res == 0:
+                    # then by column
+                    res = cmp(l[1].column, r[1].column)
+            return res
 
-def run_ghcmod(cmd, msg, alter_message_cb = None):
-    def alter_messages_cb(msgs):
-        return map(alter_message_cb, msgs[cmd])
-    run_ghcmods([cmd], msg, alter_messages_cb if alter_message_cb else None)
+        msgs.sort(cmp)
+
+    run_ghcmods_thread(view, file_dir, 'Ghc-Mod: ' + msg + ' ' + file_name, ghc_mod_args, show_current_file_first_and_alter)
+
+def run_ghcmod(cmd, msg, alter_messages_cb = None):
+    run_ghcmods([cmd], msg, alter_messages_cb)
 
 def run_ghcmods_thread(view, file_dir, msg, cmds_with_args, alter_messages_cb):
     sublime.status_message(msg + '...')
@@ -67,7 +82,7 @@ def wait_ghcmod_and_parse(view, file_dir, msg, cmds_with_args, alter_messages_cb
 
     exit_success = True
 
-    parsed_messages = {}
+    parsed_messages = []
 
     for (cmd, args) in cmds_with_args:
         stdout = call_ghcmod_and_wait(args, file_dir)
@@ -79,20 +94,16 @@ def wait_ghcmod_and_parse(view, file_dir, msg, cmds_with_args, alter_messages_cb
 
         exit_success = exit_success and len(out) == 0
 
-        parsed_messages[cmd] = parse_output_messages(file_dir, out)
+        parsed = parse_output_messages(file_dir, out)
+        for p in parsed:
+            parsed_messages.append((cmd, p))
 
     exit_code = 0 if exit_success else 1
-
-    def concat_messages(ms):
-        res = []
-        for (c, a) in cmds_with_args:
-            res.extend(ms[c])
-        return res
 
     if alter_messages_cb:
         alter_messages_cb(parsed_messages)
 
-    concated_messages = concat_messages(parsed_messages)
+    concated_messages = map(lambda m: m[1], parsed_messages)
     output_text = format_output_messages(concated_messages)
 
     show_output_result_text(view, msg, output_text, exit_code, file_dir)

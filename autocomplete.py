@@ -108,8 +108,6 @@ class AutoCompletion(object):
                     if 'imports' in current_info:
                         moduleImports.extend([m['importName'] for m in self.info[current_file_name]['imports'] if not m['qualified']])
 
-            log("QUAL: " + qualified_module)
-
             for file_name, file_info in self.info.items():
                 if 'error' in file_info:
                     # There was an error parsing this file; skip it
