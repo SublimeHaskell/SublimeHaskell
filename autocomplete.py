@@ -34,6 +34,7 @@ LANGUAGE_RE = re.compile(r'.*{-#\s+LANGUAGE.*')
 IMPORT_RE = re.compile(r'.*import(\s+qualified)?\s+')
 IMPORT_RE_PREFIX = re.compile(r'^\s*import(\s+qualified)?\s+(.*)$')
 IMPORT_QUALIFIED_POSSIBLE_RE = re.compile(r'.*import\s+(?P<qualifiedprefix>\S*)$')
+IMPORT_RE_LIST = re.compile(r'.*import(\s+qualified)?\s+\w+(\.\w+)*(\s+as\s+\w+)?\s+\(')
 
 # Checks if a word contains only alhanums, -, and _
 NO_SPECIAL_CHARS_RE = re.compile(r'^(\w|[\-])*$')
@@ -44,6 +45,22 @@ def get_line_contents(view, location):
     Returns the contents of the line at the given location.
     """
     return view.substr(sublime.Region(view.line(location).a, location))
+
+def get_line_contents_before_region(view, region):
+    """
+    Returns the of the line before the given region (including it).
+    """
+    return view.substr(sublime.Region(view.line(region).a, region.b))
+
+def get_qualified_name(s):
+    """
+    'bla bla bla Data.List.fo' -> ('Data.List', 'Data.List.fo')
+    """
+    if len(s) == 0:
+        return ('', '')
+    quals = s.split()[-1].split('.')
+    filtered = map(lambda s: filter(lambda c: c.isalpha() or c.isdigit() or c == '_', s), quals)
+    return ('.'.join(filtered[0:len(filtered) - 1]), '.'.join(filtered))
 
 # Autocompletion data
 class AutoCompletion(object):
@@ -77,22 +94,23 @@ class AutoCompletion(object):
         self.projects_lock = threading.Lock()
         self.projects = {}
 
+    def unalias_module_name(self, view, alias):
+        "Get module names by alias"
+        current_file_name = view.file_name()
+        if current_file_name in self.info:
+            current_info = self.info[current_file_name]
+            if 'imports' in current_info:
+                return [m['importName'] for m in current_info['imports'] if m['as'] == alias]
+        return []
+
     def get_completions(self, view, prefix, locations):
         "Get all the completions that apply to the current file."
 
         line_contents = get_line_contents(view, locations[0])
 
-        # 'bla bla bla Data.List.fo' -> ('Data.List', 'Data.List.fo')
-        def get_qualify(s):
-            if len(s) == 0:
-                return ('', '')
-            quals = s.split()[-1].split('.')
-            filtered = map(lambda s: filter(lambda c: c.isalpha(), s), quals)
-            return ('.'.join(filtered[0:len(filtered) - 1]), '.'.join(filtered))
-
         current_file_name = view.file_name()
 
-        (qualified_module, qualified_prefix) = get_qualify(line_contents)
+        (qualified_module, qualified_prefix) = get_qualified_name(line_contents)
         has_q = len(qualified_module) != 0
 
         completions = []
@@ -111,14 +129,14 @@ class AutoCompletion(object):
                     if 'imports' in current_info:
                         # if qualified_module is alias, find its original name
                         # e.g. for 'import Data.Text as T' return 'Data.Text' for 'T'
-                        moduleImports.extend([m['importName'] for m in self.info[current_file_name]['imports'] if m['as'] == qualified_module])
+                        moduleImports.extend([m['importName'] for m in current_info['imports'] if m['as'] == qualified_module])
                 moduleImports.append(qualified_module)
             else:
                 # list of imports, imported unqualified
                 if current_file_name in self.info:
                     current_info = self.info[current_file_name]
                     if 'imports' in current_info:
-                        moduleImports.extend([m['importName'] for m in self.info[current_file_name]['imports'] if not m['qualified']])
+                        moduleImports.extend([m['importName'] for m in current_info['imports'] if not m['qualified']])
 
             for file_name, file_info in self.info.items():
                 if 'error' in file_info:
@@ -161,6 +179,23 @@ class AutoCompletion(object):
 
         # Autocompletion for import statements
         if get_setting('auto_complete_imports'):
+            match_import_list = IMPORT_RE_LIST.match(line_contents)
+            if match_import_list:
+                (_, mname) = match_import_list.groups()
+                import_list_completions = []
+                with self.info_lock:
+                    for file_info in self.info.values():
+                        if file_info['moduleName'] == mname:
+                            for d in file_info['declarations']:
+                                identifier = d['identifier']
+                                import_list_completions.append((identifier[:MAX_COMPLETION_LENGTH], identifier))
+                with self.std_info_lock:
+                    if mname in self.std_info:
+                        for v in self.std_info[mname]:
+                            import_list_completions.append((v[:MAX_COMPLETION_LENGTH], v))
+
+                return import_list_completions
+
             match_import = IMPORT_RE_PREFIX.match(line_contents)
             if match_import:
                 (qualified, pref) = match_import.groups()
@@ -240,13 +275,61 @@ class SublimeHaskellGoToAnyDeclaration(sublime_plugin.WindowCommand):
 
 class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
     def run(self, edit):
-        ident = self.view.substr(self.view.word(self.view.sel()[0]))
+        word_region = self.view.word(self.view.sel()[0])
+        preline = get_line_contents_before_region(self.view, word_region)
+        (module_word, _) = get_qualified_name(preline)
+        no_module = len(module_word) == 0
+
+        modules = []
+
+        if not no_module: # Get modules by alias
+            modules = [module_word]
+            modules.extend(autocompletion.unalias_module_name(self.view, module_word))
+
+        ident = self.view.substr(word_region)
+        full_qualified_name = ident if no_module else '.'.join([module_word, ident]) # goto module
+
+        self.module_files = []
+        module_candidates = []
+        self.files = []
+        candidates = []
+
         for f, v in autocompletion.info.items():
-            if 'declarations' in v:
-                for d in v['declarations']:
-                    if d['identifier'] == ident:
-                        self.view.window().open_file(':'.join([f, str(d['line']), str(d['column'])]), sublime.ENCODED_POSITION)
-                        return
+            if full_qualified_name == v['moduleName']:
+                self.module_files.append(f)
+                module_candidates.append([full_qualified_name, f])
+            if no_module or v['moduleName'] in modules:
+                if 'declarations' in v:
+                    for d in v['declarations']:
+                        if d['identifier'] == ident:
+                            self.files.append([f, str(d['line']), str(d['column'])])
+                            candidates.append([d['identifier'] + ' ' + d['info'], v['moduleName'] + ':' + str(d['line']) + ':' + str(d['column'])])
+
+        if len(module_candidates) == 0 and len(candidates) == 0:
+            sublime.status_message("SublimeHaskell: Go To Declaration: identifier not found: {0}".format(full_qualified_name))
+            return
+
+        if len(module_candidates) + len(candidates) == 1:
+            if len(module_candidates) == 1:
+                self.view.window().open_file(self.module_files[0])
+                return
+            if len(candidates) == 1:
+                self.view.window().open_file(':'.join(self.files[0]), sublime.ENCODED_POSITION)
+                return
+
+        # many candidates
+        self.view.window().show_quick_panel(candidates + module_candidates, self.on_done)
+
+    def on_done(self, idx):
+        if idx == -1:
+            return
+
+        files_len = len(self.files)
+
+        if idx < files_len:
+            self.view.window().open_file(':'.join(self.files[idx]), sublime.ENCODED_POSITION)
+        else:
+            self.view.window().open_file(self.module_files[idx - files_len])
 
     def is_enabled(self):
         return is_enabled_haskell_command(False)
