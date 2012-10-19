@@ -221,7 +221,7 @@ class SublimeHaskellCabalBuild(SublimeHaskellBaseCommand):
 
 class SublimeHaskellCabalRebuild(SublimeHaskellBaseCommand):
     def run(self):
-        run_build('configure', False)
+        run_build('rebuild', False)
 
 class SublimeHaskellCabalInstall(SublimeHaskellBaseCommand):
     def run(self):
@@ -243,7 +243,7 @@ class SublimeHaskellCabalDevBuild(SublimeHaskellBaseCommand):
 
 class SublimeHaskellCabalDevRebuild(SublimeHaskellBaseCommand):
     def run(self):
-        run_build('configure', True)
+        run_build('rebuild', True)
 
 class SublimeHaskellCabalDevInstall(SublimeHaskellBaseCommand):
     def run(self):
