@@ -2,8 +2,7 @@ import sublime
 import sublime_plugin
 import re
 
-from sublime_haskell_common import call_ghcmod_and_wait
-from cabalbuild import is_enabled_haskell_command
+from sublime_haskell_common import call_ghcmod_and_wait, is_enabled_haskell_command
 
 # Used to find out the module name.
 MODULE_RE_STR = r'module\s+([^\s\(]*)' # "module" followed by everything that is neither " " nor "("
@@ -26,7 +25,7 @@ def parse_ghc_mod_type_line(l):
     return match and match.groupdict()
 
 # TODO rename to SublimeHaskellShowTypeCommand
-class HaskellShowTypeCommand(sublime_plugin.TextCommand):
+class SublimeHaskellShowType(sublime_plugin.TextCommand):
     def ghcmod_get_type_of_cursor(self):
         view = self.view
 
@@ -81,11 +80,11 @@ class HaskellShowTypeCommand(sublime_plugin.TextCommand):
         view.window().run_command('show_panel', {'panel': 'output.' + TYPE_PANEL_NAME})
 
     def is_enabled(self):
-        return is_enabled_haskell_command()
+        return is_enabled_haskell_command(False)
 
 
 # Works only with the cursor being in the name of a toplevel function so far.
-class HaskellInsertTypeCommand(HaskellShowTypeCommand):
+class SublimeHaskellInsertType(SublimeHaskellShowType):
     def run(self, edit):
         view = self.view
         result_type = self.ghcmod_get_type_of_cursor()
