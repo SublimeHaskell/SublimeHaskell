@@ -28,7 +28,7 @@ class SublimeHaskellGhcModCheckAndLint(sublime_plugin.WindowCommand):
             for m in msgs:
                 if m[0] == 'lint':
                     m[1].level = 'hint'
-        run_ghcmods(['check', 'lint'], 'Checking and Lintind', lint_as_hints)
+        run_ghcmods(['check', 'lint'], 'Checking and Linting', lint_as_hints)
 
     def is_enabled(self):
         return is_enabled_haskell_command(False)
