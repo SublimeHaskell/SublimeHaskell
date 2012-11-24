@@ -1,0 +1,7 @@
+<snippet>
+    <content><![CDATA[
+import qualified ${1:Module} as ${2:${1/(\u\w*\.)*(\u)\w*/$2/}}
+]]></content>
+    <tabTrigger>qualified</tabTrigger>
+    <scope>source.haskell</scope>
+</snippet>
