@@ -42,7 +42,7 @@ class HaskellShowTypeCommand(sublime_plugin.TextCommand):
         module = MODULE_RE.match(view.substr(module_region)).group(1)
 
         ghcmod_args = ['type', filename, module, str(row1), str(col1)]
-        out = call_ghcmod_and_wait(ghcmod_args)
+        out = call_ghcmod_and_wait(ghcmod_args, view)
 
         if not out:
             sublime.status_message("ghc-mod %s returned nothing" % ' '.join(ghcmod_args))

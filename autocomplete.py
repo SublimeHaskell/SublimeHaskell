@@ -44,14 +44,15 @@ def get_line_contents(view, location):
 
 class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
     def __init__(self):
+        self.language_completions = []
+        if get_setting('enable_ghc_mod'):
+            self.init_ghcmod_completions()
+
         # TODO: Start the InspectorAgent as a separate thread.
         self.inspector = InspectorAgent()
         self.inspector.start()
 
-        self.language_completions = []
 
-        if get_setting('enable_ghc_mod'):
-            self.init_ghcmod_completions()
 
     # Gets available LANGUAGE options and import modules from ghc-mod
     def init_ghcmod_completions(self):
