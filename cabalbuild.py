@@ -234,7 +234,6 @@ def write_output(window, text, base_dir):
     output_view.settings().set("result_base_dir", base_dir)
     # Write to the output buffer:
     edit = output_view.begin_edit()
-    #output_view.insert(edit, 0, text)
     output_view.insert(edit, 0, text)
     output_view.end_edit(edit)
     # Set the selection to the beginning of the view so that "next result" works:

@@ -37,15 +37,11 @@ sublime_haskell_settings = {}
 
 def is_enabled_haskell_command(must_be_project = True, must_be_main = False):
     """Returns True if command for .hs can be invoked"""
-    window = sublime.active_window()
-    if not window:
+    window, view, file_shown_in_view = get_haskell_command_window_view_file_project()
+
+    if not window or not view or not file_shown_in_view:
         return False
-    view = window.active_view()
-    if not view:
-        return False
-    file_shown_in_view = view.file_name()
-    if not file_shown_in_view:
-        return False
+
     syntax_file_for_view = view.settings().get('syntax').lower()
     if 'haskell' not in syntax_file_for_view:
         return False
