@@ -225,13 +225,13 @@ def set_setting(key, value):
     sublime_haskell_settings[key] = value
     get_settings().set(key, value)
 
-def call_ghcmod_and_wait(arg_list, file_dir = None):
+def call_ghcmod_and_wait(arg_list, filename = None):
     """
     Calls ghc-mod with the given arguments.
     Shows a sublime error message if ghc-mod is not available.
     """
 
-    ghc_cwd = get_cabal_project_dir_of_file(file_dir) if file_dir else None
+    ghc_cwd = get_cabal_project_dir_of_file(filename) if filename else None
 
     try:
         exit_code, out, err = call_and_wait(

@@ -68,27 +68,29 @@ def run_ghcmods(cmds, msg, alter_messages_cb = None):
 
         msgs.sort(compare)
 
-    run_ghcmods_thread(view, file_dir, 'Ghc-Mod: ' + msg + ' ' + file_name, ghc_mod_args, show_current_file_first_and_alter)
+    run_ghcmods_thread(view, file_shown_in_view, 'Ghc-Mod: ' + msg + ' ' + file_name, ghc_mod_args, show_current_file_first_and_alter)
 
 def run_ghcmod(cmd, msg, alter_messages_cb = None):
     run_ghcmods([cmd], msg, alter_messages_cb)
 
-def run_ghcmods_thread(view, file_dir, msg, cmds_with_args, alter_messages_cb):
+def run_ghcmods_thread(view, filename, msg, cmds_with_args, alter_messages_cb):
     sublime.status_message(msg + '...')
     thread = Thread(
         target=wait_ghcmod_and_parse,
-        args=(view, file_dir, msg, cmds_with_args, alter_messages_cb))
+        args=(view, filename, msg, cmds_with_args, alter_messages_cb))
     thread.start()
 
-def wait_ghcmod_and_parse(view, file_dir, msg, cmds_with_args, alter_messages_cb):
+def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb):
     sublime.set_timeout(lambda: hide_output(view), 0)
 
     exit_success = True
 
     parsed_messages = []
 
+    file_dir = os.path.dirname(filename)
+
     for (cmd, args) in cmds_with_args:
-        stdout = call_ghcmod_and_wait(args, file_dir)
+        stdout = call_ghcmod_and_wait(args, filename)
 
         # stdout contains NULL as line endings within one message
         # error_output_regex using indents to determine one message scope
