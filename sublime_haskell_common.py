@@ -22,15 +22,14 @@ SUBLIME_ERROR_PANEL_NAME = 'haskell_sublime_load'
 # And then setting can be get from any thread with get_setting_async
 # But setting must be loaded at least once from main thread
 # Some settings are loaded only from secondary threads, so we loading them here for first time
-class SublimeHaskellSettingsLoader(sublime_plugin.EventListener):
-    def __init__(self):
-        # Now we can use get_setting_async for 'add_to_PATH' safely
-        get_setting('add_to_PATH')
-        get_setting('use_cabal_dev')
-        get_setting('cabal_dev_sandbox')
-        get_setting('cabal_dev_sandbox_list')
-        get_setting('enable_auto_build')
-        get_setting('show_output_window')
+def preload_settings():
+    # Now we can use get_setting_async for 'add_to_PATH' safely
+    get_setting('add_to_PATH')
+    get_setting('use_cabal_dev')
+    get_setting('cabal_dev_sandbox')
+    get_setting('cabal_dev_sandbox_list')
+    get_setting('enable_auto_build')
+    get_setting('show_output_window')
 
 # SublimeHaskell settings dictionary
 # used to retrieve it async from any thread
@@ -203,6 +202,8 @@ def get_setting(key, default=None):
         sublime_haskell_settings[key] = result
         get_settings().add_on_change(key, lambda: update_setting(key))
     return result
+
+preload_settings()
 
 def update_setting(key):
     "Updates setting as it was changed"

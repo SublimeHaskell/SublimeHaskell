@@ -376,7 +376,6 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 
         # Init LANGUAGE completions
         autocompletion.language_completions = call_ghcmod_and_wait(['lang']).splitlines()
-        log("Reading LANGUAGE completions from ghc-mod")
 
         # Init import module completion
         autocompletion.module_completions = call_ghcmod_and_wait(['list']).splitlines()
