@@ -231,12 +231,12 @@ def call_ghcmod_and_wait(arg_list, filename = None):
     Shows a sublime error message if ghc-mod is not available.
     """
 
-    ghc_cwd = get_cabal_project_dir_of_file(filename) if filename else None
+    ghc_cwd = (get_cabal_project_dir_of_file(filename) or os.path.dirname(filename)) if filename else None
 
     try:
         exit_code, out, err = call_and_wait(
             try_attach_sandbox(['ghc-mod'] + arg_list),
-            cwd = ghc_cwd)
+            cwd = ghc_cwd or os.getcwd())
 
         if exit_code != 0:
             raise Exception("ghc-mod exited with status %d and stderr: %s" % (exit_code, err))

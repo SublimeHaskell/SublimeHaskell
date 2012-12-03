@@ -47,7 +47,7 @@ def run_ghcmods(cmds, msg, alter_messages_cb = None):
 
     ghc_mod_args = []
     for cmd in cmds:
-        ghc_mod_args.append((cmd, [cmd, file_name]))
+        ghc_mod_args.append((cmd, [cmd, file_shown_in_view]))
 
     def show_current_file_first_and_alter(msgs):
         if alter_messages_cb:
