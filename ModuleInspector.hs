@@ -6,7 +6,8 @@ module Main where
 
 import qualified Data.Aeson as Json
 import           Data.Aeson ((.=))
-import qualified Data.ByteString.Lazy as LazyByteString
+import qualified Data.Text.Lazy.Encoding as T
+import qualified Data.Text.Lazy.IO as T
 import qualified Language.Haskell.Exts as H
 import qualified System.Environment as Environment
 
@@ -14,7 +15,7 @@ import qualified System.Environment as Environment
 data ModuleInfo = ModuleInfo
     { _moduleName :: String
     , _exportList :: Maybe [String]
-    , _importList :: [String]
+    , _imports :: [ImportInfo]
     , _declarations :: [DeclarationInfo]
     }
     deriving (Show)
@@ -23,21 +24,39 @@ instance Json.ToJSON ModuleInfo where
     toJSON info = Json.object
         [ "moduleName" .= _moduleName info
         , "exportList" .= Json.Null
-        , "importList" .= Json.Null
+        , "imports" .= _imports info
         , "declarations" .= _declarations info
+        ]
+
+-- | Information about import
+data ImportInfo = ImportInfo
+    { _importName :: String
+    , _importQualified :: Bool
+    , _importAs :: Maybe String
+    }
+    deriving (Show)
+
+instance Json.ToJSON ImportInfo where
+    toJSON info = Json.object
+        [ "importName" .= _importName info
+        , "qualified" .= _importQualified info
+        , "as" .= _importAs info
         ]
 
 -- | Information about a single type or function declaration.
 data DeclarationInfo = DeclarationInfo
-    { _nameOfDeclaration :: String
+    { _declLocation :: H.SrcLoc
+    , _nameOfDeclaration :: String
     , _typeInfo :: String
     }
     deriving (Show)
 
 instance Json.ToJSON DeclarationInfo where
-    toJSON (DeclarationInfo name typeInfo) = Json.object
+    toJSON (DeclarationInfo (H.SrcLoc _ l c) name typeInfo) = Json.object
         [ "info" .= typeInfo
         , "identifier" .= name
+        , "line" .= l
+        , "column" .= c
         ]
 
 -- | Process a single file's contents.
@@ -45,26 +64,32 @@ analyzeModule :: String -> Either String ModuleInfo
 analyzeModule source = case H.parseFileContents source of
     H.ParseFailed location reason -> Left
         ("Parse failed at " ++ show location ++ ": " ++ reason)
-    H.ParseOk (H.Module _ (H.ModuleName moduleName) _ _ exports imports declarations) -> Right $
+    H.ParseOk (H.Module _ (H.ModuleName moduleName) _ _ _ imports declarations) -> Right
         ModuleInfo
             { _moduleName = moduleName
             , _exportList = Nothing
-            , _importList = []
+            , _imports = map infoOfImport imports
             , _declarations = concatMap nameOfDecl declarations
             }
+
+-- | Get module name for import
+infoOfImport :: H.ImportDecl -> ImportInfo
+infoOfImport d = ImportInfo (mname (H.importModule d)) (H.importQualified d) (fmap mname $ H.importAs d) where
+    mname (H.ModuleName n) = n
 
 -- | Get the relevant information about of a top-level declaration.
 -- Return Nothing if the declaration is not interesting.
 nameOfDecl :: H.Decl -> [DeclarationInfo]
 nameOfDecl decl = case decl of
-    H.TypeSig _ names typeSignature -> map
+    H.TypeSig loc names typeSignature -> map
         (\n -> DeclarationInfo
+            loc
             (identOfName n)
             (":: " ++ H.prettyPrint typeSignature))
         names
-    H.TypeDecl _ n _ _ -> [DeclarationInfo (identOfName n) "(type)"]
-    H.DataDecl _ _ _ n _ _ _ -> [DeclarationInfo (identOfName n) "(data)"]
-    H.ClassDecl _ _ n _ _ _ -> [DeclarationInfo (identOfName n) "(class)"]
+    H.TypeDecl loc n _ _ -> [DeclarationInfo loc (identOfName n) "(type)"]
+    H.DataDecl loc _ _ n _ _ _ -> [DeclarationInfo loc (identOfName n) "(data)"]
+    H.ClassDecl loc _ n _ _ _ -> [DeclarationInfo loc (identOfName n) "(class)"]
     _ -> []
 
 identOfName :: H.Name -> String
@@ -83,5 +108,5 @@ main = do
             let output = case analyzeModule source of
                     Left excuse -> Json.toJSON $ Json.object ["error" .= excuse]
                     Right info -> Json.toJSON info
-            LazyByteString.putStrLn . Json.encode $ output
+            T.putStrLn . T.decodeUtf8 . Json.encode $ output
         _ -> putStrLn ("Usage: " ++ programName ++ " FILENAME")

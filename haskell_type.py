@@ -2,7 +2,7 @@ import sublime
 import sublime_plugin
 import re
 
-from sublime_haskell_common import call_ghcmod_and_wait
+from sublime_haskell_common import call_ghcmod_and_wait, is_enabled_haskell_command
 
 # Used to find out the module name.
 MODULE_RE_STR = r'module\s+([^\s\(]*)' # "module" followed by everything that is neither " " nor "("
@@ -25,7 +25,7 @@ def parse_ghc_mod_type_line(l):
     return match and match.groupdict()
 
 # TODO rename to SublimeHaskellShowTypeCommand
-class HaskellShowTypeCommand(sublime_plugin.TextCommand):
+class SublimeHaskellShowType(sublime_plugin.TextCommand):
     def ghcmod_get_type_of_cursor(self):
         view = self.view
 
@@ -42,7 +42,7 @@ class HaskellShowTypeCommand(sublime_plugin.TextCommand):
         module = MODULE_RE.match(view.substr(module_region)).group(1)
 
         ghcmod_args = ['type', filename, module, str(row1), str(col1)]
-        out = call_ghcmod_and_wait(ghcmod_args)
+        out = call_ghcmod_and_wait(ghcmod_args, filename)
 
         if not out:
             sublime.status_message("ghc-mod %s returned nothing" % ' '.join(ghcmod_args))
@@ -51,7 +51,7 @@ class HaskellShowTypeCommand(sublime_plugin.TextCommand):
         # ghc-mod type returns the type of the expression at at the given row/col.
         # It can return multiple lines, extending the expression scope by one level each.
         # The last line belongs to the toplevel expression.
-        types = map(parse_ghc_mod_type_line, out.strip().split('\n'))
+        types = map(parse_ghc_mod_type_line, out.strip().splitlines())
         result_type = types[0]['type']  # innermost expression's type
 
         if not result_type:
@@ -79,9 +79,12 @@ class HaskellShowTypeCommand(sublime_plugin.TextCommand):
         # Show the results panel:
         view.window().run_command('show_panel', {'panel': 'output.' + TYPE_PANEL_NAME})
 
+    def is_enabled(self):
+        return is_enabled_haskell_command(False)
+
 
 # Works only with the cursor being in the name of a toplevel function so far.
-class HaskellInsertTypeCommand(HaskellShowTypeCommand):
+class SublimeHaskellInsertType(SublimeHaskellShowType):
     def run(self, edit):
         view = self.view
         result_type = self.ghcmod_get_type_of_cursor()

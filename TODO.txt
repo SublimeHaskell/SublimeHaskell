@@ -22,9 +22,6 @@ Autobuild (error checking)
 
 Autocomplete
 ------------
-* Get export list of each module:
-  * Either read explicit export list, or, if implicit, include all the declarations
-* Get all the modules imported into the current file
 * Find the declarations of constructors, record fields, class functions, and other non-top-level declarations
 * Somehow include Prelude and library functions
   * Hard-coded? (.sublime-completions file)
