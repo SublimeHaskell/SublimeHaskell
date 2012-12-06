@@ -7,6 +7,7 @@ Requirements
 * cabal
 * Cabal packages: base, bytestring, data-aeson, haskell-src-exts
 * ghc-mod (for import and LANGUAGE completions and type inference)
+* stylish-haskell
 
 Installation
 ------------
@@ -21,6 +22,10 @@ When editing Haskell source files that are part of a Cabal project, automatic er
 Each time you save, any errors in your program will be listed at the bottom of the window and highlighted in the source code.
 
 All source files in the project are scanned when the change. Any symbols that they export are provided in the auto-complete suggestions.
+
+To use cabal-dev instead of cabal, set use_cabal_dev to true (or use command "Switch Cabal/Cabal-Dev") and specify cabal-dev absolute path. Completion list will be rescanned and build will use cabal-dev.
+
+Stylish-haskell can be used to stylish file or selected text.
 
 Keybindings
 -----------

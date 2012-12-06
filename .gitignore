@@ -1,0 +1,19 @@
+
+# vim swap files
+.*.sw[a-z]
+
+# haskell's junk
+dist
+cabal-dev
+*.hi
+*.o
+
+#python's junk
+*.pyc
+
+#util
+*.exe
+*.cache
+
+# logs
+*.log
