@@ -3,11 +3,16 @@ README
 
 Requirements
 ------------
-* ghc
+
+Necessary:
+* ghc and a recent Haskell Platform (>= 2012 should do fine)
 * cabal
-* Cabal packages: base, bytestring, data-aeson, haskell-src-exts
-* ghc-mod (for import and LANGUAGE completions and type inference)
-* stylish-haskell
+* Cabal packages: base, bytestring, aeson, haskell-src-exts (`cabal install aeson haskell-src-exts`)
+
+Optional, but useful:
+* ghc-mod (for import and LANGUAGE completions and type inference, `cabal install ghc-mod`)
+* stylish-haskell (for code prettification, `cabal install stylish-haskell`)
+* cabal-dev if you want to use it
 
 Installation
 ------------
