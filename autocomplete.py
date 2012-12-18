@@ -94,6 +94,11 @@ class AutoCompletion(object):
         self.projects_lock = threading.Lock()
         self.projects = {}
 
+    def clear_inspected(self):
+        self.info = {}
+        self.std_info = {}
+        self.projects = {}
+
     def unalias_module_name(self, view, alias):
         "Get module names by alias"
         current_file_name = view.file_name()
@@ -273,6 +278,11 @@ class SublimeHaskellGoToAnyDeclaration(sublime_plugin.WindowCommand):
     def is_enabled(self):
         return is_enabled_haskell_command(False)
 
+class SublimeHaskellReinspectAll(sublime_plugin.WindowCommand):
+    def run(self):
+        autocompletion.clear_inspected()
+        SublimeHaskellAutocomplete.inspector.mark_all_files(self.window)
+
 class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
     def run(self, edit):
         word_region = self.view.word(self.view.sel()[0])
@@ -333,116 +343,6 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
 
     def is_enabled(self):
         return is_enabled_haskell_command(False)
-
-class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
-    def __init__(self):
-        # TODO: Start the InspectorAgent as a separate thread.
-        self.inspector = InspectorAgent()
-        self.inspector.start()
-
-        autocompletion.language_completions = []
-        autocompletion.module_completions = []
-
-        self.local_settings = {
-            'enable_ghc_mod' : None,
-            'use_cabal_dev' : None,
-            'cabal_dev_sandbox' : None }
-
-        for s in self.local_settings.keys():
-            self.local_settings[s] = get_setting(s)
-
-        self.init_ghcmod_completions()
-
-        # Subscribe to settings changes to update data
-        get_settings().add_on_change('enable_ghc_mod', lambda: self.on_setting_changed())
-
-    def on_setting_changed(self):
-        same = True
-        for k, v in self.local_settings.items():
-            r = get_setting(k)
-            same = same and v == r
-            self.local_settings[k] = r
-
-        if not same:
-            self.init_ghcmod_completions()
-
-    # Gets available LANGUAGE options and import modules from ghc-mod
-    def init_ghcmod_completions(self):
-
-        if not get_setting('enable_ghc_mod'):
-            return
-
-        sublime.status_message('SublimeHaskell: Updating ghc_mod completions...')
-
-        # Init LANGUAGE completions
-        autocompletion.language_completions = call_ghcmod_and_wait(['lang']).splitlines()
-
-        # Init import module completion
-        autocompletion.module_completions = call_ghcmod_and_wait(['list']).splitlines()
-
-        sublime.status_message('SublimeHaskell: Updating ghc_mod completions ' + u" \u2714")
-
-    def get_special_completions(self, view, prefix, locations):
-
-        # Contents of the current line up to the cursor
-        line_contents = get_line_contents(view, locations[0])
-
-        # Autocompletion for LANGUAGE pragmas
-        if get_setting('auto_complete_language_pragmas'):
-            # TODO handle multiple selections
-            match_language = LANGUAGE_RE.match(line_contents)
-            if match_language:
-                return [ (unicode(c),) * 2 for c in autocompletion.language_completions ]
-
-        # Autocompletion for import statements
-        if get_setting('auto_complete_imports'):
-            match_import = IMPORT_RE.match(line_contents)
-            if match_import:
-                import_completions = [ (unicode(c),) * 2 for c in autocompletion.module_completions ]
-
-                # Right after "import "? Propose "qualified" as well!
-                qualified_match = IMPORT_QUALIFIED_POSSIBLE_RE.match(line_contents)
-                if qualified_match:
-                    qualified_prefix = qualified_match.group('qualifiedprefix')
-                    if qualified_prefix == "" or "qualified".startswith(qualified_prefix):
-                        import_completions.insert(0, (u"qualified", "qualified "))
-
-                return import_completions
-
-        return None
-
-    def on_query_completions(self, view, prefix, locations):
-        begin_time = time.clock()
-        # Only suggest symbols if the current file is part of a Cabal project.
-        # TODO: Only suggest symbols from within this project.
-
-        cabal_dir = get_cabal_project_dir_of_view(view)
-        # if cabal_dir is not None:
-
-        completions = autocompletion.get_import_completions(view, prefix, locations)
-
-        if not completions:
-            completions = autocompletion.get_completions(view, prefix, locations)
-
-        end_time = time.clock()
-        log('time to get completions: {0} seconds'.format(end_time - begin_time))
-        # Don't put completions with special characters (?, !, ==, etc.)
-        # into completion because that wipes all default Sublime completions:
-        # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
-        # TODO: work around this
-        return [ c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0]) ]
-
-        return []
-
-    def on_new(self, view):
-        filename = view.file_name();
-        if filename:
-            self.inspector.mark_file_dirty(filename)
-
-    def on_post_save(self, view):
-        filename = view.file_name()
-        if filename:
-            self.inspector.mark_file_dirty(filename)
 
 class InspectorAgent(threading.Thread):
     def __init__(self):
@@ -624,3 +524,112 @@ def list_files_in_dir_recursively(base_dir):
         for filename in filenames:
             files.append(os.path.join(base_dir, dirname, filename))
     return files
+
+class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
+    inspector = InspectorAgent()
+    inspector.start()
+
+    def __init__(self):
+        autocompletion.language_completions = []
+        autocompletion.module_completions = []
+
+        self.local_settings = {
+            'enable_ghc_mod' : None,
+            'use_cabal_dev' : None,
+            'cabal_dev_sandbox' : None }
+
+        for s in self.local_settings.keys():
+            self.local_settings[s] = get_setting(s)
+
+        self.init_ghcmod_completions()
+
+        # Subscribe to settings changes to update data
+        get_settings().add_on_change('enable_ghc_mod', lambda: self.on_setting_changed())
+
+    def on_setting_changed(self):
+        same = True
+        for k, v in self.local_settings.items():
+            r = get_setting(k)
+            same = same and v == r
+            self.local_settings[k] = r
+
+        if not same:
+            self.init_ghcmod_completions()
+
+    # Gets available LANGUAGE options and import modules from ghc-mod
+    def init_ghcmod_completions(self):
+
+        if not get_setting('enable_ghc_mod'):
+            return
+
+        sublime.status_message('SublimeHaskell: Updating ghc_mod completions...')
+
+        # Init LANGUAGE completions
+        autocompletion.language_completions = call_ghcmod_and_wait(['lang']).splitlines()
+
+        # Init import module completion
+        autocompletion.module_completions = call_ghcmod_and_wait(['list']).splitlines()
+
+        sublime.status_message('SublimeHaskell: Updating ghc_mod completions ' + u" \u2714")
+
+    def get_special_completions(self, view, prefix, locations):
+
+        # Contents of the current line up to the cursor
+        line_contents = get_line_contents(view, locations[0])
+
+        # Autocompletion for LANGUAGE pragmas
+        if get_setting('auto_complete_language_pragmas'):
+            # TODO handle multiple selections
+            match_language = LANGUAGE_RE.match(line_contents)
+            if match_language:
+                return [ (unicode(c),) * 2 for c in autocompletion.language_completions ]
+
+        # Autocompletion for import statements
+        if get_setting('auto_complete_imports'):
+            match_import = IMPORT_RE.match(line_contents)
+            if match_import:
+                import_completions = [ (unicode(c),) * 2 for c in autocompletion.module_completions ]
+
+                # Right after "import "? Propose "qualified" as well!
+                qualified_match = IMPORT_QUALIFIED_POSSIBLE_RE.match(line_contents)
+                if qualified_match:
+                    qualified_prefix = qualified_match.group('qualifiedprefix')
+                    if qualified_prefix == "" or "qualified".startswith(qualified_prefix):
+                        import_completions.insert(0, (u"qualified", "qualified "))
+
+                return import_completions
+
+        return None
+
+    def on_query_completions(self, view, prefix, locations):
+        begin_time = time.clock()
+        # Only suggest symbols if the current file is part of a Cabal project.
+        # TODO: Only suggest symbols from within this project.
+
+        cabal_dir = get_cabal_project_dir_of_view(view)
+        # if cabal_dir is not None:
+
+        completions = autocompletion.get_import_completions(view, prefix, locations)
+
+        if not completions:
+            completions = autocompletion.get_completions(view, prefix, locations)
+
+        end_time = time.clock()
+        log('time to get completions: {0} seconds'.format(end_time - begin_time))
+        # Don't put completions with special characters (?, !, ==, etc.)
+        # into completion because that wipes all default Sublime completions:
+        # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
+        # TODO: work around this
+        return [ c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0]) ]
+
+        return []
+
+    def on_new(self, view):
+        filename = view.file_name();
+        if filename:
+            SublimeHaskellAutocomplete.inspector.mark_file_dirty(filename)
+
+    def on_post_save(self, view):
+        filename = view.file_name()
+        if filename:
+            SublimeHaskellAutocomplete.inspector.mark_file_dirty(filename)

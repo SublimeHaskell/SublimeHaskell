@@ -7,7 +7,7 @@ import subprocess
 from threading import Thread
 import time
 
-from sublime_haskell_common import get_cabal_project_dir_of_view, get_cabal_project_dir_and_name_of_view, call_and_wait, log, are_paths_equal, get_setting, get_setting_async, set_setting, save_settings, is_enabled_haskell_command, get_haskell_command_window_view_file_project, SublimeHaskellBaseCommand
+from sublime_haskell_common import get_cabal_project_dir_of_view, get_cabal_project_dir_and_name_of_view, call_and_wait, log, are_paths_equal, get_setting, get_setting_async, set_setting, save_settings, is_enabled_haskell_command, get_haskell_command_window_view_file_project, is_enabled_haskell_command
 from parseoutput import run_chain_build_thread
 from autobuild import attach_sandbox
 from autocomplete import autocompletion
@@ -27,7 +27,47 @@ cabal_command = {
     'install': { 'args': ['install'], 'message': 'Installing' }
 }
 
-def run_build(command, use_cabal_dev = None):
+# Base command
+class SublimeHaskellBaseCommand(sublime_plugin.WindowCommand):
+    def is_enabled(self):
+        return len(autocompletion.projects) > 0
+
+    def build(self, command, use_cabal_dev = None):
+        select_project(
+            self.window,
+            lambda n, d: run_build(self.window.active_view(), n, d, command, use_cabal_dev))
+
+# Select project from list
+# on_selected accepts name of project and directory of project
+def select_project(window, on_selected):
+    ps = autocompletion.projects.items()
+
+    def run_selected(psel):
+        on_selected(psel[0], psel[1]['dir'])
+
+    if len(ps) == 0:
+        return
+    if len(ps) == 1: # There's only one project, build it
+        run_selected(ps[0])
+
+    cabal_project_dir, cabal_project_name = get_cabal_project_dir_and_name_of_view(window.active_view())
+
+    # Show current project first
+    def compare(l, r):
+        res = cmp(not (l[0] == cabal_project_name), not (r[0] == cabal_project_name))
+        if res == 0:
+            res = cmp(l[0], r[0])
+        return res
+
+    ps.sort(compare)
+
+    def on_done(idx):
+        if idx != -1:
+            run_selected(ps[idx])
+
+    window.show_quick_panel(map (lambda m: [m[0], m[1]['dir']], ps), on_done)
+
+def run_build(view, project_name, project_dir, command, use_cabal_dev = None):
     # Run cabal or cabal-dev
     if use_cabal_dev == None:
         use_cabal_dev = get_setting_async('use_cabal_dev')
@@ -46,8 +86,10 @@ def run_build(command, use_cabal_dev = None):
     # Tool arguments (commands): build, clean, etc.
     tool_args = config['args']
 
-    run_build_commands_with(
-        lambda name: tool_title + ': ' + action_title + ' ' + name,
+    run_chain_build_thread(
+        view,
+        project_dir,
+        tool_title + ': ' + action_title + ' ' + project_name,
         [extra_args([tool_name, arg]) for arg in tool_args])
 
 class SublimeHaskellSwitchCabalDev(sublime_plugin.WindowCommand):
@@ -107,23 +149,23 @@ class SublimeHaskellSwitchCabalDev(sublime_plugin.WindowCommand):
 
 class SublimeHaskellClean(SublimeHaskellBaseCommand):
     def run(self):
-        run_build('clean')
+        self.build('clean')
 
 class SublimeHaskellConfigure(SublimeHaskellBaseCommand):
     def run(self):
-        run_build('configure')
+        self.build('configure')
 
 class SublimeHaskellBuild(SublimeHaskellBaseCommand):
     def run(self):
-        run_build('build')
+        self.build('build')
 
 class SublimeHaskellRebuild(SublimeHaskellBaseCommand):
     def run(self):
-        run_build('rebuild')
+        self.build('rebuild')
 
 class SublimeHaskellInstall(SublimeHaskellBaseCommand):
     def run(self):
-        run_build('install')
+        self.build('install')
 
 class SublimeHaskellRun(SublimeHaskellBaseCommand):
     def run(self):
@@ -209,45 +251,45 @@ def hide_output(window):
 
 class SublimeHaskellCabalClean(SublimeHaskellBaseCommand):
     def run(self):
-        run_build('clean', False)
+        self.build('clean', False)
 
 class SublimeHaskellCabalConfigure(SublimeHaskellBaseCommand):
     def run(self):
-        run_build('configure', False)
+        self.build('configure', False)
 
 class SublimeHaskellCabalBuild(SublimeHaskellBaseCommand):
     def run(self):
-        run_build('build', False)
+        self.build('build', False)
 
 class SublimeHaskellCabalRebuild(SublimeHaskellBaseCommand):
     def run(self):
-        run_build('rebuild', False)
+        self.build('rebuild', False)
 
 class SublimeHaskellCabalInstall(SublimeHaskellBaseCommand):
     def run(self):
-        run_build('install', False)
+        self.build('install', False)
 
 # Cabal-Dev build system
 
 class SublimeHaskellCabalDevClean(SublimeHaskellBaseCommand):
     def run(self):
-        run_build('clean', True)
+        self.build('clean', True)
 
 class SublimeHaskellCabalDevConfigure(SublimeHaskellBaseCommand):
     def run(self):
-        run_build('configure', True)
+        self.build('configure', True)
 
 class SublimeHaskellCabalDevBuild(SublimeHaskellBaseCommand):
     def run(self):
-        run_build('build', True)
+        self.build('build', True)
 
 class SublimeHaskellCabalDevRebuild(SublimeHaskellBaseCommand):
     def run(self):
-        run_build('rebuild', True)
+        self.build('rebuild', True)
 
 class SublimeHaskellCabalDevInstall(SublimeHaskellBaseCommand):
     def run(self):
-        run_build('install', True)
+        self.build('install', True)
 
 def run_build_commands_with(msg, cmds):
     """Run general build commands"""

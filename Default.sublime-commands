@@ -76,5 +76,9 @@
     {
         "caption": "SublimeHaskell: Switch Cabal/Cabal-Dev",
         "command": "sublime_haskell_switch_cabal_dev"
+    },
+    {
+        "caption": "SublimeHaskell: Reinspect all",
+        "command": "sublime_haskell_reinspect_all"
     }
 ]

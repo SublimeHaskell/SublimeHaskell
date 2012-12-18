@@ -35,11 +35,6 @@ def preload_settings():
 # used to retrieve it async from any thread
 sublime_haskell_settings = {}
 
-# Base command
-class SublimeHaskellBaseCommand(sublime_plugin.WindowCommand):
-    def is_enabled(self):
-        return is_enabled_haskell_command(True)
-
 def is_enabled_haskell_command(must_be_project = True, must_be_main = False):
     """Returns True if command for .hs can be invoked"""
     window = sublime.active_window()
