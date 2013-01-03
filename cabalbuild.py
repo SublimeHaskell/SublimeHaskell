@@ -49,6 +49,7 @@ def select_project(window, on_selected):
         return
     if len(ps) == 1: # There's only one project, build it
         run_selected(ps[0])
+        return
 
     cabal_project_dir, cabal_project_name = get_cabal_project_dir_and_name_of_view(window.active_view())
 
