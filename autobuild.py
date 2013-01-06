@@ -13,7 +13,7 @@ class SublimeHaskellAutobuild(sublime_plugin.EventListener):
 
         # auto build enabled and file within a cabal project
         if auto_build_enabled and cabal_project_dir is not None:
-            view.window().run_command('sublime_haskell_build')
+            view.window().run_command('sublime_haskell_build_auto')
         # try to ghc-mod check
         elif auto_check_enabled and auto_lint_enabled:
             view.window().run_command('sublime_haskell_ghc_mod_check_and_lint')

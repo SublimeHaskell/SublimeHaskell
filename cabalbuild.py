@@ -168,6 +168,13 @@ class SublimeHaskellInstall(SublimeHaskellBaseCommand):
     def run(self):
         self.build('install')
 
+# Auto build current project
+class SublimeHaskellBuildAuto(SublimeHaskellBaseCommand):
+    def run(self):
+        current_project_dir, current_project_name = get_cabal_project_dir_and_name_of_view(self.window.active_view())
+        if current_project_name and current_project_dir:
+            run_build(self.window.active_view(), current_project_name, current_project_dir, 'build', None)
+
 class SublimeHaskellRun(SublimeHaskellBaseCommand):
     def run(self):
         self.executables = []
