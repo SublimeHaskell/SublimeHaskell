@@ -15,11 +15,11 @@ cabal_tool = {
 }
 
 cabal_command = {
-    'clean': {'args': ['clean'], 'message': 'Cleaning'},
-    'configure': {'args': ['configure'], 'message': 'Configure'},
-    'build': {'args': ['build'], 'message': 'Building'},
-    'rebuild': {'args': ['clean', 'configure', 'build'], 'message': 'Rebuilding'},
-    'install': {'args': ['install'], 'message': 'Installing'}
+    'clean': {'steps': ['clean'], 'message': 'Cleaning'},
+    'configure': {'steps': ['configure'], 'message': 'Configure'},
+    'build': {'steps': ['build'], 'message': 'Building'},
+    'rebuild': {'steps': ['clean', 'configure', 'build'], 'message': 'Rebuilding'},
+    'install': {'steps': ['install'], 'message': 'Installing'}
 }
 
 
@@ -83,13 +83,13 @@ def run_build(view, project_name, project_dir, command, use_cabal_dev=None):
     # Tool name: cabal, cabal-dev
     tool_name = tool['command']
     # Tool arguments (commands): build, clean, etc.
-    tool_args = config['args']
+    tool_steps = config['steps']
 
     run_chain_build_thread(
         view,
         project_dir,
         tool_title + ': ' + action_title + ' ' + project_name,
-        [extra_args([tool_name, arg]) for arg in tool_args])
+        [extra_args([tool_name, step]) for step in tool_steps])
 
 
 class SublimeHaskellSwitchCabalDev(sublime_plugin.WindowCommand):
