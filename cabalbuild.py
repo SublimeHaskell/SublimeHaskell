@@ -3,9 +3,8 @@ import sublime
 import sublime_plugin
 from threading import Thread
 
-from sublime_haskell_common import get_cabal_project_dir_and_name_of_view, call_and_wait, get_setting, get_setting_async, set_setting, save_settings, get_haskell_command_window_view_file_project
+from sublime_haskell_common import get_cabal_project_dir_and_name_of_view, call_and_wait, get_setting, get_setting_async, set_setting, save_settings, get_haskell_command_window_view_file_project, attach_sandbox
 from parseoutput import run_chain_build_thread
-from autobuild import attach_sandbox
 from autocomplete import autocompletion
 
 OUTPUT_PANEL_NAME = "haskell_run_output"
