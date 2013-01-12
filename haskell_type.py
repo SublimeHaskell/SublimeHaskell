@@ -5,7 +5,7 @@ import re
 from sublime_haskell_common import call_ghcmod_and_wait, is_enabled_haskell_command
 
 # Used to find out the module name.
-MODULE_RE_STR = r'module\s+([^\s\(]*)' # "module" followed by everything that is neither " " nor "("
+MODULE_RE_STR = r'module\s+([^\s\(]*)'  # "module" followed by everything that is neither " " nor "("
 MODULE_RE = re.compile(MODULE_RE_STR)
 
 # Parses the output of `ghc-mod type`.
@@ -23,6 +23,7 @@ def parse_ghc_mod_type_line(l):
     """
     match = GHCMOD_TYPE_LINE_RE.match(l)
     return match and match.groupdict()
+
 
 # TODO rename to SublimeHaskellShowTypeCommand
 class SublimeHaskellShowType(sublime_plugin.TextCommand):

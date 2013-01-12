@@ -1,8 +1,7 @@
-import os
-import sublime
 import sublime_plugin
 
-from sublime_haskell_common import attach_sandbox, get_cabal_project_dir_and_name_of_view, call_and_wait, log, get_setting
+from sublime_haskell_common import attach_sandbox, get_cabal_project_dir_and_name_of_view, get_setting
+
 
 class SublimeHaskellAutobuild(sublime_plugin.EventListener):
     def on_post_save(self, view):
@@ -21,6 +20,7 @@ class SublimeHaskellAutobuild(sublime_plugin.EventListener):
             view.window().run_command('sublime_haskell_ghc_mod_check')
         elif auto_lint_enabled:
             view.window().run_command('sublime_haskell_ghc_mod_lint')
+
 
 def current_cabal_build():
     """Current cabal build command"""

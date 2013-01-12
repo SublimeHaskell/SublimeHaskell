@@ -18,6 +18,7 @@ output_regex = re.compile(
 # Extract the filename, line, column, and description from an error message:
 result_file_regex = r'^(\S*?): line (\d+), column (\d+):$'
 
+
 class OutputMessage(object):
     "Describe an error or warning message produced by GHC."
     def __init__(self, filename, line, column, message, level):
@@ -44,8 +45,10 @@ class OutputMessage(object):
         region = trim_region(view, region)
         return region
 
+
 def run_build_thread(view, cabal_project_dir, msg, cmd):
     run_chain_build_thread(view, cabal_project_dir, msg, [cmd])
+
 
 def run_chain_build_thread(view, cabal_project_dir, msg, cmds):
     sublime.status_message(msg + '...')
@@ -54,11 +57,13 @@ def run_chain_build_thread(view, cabal_project_dir, msg, cmds):
         args=(view, cabal_project_dir, msg, cmds))
     thread.start()
 
+
 def wait_for_build_to_complete(view, cabal_project_dir, msg, cmd):
     """Start 'cabal build', wait for it to complete, then parse and diplay
     the resulting errors."""
 
     wait_for_chain_to_complete(view, cabal_project_dir, msg, [cmd])
+
 
 def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds):
     """Chains several commands, wait for them to complete, then parse and display
@@ -77,9 +82,11 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds):
 
     parse_output_messages_and_show(view, msg, cabal_project_dir, exit_code, stderr)
 
+
 def format_output_messages(messages):
     """Formats list of messages"""
     return u'\n'.join(unicode(x) for x in messages)
+
 
 def show_output_result_text(view, msg, text, exit_code, base_dir):
     """Shows text (formatted messages) in output with build result"""
@@ -96,6 +103,7 @@ def show_output_result_text(view, msg, text, exit_code, base_dir):
         if get_setting_async('show_output_window'):
             sublime.set_timeout(lambda: write_output(view, output, base_dir), 0)
 
+
 def parse_output_messages_and_show(view, msg, base_dir, exit_code, stderr):
     """Parse errors and display resulting errors"""
 
@@ -109,6 +117,7 @@ def parse_output_messages_and_show(view, msg, base_dir, exit_code, stderr):
     show_output_result_text(view, msg, output_text, exit_code, base_dir)
 
     sublime.set_timeout(lambda: mark_messages_in_views(parsed_messages), 0)
+
 
 def mark_messages_in_views(errors):
     "Mark the regions in open views where errors were found."
@@ -143,8 +152,10 @@ message_levels = {
     }
 }
 
+
 def region_key(name):
     return 'subhs-{0}s'.format(name)
+
 
 def mark_messages_in_view(messages, view):
     # Regions by level
@@ -163,6 +174,7 @@ def mark_messages_in_view(messages, view):
             lev['style'],
             lev['icon'],
             sublime.DRAW_OUTLINED)
+
 
 def write_output(view, text, cabal_project_dir):
     "Write text to Sublime's output panel."
@@ -183,8 +195,10 @@ def write_output(view, text, cabal_project_dir):
     # Show the results panel:
     view.window().run_command('show_panel', {'panel': 'output.' + ERROR_PANEL_NAME})
 
+
 def hide_output(view):
     view.window().run_command('hide_panel', {'panel': 'output.' + ERROR_PANEL_NAME})
+
 
 def parse_output_messages(base_dir, text):
     "Parse text into a list of OutputMessage objects."
@@ -201,6 +215,7 @@ def parse_output_messages(base_dir, text):
             'warning' if 'warning' in messy_details.lower() else 'error')
 
     return map(to_error, matches)
+
 
 def trim_region(view, region):
     "Return the specified Region, but without leading or trailing whitespace."

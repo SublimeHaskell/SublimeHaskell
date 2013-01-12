@@ -2,7 +2,6 @@ import errno
 import fnmatch
 import os
 import sublime
-import sublime_plugin
 import subprocess
 
 # Maximum seconds to wait for window to appear
@@ -14,6 +13,7 @@ PACKAGE_PATH = os.path.join(sublime.packages_path(), 'SublimeHaskell')
 
 # Panel for SublimeHaskell errors
 SUBLIME_ERROR_PANEL_NAME = 'haskell_sublime_load'
+
 
 # Setting can't be get from not main threads
 # So we using a trick:
@@ -35,7 +35,8 @@ def preload_settings():
 # used to retrieve it async from any thread
 sublime_haskell_settings = {}
 
-def is_enabled_haskell_command(must_be_project = True, must_be_main = False):
+
+def is_enabled_haskell_command(must_be_project=True, must_be_main=False):
     """Returns True if command for .hs can be invoked"""
     window, view, file_shown_in_view = get_haskell_command_window_view_file_project()
 
@@ -54,6 +55,7 @@ def is_enabled_haskell_command(must_be_project = True, must_be_main = False):
         return False
     return True
 
+
 def get_haskell_command_window_view_file_project():
     """Returns window, view and file"""
     window = sublime.active_window()
@@ -65,8 +67,10 @@ def get_haskell_command_window_view_file_project():
         file_name = view.file_name()
     return window, view, file_name
 
+
 def call_and_wait(command, **popen_kwargs):
     return call_and_wait_with_input(command, None, **popen_kwargs)
+
 
 def call_and_wait_with_input(command, input_string, **popen_kwargs):
     """Run the specified command, block until it completes, and return
@@ -94,8 +98,10 @@ def call_and_wait_with_input(command, input_string, **popen_kwargs):
     exit_code = process.wait()
     return (exit_code, stdout, stderr)
 
+
 def log(message):
     print(u'Sublime Haskell: {0}'.format(message))
+
 
 def get_cabal_project_dir_and_name_of_view(view):
     """Return the path to the .cabal file project for the source file in the
@@ -113,8 +119,10 @@ def get_cabal_project_dir_and_name_of_view(view):
         return None, None
     return get_cabal_project_dir_and_name_of_file(file_shown_in_view)
 
+
 def get_cabal_project_dir_of_view(view):
     return get_cabal_project_dir_and_name_of_view(view)[0]
+
 
 def get_cabal_project_dir_and_name_of_file(filename):
     """Return the path to the .cabal file and name of project for the specified file."""
@@ -128,9 +136,11 @@ def get_cabal_project_dir_and_name_of_file(filename):
     project_name = os.path.splitext(cabal_file)[0]
     return project_path, project_name
 
+
 def get_cabal_project_dir_of_file(filename):
     """Return the path to the .cabal file project for the specified file."""
     return get_cabal_project_dir_and_name_of_file(filename)[0]
+
 
 def get_cabal_in_dir(cabal_dir):
     """Return .cabal file for cabal directory"""
@@ -139,6 +149,7 @@ def get_cabal_in_dir(cabal_dir):
             project_name = os.path.splitext(entry)[0]
             return (project_name, os.path.join(cabal_dir, entry))
     return (None, None)
+
 
 def find_file_in_parent_dir(subdirectory, filename_pattern):
     """Look for a file with the specified name in a parent directory of the
@@ -159,11 +170,13 @@ def find_file_in_parent_dir(subdirectory, filename_pattern):
         if last_dir == current_dir:
             return None
 
+
 def are_paths_equal(path, other_path):
     "Test whether filesystem paths are equal."
     path = os.path.abspath(path)
     other_path = os.path.abspath(other_path)
     return path == other_path
+
 
 def attach_sandbox(cmd):
     """Attach sandbox arguments to command"""
@@ -172,17 +185,21 @@ def attach_sandbox(cmd):
         return cmd + ['-s', sand]
     return cmd
 
+
 def try_attach_sandbox(cmd):
     """Attach sandbox if use_cabal_dev enabled"""
     if not get_setting_async('use_cabal_dev'):
         return cmd
     return attach_sandbox(cmd)
 
+
 def get_settings():
     return sublime.load_settings("SublimeHaskell.sublime-settings")
 
+
 def save_settings():
     sublime.save_settings("SublimeHaskell.sublime-settings")
+
 
 def get_setting(key, default=None):
     "This should be used only from main thread"
@@ -196,9 +213,11 @@ def get_setting(key, default=None):
 
 preload_settings()
 
+
 def update_setting(key):
     "Updates setting as it was changed"
     sublime_haskell_settings[key] = get_setting(key)
+
 
 def get_setting_async(key, default=None):
     """
@@ -212,12 +231,14 @@ def get_setting_async(key, default=None):
         return default
     return sublime_haskell_settings[key]
 
+
 def set_setting(key, value):
     """Set setting and update dictionary"""
     sublime_haskell_settings[key] = value
     get_settings().set(key, value)
 
-def call_ghcmod_and_wait(arg_list, filename = None):
+
+def call_ghcmod_and_wait(arg_list, filename=None):
     """
     Calls ghc-mod with the given arguments.
     Shows a sublime error message if ghc-mod is not available.
@@ -228,7 +249,8 @@ def call_ghcmod_and_wait(arg_list, filename = None):
     try:
         exit_code, out, err = call_and_wait(
             try_attach_sandbox(['ghc-mod'] + arg_list),
-            cwd = ghc_cwd or os.getcwd())
+            cwd=(ghc_cwd or os.getcwd())
+        )
 
         if exit_code != 0:
             raise Exception("ghc-mod exited with status %d and stderr: %s" % (exit_code, err))
@@ -243,6 +265,7 @@ def call_ghcmod_and_wait(arg_list, filename = None):
                 + "Try adjusting the 'add_to_PATH' setting.\n"
                 + "You can also turn this off using the 'enable_ghc_mod' setting.")
 
+
 def wait_for_window_callback(on_appear, seconds_to_wait):
     window = sublime.active_window()
     if window:
@@ -250,14 +273,16 @@ def wait_for_window_callback(on_appear, seconds_to_wait):
         return
     if seconds_to_wait == 0:
         return
-    sublime.set_timeout(lambda: wait_for_window_callback(on_appear, seconds_to_wait - 1), 1000)    
+    sublime.set_timeout(lambda: wait_for_window_callback(on_appear, seconds_to_wait - 1), 1000)
 
-def wait_for_window(on_appear, seconds_to_wait = MAX_WAIT_FOR_WINDOW):
+
+def wait_for_window(on_appear, seconds_to_wait=MAX_WAIT_FOR_WINDOW):
     """
     Wait for window to appear on startup
     It's dirty hack, but I have no idea how to make it better
     """
     sublime.set_timeout(lambda: wait_for_window_callback(on_appear, seconds_to_wait), 0)
+
 
 def output_error(window, text):
     "Write text to Sublime's output panel with important information about SublimeHaskell error during load"

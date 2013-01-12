@@ -3,11 +3,10 @@ import os
 import re
 import sublime
 import sublime_plugin
-import subprocess
 import threading
 import time
 
-from sublime_haskell_common import PACKAGE_PATH, get_setting, get_setting_async, get_cabal_project_dir_of_file, get_cabal_project_dir_of_view, call_and_wait, call_ghcmod_and_wait, log, wait_for_window, output_error, get_settings, attach_sandbox, is_enabled_haskell_command, get_cabal_in_dir
+from sublime_haskell_common import PACKAGE_PATH, get_setting, get_cabal_project_dir_of_file, call_and_wait, call_ghcmod_and_wait, log, wait_for_window, output_error, get_settings, is_enabled_haskell_command, get_cabal_in_dir
 
 # Completion text longer than this is ellipsized:
 MAX_COMPLETION_LENGTH = 37
@@ -46,11 +45,13 @@ def get_line_contents(view, location):
     """
     return view.substr(sublime.Region(view.line(location).a, location))
 
+
 def get_line_contents_before_region(view, region):
     """
     Returns the of the line before the given region (including it).
     """
     return view.substr(sublime.Region(view.line(region).a, region.b))
+
 
 def get_qualified_name(s):
     """
@@ -61,6 +62,7 @@ def get_qualified_name(s):
     quals = s.split()[-1].split('.')
     filtered = map(lambda s: filter(lambda c: c.isalpha() or c.isdigit() or c == '_', s), quals)
     return ('.'.join(filtered[0:len(filtered) - 1]), '.'.join(filtered))
+
 
 # Autocompletion data
 class AutoCompletion(object):
@@ -152,7 +154,7 @@ class AutoCompletion(object):
                 if file_info['moduleName'] in moduleImports:
                     for d in file_info['declarations']:
                         identifier = d['identifier']
-                        declaration_info = d['info']
+                        #declaration_info = d['info']
                         # TODO: Show the declaration info somewhere.
                         completions.append((identifier[:MAX_COMPLETION_LENGTH], identifier))
 
@@ -180,7 +182,7 @@ class AutoCompletion(object):
             # TODO handle multiple selections
             match_language = LANGUAGE_RE.match(line_contents)
             if match_language:
-                return [ (unicode(c),) * 2 for c in self.language_completions ]
+                return [(unicode(c),) * 2 for c in self.language_completions]
 
         # Autocompletion for import statements
         if get_setting('auto_complete_imports'):
@@ -224,10 +226,11 @@ class AutoCompletion(object):
             pref = Control.Con, mname = Control.Concurrent.MVar, result = Concurrent
             """
             return mname.split('.')[len(qualified_prefix.split('.')) - 1]
-        return list(set([ (unicode(module_next_name(m)),) * 2 for m in self.module_completions if m.startswith(qualified_prefix) ]))
+        return list(set((unicode(module_next_name(m)),) * 2 for m in self.module_completions if m.startswith(qualified_prefix)))
 
 
 autocompletion = AutoCompletion()
+
 
 class SublimeHaskellBrowseDeclarations(sublime_plugin.WindowCommand):
     def run(self):
@@ -237,7 +240,7 @@ class SublimeHaskellBrowseDeclarations(sublime_plugin.WindowCommand):
             if 'declarations' in v:
                 for d in v['declarations']:
                     self.names.append(d['identifier'])
-                    self.declarations.append(v['moduleName'] + ': '  + d['identifier'] + ' ' + d['info'])
+                    self.declarations.append(v['moduleName'] + ': ' + d['identifier'] + ' ' + d['info'])
         for m, decls in autocompletion.std_info.items():
             for decl in decls:
                 self.names.append(decl)
@@ -259,6 +262,7 @@ class SublimeHaskellBrowseDeclarations(sublime_plugin.WindowCommand):
     def is_enabled(self):
         return is_enabled_haskell_command(False)
 
+
 class SublimeHaskellGoToAnyDeclaration(sublime_plugin.WindowCommand):
     def run(self):
         self.files = []
@@ -278,10 +282,12 @@ class SublimeHaskellGoToAnyDeclaration(sublime_plugin.WindowCommand):
     def is_enabled(self):
         return is_enabled_haskell_command(False)
 
+
 class SublimeHaskellReinspectAll(sublime_plugin.WindowCommand):
     def run(self):
         autocompletion.clear_inspected()
         SublimeHaskellAutocomplete.inspector.mark_all_files(self.window)
+
 
 class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
     def run(self, edit):
@@ -292,12 +298,12 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
 
         modules = []
 
-        if not no_module: # Get modules by alias
+        if not no_module:  # Get modules by alias
             modules = [module_word]
             modules.extend(autocompletion.unalias_module_name(self.view, module_word))
 
         ident = self.view.substr(word_region)
-        full_qualified_name = ident if no_module else '.'.join([module_word, ident]) # goto module
+        full_qualified_name = ident if no_module else '.'.join([module_word, ident])  # goto module
 
         self.module_files = []
         module_candidates = []
@@ -343,6 +349,7 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
 
     def is_enabled(self):
         return is_enabled_haskell_command(False)
+
 
 class InspectorAgent(threading.Thread):
     def __init__(self):
@@ -462,7 +469,8 @@ class InspectorAgent(threading.Thread):
                         autocompletion.projects[project_name] = {
                             'dir': cabal_dir,
                             'cabal': os.path.basename(cabal_file),
-                            'executables': new_info['executables'] }
+                            'executables': new_info['executables'],
+                        }
 
     def _refresh_module_info(self, filename):
         "Rebuild module information for the specified file."
@@ -516,6 +524,7 @@ class InspectorAgent(threading.Thread):
             except KeyError:
                 return 0.0
 
+
 def list_files_in_dir_recursively(base_dir):
     """Return a list of a all files in a directory, recursively.
     The files will be specified by full paths."""
@@ -524,6 +533,7 @@ def list_files_in_dir_recursively(base_dir):
         for filename in filenames:
             files.append(os.path.join(base_dir, dirname, filename))
     return files
+
 
 class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
     inspector = InspectorAgent()
@@ -534,9 +544,10 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         autocompletion.module_completions = []
 
         self.local_settings = {
-            'enable_ghc_mod' : None,
-            'use_cabal_dev' : None,
-            'cabal_dev_sandbox' : None }
+            'enable_ghc_mod': None,
+            'use_cabal_dev': None,
+            'cabal_dev_sandbox': None,
+        }
 
         for s in self.local_settings.keys():
             self.local_settings[s] = get_setting(s)
@@ -582,13 +593,13 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             # TODO handle multiple selections
             match_language = LANGUAGE_RE.match(line_contents)
             if match_language:
-                return [ (unicode(c),) * 2 for c in autocompletion.language_completions ]
+                return [(unicode(c),) * 2 for c in autocompletion.language_completions]
 
         # Autocompletion for import statements
         if get_setting('auto_complete_imports'):
             match_import = IMPORT_RE.match(line_contents)
             if match_import:
-                import_completions = [ (unicode(c),) * 2 for c in autocompletion.module_completions ]
+                import_completions = [(unicode(c),) * 2 for c in autocompletion.module_completions]
 
                 # Right after "import "? Propose "qualified" as well!
                 qualified_match = IMPORT_QUALIFIED_POSSIBLE_RE.match(line_contents)
@@ -606,9 +617,6 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         # Only suggest symbols if the current file is part of a Cabal project.
         # TODO: Only suggest symbols from within this project.
 
-        cabal_dir = get_cabal_project_dir_of_view(view)
-        # if cabal_dir is not None:
-
         completions = autocompletion.get_import_completions(view, prefix, locations)
 
         if not completions:
@@ -620,12 +628,12 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         # into completion because that wipes all default Sublime completions:
         # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
         # TODO: work around this
-        return [ c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0]) ]
+        return [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0])]
 
         return []
 
     def on_new(self, view):
-        filename = view.file_name();
+        filename = view.file_name()
         if filename:
             SublimeHaskellAutocomplete.inspector.mark_file_dirty(filename)
 

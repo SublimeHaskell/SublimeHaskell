@@ -2,7 +2,8 @@ import errno
 import sublime
 import sublime_plugin
 
-from sublime_haskell_common import log, is_enabled_haskell_command, call_and_wait_with_input
+from sublime_haskell_common import is_enabled_haskell_command, call_and_wait_with_input
+
 
 class SublimeHaskellStylish(sublime_plugin.TextCommand):
     def run(self, edit):

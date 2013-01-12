@@ -1,12 +1,11 @@
 import os
-import re
 import sublime
 import sublime_plugin
 from threading import Thread
-import time
 
-from sublime_haskell_common import log, is_enabled_haskell_command, get_haskell_command_window_view_file_project, try_attach_sandbox, call_ghcmod_and_wait
-from parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, parse_output_messages_and_show, hide_output, OutputMessage
+from sublime_haskell_common import is_enabled_haskell_command, get_haskell_command_window_view_file_project, call_ghcmod_and_wait
+from parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output
+
 
 class SublimeHaskellGhcModCheck(sublime_plugin.WindowCommand):
     def run(self):
@@ -15,12 +14,14 @@ class SublimeHaskellGhcModCheck(sublime_plugin.WindowCommand):
     def is_enabled(self):
         return is_enabled_haskell_command(False)
 
+
 class SublimeHaskellGhcModLint(sublime_plugin.WindowCommand):
     def run(self):
         run_ghcmod('lint', 'Linting')
 
     def is_enabled(self):
         return is_enabled_haskell_command(False)
+
 
 class SublimeHaskellGhcModCheckAndLint(sublime_plugin.WindowCommand):
     def run(self):
@@ -33,7 +34,8 @@ class SublimeHaskellGhcModCheckAndLint(sublime_plugin.WindowCommand):
     def is_enabled(self):
         return is_enabled_haskell_command(False)
 
-def run_ghcmods(cmds, msg, alter_messages_cb = None):
+
+def run_ghcmods(cmds, msg, alter_messages_cb=None):
     """
     Run several ghcmod commands, concats result messages with callback
     and show output.
@@ -52,6 +54,7 @@ def run_ghcmods(cmds, msg, alter_messages_cb = None):
     def show_current_file_first_and_alter(msgs):
         if alter_messages_cb:
             alter_messages_cb(msgs)
+
         def compare(l, r):
             # sort by file equality to file_name
             res = cmp(l[1].filename != file_shown_in_view, r[1].filename != file_shown_in_view)
@@ -70,8 +73,10 @@ def run_ghcmods(cmds, msg, alter_messages_cb = None):
 
     run_ghcmods_thread(view, file_shown_in_view, 'Ghc-Mod: ' + msg + ' ' + file_name, ghc_mod_args, show_current_file_first_and_alter)
 
-def run_ghcmod(cmd, msg, alter_messages_cb = None):
+
+def run_ghcmod(cmd, msg, alter_messages_cb=None):
     run_ghcmods([cmd], msg, alter_messages_cb)
+
 
 def run_ghcmods_thread(view, filename, msg, cmds_with_args, alter_messages_cb):
     sublime.status_message(msg + '...')
@@ -79,6 +84,7 @@ def run_ghcmods_thread(view, filename, msg, cmds_with_args, alter_messages_cb):
         target=wait_ghcmod_and_parse,
         args=(view, filename, msg, cmds_with_args, alter_messages_cb))
     thread.start()
+
 
 def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb):
     sublime.set_timeout(lambda: hide_output(view), 0)
