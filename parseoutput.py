@@ -73,7 +73,7 @@ def run_chain_build_thread(view, cabal_project_dir, msg, cmds):
 
 
 def wait_for_build_to_complete(view, cabal_project_dir, msg, cmd):
-    """Start 'cabal build', wait for it to complete, then parse and diplay
+    """Run a command, wait for it to complete, then parse and display
     the resulting errors."""
 
     wait_for_chain_to_complete(view, cabal_project_dir, msg, [cmd])
