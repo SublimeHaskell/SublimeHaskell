@@ -19,6 +19,13 @@ output_regex = re.compile(
 result_file_regex = r'^(\S*?): line (\d+), column (\d+):$'
 
 
+def filename_of_path(p):
+    """Returns everything after the last slash or backslash."""
+    # Not using os.path here because we don't know/care here if
+    # we have forward or backslashes on Windows.
+    return re.match(r'(.*[/\\])?(.*)', p).groups()[1]
+
+
 class OutputMessage(object):
     "Describe an error or warning message produced by GHC."
     def __init__(self, filename, line, column, message, level):
@@ -35,6 +42,13 @@ class OutputMessage(object):
             self.line,
             self.column,
             self.message)
+
+    def __repr__(self):
+        return '<OutputMessage {0}:{1}:{2}: {3}>'.format(
+            filename_of_path(self.filename),
+            self.line,
+            self.column,
+            self.message[:10] + '..')
 
     def find_region_in_view(self, view):
         "Return the Region referred to by this error message."
