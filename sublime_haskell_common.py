@@ -260,9 +260,9 @@ def call_ghcmod_and_wait(arg_list, filename=None):
 
     except OSError, e:
         if e.errno == errno.ENOENT:
-            sublime.error_message("SublimeHaskell: ghc-mod was not found!\n"
-                + "It is used for LANGUAGE and import autocompletions "
-                + "and type inference.\n"
+            output_error(sublime.active_window(),
+                "SublimeHaskell: ghc-mod was not found!\n"
+                + "It is used for LANGUAGE and import autocompletions and type inference.\n"
                 + "Try adjusting the 'add_to_PATH' setting.\n"
                 + "You can also turn this off using the 'enable_ghc_mod' setting.")
 
