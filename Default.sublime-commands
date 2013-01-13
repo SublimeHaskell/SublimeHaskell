@@ -26,6 +26,10 @@
         "command": "sublime_haskell_build"
     },
     {
+        "caption": "SublimeHaskell: Typecheck build (no codegen)",
+        "command": "sublime_haskell_build"
+    },
+    {
         "caption": "SublimeHaskell: Clean",
         "command": "sublime_haskell_clean"
     },

@@ -19,6 +19,32 @@
 	// Enable auto lint on save (as hints when building)
 	"enable_auto_lint": true,
 
+	// How to build the cabal project in order to obtain error messages.
+	// This option exists because `cabal build` is slow and cannot re-print
+	// warnings of already compiled modules.
+	// (Also see https://github.com/haskell/cabal/issues/1179, cabal 1.16).
+	//
+	// Possible values:
+	// - "normal"
+	//   Uses a full `cabal build`, generating object files and binaries.
+	//   If this takes too long for you, look at the other options.
+	// - "normal-then-warnings"
+	//   Like "normal", but afterwards also collects project-wide warnings with
+	//   `cabal build --ghc-options="-fforce-recomp -Wall -fno-code"`
+	//   (this recompiles everything, but skips code generation for speed).
+	// - "typecheck"
+	//   Performs a type check of the whole project, trying to not do any more
+	//   than that in order to give faster feedback (that "normal").
+	//   Currently uses `cabal build --ghc-options="-c"` to skip linking.
+	// - "typecheck-then-warnings"
+	//   Like "typecheck", but afterwards collects warnings like
+	//   "normal-then-warnings".
+	//
+	// Please note that it is currently impossible to properly use a `-fno-code`
+	// build on a cabal project that links a shared library; it errors too early.
+	// (https://github.com/haskell/cabal/issues/1176, cabal 1.16).
+	"auto_build_mode": "normal-then-warnings",
+
 	// Show output window on build/check/lint:
 	"show_output_window": true,
 

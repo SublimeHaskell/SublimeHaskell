@@ -4,6 +4,10 @@
         "command": "sublime_haskell_cabal_build"
     },
     {
+        "caption": "Cabal: Typecheck build (no codegen)",
+        "command": "sublime_haskell_cabal_check_build"
+    },
+    {
         "caption": "Cabal: Clean",
         "command": "sublime_haskell_cabal_clean"
     },
@@ -22,6 +26,10 @@
     {
         "caption": "Cabal-Dev: Build",
         "command": "sublime_haskell_cabal_dev_build"
+    },
+    {
+        "caption": "Cabal-Dev: Typecheck build (no codegen)",
+        "command": "sublime_haskell_cabal_dev_check_build"
     },
     {
         "caption": "Cabal-Dev: Clean",

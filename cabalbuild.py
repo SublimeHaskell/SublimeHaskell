@@ -3,7 +3,7 @@ import sublime
 import sublime_plugin
 from threading import Thread
 
-from sublime_haskell_common import log, get_cabal_project_dir_and_name_of_view, call_and_wait, get_setting, get_setting_async, set_setting, save_settings, get_haskell_command_window_view_file_project, attach_sandbox
+from sublime_haskell_common import log, get_cabal_project_dir_and_name_of_view, call_and_wait, get_setting, get_setting_async, set_setting, save_settings, get_haskell_command_window_view_file_project, attach_sandbox, output_error
 from parseoutput import run_chain_build_thread
 from autocomplete import autocompletion
 
@@ -18,6 +18,12 @@ cabal_command = {
     'clean': {'steps': [['clean']], 'message': 'Cleaning'},
     'configure': {'steps': [['configure']], 'message': 'Configure'},
     'build': {'steps': [['build']], 'message': 'Building'},
+    'typecheck': {'steps': [['build', '--ghc-options=-c']], 'message': 'Checking'},
+    # Commands with warnings:
+    # Run fast, incremental build first. Then build everything with -Wall and -fno-code
+    # If the incremental build fails, the second step is not executed.
+    'build_then_warnings': {'steps': [['build'], ['build', '--ghc-options=-fforce-recomp -Wall -fno-code']], 'message': 'Building'},
+    'typecheck_then_warnings': {'steps': [['build', '--ghc-options=-c'], ['build', '--ghc-options=-fforce-recomp -Wall -fno-code']], 'message': 'Checking'},
     'rebuild': {'steps': [['clean'], ['configure'], ['build']], 'message': 'Rebuilding'},
     'install': {'steps': [['install']], 'message': 'Installing'}
 }
@@ -166,7 +172,7 @@ class SublimeHaskellConfigure(SublimeHaskellBaseCommand):
 
 class SublimeHaskellBuild(SublimeHaskellBaseCommand):
     def run(self):
-        self.build('build')
+        self.build('build_then_warnings')
 
 
 class SublimeHaskellRebuild(SublimeHaskellBaseCommand):
@@ -184,7 +190,19 @@ class SublimeHaskellBuildAuto(SublimeHaskellBaseCommand):
     def run(self):
         current_project_dir, current_project_name = get_cabal_project_dir_and_name_of_view(self.window.active_view())
         if current_project_name and current_project_dir:
-            run_build(self.window.active_view(), current_project_name, current_project_dir, 'build', None)
+            build_mode = get_setting('auto_build_mode')
+
+            build_command = {
+               'normal': 'build',
+               'normal-then-warnings': 'build_then_warnings',
+               'typecheck': 'typecheck',
+               'typecheck-then-warnings': 'typecheck_then_warnings',
+            }.get(build_mode)
+
+            if not build_command:
+                output_error(self.window, "SublimeHaskell: invalid auto_build_mode '%s'" % build_mode)
+
+            run_build(self.window.active_view(), current_project_name, current_project_dir, build_command, None)
 
 
 class SublimeHaskellRun(SublimeHaskellBaseCommand):
@@ -285,7 +303,7 @@ class SublimeHaskellCabalConfigure(SublimeHaskellBaseCommand):
 
 class SublimeHaskellCabalBuild(SublimeHaskellBaseCommand):
     def run(self):
-        self.build('build', False)
+        self.build('build_then_warnings', False)
 
 
 class SublimeHaskellCabalRebuild(SublimeHaskellBaseCommand):
@@ -312,7 +330,7 @@ class SublimeHaskellCabalDevConfigure(SublimeHaskellBaseCommand):
 
 class SublimeHaskellCabalDevBuild(SublimeHaskellBaseCommand):
     def run(self):
-        self.build('build', True)
+        self.build('build_then_warnings', True)
 
 
 class SublimeHaskellCabalDevRebuild(SublimeHaskellBaseCommand):
