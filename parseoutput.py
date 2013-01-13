@@ -10,9 +10,10 @@ ERROR_PANEL_NAME = 'haskell_error_checker'
 
 # This regex matches an unindented line, followed by zero or more
 # indented, non-empty lines.
+# It also eats whitespace before the first line.
 # The first line is divided into a filename, a line number, and a column.
 output_regex = re.compile(
-    r'^(\S*):(\d+):(\d+):(.*$(?:\n^[ \t].*$)*)',
+    r'\s*^(\S*):(\d+):(\d+):(.*$(?:\n^[ \t].*$)*)',
     re.MULTILINE)
 
 # Extract the filename, line, column, and description from an error message:
@@ -126,7 +127,14 @@ def parse_output_messages_and_show(view, msg, base_dir, exit_code, stderr):
 
     # The process has terminated; parse and display the output:
     parsed_messages = parse_output_messages(base_dir, stderr)
-    output_text = format_output_messages(parsed_messages) if parsed_messages else stderr
+    # The unparseable part (for other errors)
+    unparsable = output_regex.sub('', stderr).strip()
+    # If we couldn't parse any messages, just show the stderr
+    # Otherwise the parsed errors and the unparsable stderr remainder
+    unparsable_section_header = "\n\nREMAINING STDERR:\n\n"
+    output_text = (format_output_messages(parsed_messages) +
+                   unparsable_section_header + unparsable
+                   if parsed_messages else stderr)
 
     show_output_result_text(view, msg, output_text, exit_code, base_dir)
 
