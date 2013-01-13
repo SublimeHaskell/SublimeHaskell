@@ -68,7 +68,7 @@ def select_project(window, on_selected):
 
 def run_build(view, project_name, project_dir, command, use_cabal_dev=None):
     # Run cabal or cabal-dev
-    if use_cabal_dev == None:
+    if use_cabal_dev is None:
         use_cabal_dev = get_setting_async('use_cabal_dev')
 
     tool = cabal_tool[use_cabal_dev]
