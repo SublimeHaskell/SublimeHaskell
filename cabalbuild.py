@@ -3,7 +3,7 @@ import sublime
 import sublime_plugin
 from threading import Thread
 
-from sublime_haskell_common import get_cabal_project_dir_and_name_of_view, call_and_wait, get_setting, get_setting_async, set_setting, save_settings, get_haskell_command_window_view_file_project, attach_sandbox
+from sublime_haskell_common import log, get_cabal_project_dir_and_name_of_view, call_and_wait, get_setting, get_setting_async, set_setting, save_settings, get_haskell_command_window_view_file_project, attach_sandbox
 from parseoutput import run_chain_build_thread
 from autocomplete import autocompletion
 
@@ -15,11 +15,11 @@ cabal_tool = {
 }
 
 cabal_command = {
-    'clean': {'steps': ['clean'], 'message': 'Cleaning'},
-    'configure': {'steps': ['configure'], 'message': 'Configure'},
-    'build': {'steps': ['build'], 'message': 'Building'},
-    'rebuild': {'steps': ['clean', 'configure', 'build'], 'message': 'Rebuilding'},
-    'install': {'steps': ['install'], 'message': 'Installing'}
+    'clean': {'steps': [['clean']], 'message': 'Cleaning'},
+    'configure': {'steps': [['configure']], 'message': 'Configure'},
+    'build': {'steps': [['build']], 'message': 'Building'},
+    'rebuild': {'steps': [['clean'], ['configure'], ['build']], 'message': 'Rebuilding'},
+    'install': {'steps': [['install']], 'message': 'Installing'}
 }
 
 
@@ -85,11 +85,17 @@ def run_build(view, project_name, project_dir, command, use_cabal_dev=None):
     # Tool arguments (commands): build, clean, etc.
     tool_steps = config['steps']
 
+    # Assemble command lines to run (possibly multiple steps)
+    commands = [extra_args([tool_name] + step) for step in tool_steps]
+
+    log('running build commands: {0}'.format(commands))
+
+    # Run them
     run_chain_build_thread(
         view,
         project_dir,
         tool_title + ': ' + action_title + ' ' + project_name,
-        [extra_args([tool_name, step]) for step in tool_steps])
+        commands)
 
 
 class SublimeHaskellSwitchCabalDev(sublime_plugin.WindowCommand):
