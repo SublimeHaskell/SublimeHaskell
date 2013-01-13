@@ -175,6 +175,11 @@ class SublimeHaskellBuild(SublimeHaskellBaseCommand):
         self.build('build_then_warnings')
 
 
+class SublimeHaskellTypecheck(SublimeHaskellBaseCommand):
+    def run(self):
+        self.build('typecheck_then_warnings')
+
+
 class SublimeHaskellRebuild(SublimeHaskellBaseCommand):
     def run(self):
         self.build('rebuild')
@@ -306,6 +311,11 @@ class SublimeHaskellCabalBuild(SublimeHaskellBaseCommand):
         self.build('build_then_warnings', False)
 
 
+class SublimeHaskellCabalTypecheck(SublimeHaskellBaseCommand):
+    def run(self):
+        self.build('typecheck_then_warnings', False)
+
+
 class SublimeHaskellCabalRebuild(SublimeHaskellBaseCommand):
     def run(self):
         self.build('rebuild', False)
@@ -331,6 +341,11 @@ class SublimeHaskellCabalDevConfigure(SublimeHaskellBaseCommand):
 class SublimeHaskellCabalDevBuild(SublimeHaskellBaseCommand):
     def run(self):
         self.build('build_then_warnings', True)
+
+
+class SublimeHaskellCabalDevTypecheck(SublimeHaskellBaseCommand):
+    def run(self):
+        self.build('typecheck_then_warnings', True)
 
 
 class SublimeHaskellCabalDevRebuild(SublimeHaskellBaseCommand):
