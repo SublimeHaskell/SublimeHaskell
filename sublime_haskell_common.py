@@ -294,8 +294,6 @@ def output_error(window, text):
     output_view.insert(edit, 0, text)
     output_view.end_edit(edit)
 
-    output_view.sel().clear()
-    output_view.sel().add(sublime.Region(0))
     output_view.set_read_only(True)
 
     window.run_command('show_panel', {'panel': 'output.' + SUBLIME_ERROR_PANEL_NAME})
