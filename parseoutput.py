@@ -61,26 +61,26 @@ class OutputMessage(object):
         return region
 
 
-def run_build_thread(view, cabal_project_dir, msg, cmd):
-    run_chain_build_thread(view, cabal_project_dir, msg, [cmd])
+def run_build_thread(view, cabal_project_dir, msg, cmd, on_done):
+    run_chain_build_thread(view, cabal_project_dir, msg, [cmd], on_done)
 
 
-def run_chain_build_thread(view, cabal_project_dir, msg, cmds):
+def run_chain_build_thread(view, cabal_project_dir, msg, cmds, on_done):
     sublime.status_message(msg + '...')
     thread = Thread(
         target=wait_for_chain_to_complete,
-        args=(view, cabal_project_dir, msg, cmds))
+        args=(view, cabal_project_dir, msg, cmds, on_done))
     thread.start()
 
 
-def wait_for_build_to_complete(view, cabal_project_dir, msg, cmd):
+def wait_for_build_to_complete(view, cabal_project_dir, msg, cmd, on_done):
     """Run a command, wait for it to complete, then parse and display
     the resulting errors."""
 
-    wait_for_chain_to_complete(view, cabal_project_dir, msg, [cmd])
+    wait_for_chain_to_complete(view, cabal_project_dir, msg, [cmd], on_done)
 
 
-def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds):
+def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
     """Chains several commands, wait for them to complete, then parse and display
     the resulting errors."""
 
@@ -94,6 +94,9 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds):
             cwd=cabal_project_dir)
         if exit_code != 0:
             break
+
+    # Notify UI thread that commands are done
+    sublime.set_timeout(on_done, 0)
 
     parse_output_messages_and_show(view, msg, cabal_project_dir, exit_code, stderr)
 
