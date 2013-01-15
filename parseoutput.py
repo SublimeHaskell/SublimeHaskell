@@ -129,12 +129,17 @@ def parse_output_messages_and_show(view, msg, base_dir, exit_code, stderr):
     parsed_messages = parse_output_messages(base_dir, stderr)
     # The unparseable part (for other errors)
     unparsable = output_regex.sub('', stderr).strip()
+
     # If we couldn't parse any messages, just show the stderr
     # Otherwise the parsed errors and the unparsable stderr remainder
-    unparsable_section_header = "\n\nREMAINING STDERR:\n\n"
-    output_text = (format_output_messages(parsed_messages) +
-                   unparsable_section_header + unparsable
-                   if parsed_messages else stderr)
+    outputs = []
+
+    if parsed_messages:
+        outputs += [format_output_messages(parsed_messages)]
+    if unparsable:
+        outputs += ["\nREMAINING STDERR:\n", unparsable]
+
+    output_text = '\n'.join(outputs)
 
     show_output_result_text(view, msg, output_text, exit_code, base_dir)
 
