@@ -293,71 +293,6 @@ def write_output(window, text, base_dir):
 def hide_output(window):
     window.run_command('hide_panel', {'panel': 'output.' + OUTPUT_PANEL_NAME})
 
-
-# Cabal build system
-
-class SublimeHaskellCabalClean(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('clean', False)
-
-
-class SublimeHaskellCabalConfigure(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('configure', False)
-
-
-class SublimeHaskellCabalBuild(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('build_then_warnings', False)
-
-
-class SublimeHaskellCabalTypecheck(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('typecheck_then_warnings', False)
-
-
-class SublimeHaskellCabalRebuild(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('rebuild', False)
-
-
-class SublimeHaskellCabalInstall(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('install', False)
-
-
-# Cabal-Dev build system
-
-class SublimeHaskellCabalDevClean(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('clean', True)
-
-
-class SublimeHaskellCabalDevConfigure(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('configure', True)
-
-
-class SublimeHaskellCabalDevBuild(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('build_then_warnings', True)
-
-
-class SublimeHaskellCabalDevTypecheck(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('typecheck_then_warnings', True)
-
-
-class SublimeHaskellCabalDevRebuild(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('rebuild', True)
-
-
-class SublimeHaskellCabalDevInstall(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('install', True)
-
-
 def run_build_commands_with(msg, cmds):
     """Run general build commands"""
     window, view, file_shown_in_view = get_haskell_command_window_view_file_project()
@@ -371,7 +306,6 @@ def run_build_commands_with(msg, cmds):
         return
 
     run_chain_build_thread(view, cabal_project_dir, msg(cabal_project_name), cmds)
-
 
 def run_build_command_with(msg, cmd):
     """Run one command"""
