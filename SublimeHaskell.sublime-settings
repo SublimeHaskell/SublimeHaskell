@@ -60,5 +60,8 @@
 	"cabal_dev_sandbox": "",
 
 	// Cabal-dev sandboxes
-	"cabal_dev_sandbox_list": []
+	"cabal_dev_sandbox_list": [],
+
+	// Inhibit default Sublime word completions
+	"inhibit_completions": true
 }

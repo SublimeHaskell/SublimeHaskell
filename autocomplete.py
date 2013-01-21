@@ -69,7 +69,7 @@ class AutoCompletion(object):
     """Information for completion"""
     def __init__(self):
         self.language_completions = []
-        self.module_completions = []
+        self.module_completions = set()
         # Module info (dictionary: filename => info)
         # info is:
         #   moduleName - name of module
@@ -144,6 +144,7 @@ class AutoCompletion(object):
                     current_info = self.info[current_file_name]
                     if 'imports' in current_info:
                         moduleImports.extend([m['importName'] for m in current_info['imports'] if not m['qualified']])
+                        completions.extend(self.get_module_completions_for(qualified_prefix, [m['importName'] for m in current_info['imports']]))
 
             for file_name, file_info in self.info.items():
                 if 'error' in file_info:
@@ -219,14 +220,15 @@ class AutoCompletion(object):
 
         return None
 
-    def get_module_completions_for(self, qualified_prefix):
+    def get_module_completions_for(self, qualified_prefix, modules = None):
         def module_next_name(mname):
             """
             Returns next name for prefix
             pref = Control.Con, mname = Control.Concurrent.MVar, result = Concurrent
             """
             return mname.split('.')[len(qualified_prefix.split('.')) - 1]
-        return list(set((unicode(module_next_name(m)),) * 2 for m in self.module_completions if m.startswith(qualified_prefix)))
+        module_list = modules if modules else self.module_completions
+        return list(set((unicode(module_next_name(m)),) * 2 for m in module_list if m.startswith(qualified_prefix)))
 
 
 autocompletion = AutoCompletion()
@@ -508,6 +510,7 @@ class InspectorAgent(threading.Thread):
                     f.write(formatted_json)
                 with autocompletion.info_lock:
                     autocompletion.info[filename] = new_info
+                autocompletion.module_completions.add(new_info['moduleName'])
 
     def _load_standard_module(self, module_name):
         if module_name not in autocompletion.std_info:
@@ -541,7 +544,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 
     def __init__(self):
         autocompletion.language_completions = []
-        autocompletion.module_completions = []
+        autocompletion.module_completions = set()
 
         self.local_settings = {
             'enable_ghc_mod': None,
@@ -579,7 +582,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         autocompletion.language_completions = call_ghcmod_and_wait(['lang']).splitlines()
 
         # Init import module completion
-        autocompletion.module_completions = call_ghcmod_and_wait(['list']).splitlines()
+        autocompletion.module_completions = set(call_ghcmod_and_wait(['list']).splitlines())
 
         sublime.status_message('SublimeHaskell: Updating ghc_mod completions ' + u" \u2714")
 
@@ -628,9 +631,10 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         # into completion because that wipes all default Sublime completions:
         # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
         # TODO: work around this
-        return [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0])]
-
-        return []
+        comp = [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0])]
+        if get_setting('inhibit_completions'):
+            return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
+        return comp
 
     def on_new(self, view):
         filename = view.file_name()
