@@ -162,6 +162,11 @@ class AutoCompletion(object):
                         # TODO: Show the declaration info somewhere.
                         completions.append((identifier[:MAX_COMPLETION_LENGTH], identifier))
 
+            # PRELUDE: Add the Prelude to the imports if it is not imported manually
+            # This is also done before the call to the ModuleInspector.
+            if u'Prelude' not in moduleImports:
+                moduleImports.insert(0, u'Prelude')
+
             # Completion for modules by ghc-mod browse
             with self.std_info_lock:
                 for mi in moduleImports:
@@ -501,9 +506,15 @@ class InspectorAgent(threading.Thread):
             if 'error' not in new_info:
                 # Load standard modules
                 if 'imports' in new_info:
-                    for mi in new_info['imports']:
-                        if 'importName' in mi:
-                            self._load_standard_module(mi['importName'])
+                    # Get all module names (filter away imports without module name)
+                    module_names = filter(id, [i.get('importName') for i in new_info['imports']])
+
+                    # PRELUDE: Add Prelude to the imports if it is not imported manually
+                    if u'Prelude' not in module_names:
+                        module_names.insert(0, u'Prelude')
+
+                    for import_name in module_names:
+                        self._load_standard_module(import_name)
 
                 # Remember when this info was collected.
                 new_info['inspectedAt'] = modification_time
