@@ -237,11 +237,11 @@ class AutoCompletion(object):
         def module_next_name(mname):
             """
             Returns next name for prefix
-            pref = Control.Con, mname = Control.Concurrent.MVar, result = Concurrent
+            pref = Control.Con, mname = Control.Concurrent.MVar, result = Concurrent.MVar
             """
-            return mname.split('.')[len(qualified_prefix.split('.')) - 1]
+            return '.'.join(mname.split('.')[(len(qualified_prefix.split('.')) - 1):])
         module_list = modules if modules else self.module_completions
-        return list(set((m + '\t(module)', m) for m in module_list if m.startswith(qualified_prefix)))
+        return list(set((m + '\t(module)', module_next_name(m)) for m in module_list if m.startswith(qualified_prefix)))
         # return list(set((unicode(module_next_name(m)),) * 2 for m in module_list if m.startswith(qualified_prefix)))
 
 
