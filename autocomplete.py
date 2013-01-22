@@ -35,8 +35,8 @@ IMPORT_RE_PREFIX = re.compile(r'^\s*import(\s+qualified)?\s+(.*)$')
 IMPORT_QUALIFIED_POSSIBLE_RE = re.compile(r'.*import\s+(?P<qualifiedprefix>\S*)$')
 IMPORT_RE_LIST = re.compile(r'.*import(\s+qualified)?\s+\w+(\.\w+)*(\s+as\s+\w+)?\s+\(')
 
-# Checks if a word contains only alhanums, -, and _
-NO_SPECIAL_CHARS_RE = re.compile(r'^(\w|[\-])*$')
+# Checks if a word contains only alhanums, -, and _, and dot
+NO_SPECIAL_CHARS_RE = re.compile(r'^(\w|[\-\.])*$')
 
 
 def get_line_contents(view, location):
@@ -96,6 +96,12 @@ class AutoCompletion(object):
         self.projects_lock = threading.Lock()
         self.projects = {}
 
+        # keywords
+        # TODO: keywords can't appear anywhere, we can suggest in right places
+        self.keyword_completions = map(
+            lambda k: (k + '\t(keyrowd)', k),
+            ['case', 'data', 'instance', 'type', 'where', 'deriving', 'import', 'module'])
+
     def clear_inspected(self):
         self.info = {}
         self.std_info = {}
@@ -139,11 +145,17 @@ class AutoCompletion(object):
                         moduleImports.extend([m['importName'] for m in current_info['imports'] if m['as'] == qualified_module])
                 moduleImports.append(qualified_module)
             else:
+                # add keywords
+                completions.extend(self.keyword_completions)
+
                 # list of imports, imported unqualified
                 if current_file_name in self.info:
                     current_info = self.info[current_file_name]
                     if 'imports' in current_info:
                         moduleImports.extend([m['importName'] for m in current_info['imports'] if not m['qualified']])
+                        # Prelude imported implicitly as unqualified
+                        if 'Prelude' not in current_info['imports']:
+                            moduleImports.append('Prelude')
                         completions.extend(self.get_module_completions_for(qualified_prefix, [m['importName'] for m in current_info['imports']]))
 
             for file_name, file_info in self.info.items():
@@ -155,9 +167,9 @@ class AutoCompletion(object):
                 if file_info['moduleName'] in moduleImports:
                     for d in file_info['declarations']:
                         identifier = d['identifier']
-                        #declaration_info = d['info']
+                        declaration_info = d['info']
                         # TODO: Show the declaration info somewhere.
-                        completions.append((identifier[:MAX_COMPLETION_LENGTH], identifier))
+                        completions.append((identifier + '\t' + declaration_info, identifier))
 
             # Completion for modules by ghc-mod browse
             with self.std_info_lock:
@@ -169,7 +181,7 @@ class AutoCompletion(object):
                     std_module = self.std_info[mi]
 
                     for v in std_module:
-                        completions.append((v[:MAX_COMPLETION_LENGTH], v))
+                        completions.append((v + '\t' + mi, v))
 
         return list(set(completions))
 
@@ -196,11 +208,12 @@ class AutoCompletion(object):
                         if file_info['moduleName'] == mname:
                             for d in file_info['declarations']:
                                 identifier = d['identifier']
-                                import_list_completions.append((identifier[:MAX_COMPLETION_LENGTH], identifier))
+                                declaration_info = d['info']
+                                import_list_completions.append((identifier + '\t' + declaration_info, identifier))
                 with self.std_info_lock:
                     if mname in self.std_info:
                         for v in self.std_info[mname]:
-                            import_list_completions.append((v[:MAX_COMPLETION_LENGTH], v))
+                            import_list_completions.append((v + '\t' + mname, v))
 
                 return import_list_completions
 
@@ -228,7 +241,8 @@ class AutoCompletion(object):
             """
             return mname.split('.')[len(qualified_prefix.split('.')) - 1]
         module_list = modules if modules else self.module_completions
-        return list(set((unicode(module_next_name(m)),) * 2 for m in module_list if m.startswith(qualified_prefix)))
+        return list(set((m + '\t(module)', m) for m in module_list if m.startswith(qualified_prefix)))
+        # return list(set((unicode(module_next_name(m)),) * 2 for m in module_list if m.startswith(qualified_prefix)))
 
 
 autocompletion = AutoCompletion()
@@ -631,7 +645,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         # into completion because that wipes all default Sublime completions:
         # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
         # TODO: work around this
-        comp = [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0])]
+        comp = [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0].split('\t')[0])]
         if get_setting('inhibit_completions'):
             return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         return comp
