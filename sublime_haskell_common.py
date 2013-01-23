@@ -297,3 +297,31 @@ def output_error(window, text):
     output_view.set_read_only(True)
 
     window.run_command('show_panel', {'panel': 'output.' + SUBLIME_ERROR_PANEL_NAME})
+
+class SublimeHaskellError(RuntimeError):
+    def __init__(self, what):
+        self.reason = what
+
+def show_status_message(msg, isok = None):
+    """
+    Show status message with check mark (isok = true), ballot x (isok = false) or ... (isok = None)
+    """
+    mark = u'...'
+    if isok is not None:
+        mark = u' \u2714' if isok else u' \u2718'
+    sublime.set_timeout(lambda: sublime.status_message(u'SublimeHaskell: {0}{1}'.format(msg, mark)), 0)
+
+def with_status_message(msg, action):
+    """
+    Show status message for action with check mark or with ballot x
+    Returns whether action exited properly
+    """
+    try:
+        show_status_message(msg)
+        action()
+        show_status_message(msg, True)
+        return True
+    except SublimeHaskellError as e:
+        show_status_message(msg, False)
+        log(e.reason)
+        return False

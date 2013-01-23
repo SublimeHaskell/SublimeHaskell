@@ -6,7 +6,7 @@ import sublime_plugin
 import threading
 import time
 
-from sublime_haskell_common import PACKAGE_PATH, get_setting, get_cabal_project_dir_of_file, call_and_wait, call_ghcmod_and_wait, log, wait_for_window, output_error, get_settings, is_enabled_haskell_command, get_cabal_in_dir
+from sublime_haskell_common import PACKAGE_PATH, get_setting, get_cabal_project_dir_of_file, call_and_wait, call_ghcmod_and_wait, log, wait_for_window, output_error, get_settings, is_enabled_haskell_command, get_cabal_in_dir, with_status_message, show_status_message, SublimeHaskellError
 
 # Completion text longer than this is ellipsized:
 MAX_COMPLETION_LENGTH = 37
@@ -382,10 +382,13 @@ class InspectorAgent(threading.Thread):
         self.dirty_files_lock = threading.Lock()
         self.dirty_files = []
 
+    CABALMSG = 'Compiling Haskell CabalInspector'
+    MODULEMSG = 'Compiling Haskell ModuleInspector'
+
     def run(self):
         # Compile the CabalInspector:
         # TODO: Where to compile it?
-        sublime.set_timeout(lambda: sublime.status_message('Compiling Haskell CabalInspector...'), 0)
+        show_status_message(InspectorAgent.CABALMSG)
 
         exit_code, out, err = call_and_wait(['ghc',
             '--make', CABAL_INSPECTOR_SOURCE_PATH,
@@ -393,14 +396,16 @@ class InspectorAgent(threading.Thread):
             '-outputdir', CABAL_INSPECTOR_OBJ_DIR])
 
         if exit_code != 0:
+            show_status_message(InspectorAgent.CABALMSG, False)
             error_msg = u"SublimeHaskell: Failed to compile CabalInspector\n{0}".format(err)
             wait_for_window(lambda w: self.show_errors(w, error_msg))
         else:
+            show_status_message(InspectorAgent.CABALMSG, True)
             sublime.set_timeout(lambda: sublime.status_message('Compiling Haskell CabalInspector' + u" \u2714"), 0)
         # Continue anyway
 
         # Compile the ModuleInspector:
-        sublime.set_timeout(lambda: sublime.status_message('Compiling Haskell ModuleInspector...'), 0)
+        show_status_message(InspectorAgent.MODULEMSG)
 
         exit_code, out, err = call_and_wait(['ghc',
             '--make', MODULE_INSPECTOR_SOURCE_PATH,
@@ -408,11 +413,12 @@ class InspectorAgent(threading.Thread):
             '-outputdir', MODULE_INSPECTOR_OBJ_DIR])
 
         if exit_code != 0:
+            show_status_message(InspectorAgent.MODULEMSG, False)
             error_msg = u"SublimeHaskell: Failed to compile ModuleInspector\n{0}".format(err)
             wait_for_window(lambda w: self.show_errors(w, error_msg))
             return
 
-        sublime.set_timeout(lambda: sublime.status_message('Compiling Haskell ModuleInspector' + u" \u2714"), 0)
+        show_status_message(InspectorAgent.MODULEMSG, True)
 
         # For first time, inspect all open folders and files
         wait_for_window(lambda w: self.mark_all_files(w))
@@ -436,8 +442,8 @@ class InspectorAgent(threading.Thread):
             # Eliminate duplicate project directories:
             cabal_dirs = list(set(cabal_dirs))
             standalone_files = list(set(standalone_files))
-            for d in cabal_dirs:
-                self._refresh_all_module_info(d)
+            for i, d in enumerate(cabal_dirs):
+                self._refresh_all_module_info(d, i + 1, len(cabal_dirs))
             for f in standalone_files:
                 self._refresh_module_info(f)
             time.sleep(AGENT_SLEEP_DURATION)
@@ -450,7 +456,6 @@ class InspectorAgent(threading.Thread):
             self.dirty_files.extend(folder_files)
 
     def show_errors(self, window, error_text):
-        sublime.set_timeout(lambda: sublime.status_message('Compiling Haskell ModuleInspector' + u" \u2717"), 0)
         sublime.set_timeout(lambda: output_error(window, error_text), 0)
 
     def mark_file_dirty(self, filename):
@@ -458,13 +463,14 @@ class InspectorAgent(threading.Thread):
         with self.dirty_files_lock:
             self.dirty_files.append(filename)
 
-    def _refresh_all_module_info(self, cabal_dir):
+    def _refresh_all_module_info(self, cabal_dir, index, count):
         "Rebuild module information for all files under the specified directory."
         begin_time = time.clock()
         log('reinspecting project ({0})'.format(cabal_dir))
         # Process all files within the Cabal project:
         # TODO: Only process files within the .cabal file's "src" directory.
         (project_name, cabal_file) = get_cabal_in_dir(cabal_dir)
+        show_status_message('Reinspecting ({0}/{1}) {2}'.format(index, count, project_name))
         # set project and read cabal
         if cabal_file and project_name:
             self._refresh_project_info(cabal_dir, project_name, cabal_file)
@@ -474,6 +480,7 @@ class InspectorAgent(threading.Thread):
         for filename in haskell_source_files:
             self._refresh_module_info(filename)
         end_time = time.clock()
+        show_status_message('Reinspecting ({0}/{1}) {2}'.format(index, count, project_name), True)
         log('total inspection time: {0} seconds'.format(end_time - begin_time))
 
     def _refresh_project_info(self, cabal_dir, project_name, cabal_file):
