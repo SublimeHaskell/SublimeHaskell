@@ -63,5 +63,5 @@
 	"cabal_dev_sandbox_list": [],
 
 	// Inhibit default Sublime word completions
-	"inhibit_completions": true
+	"inhibit_completions": false
 }
