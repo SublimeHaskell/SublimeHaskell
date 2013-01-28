@@ -114,7 +114,7 @@ def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb
     if alter_messages_cb:
         alter_messages_cb(parsed_messages)
 
-    concated_messages = map(lambda m: m[1], parsed_messages)
+    concated_messages = [m[1] for m in parsed_messages]
     output_text = format_output_messages(concated_messages)
 
     exit_code = 0 if all_cmds_successful else 1
