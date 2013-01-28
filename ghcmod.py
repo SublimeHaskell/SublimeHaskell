@@ -3,7 +3,7 @@ import sublime
 import sublime_plugin
 from threading import Thread
 
-from sublime_haskell_common import is_enabled_haskell_command, get_haskell_command_window_view_file_project, call_ghcmod_and_wait
+from sublime_haskell_common import log, is_enabled_haskell_command, get_haskell_command_window_view_file_project, call_ghcmod_and_wait
 from parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output
 
 
@@ -96,6 +96,7 @@ def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb
     file_dir = os.path.dirname(filename)
 
     all_cmds_successful = True
+    all_cmds_outputs = []
 
     for (cmd, args) in cmds_with_args:
         stdout = call_ghcmod_and_wait(args, filename)
@@ -105,19 +106,32 @@ def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb
         # Replace NULLs to indents
         out = stdout.replace('\0', '\n  ').decode('utf-8')
 
-        all_cmds_successful &= len(out) == 0
+        success = len(out) == 0
+
+        if not success:
+            all_cmds_outputs.append(out)
+            log("ghc-mod %s didn't exit with success on '%s'" % (cmd, filename))
+
+        all_cmds_successful &= success
 
         parsed = parse_output_messages(file_dir, out)
         for p in parsed:
             parsed_messages.append((cmd, p))
 
-    if alter_messages_cb:
-        alter_messages_cb(parsed_messages)
+    output_text = ""
 
-    concated_messages = [m[1] for m in parsed_messages]
-    output_text = format_output_messages(concated_messages)
+    if parsed_messages:
+        if alter_messages_cb:
+            alter_messages_cb(parsed_messages)
+
+        concated_messages = [m[1] for m in parsed_messages]
+        output_text = format_output_messages(concated_messages)
+
+        sublime.set_timeout(lambda: mark_messages_in_views(concated_messages), 0)
+    else:
+        # No parsed messages
+        output_text = '\n'.join(all_cmds_outputs)
 
     exit_code = 0 if all_cmds_successful else 1
 
     show_output_result_text(view, msg, output_text, exit_code, file_dir)
-    sublime.set_timeout(lambda: mark_messages_in_views(concated_messages), 0)
