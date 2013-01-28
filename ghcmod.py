@@ -7,6 +7,12 @@ from sublime_haskell_common import is_enabled_haskell_command, get_haskell_comma
 from parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output
 
 
+def lint_as_hints(msgs):
+    for m in msgs:
+        if m[0] == 'lint':
+            m[1].level = 'hint'
+
+
 class SublimeHaskellGhcModCheck(sublime_plugin.WindowCommand):
     def run(self):
         run_ghcmod('check', 'Checking')
@@ -25,10 +31,6 @@ class SublimeHaskellGhcModLint(sublime_plugin.WindowCommand):
 
 class SublimeHaskellGhcModCheckAndLint(sublime_plugin.WindowCommand):
     def run(self):
-        def lint_as_hints(msgs):
-            for m in msgs:
-                if m[0] == 'lint':
-                    m[1].level = 'hint'
         run_ghcmods(['check', 'lint'], 'Checking and Linting', lint_as_hints)
 
     def is_enabled(self):
