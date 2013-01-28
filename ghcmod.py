@@ -23,7 +23,7 @@ class SublimeHaskellGhcModCheck(sublime_plugin.WindowCommand):
 
 class SublimeHaskellGhcModLint(sublime_plugin.WindowCommand):
     def run(self):
-        run_ghcmod('lint', 'Linting')
+        run_ghcmod('lint', 'Linting', lint_as_hints)
 
     def is_enabled(self):
         return is_enabled_haskell_command(False)
