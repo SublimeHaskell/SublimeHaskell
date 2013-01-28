@@ -118,19 +118,15 @@ def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb
         for p in parsed:
             parsed_messages.append((cmd, p))
 
-    output_text = ""
+    if alter_messages_cb:
+        alter_messages_cb(parsed_messages)
 
-    if parsed_messages:
-        if alter_messages_cb:
-            alter_messages_cb(parsed_messages)
+    concated_messages = [m[1] for m in parsed_messages]
 
-        concated_messages = [m[1] for m in parsed_messages]
-        output_text = format_output_messages(concated_messages)
+    sublime.set_timeout(lambda: mark_messages_in_views(concated_messages), 0)
 
-        sublime.set_timeout(lambda: mark_messages_in_views(concated_messages), 0)
-    else:
-        # No parsed messages
-        output_text = '\n'.join(all_cmds_outputs)
+    output_text = (format_output_messages(concated_messages) if parsed_messages
+                   else '\n'.join(all_cmds_outputs))
 
     exit_code = 0 if all_cmds_successful else 1
 
