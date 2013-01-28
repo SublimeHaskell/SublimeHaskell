@@ -89,11 +89,11 @@ def run_ghcmods_thread(view, filename, msg, cmds_with_args, alter_messages_cb):
 def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb):
     sublime.set_timeout(lambda: hide_output(view), 0)
 
-    exit_success = True
-
     parsed_messages = []
 
     file_dir = os.path.dirname(filename)
+
+    all_cmds_successful = True
 
     for (cmd, args) in cmds_with_args:
         stdout = call_ghcmod_and_wait(args, filename)
@@ -103,19 +103,19 @@ def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb
         # Replace NULLs to indents
         out = stdout.replace('\0', '\n  ').decode('utf-8')
 
-        exit_success = exit_success and len(out) == 0
+        all_cmds_successful &= len(out) == 0
 
         parsed = parse_output_messages(file_dir, out)
         for p in parsed:
             parsed_messages.append((cmd, p))
-
-    exit_code = 0 if exit_success else 1
 
     if alter_messages_cb:
         alter_messages_cb(parsed_messages)
 
     concated_messages = map(lambda m: m[1], parsed_messages)
     output_text = format_output_messages(concated_messages)
+
+    exit_code = 0 if all_cmds_successful else 1
 
     show_output_result_text(view, msg, output_text, exit_code, file_dir)
     sublime.set_timeout(lambda: mark_messages_in_views(concated_messages), 0)
