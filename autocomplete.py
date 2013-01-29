@@ -123,6 +123,15 @@ class AutoCompletion(object):
                 return [m['importName'] for m in current_info['imports'] if m['as'] == alias]
         return []
 
+    def current_file_imports(self, view):
+        "Get module imports for current file"
+        current_file_name = view.file_name()
+        if current_file_name in self.info:
+            current_info = self.info[current_file_name]
+            if 'imports' in current_info:
+                return [m['importName'] for m in current_info['imports']]
+        return []
+
     def get_completions(self, view, prefix, locations):
         "Get all the completions that apply to the current file."
 
@@ -328,6 +337,103 @@ class SublimeHaskellReinspectAll(sublime_plugin.WindowCommand):
         autocompletion.clear_inspected()
         SublimeHaskellAutocomplete.inspector.mark_all_files(self.window)
 
+
+class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
+    def run(self, edit):
+        word_region = self.view.word(self.view.sel()[0])
+        preline = get_line_contents_before_region(self.view, word_region)
+        (module_word, _) = get_qualified_name(preline)
+        no_module = len(module_word) == 0
+
+        modules = []
+        imported_modules = autocompletion.current_file_imports(self.view)
+
+        if not no_module:
+            modules = [module_word]
+            modules.extend(autocompletion.unalias_module_name(self.view, module_word))
+
+        ident = self.view.substr(word_region)
+        full_qualified_name = ident if no_module else '.'.join([module_word, ident])
+
+        candidates = []
+
+        def is_module_imported(module_name):
+            if no_module:
+                return module_name in imported_modules
+            else:
+                return module_name in modules
+
+        for f, v in autocompletion.info.items():
+            if 'declarations' in v:
+                for d in v['declarations']:
+                    if d['identifier'] == ident:
+                        candidates.append((v['moduleName'], d, is_module_imported(v['moduleName'])))
+
+        for m, v in autocompletion.std_info.items():
+            if 'declarations' in v:
+                for d in v['declarations']:
+                    if d['name'] == ident:
+                        candidates.append((v['moduleName'], d, is_module_imported(v['moduleName'])))
+
+        preferred_candidates = [c for c in candidates if c[2]]
+        other_candidates = [c for c in candidates if not c[2]]
+
+        if not self.try_candidates(preferred_candidates):
+            self.try_candidates(other_candidates)
+
+    def try_candidates(self, candidates):
+        if len(candidates) == 0:
+            return False
+        if len(candidates) == 1:
+            self.show_symbol_info(candidates[0])
+            return True
+        # many candidates
+        self.candidates = candidates
+        names = ['.'.join([c[0], c[1]]) for c in candidates]
+        self.view.window().show_quick_panel(names, self.on_done)
+
+    def on_done(self, idx):
+        if idx == -1:
+            return
+        self.show_symbol_info(self.candidates[idx])
+
+    def show_symbol_info(self, symbol):
+        output_view = self.view.window().get_output_panel('sublime_haskell_symbol_info')
+        output_view.set_read_only(False)
+
+        (module_name, decl, _) = symbol
+
+        info_text = []
+        if 'info' in decl:
+            info_text.extend([
+                '{0} :: {1}'.format(decl['declaration'], decl['info']),
+                module_name])
+        elif 'name' in decl:
+            if 'what' not in decl: # info is not detailed
+                decl_info = ghci_info(module_name, decl['name'])
+                if decl_info:
+                    decl.update(decl_info)
+            if 'what' not in decl: # failed to load info
+                info_text.extend([decl['name']])
+            else:
+                if decl['what'] == 'function':
+                    info_text.extend([
+                        '{0} :: {1}'.format(decl['name'], decl['type']),
+                        module_name])
+                else:
+                    info_text.extend([
+                        ' '.join(decl['what'], decl['name'], ' '.join(decl['args'])),
+                        module_name])
+
+        edit = output_view.begin_edit()
+        output_view.insert(edit, output_view.size(), '\n'.join(info_text))
+        output_view.end_edit(edit)
+
+        output_view.sel().clear()
+        output_view.set_read_only(True)
+
+        self.view.window().run_command('show_panel', {
+            'panel': 'output.' + 'sublime_haskell_symbol_info' })
 
 class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
     def run(self, edit):

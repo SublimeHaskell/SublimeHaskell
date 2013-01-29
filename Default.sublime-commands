@@ -22,6 +22,10 @@
         "command": "sublime_haskell_insert_type"
     },
     {
+        "caption": "SublimeHaskell: Show symbol info",
+        "command": "sublime_haskell_symbol_info"
+    },
+    {
         "caption": "SublimeHaskell: Build",
         "command": "sublime_haskell_build"
     },
