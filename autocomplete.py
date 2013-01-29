@@ -851,7 +851,17 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
     def on_new(self, view):
         filename = view.file_name()
         if filename:
+            (cabal_dir, project_name) = get_cabal_project_dir_and_name_of_file(filename)
+            if project_name:
+                view.set_status('cabal', 'cabal: {0}'.format(project_name))
             SublimeHaskellAutocomplete.inspector.mark_file_dirty(filename)
+
+    def on_load(self, view):
+        filename = view.file_name()
+        if filename:
+            (cabal_dir, project_name) = get_cabal_project_dir_and_name_of_file(filename)
+            if project_name:
+                view.set_status('cabal', 'cabal: {0}'.format(project_name))
 
     def on_post_save(self, view):
         filename = view.file_name()
