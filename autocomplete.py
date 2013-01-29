@@ -389,7 +389,10 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
             return True
         # many candidates
         self.candidates = candidates
-        names = ['.'.join([c[0], c[1]]) for c in candidates]
+        def candidate_name(candidate):
+            (module_name, decl, _) = candidate
+            return '.'.join([module_name, decl['identifier'] or decl['name']])
+        names = [candidate_name(c) for c in candidates]
         self.view.window().show_quick_panel(names, self.on_done)
 
     def on_done(self, idx):
@@ -406,7 +409,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
         info_text = []
         if 'info' in decl:
             info_text.extend([
-                '{0} :: {1}'.format(decl['declaration'], decl['info']),
+                '{0} :: {1}'.format(decl['identifier'], decl['info']),
                 module_name])
         elif 'name' in decl:
             if 'what' not in decl: # info is not detailed
