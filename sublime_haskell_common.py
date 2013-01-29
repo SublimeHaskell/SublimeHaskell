@@ -3,6 +3,7 @@ import fnmatch
 import os
 import sublime
 import subprocess
+import threading
 
 # Maximum seconds to wait for window to appear
 # This dirty hack is used in wait_for_window function
@@ -333,3 +334,50 @@ def crlf2lf(s):
     if not s:
         return None
     return s.replace('\r\n', '\n')
+
+class StatusBarMessage(threading.Thread):
+    def __init__(self, view, msg):
+        super(StatusBarMessage, self).__init__()
+        self.interval = 0.5
+        self.msg = msg
+        self.view = view
+        self.times = 0
+        self.event = threading.Event()
+        self.event.set()
+        self.timer = None
+
+    def run(self):
+        self.update_message()
+        while self.event.is_set():
+            self.timer = threading.Timer(self.interval, self.update_message)
+            self.timer.start()
+            self.timer.join()
+
+    def cancel(self):
+        self.event.clear()
+        if self.timer:
+            self.timer.cancel()
+        sublime.set_timeout(lambda: self.view.set_status('SublimeHaskell', ''), 0)
+
+    def update_message(self):
+        dots = self.times % 4
+        self.times += 1
+        sublime.set_timeout(lambda: self.view.set_status('SublimeHaskell', 'SublimeHaskell: {0}{1}'.format(self.msg, '.' * dots)), 0)
+
+status_bar_message = None
+
+def show_status_bar_message(view, msg, isok = None):
+    """
+    Same as show_status_message, but shows permanently until called with isok
+    """
+    global status_bar_message
+    if isok is not None:
+        if status_bar_message:
+            status_bar_message.cancel()
+        show_status_message(msg, isok)
+    else:
+        if status_bar_message:
+            status_bar_message.cancel()
+
+        status_bar_message = StatusBarMessage(view, msg)
+        status_bar_message.start()

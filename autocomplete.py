@@ -457,7 +457,7 @@ class StandardInspectorAgent(threading.Thread):
 
     def _load_standard_module_detailed(self, module_name):
         if not autocompletion.std_info[module_name]['detailed']:
-            msg = 'SublimeHaskell: Loading info for {0}'.format(module_name)
+            msg = 'Loading info for {0}'.format(module_name)
             begin_time = time.clock()
             log('loading detailed info for standard module {0}'.format(module_name))
             show_status_message(msg)
