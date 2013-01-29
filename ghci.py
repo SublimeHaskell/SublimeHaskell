@@ -1,5 +1,6 @@
 import re
 import os
+import sublime_plugin
 
 from sublime_haskell_common import *
 
@@ -60,3 +61,14 @@ def ghci_append_package_db(cmd):
     if package_conf:
         cmd.extend(['-package-db', package_conf])
     return cmd
+
+# Opens REPL in SublimeREPL
+class SublimeHaskellReplOpenCommand(sublime_plugin.WindowCommand):
+    def run(self):
+        self.window.run_command("repl_open", {
+            "type": "subprocess",
+            "encoding": "utf8",
+            "cmd": ghci_append_package_db(["ghci"]),
+            "cwd": "$file_path",
+            "external_id": "sublime_haskell",
+            "syntax": "Packages/Haskell/Haskell.tmLanguage" })
