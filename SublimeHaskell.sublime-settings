@@ -63,5 +63,8 @@
 	"cabal_dev_sandbox_list": [],
 
 	// Inhibit default Sublime word completions
-	"inhibit_completions": false
+	"inhibit_completions": false,
+
+	// Replace data and class with snippet
+	"snippet_replace": true
 }

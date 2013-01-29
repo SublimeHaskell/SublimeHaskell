@@ -6,7 +6,8 @@ import sublime_plugin
 import threading
 import time
 
-from sublime_haskell_common import PACKAGE_PATH, get_setting, get_cabal_project_dir_of_file, call_and_wait, call_ghcmod_and_wait, log, wait_for_window, output_error, get_settings, is_enabled_haskell_command, get_cabal_in_dir, with_status_message, show_status_message, SublimeHaskellError
+from sublime_haskell_common import *
+from ghci import ghci_info
 
 # Completion text longer than this is ellipsized:
 MAX_COMPLETION_LENGTH = 37
@@ -83,7 +84,13 @@ class AutoCompletion(object):
         #     identifier - declaration identifier
         self.info_lock = threading.Lock()
         self.info = {}
-        # Standard module completions (dictionary: module name => completions):
+        # Standard module completions (dictionary: module name => info):
+        # info is:
+        #   moduleName - name of module
+        #   detailed - is info detailed?
+        #   declarations - list of declarations, where declaration is:
+        #     name - name
+        #     other info from ghci_info
         self.std_info_lock = threading.Lock()
         self.std_info = {}
 
@@ -158,32 +165,54 @@ class AutoCompletion(object):
                             moduleImports.append('Prelude')
                         completions.extend(self.get_module_completions_for(qualified_prefix, [m['importName'] for m in current_info['imports']]))
 
-            for file_name, file_info in self.info.items():
+        for mi in moduleImports:
+            completions.extend(self.info_completions(mi))
+            completions.extend(self.std_info_completions(mi))
+
+        return list(set(completions))
+
+    def replace_string(self, v):
+        if not get_setting_async('snippet_replace'):
+            return v['name']
+        if 'what' not in v:
+            return v['name']
+        if v['what'] == 'function':
+            return v['name']
+        # Map k a -> Map ${1:k} ${2:a}
+        result = [v['name']]
+        i = 1
+        for arg in v['args']:
+            result.append("${" + str(i) + ":" + arg + "}")
+
+        return ' '.join(result)
+
+    def std_info_completions(self, module_name):
+        result = []
+        with self.std_info_lock:
+            if module_name in self.std_info:
+                for v in self.std_info[module_name]['declarations']:
+                    if 'what' in v:
+                        if v['what'] == 'function':
+                            result.append((v['name'] + '\t' + v['type'], v['name']))
+                        else:
+                            result.append((v['name'] + '\t' + ' '.join(v['args']), self.replace_string(v)))
+                    else:
+                        result.append((v['name'] + '\t' + module_name, v['name']))
+        return result
+
+    def info_completions(self, module_name):
+        result = []
+        with self.info_lock:
+            for file_info in self.info.values():
                 if 'error' in file_info:
                     # There was an error parsing this file; skip it
                     continue
-
-                # File is imported, add to completion list
-                if file_info['moduleName'] in moduleImports:
+                if file_info['moduleName'] == module_name:
                     for d in file_info['declarations']:
                         identifier = d['identifier']
                         declaration_info = d['info']
-                        # TODO: Show the declaration info somewhere.
-                        completions.append((identifier + '\t' + declaration_info, identifier))
-
-            # Completion for modules by ghc-mod browse
-            with self.std_info_lock:
-                for mi in moduleImports:
-                    if mi not in self.std_info:
-                        # Module not imported, skip it
-                        continue
-
-                    std_module = self.std_info[mi]
-
-                    for v in std_module:
-                        completions.append((v + '\t' + mi, v))
-
-        return list(set(completions))
+                        result.append((identifier + '\t' + declaration_info, identifier))
+        return result
 
     def get_import_completions(self, view, prefix, locations):
 
@@ -203,17 +232,8 @@ class AutoCompletion(object):
             if match_import_list:
                 (_, mname) = match_import_list.groups()
                 import_list_completions = []
-                with self.info_lock:
-                    for file_info in self.info.values():
-                        if file_info['moduleName'] == mname:
-                            for d in file_info['declarations']:
-                                identifier = d['identifier']
-                                declaration_info = d['info']
-                                import_list_completions.append((identifier + '\t' + declaration_info, identifier))
-                with self.std_info_lock:
-                    if mname in self.std_info:
-                        for v in self.std_info[mname]:
-                            import_list_completions.append((v + '\t' + mname, v))
+                import_list_completions.extend(self.info_completions(mname))
+                import_list_completions.extend(self.std_info_completions(mname))
 
                 return import_list_completions
 
@@ -262,7 +282,7 @@ class SublimeHaskellBrowseDeclarations(sublime_plugin.WindowCommand):
                     self.names.append(d['identifier'])
                     self.declarations.append(v['moduleName'] + ': ' + d['identifier'] + ' ' + d['info'])
         for m, decls in autocompletion.std_info.items():
-            for decl in decls:
+            for decl in decls['declarations']:
                 self.names.append(decl)
                 self.declarations.append(m + ': ' + decl)
 
@@ -371,7 +391,94 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
         return is_enabled_haskell_command(False)
 
 
+
+class StandardInspectorAgent(threading.Thread):
+    def __init__(self):
+        super(StandardInspectorAgent, self).__init__()
+        self.daemon = True
+        self.modules_lock = threading.Lock()
+        self.modules_to_load = []
+
+    def run(self):
+        self.init_ghcmod_completions()
+
+        while True:
+            load_modules = []
+            with self.modules_lock:
+                load_modules = self.modules_to_load
+                self.modules_to_load = []
+
+            if len(load_modules) > 0:
+                show_status_message('SublimeHaskell: Updating standard modules')
+                try:
+                    for m in load_modules:            
+                        self._load_standard_module(m)
+                    for m in load_modules:
+                        self._load_standard_module_detailed(m)
+                except:
+                    show_status_message('SublimeHaskell: Updating standard modules', False)
+                    continue
+                show_status_message('SublimeHaskell: Updating standard modules', True)
+
+    def load_module_info(self, module_name):
+        with self.modules_lock:
+            self.modules_to_load.append(module_name)
+
+    # Gets available LANGUAGE options and import modules from ghc-mod
+    def init_ghcmod_completions(self):
+
+        if not get_setting_async('enable_ghc_mod'):
+            return
+
+        show_status_message('SublimeHaskell: Updating ghc_mod completions')
+
+        # Init LANGUAGE completions
+        autocompletion.language_completions = call_ghcmod_and_wait(['lang']).splitlines()
+        # Init import module completion
+        autocompletion.module_completions = set(call_ghcmod_and_wait(['list']).splitlines())
+
+        show_status_message('SublimeHaskell: Updating ghc_mod completions', True)
+
+    def _load_standard_module(self, module_name):
+        if module_name not in autocompletion.std_info:
+            try:
+                module_contents = call_ghcmod_and_wait(['browse', module_name]).splitlines()
+                module_info = {
+                    'moduleName': module_name,
+                    'detailed': False,
+                    'declarations': [] }
+                for name in module_contents:
+                    module_info['declarations'].append({ 'name': name })
+
+                with autocompletion.std_info_lock:
+                    autocompletion.std_info[module_name] = module_info
+            except Exception:
+                pass
+
+    def _load_standard_module_detailed(self, module_name):
+        if not autocompletion.std_info[module_name]['detailed']:
+            msg = 'SublimeHaskell: Loading info for {0}'.format(module_name)
+            begin_time = time.clock()
+            log('loading detailed info for standard module {0}'.format(module_name))
+            show_status_message(msg)
+            decls = autocompletion.std_info[module_name]['declarations'][:]
+            for cts in decls:
+                cts_info = ghci_info(module_name, cts['name'])
+                if cts_info:
+                    cts.update(cts_info)
+            with autocompletion.std_info_lock:
+                autocompletion.std_info[module_name]['declarations'] = decls
+                autocompletion.std_info[module_name]['detailed'] = True
+            show_status_message(msg, True)
+            end_time = time.clock()
+            log('loaded detailed info for standard module {0} within {1} seconds'.format(module_name, end_time - begin_time))
+
+
+
 class InspectorAgent(threading.Thread):
+    std_inspector = StandardInspectorAgent()
+    std_inspector.start()
+
     def __init__(self):
         # Call the superclass constructor:
         super(InspectorAgent, self).__init__()
@@ -521,11 +628,11 @@ class InspectorAgent(threading.Thread):
             new_info = json.loads(stdout)
 
             if 'error' not in new_info:
-                # Load standard modules
+                # # Load standard modules
                 if 'imports' in new_info:
                     for mi in new_info['imports']:
                         if 'importName' in mi:
-                            self._load_standard_module(mi['importName'])
+                            InspectorAgent.std_inspector.load_module_info(mi['importName'])
 
                 # Remember when this info was collected.
                 new_info['inspectedAt'] = modification_time
@@ -537,14 +644,8 @@ class InspectorAgent(threading.Thread):
                     autocompletion.info[filename] = new_info
                 autocompletion.module_completions.add(new_info['moduleName'])
 
-    def _load_standard_module(self, module_name):
-        if module_name not in autocompletion.std_info:
-            module_contents = call_ghcmod_and_wait(['browse', module_name]).splitlines()
-            with autocompletion.std_info_lock:
-                autocompletion.std_info[module_name] = module_contents
-
     def _get_inspection_time_of_file(self, filename):
-        """Return the time that a file was last inspected.
+        """Return the time that a file was last inspected.`
         Return zero if it has never been inspected."""
         with autocompletion.info_lock:
             try:
@@ -568,9 +669,6 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
     inspector.start()
 
     def __init__(self):
-        autocompletion.language_completions = []
-        autocompletion.module_completions = set()
-
         self.local_settings = {
             'enable_ghc_mod': None,
             'use_cabal_dev': None,
@@ -579,8 +677,6 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 
         for s in self.local_settings.keys():
             self.local_settings[s] = get_setting(s)
-
-        self.init_ghcmod_completions()
 
         # Subscribe to settings changes to update data
         get_settings().add_on_change('enable_ghc_mod', lambda: self.on_setting_changed())
@@ -593,23 +689,8 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             self.local_settings[k] = r
 
         if not same:
-            self.init_ghcmod_completions()
-
-    # Gets available LANGUAGE options and import modules from ghc-mod
-    def init_ghcmod_completions(self):
-
-        if not get_setting('enable_ghc_mod'):
-            return
-
-        sublime.status_message('SublimeHaskell: Updating ghc_mod completions...')
-
-        # Init LANGUAGE completions
-        autocompletion.language_completions = call_ghcmod_and_wait(['lang']).splitlines()
-
-        # Init import module completion
-        autocompletion.module_completions = set(call_ghcmod_and_wait(['list']).splitlines())
-
-        sublime.status_message('SublimeHaskell: Updating ghc_mod completions ' + u" \u2714")
+            # TODO: Changed completion settings!
+            pass
 
     def get_special_completions(self, view, prefix, locations):
 

@@ -30,6 +30,8 @@ def preload_settings():
     get_setting('cabal_dev_sandbox_list')
     get_setting('enable_auto_build')
     get_setting('show_output_window')
+    get_setting('enable_ghc_mod')
+    get_setting('snippet_replace')
 
 # SublimeHaskell settings dictionary
 # used to retrieve it async from any thread
@@ -325,3 +327,9 @@ def with_status_message(msg, action):
         show_status_message(msg, False)
         log(e.reason)
         return False
+
+def crlf2lf(s):
+    " CRLF -> LF "
+    if not s:
+        return None
+    return s.replace('\r\n', '\n')
