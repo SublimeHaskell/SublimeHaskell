@@ -335,12 +335,11 @@ def crlf2lf(s):
         return None
     return s.replace('\r\n', '\n')
 
-class StatusBarMessage(threading.Thread):
-    def __init__(self, view, msg):
-        super(StatusBarMessage, self).__init__()
+class StatusMessage(threading.Thread):
+    def __init__(self, msg):
+        super(StatusMessage, self).__init__()
         self.interval = 0.5
         self.msg = msg
-        self.view = view
         self.times = 0
         self.event = threading.Event()
         self.event.set()
@@ -357,27 +356,26 @@ class StatusBarMessage(threading.Thread):
         self.event.clear()
         if self.timer:
             self.timer.cancel()
-        sublime.set_timeout(lambda: self.view.set_status('SublimeHaskell', ''), 0)
 
     def update_message(self):
         dots = self.times % 4
         self.times += 1
-        sublime.set_timeout(lambda: self.view.set_status('SublimeHaskell', 'SublimeHaskell: {0}{1}'.format(self.msg, '.' * dots)), 0)
+        sublime.set_timeout(lambda: sublime.status_message('SublimeHaskell: {0}{1}'.format(self.msg, '.' * dots)), 0)
 
-status_bar_message = None
+status_messager = None
 
-def show_status_bar_message(view, msg, isok = None):
+def show_status_message_process(msg, isok = None):
     """
-    Same as show_status_message, but shows permanently until called with isok
+    Same as show_status_message, but shows permanently until called with isok not None
     """
-    global status_bar_message
+    global status_messager
     if isok is not None:
-        if status_bar_message:
-            status_bar_message.cancel()
+        if status_messager:
+            status_messager.cancel()
         show_status_message(msg, isok)
     else:
-        if status_bar_message:
-            status_bar_message.cancel()
+        if status_messager:
+            status_messager.cancel()
 
-        status_bar_message = StatusBarMessage(view, msg)
-        status_bar_message.start()
+        status_messager = StatusMessage(msg)
+        status_messager.start()
