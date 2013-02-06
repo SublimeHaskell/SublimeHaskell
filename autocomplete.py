@@ -797,6 +797,13 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             same = same and v == r
             self.local_settings[k] = r
 
+        # Update cabal status of active view
+        window = sublime.active_window()
+        if window:
+            view = window.active_view()
+            if view:
+                self.set_cabal_status(view)
+
         if not same:
             # TODO: Changed completion settings!
             pass
@@ -851,20 +858,25 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         return comp
 
-    def on_new(self, view):
+    def set_cabal_status(self, view):
         filename = view.file_name()
         if filename:
             (cabal_dir, project_name) = get_cabal_project_dir_and_name_of_file(filename)
+            cabal = 'cabal-dev' if get_setting_async('use_cabal_dev') else 'cabal'
             if project_name:
-                view.set_status('cabal', 'cabal: {0}'.format(project_name))
+                view.set_status('sublime_haskell_cabal', '{0}: {1}'.format(cabal, project_name))
+
+    def on_new(self, view):
+        self.set_cabal_status(view)
+        filename = view.file_name()
+        if filename:
             SublimeHaskellAutocomplete.inspector.mark_file_dirty(filename)
 
     def on_load(self, view):
-        filename = view.file_name()
-        if filename:
-            (cabal_dir, project_name) = get_cabal_project_dir_and_name_of_file(filename)
-            if project_name:
-                view.set_status('cabal', 'cabal: {0}'.format(project_name))
+        self.set_cabal_status(view)
+
+    def on_activated(self, view):
+        self.set_cabal_status(view)
 
     def on_post_save(self, view):
         filename = view.file_name()
