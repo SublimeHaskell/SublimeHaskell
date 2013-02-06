@@ -391,7 +391,8 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
         self.candidates = candidates
         def candidate_name(candidate):
             (module_name, decl, _) = candidate
-            return '.'.join([module_name, decl['identifier'] or decl['name']])
+            decl_name = decl['identifier'] if 'identifier' in decl or decl['name']
+            return '.'.join([module_name, decl_name])
         names = [candidate_name(c) for c in candidates]
         self.view.window().show_quick_panel(names, self.on_done)
 
