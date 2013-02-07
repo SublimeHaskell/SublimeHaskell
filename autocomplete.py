@@ -194,6 +194,7 @@ class AutoCompletion(object):
         i = 1
         for arg in v['args']:
             result.append("${" + str(i) + ":" + arg + "}")
+            i += 1
 
         return ' '.join(result)
 
