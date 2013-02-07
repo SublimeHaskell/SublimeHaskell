@@ -8,6 +8,7 @@ import time
 
 from sublime_haskell_common import *
 from ghci import ghci_info
+from haskell_docs import haskell_docs
 
 # Completion text longer than this is ellipsized:
 MAX_COMPLETION_LENGTH = 37
@@ -90,6 +91,7 @@ class AutoCompletion(object):
         #   detailed - is info detailed?
         #   declarations - list of declarations, where declaration is:
         #     name - name
+        #     docs - info from haskell_docs
         #     other info from ghci_info
         self.std_info_lock = threading.Lock()
         self.std_info = {}
@@ -417,17 +419,24 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
                 decl_info = ghci_info(module_name, decl['name'])
                 if decl_info:
                     decl.update(decl_info)
+                docs_info = haskell_docs(module_name, decl['name'])
+                if docs_info:
+                    decl['docs'] = docs_info
             if 'what' not in decl: # failed to load info
                 info_text.extend([decl['name']])
             else:
+                docs = decl.get('docs', '')
+
                 if decl['what'] == 'function':
                     info_text.extend([
                         '{0} :: {1}'.format(decl['name'], decl['type']),
-                        module_name])
+                        module_name,
+                        docs])
                 else:
                     info_text.extend([
                         ' '.join([decl['what'], decl['name'], ' '.join(decl['args'])]),
-                        module_name])
+                        module_name,
+                        docs])
 
         edit = output_view.begin_edit()
         output_view.insert(edit, output_view.size(), '\n'.join(info_text))
@@ -576,6 +585,9 @@ class StandardInspectorAgent(threading.Thread):
                 cts_info = ghci_info(module_name, cts['name'])
                 if cts_info:
                     cts.update(cts_info)
+                docs_info = haskell_docs(module_name, cts['name'])
+                if docs_info:
+                    cts['docs'] = docs_info
             with autocompletion.std_info_lock:
                 autocompletion.std_info[module_name]['declarations'] = decls
                 autocompletion.std_info[module_name]['detailed'] = True
