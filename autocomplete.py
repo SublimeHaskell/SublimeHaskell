@@ -365,16 +365,16 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
             else:
                 return module_name in modules
 
-        for m, v in autocompletion.std_info.items():
-            if 'declarations' in v:
-                for d in v['declarations']:
-                    if d['name'] == ident:
-                        candidates['.'.join([v['moduleName'], ident])] = (v['moduleName'], d, is_module_imported(v['moduleName']))
-
         for f, v in autocompletion.info.items():
             if 'declarations' in v:
                 for d in v['declarations']:
                     if d['identifier'] == ident:
+                        candidates['.'.join([v['moduleName'], ident])] = (v['moduleName'], d, is_module_imported(v['moduleName']))
+
+        for m, v in autocompletion.std_info.items():
+            if 'declarations' in v:
+                for d in v['declarations']:
+                    if d['name'] == ident:
                         candidates['.'.join([v['moduleName'], ident])] = (v['moduleName'], d, is_module_imported(v['moduleName']))
 
         preferred_candidates = [c for c in candidates.itervalues() if c[2]]
@@ -411,9 +411,13 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
 
         info_text = []
         if 'info' in decl:
+            # Try to load docs anyway
+            docs_info = haskell_docs(module_name, decl['identifier'])
+            docs = docs_info if docs_info else ''
             info_text.extend([
                 '{0} {1}'.format(decl['identifier'], decl['info']),
-                module_name])
+                module_name,
+                docs])
         elif 'name' in decl:
             if 'what' not in decl: # info is not detailed
                 decl_info = ghci_info(module_name, decl['name'])
