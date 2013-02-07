@@ -410,7 +410,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
         info_text = []
         if 'info' in decl:
             info_text.extend([
-                '{0} :: {1}'.format(decl['identifier'], decl['info']),
+                '{0} {1}'.format(decl['identifier'], decl['info']),
                 module_name])
         elif 'name' in decl:
             if 'what' not in decl: # info is not detailed
@@ -426,7 +426,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
                         module_name])
                 else:
                     info_text.extend([
-                        ' '.join(decl['what'], decl['name'], ' '.join(decl['args'])),
+                        ' '.join([decl['what'], decl['name'], ' '.join(decl['args'])]),
                         module_name])
 
         edit = output_view.begin_edit()
