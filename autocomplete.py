@@ -291,11 +291,17 @@ class SublimeHaskellBrowseDeclarations(sublime_plugin.WindowCommand):
             if 'declarations' in v:
                 for d in v['declarations']:
                     self.names.append(d['identifier'])
-                    self.declarations.append(v['moduleName'] + ': ' + d['identifier'] + ' ' + d['info'])
+                    self.declarations.append('{0}: {1} {2}'.format(v['moduleName'], d['identifier'], d['info']))
         for m, decls in autocompletion.std_info.items():
             for decl in decls['declarations']:
-                self.names.append(decl)
-                self.declarations.append(m + ': ' + decl)
+                self.names.append(decl['name'])
+                if 'what' in decl:
+                    if decl['what'] == 'function':
+                        self.declarations.append('{0}: {1} :: {2}'.format(m, decl['name'], decl['type']))
+                    else:
+                        self.declarations.append('{0}: {1} {2}'.format(m, decl['name'], ' '.join(decl['args'])))
+                else:
+                    self.declarations.append('{0}: {1}'.format(m, decl['name']))
 
         self.window.show_quick_panel(self.declarations, self.on_done)
 
