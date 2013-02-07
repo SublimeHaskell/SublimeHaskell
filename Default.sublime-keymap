@@ -1,5 +1,6 @@
 [
     { "keys": ["ctrl+shift+r"], "command": "sublime_haskell_go_to_declaration" },
     { "keys": ["ctrl+k", "ctrl+h", "ctrl+t"], "command": "sublime_haskell_show_type" },
-    { "keys": ["ctrl+k", "ctrl+h", "ctrl+i"], "command": "sublime_haskell_insert_type" }
+    { "keys": ["ctrl+k", "ctrl+h", "ctrl+i"], "command": "sublime_haskell_insert_type" },
+    { "keys": ["ctrl+k", "ctrl+i"], "command": "sublime_haskell_symbol_info" }
 ]
