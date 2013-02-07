@@ -355,7 +355,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
         ident = self.view.substr(word_region)
         full_qualified_name = ident if no_module else '.'.join([module_word, ident])
 
-        candidates = []
+        candidates = {}
 
         def is_module_imported(module_name):
             if no_module:
@@ -363,20 +363,20 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
             else:
                 return module_name in modules
 
-        for f, v in autocompletion.info.items():
-            if 'declarations' in v:
-                for d in v['declarations']:
-                    if d['identifier'] == ident:
-                        candidates.append((v['moduleName'], d, is_module_imported(v['moduleName'])))
-
         for m, v in autocompletion.std_info.items():
             if 'declarations' in v:
                 for d in v['declarations']:
                     if d['name'] == ident:
-                        candidates.append((v['moduleName'], d, is_module_imported(v['moduleName'])))
+                        candidates['.'.join([v['moduleName'], ident])] = (v['moduleName'], d, is_module_imported(v['moduleName']))
 
-        preferred_candidates = [c for c in candidates if c[2]]
-        other_candidates = [c for c in candidates if not c[2]]
+        for f, v in autocompletion.info.items():
+            if 'declarations' in v:
+                for d in v['declarations']:
+                    if d['identifier'] == ident:
+                        candidates['.'.join([v['moduleName'], ident])] = (v['moduleName'], d, is_module_imported(v['moduleName']))
+
+        preferred_candidates = [c for c in candidates.itervalues() if c[2]]
+        other_candidates = [c for c in candidates.itervalues() if not c[2]]
 
         if not self.try_candidates(preferred_candidates):
             self.try_candidates(other_candidates)
@@ -391,7 +391,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
         self.candidates = candidates
         def candidate_name(candidate):
             (module_name, decl, _) = candidate
-            decl_name = decl['identifier'] if 'identifier' in decl or decl['name']
+            decl_name = decl['identifier'] if 'identifier' in decl else decl['name']
             return '.'.join([module_name, decl_name])
         names = [candidate_name(c) for c in candidates]
         self.view.window().show_quick_panel(names, self.on_done)
