@@ -29,6 +29,13 @@ cabal_command = {
 }
 
 
+# GLOBAL STATE
+
+# Contains names of projects currently being built.
+# To be updated only from the UI thread.
+projects_being_built = set()
+
+
 # Base command
 class SublimeHaskellBaseCommand(sublime_plugin.WindowCommand):
     def is_enabled(self):
@@ -73,6 +80,18 @@ def select_project(window, on_selected):
 
 
 def run_build(view, project_name, project_dir, command, use_cabal_dev=None):
+    global projects_being_built
+
+    # Don't build if a build is already running for this project
+    # We compare the project_name for simplicity (projects with same
+    # names are of course possible, but unlikely, so we let them wait)
+    if project_name in projects_being_built:
+        print "SublimeHaskell: Not building '%s' because it is already being built" % project_name
+        sublime.status_message('SublimeHaskell: Already building %s' % project_name)
+        return
+    # Set project as building
+    projects_being_built.add(project_name)
+
     # Run cabal or cabal-dev
     if use_cabal_dev is None:
         use_cabal_dev = get_setting_async('use_cabal_dev')
@@ -96,12 +115,17 @@ def run_build(view, project_name, project_dir, command, use_cabal_dev=None):
 
     log('running build commands: {0}'.format(commands))
 
+    def done_callback():
+        # Set project as done being built so that it can be built again
+        projects_being_built.remove(project_name)
+
     # Run them
     run_chain_build_thread(
         view,
         project_dir,
         tool_title + ': ' + action_title + ' ' + project_name,
-        commands)
+        commands,
+        on_done=done_callback)
 
 
 class SublimeHaskellSwitchCabalDev(sublime_plugin.WindowCommand):

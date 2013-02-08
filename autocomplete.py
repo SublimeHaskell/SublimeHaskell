@@ -119,13 +119,16 @@ class AutoCompletion(object):
     def get_completions(self, view, prefix, locations):
         "Get all the completions that apply to the current file."
 
-        line_contents = get_line_contents(view, locations[0])
-
         current_file_name = view.file_name()
 
+        # Contents of the line under the first cursor
+        line_contents = get_line_contents(view, locations[0])
+
+        # If the current line is an import line, gives us (My.Module, My.Module.asd)
         (qualified_module, qualified_prefix) = get_qualified_name(line_contents)
         has_q = len(qualified_module) != 0
 
+        # The list of completions we're going to assemble
         completions = []
 
         # Complete with modules too
@@ -170,6 +173,11 @@ class AutoCompletion(object):
                         declaration_info = d['info']
                         # TODO: Show the declaration info somewhere.
                         completions.append((identifier + '\t' + declaration_info, identifier))
+
+            # PRELUDE: Add the Prelude to the imports if it is not imported manually
+            # This is also done before the call to the ModuleInspector.
+            if u'Prelude' not in moduleImports:
+                moduleImports.insert(0, u'Prelude')
 
             # Completion for modules by ghc-mod browse
             with self.std_info_lock:
@@ -523,9 +531,15 @@ class InspectorAgent(threading.Thread):
             if 'error' not in new_info:
                 # Load standard modules
                 if 'imports' in new_info:
-                    for mi in new_info['imports']:
-                        if 'importName' in mi:
-                            self._load_standard_module(mi['importName'])
+                    # Get all module names (filter away imports without module name)
+                    module_names = filter(id, [i.get('importName') for i in new_info['imports']])
+
+                    # PRELUDE: Add Prelude to the imports if it is not imported manually
+                    if u'Prelude' not in module_names:
+                        module_names.insert(0, u'Prelude')
+
+                    for import_name in module_names:
+                        self._load_standard_module(import_name)
 
                 # Remember when this info was collected.
                 new_info['inspectedAt'] = modification_time
