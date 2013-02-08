@@ -61,26 +61,26 @@ class OutputMessage(object):
         return region
 
 
-def run_build_thread(view, cabal_project_dir, msg, cmd):
-    run_chain_build_thread(view, cabal_project_dir, msg, [cmd])
+def run_build_thread(view, cabal_project_dir, msg, cmd, on_done):
+    run_chain_build_thread(view, cabal_project_dir, msg, [cmd], on_done)
 
 
-def run_chain_build_thread(view, cabal_project_dir, msg, cmds):
+def run_chain_build_thread(view, cabal_project_dir, msg, cmds, on_done):
     show_status_message_process(msg)
     thread = Thread(
         target=wait_for_chain_to_complete,
-        args=(view, cabal_project_dir, msg, cmds))
+        args=(view, cabal_project_dir, msg, cmds, on_done))
     thread.start()
 
 
-def wait_for_build_to_complete(view, cabal_project_dir, msg, cmd):
+def wait_for_build_to_complete(view, cabal_project_dir, msg, cmd, on_done):
     """Run a command, wait for it to complete, then parse and display
     the resulting errors."""
 
-    wait_for_chain_to_complete(view, cabal_project_dir, msg, [cmd])
+    wait_for_chain_to_complete(view, cabal_project_dir, msg, [cmd], on_done)
 
 
-def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds):
+def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
     """Chains several commands, wait for them to complete, then parse and display
     the resulting errors."""
 
@@ -94,6 +94,9 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds):
             cwd=cabal_project_dir)
         if exit_code != 0:
             break
+
+    # Notify UI thread that commands are done
+    sublime.set_timeout(on_done, 0)
 
     parse_output_messages_and_show(view, msg, cabal_project_dir, exit_code, stderr)
 
@@ -127,12 +130,17 @@ def parse_output_messages_and_show(view, msg, base_dir, exit_code, stderr):
     parsed_messages = parse_output_messages(base_dir, stderr)
     # The unparseable part (for other errors)
     unparsable = output_regex.sub('', stderr).strip()
+
     # If we couldn't parse any messages, just show the stderr
     # Otherwise the parsed errors and the unparsable stderr remainder
-    unparsable_section_header = "\n\nREMAINING STDERR:\n\n"
-    output_text = (format_output_messages(parsed_messages) +
-                   unparsable_section_header + unparsable
-                   if parsed_messages else stderr)
+    outputs = []
+
+    if parsed_messages:
+        outputs += [format_output_messages(parsed_messages)]
+    if unparsable:
+        outputs += ["\nREMAINING STDERR:\n", unparsable]
+
+    output_text = '\n'.join(outputs)
 
     show_output_result_text(view, msg, output_text, exit_code, base_dir)
 

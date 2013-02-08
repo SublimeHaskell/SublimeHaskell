@@ -137,13 +137,16 @@ class AutoCompletion(object):
     def get_completions(self, view, prefix, locations):
         "Get all the completions that apply to the current file."
 
-        line_contents = get_line_contents(view, locations[0])
-
         current_file_name = view.file_name()
 
+        # Contents of the line under the first cursor
+        line_contents = get_line_contents(view, locations[0])
+
+        # If the current line is an import line, gives us (My.Module, My.Module.asd)
         (qualified_module, qualified_prefix) = get_qualified_name(line_contents)
         has_q = len(qualified_module) != 0
 
+        # The list of completions we're going to assemble
         completions = []
 
         # Complete with modules too
