@@ -63,5 +63,8 @@
 	"cabal_dev_sandbox_list": [],
 
 	// Inhibit default Sublime word completions
-	"inhibit_completions": false
+	"inhibit_completions": false,
+
+	// Auto autocompletion popup on '.' in import list
+	"auto_completion_popup": true
 }
