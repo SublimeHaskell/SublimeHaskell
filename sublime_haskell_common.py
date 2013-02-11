@@ -321,7 +321,7 @@ def show_status_message(msg, isok = None):
     mark = u'...'
     if isok is not None:
         mark = u' \u2714' if isok else u' \u2718'
-    sublime_status_message(u'SublimeHaskell: {0}{1}'.format(msg, mark))
+    sublime_status_message(u'{0}{1}'.format(msg, mark))
 
 def with_status_message(msg, action):
     """
@@ -369,7 +369,7 @@ class StatusMessage(threading.Thread):
     def update_message(self):
         dots = self.times % 4
         self.times += 1
-        sublime_status_message('SublimeHaskell: {0}{1}'.format(self.msg, '.' * dots))
+        sublime_status_message(u'{0}{1}'.format(self.msg, '.' * dots))
 
 status_messager = None
 
