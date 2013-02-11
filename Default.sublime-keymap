@@ -1,17 +1,17 @@
 [
-    { "keys": ["ctrl+shift+r"], "command": "sublime_haskell_go_to_declaration" },
-    { "keys": ["ctrl+k", "ctrl+h", "ctrl+t"], "command": "sublime_haskell_show_type" },
-    { "keys": ["ctrl+k", "ctrl+h", "ctrl+i"], "command": "sublime_haskell_insert_type" },
+    { "keys": ["ctrl+shift+r"], "context": [ {"key" : "is_haskell_source" } ], "command": "sublime_haskell_go_to_declaration" },
+    { "keys": ["ctrl+k", "ctrl+h", "ctrl+t"], "context": [ {"key" : "is_haskell_source" } ], "command": "sublime_haskell_show_type" },
+    { "keys": ["ctrl+k", "ctrl+h", "ctrl+i"], "context": [ {"key" : "is_haskell_source" } ], "command": "sublime_haskell_insert_type" },
     {
         "command": "sublime_haskell_complete",
         "args": {"characters": "."},
         "keys": ["."],
-        "context": [ { "key": "auto_completion_popup" } ]
+        "context": [ { "key": "is_haskell_source" }, { "key": "auto_completion_popup" } ]
     },
     {
         "command": "sublime_haskell_complete",
         "args": {"characters": "("},
         "keys": ["("],
-        "context": [ { "key": "auto_completion_popup" } ]
+        "context": [ { "key": "is_haskell_source" }, { "key": "auto_completion_popup" } ]
     }
 ]
