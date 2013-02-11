@@ -381,26 +381,25 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
     def run(self, edit):
         word_region = self.view.word(self.view.sel()[0])
         preline = get_line_contents_before_region(self.view, word_region)
-        (module_word, _) = get_qualified_name(preline)
-        no_module = len(module_word) == 0
+        (module_word, ident) = get_qualified_symbol(preline)
 
         modules = []
         imported_modules = autocompletion.current_file_imports(self.view)
 
-        if not no_module:
+        if module_word:
             modules = [module_word]
             modules.extend(autocompletion.unalias_module_name(self.view, module_word))
 
         ident = self.view.substr(word_region)
-        full_qualified_name = ident if no_module else '.'.join([module_word, ident])
+        full_qualified_name = '.'.join([module_word, ident]) if module_word else ident
 
         candidates = {}
 
         def is_module_imported(module_name):
-            if no_module:
-                return module_name in imported_modules
-            else:
+            if module_word:
                 return module_name in modules
+            else:
+                return module_name in imported_modules
 
         for f, v in autocompletion.info.items():
             if 'declarations' in v:
