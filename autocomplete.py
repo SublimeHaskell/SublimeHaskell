@@ -311,6 +311,9 @@ class SublimeHaskellComplete(sublime_plugin.TextCommand):
     def do_complete(self):
         self.view.run_command("auto_complete")
 
+    def is_enabled(self):
+        return is_enabled_haskell_command(self.view, False)
+
 class SublimeHaskellBrowseDeclarations(sublime_plugin.WindowCommand):
     def run(self):
         self.names = []
@@ -345,7 +348,7 @@ class SublimeHaskellBrowseDeclarations(sublime_plugin.WindowCommand):
         view.end_edit(edit)
 
     def is_enabled(self):
-        return is_enabled_haskell_command(False)
+        return is_enabled_haskell_command(None, False)
 
 
 class SublimeHaskellGoToAnyDeclaration(sublime_plugin.WindowCommand):
@@ -365,7 +368,7 @@ class SublimeHaskellGoToAnyDeclaration(sublime_plugin.WindowCommand):
         self.window.open_file(':'.join(self.files[idx]), sublime.ENCODED_POSITION)
 
     def is_enabled(self):
-        return is_enabled_haskell_command(False)
+        return is_enabled_haskell_command(None, False)
 
 
 class SublimeHaskellReinspectAll(sublime_plugin.WindowCommand):
@@ -543,7 +546,7 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
             self.view.window().open_file(self.module_files[idx - files_len])
 
     def is_enabled(self):
-        return is_enabled_haskell_command(False)
+        return is_enabled_haskell_command(self.view, False)
 
 
 
@@ -892,6 +895,9 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         return None
 
     def on_query_completions(self, view, prefix, locations):
+        if not is_haskell_source(view):
+            return []
+
         begin_time = time.clock()
         # Only suggest symbols if the current file is part of a Cabal project.
         # TODO: Only suggest symbols from within this project.
@@ -940,5 +946,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
     def on_query_context(self, view, key, operator, operand, match_all):
         if key == 'auto_completion_popup':
             return get_setting('auto_completion_popup')
+        elif key == 'is_haskell_source':
+            return is_haskell_source(view)
         else:
             return False
