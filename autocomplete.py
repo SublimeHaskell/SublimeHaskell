@@ -10,9 +10,6 @@ from sublime_haskell_common import *
 from ghci import ghci_info
 from haskell_docs import haskell_docs
 
-# Completion text longer than this is ellipsized:
-MAX_COMPLETION_LENGTH = 37
-
 # If true, files that have not changed will not be re-inspected.
 CHECK_MTIME = True
 
