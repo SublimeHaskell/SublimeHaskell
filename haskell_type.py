@@ -36,7 +36,7 @@ class SublimeHaskellShowType(sublime_plugin.TextCommand):
         module_region = view.find(MODULE_RE_STR, 0)
 
         if module_region is None:
-            sublime.status_message("SublimeHaskell: Could not determine module name!")
+            show_status_message("Could not determine module name", False)
             return None
 
         # RE must match; there is only one group in the RE.
@@ -46,7 +46,7 @@ class SublimeHaskellShowType(sublime_plugin.TextCommand):
         out = call_ghcmod_and_wait(ghcmod_args, filename)
 
         if not out:
-            sublime.status_message("ghc-mod %s returned nothing" % ' '.join(ghcmod_args))
+            sublime_status_message("ghc-mod %s returned nothing" % ' '.join(ghcmod_args))
             return None
 
         # ghc-mod type returns the type of the expression at at the given row/col.
@@ -56,7 +56,7 @@ class SublimeHaskellShowType(sublime_plugin.TextCommand):
         result_type = types[0]['type']  # innermost expression's type
 
         if not result_type:
-            sublime.error_message("ghc-mod type returned unexpected output")
+            sublime.error_message("SublimeHaskell: ghc-mod type returned unexpected output")
             return None
 
         return result_type

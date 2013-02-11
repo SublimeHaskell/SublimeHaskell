@@ -305,6 +305,12 @@ class SublimeHaskellError(RuntimeError):
     def __init__(self, what):
         self.reason = what
 
+def sublime_status_message(msg):
+    """
+    Pure msg with 'SublimeHaskell' prefix and set_timeout
+    """
+    sublime.set_timeout(lambda: sublime.status_message(u'SublimeHaskell: {0}'.format(msg)), 0)
+
 def show_status_message(msg, isok = None):
     """
     Show status message with check mark (isok = true), ballot x (isok = false) or ... (isok = None)
@@ -312,7 +318,7 @@ def show_status_message(msg, isok = None):
     mark = u'...'
     if isok is not None:
         mark = u' \u2714' if isok else u' \u2718'
-    sublime.set_timeout(lambda: sublime.status_message(u'SublimeHaskell: {0}{1}'.format(msg, mark)), 0)
+    sublime_status_message(u'SublimeHaskell: {0}{1}'.format(msg, mark))
 
 def with_status_message(msg, action):
     """
@@ -360,7 +366,7 @@ class StatusMessage(threading.Thread):
     def update_message(self):
         dots = self.times % 4
         self.times += 1
-        sublime.set_timeout(lambda: sublime.status_message('SublimeHaskell: {0}{1}'.format(self.msg, '.' * dots)), 0)
+        sublime_status_message('SublimeHaskell: {0}{1}'.format(self.msg, '.' * dots))
 
 status_messager = None
 

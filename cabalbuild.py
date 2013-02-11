@@ -3,7 +3,7 @@ import sublime
 import sublime_plugin
 from threading import Thread
 
-from sublime_haskell_common import log, get_cabal_project_dir_and_name_of_view, call_and_wait, get_setting, get_setting_async, set_setting, save_settings, get_haskell_command_window_view_file_project, attach_sandbox, output_error
+from sublime_haskell_common import *
 from parseoutput import run_chain_build_thread
 from autocomplete import autocompletion
 
@@ -86,8 +86,8 @@ def run_build(view, project_name, project_dir, command, use_cabal_dev=None):
     # We compare the project_name for simplicity (projects with same
     # names are of course possible, but unlikely, so we let them wait)
     if project_name in projects_being_built:
-        print "SublimeHaskell: Not building '%s' because it is already being built" % project_name
-        sublime.status_message('SublimeHaskell: Already building %s' % project_name)
+        log("Not building '%s' because it is already being built" % project_name)
+        sublime_status_message('Already building %s' % project_name)
         return
     # Set project as building
     projects_being_built.add(project_name)
@@ -140,7 +140,7 @@ class SublimeHaskellSwitchCabalDev(sublime_plugin.WindowCommand):
 
         # No candboxes
         if len(sandboxes) == 0:
-            sublime.status_message('SublimeHaskell: There is nothing to switch to')
+            sublime_status_message('There is nothing to switch to')
             set_setting('use_cabal_dev', False)
             save_settings()
             return
@@ -152,7 +152,7 @@ class SublimeHaskellSwitchCabalDev(sublime_plugin.WindowCommand):
                 now_using = 'Cabal'
             else:
                 now_using = 'Cabal-Dev'
-            sublime.status_message('SublimeHaskell: Switched to ' + now_using)
+            sublime_status_message('Switched to ' + now_using)
             save_settings()
             return
 
@@ -247,7 +247,7 @@ class SublimeHaskellRun(SublimeHaskellBaseCommand):
 
         # Nothing to run
         if len(ps) == 0:
-            sublime.status_message('SublimeHaskell: Nothing to run')
+            sublime_status_message('Nothing to run')
             return
 
         cabal_project_dir, cabal_project_name = get_cabal_project_dir_and_name_of_view(self.window.active_view())
@@ -274,7 +274,7 @@ class SublimeHaskellRun(SublimeHaskellBaseCommand):
 
         hide_output(self.window)
 
-        sublime.status_message('SublimeHaskell: Running ' + name + "...")
+        show_status_message_process('Running '.format(name))
 
         # Run in thread
         thread = Thread(
@@ -289,10 +289,10 @@ def run_binary(name, bin_file, base_dir):
     if not window:
         return
     if exit_code == 0:
-        sublime.set_timeout(lambda: sublime.status_message('SublimeHaskell: Running ' + name + u" \u2714"), 0)
+        show_status_message_process('Running {0}'.format(name), True)
         sublime.set_timeout(lambda: write_output(window, out, base_dir), 0)
     else:
-        sublime.set_timeout(lambda: sublime.status_message('SublimeHaskell: Running ' + name + u" \u2717"), 0)
+        show_status_message_process('Running {0}'.format(name), False)
         sublime.set_timeout(lambda: write_output(window, err, base_dir), 0)
 
 

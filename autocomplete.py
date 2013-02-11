@@ -495,7 +495,7 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
                             candidates.append([d['identifier'] + ' ' + d['info'], v['moduleName'] + ':' + str(d['line']) + ':' + str(d['column'])])
 
         if len(module_candidates) == 0 and len(candidates) == 0:
-            sublime.status_message("SublimeHaskell: Go To Declaration: identifier not found: {0}".format(full_qualified_name))
+            show_status_message('Go To Declaration: identifier not fount: {0}'.format(full_qualified_name), False)
             return
 
         if len(module_candidates) + len(candidates) == 1:
@@ -535,6 +535,12 @@ class StandardInspectorAgent(threading.Thread):
     def run(self):
         self.init_ghcmod_completions()
 
+        # Load general info about all standard modules
+        show_status_message('Updating standard modules')
+        for m in autocompletion.module_completions.copy():
+            self._load_standard_module(m)
+        show_status_message('Updating standard modules', True)
+
         while True:
             load_modules = []
             with self.modules_lock:
@@ -542,16 +548,16 @@ class StandardInspectorAgent(threading.Thread):
                 self.modules_to_load = []
 
             if len(load_modules) > 0:
-                show_status_message('SublimeHaskell: Updating standard modules')
+                show_status_message('Updating standard modules extended info')
                 try:
                     for m in load_modules:            
                         self._load_standard_module(m)
                     for m in load_modules:
                         self._load_standard_module_detailed(m)
                 except:
-                    show_status_message('SublimeHaskell: Updating standard modules', False)
+                    show_status_message('Updating standard modules extended info', False)
                     continue
-                show_status_message('SublimeHaskell: Updating standard modules', True)
+                show_status_message('Updating standard modules extended info', True)
 
     def load_module_info(self, module_name):
         with self.modules_lock:
@@ -563,14 +569,14 @@ class StandardInspectorAgent(threading.Thread):
         if not get_setting_async('enable_ghc_mod'):
             return
 
-        show_status_message('SublimeHaskell: Updating ghc_mod completions')
+        show_status_message('Updating ghc_mod completions')
 
         # Init LANGUAGE completions
         autocompletion.language_completions = call_ghcmod_and_wait(['lang']).splitlines()
         # Init import module completion
         autocompletion.module_completions = set(call_ghcmod_and_wait(['list']).splitlines())
 
-        show_status_message('SublimeHaskell: Updating ghc_mod completions', True)
+        show_status_message('Updating ghc_mod completions', True)
 
     def _load_standard_module(self, module_name):
         if module_name not in autocompletion.std_info:
@@ -644,7 +650,6 @@ class InspectorAgent(threading.Thread):
             wait_for_window(lambda w: self.show_errors(w, error_msg))
         else:
             show_status_message(InspectorAgent.CABALMSG, True)
-            sublime.set_timeout(lambda: sublime.status_message('Compiling Haskell CabalInspector' + u" \u2714"), 0)
         # Continue anyway
 
         # Compile the ModuleInspector:
@@ -881,7 +886,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
         # TODO: work around this
         comp = [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0].split('\t')[0])]
-        if get_setting('inhibit_completions'):
+        if get_setting('inhibit_completions') and len(comp) != 0:
             return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         return comp
 
