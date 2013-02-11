@@ -18,7 +18,7 @@ class SublimeHaskellGhcModCheck(sublime_plugin.WindowCommand):
         run_ghcmod('check', 'Checking')
 
     def is_enabled(self):
-        return is_enabled_haskell_command(False)
+        return is_enabled_haskell_command(None, False)
 
 
 class SublimeHaskellGhcModLint(sublime_plugin.WindowCommand):
@@ -26,7 +26,7 @@ class SublimeHaskellGhcModLint(sublime_plugin.WindowCommand):
         run_ghcmod('lint', 'Linting', lint_as_hints)
 
     def is_enabled(self):
-        return is_enabled_haskell_command(False)
+        return is_enabled_haskell_command(None, False)
 
 
 class SublimeHaskellGhcModCheckAndLint(sublime_plugin.WindowCommand):
@@ -34,7 +34,7 @@ class SublimeHaskellGhcModCheckAndLint(sublime_plugin.WindowCommand):
         run_ghcmods(['check', 'lint'], 'Checking and Linting', lint_as_hints)
 
     def is_enabled(self):
-        return is_enabled_haskell_command(False)
+        return is_enabled_haskell_command(None, False)
 
 
 def run_ghcmods(cmds, msg, alter_messages_cb=None):
