@@ -35,11 +35,14 @@ LANGUAGE_RE = re.compile(r'.*{-#\s+LANGUAGE.*')
 IMPORT_RE = re.compile(r'.*import(\s+qualified)?\s+')
 IMPORT_RE_PREFIX = re.compile(r'^\s*import(\s+qualified)?\s+(.*)$')
 IMPORT_QUALIFIED_POSSIBLE_RE = re.compile(r'.*import\s+(?P<qualifiedprefix>\S*)$')
-IMPORT_RE_LIST = re.compile(r'.*import(\s+qualified)?\s+\w+(\.\w+)*(\s+as\s+\w+)?\s+\(')
 
 # Checks if a word contains only alhanums, -, and _, and dot
 NO_SPECIAL_CHARS_RE = re.compile(r'^(\w|[\-\.])*$')
 
+# Get symbol qualified prefix and its name
+SYMBOL_RE = re.compile(r'((?P<module>\w+(\.\w+)*)\.)?(?P<identifier>\w*)$')
+# Get symbol module scope and its name within import statement
+IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>\w+(\.\w+)*)(\s+as\s+(?P<as>\w+))?\s*\(.*?(?P<identifier>\w*)$')
 
 def get_line_contents(view, location):
     """
@@ -54,7 +57,6 @@ def get_line_contents_before_region(view, region):
     """
     return view.substr(sublime.Region(view.line(region).a, region.b))
 
-
 def get_qualified_name(s):
     """
     'bla bla bla Data.List.fo' -> ('Data.List', 'Data.List.fo')
@@ -65,6 +67,17 @@ def get_qualified_name(s):
     filtered = map(lambda s: filter(lambda c: c.isalpha() or c.isdigit() or c == '_', s), quals)
     return ('.'.join(filtered[0:len(filtered) - 1]), '.'.join(filtered))
 
+def get_qualified_symbol(line):
+    """
+    Get module context of symbol and symbol itself
+    Returns (module, name), where module (or one of) can be None
+    """
+    res = IMPORT_SYMBOL_RE.search(line)
+    if res:
+        return (res.group('module'), res.group('identifier'))
+    res = SYMBOL_RE.search(line)
+    # res always match
+    return (res.group('module'), res.group('identifier'))
 
 # Autocompletion data
 class AutoCompletion(object):
@@ -143,21 +156,21 @@ class AutoCompletion(object):
         line_contents = get_line_contents(view, locations[0])
 
         # If the current line is an import line, gives us (My.Module, My.Module.asd)
-        (qualified_module, qualified_prefix) = get_qualified_name(line_contents)
-        has_q = len(qualified_module) != 0
+        (qualified_module, symbol_name) = get_qualified_symbol(line_contents)
+        qualified_prefix = '{0}.{1}'.format(qualified_module, symbol_name) if qualified_module else symbol_name
 
         # The list of completions we're going to assemble
         completions = []
 
         # Complete with modules too
-        if has_q:
+        if qualified_module:
             completions.extend(self.get_module_completions_for(qualified_prefix))
 
         with self.info_lock:
 
             moduleImports = []
             # Use completion only from qualified_module
-            if has_q:
+            if qualified_module:
                 if current_file_name in self.info:
                     current_info = self.info[current_file_name]
                     if 'imports' in current_info:
@@ -243,12 +256,13 @@ class AutoCompletion(object):
 
         # Autocompletion for import statements
         if get_setting('auto_complete_imports'):
-            match_import_list = IMPORT_RE_LIST.match(line_contents)
+            match_import_list = IMPORT_SYMBOL_RE.search(line_contents)
             if match_import_list:
-                (_, mname) = match_import_list.groups()
+                module_name = match_import_list.group('module')
                 import_list_completions = []
-                import_list_completions.extend(self.info_completions(mname))
-                import_list_completions.extend(self.std_info_completions(mname))
+
+                import_list_completions.extend(self.info_completions(module_name))
+                import_list_completions.extend(self.std_info_completions(module_name))
 
                 return import_list_completions
 
@@ -286,6 +300,19 @@ class AutoCompletion(object):
 
 autocompletion = AutoCompletion()
 
+# Show autocompletion popup
+class SublimeHaskellComplete(sublime_plugin.TextCommand):
+    def run(self, edit, characters):
+        for region in self.view.sel():
+            self.view.insert(edit, region.end(), characters)
+        line = get_line_contents_before_region(self.view, self.view.sel()[0])
+        (module_name, symbol_name) = get_qualified_symbol(line)
+        if module_name and module_name in autocompletion.module_completions:
+            self.view.run_command("hide_auto_complete")
+            sublime.set_timeout(self.do_complete, 1)
+
+    def do_complete(self):
+        self.view.run_command("auto_complete")
 
 class SublimeHaskellBrowseDeclarations(sublime_plugin.WindowCommand):
     def run(self):
@@ -466,17 +493,15 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
     def run(self, edit):
         word_region = self.view.word(self.view.sel()[0])
         preline = get_line_contents_before_region(self.view, word_region)
-        (module_word, _) = get_qualified_name(preline)
-        no_module = len(module_word) == 0
+        (module_word, ident) = get_qualified_symbol(preline)
 
         modules = []
 
-        if not no_module:  # Get modules by alias
+        if module_word:  # Get modules by alias
             modules = [module_word]
             modules.extend(autocompletion.unalias_module_name(self.view, module_word))
 
-        ident = self.view.substr(word_region)
-        full_qualified_name = ident if no_module else '.'.join([module_word, ident])  # goto module
+        full_qualified_name = '.'.join([module_word, ident]) if module_word else ident # goto module
 
         self.module_files = []
         module_candidates = []
@@ -487,7 +512,7 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
             if full_qualified_name == v['moduleName']:
                 self.module_files.append(f)
                 module_candidates.append([full_qualified_name, f])
-            if no_module or v['moduleName'] in modules:
+            if not module_word or v['moduleName'] in modules:
                 if 'declarations' in v:
                     for d in v['declarations']:
                         if d['identifier'] == ident:
@@ -914,3 +939,9 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         filename = view.file_name()
         if filename:
             SublimeHaskellAutocomplete.inspector.mark_file_dirty(filename)
+
+    def on_query_context(self, view, key, operator, operand, match_all):
+        if key == 'auto_completion_popup':
+            return get_setting('auto_completion_popup')
+        else:
+            return False
