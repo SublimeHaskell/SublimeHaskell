@@ -662,7 +662,7 @@ class InspectorAgent(threading.Thread):
     def run(self):
         # Compile the CabalInspector:
         # TODO: Where to compile it?
-        show_status_message(InspectorAgent.CABALMSG)
+        show_status_message_process(InspectorAgent.CABALMSG)
 
         exit_code, out, err = call_and_wait(['ghc',
             '--make', CABAL_INSPECTOR_SOURCE_PATH,
@@ -670,15 +670,15 @@ class InspectorAgent(threading.Thread):
             '-outputdir', CABAL_INSPECTOR_OBJ_DIR])
 
         if exit_code != 0:
-            show_status_message(InspectorAgent.CABALMSG, False)
+            show_status_message_process(InspectorAgent.CABALMSG, False)
             error_msg = u"SublimeHaskell: Failed to compile CabalInspector\n{0}".format(err)
             wait_for_window(lambda w: self.show_errors(w, error_msg))
         else:
-            show_status_message(InspectorAgent.CABALMSG, True)
+            show_status_message_process(InspectorAgent.CABALMSG, True)
         # Continue anyway
 
         # Compile the ModuleInspector:
-        show_status_message(InspectorAgent.MODULEMSG)
+        show_status_message_process(InspectorAgent.MODULEMSG)
 
         exit_code, out, err = call_and_wait(['ghc',
             '--make', MODULE_INSPECTOR_SOURCE_PATH,
@@ -686,12 +686,12 @@ class InspectorAgent(threading.Thread):
             '-outputdir', MODULE_INSPECTOR_OBJ_DIR])
 
         if exit_code != 0:
-            show_status_message(InspectorAgent.MODULEMSG, False)
+            show_status_message_process(InspectorAgent.MODULEMSG, False)
             error_msg = u"SublimeHaskell: Failed to compile ModuleInspector\n{0}".format(err)
             wait_for_window(lambda w: self.show_errors(w, error_msg))
             return
 
-        show_status_message(InspectorAgent.MODULEMSG, True)
+        show_status_message_process(InspectorAgent.MODULEMSG, True)
 
         # For first time, inspect all open folders and files
         wait_for_window(lambda w: self.mark_all_files(w))
@@ -743,7 +743,7 @@ class InspectorAgent(threading.Thread):
         # Process all files within the Cabal project:
         # TODO: Only process files within the .cabal file's "src" directory.
         (project_name, cabal_file) = get_cabal_in_dir(cabal_dir)
-        show_status_message('Reinspecting ({0}/{1}) {2}'.format(index, count, project_name))
+        show_status_message_process('Reinspecting ({0}/{1}) {2}'.format(index, count, project_name))
         # set project and read cabal
         if cabal_file and project_name:
             self._refresh_project_info(cabal_dir, project_name, cabal_file)
@@ -753,7 +753,7 @@ class InspectorAgent(threading.Thread):
         for filename in haskell_source_files:
             self._refresh_module_info(filename)
         end_time = time.clock()
-        show_status_message('Reinspecting ({0}/{1}) {2}'.format(index, count, project_name), True)
+        show_status_message_process('Reinspecting ({0}/{1}) {2}'.format(index, count, project_name), True)
         log('total inspection time: {0} seconds'.format(end_time - begin_time))
 
     def _refresh_project_info(self, cabal_dir, project_name, cabal_file):
