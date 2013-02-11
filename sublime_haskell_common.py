@@ -345,6 +345,8 @@ def crlf2lf(s):
     return s.replace('\r\n', '\n')
 
 class StatusMessage(threading.Thread):
+    me = None
+
     def __init__(self, msg):
         super(StatusMessage, self).__init__()
         self.interval = 0.5
@@ -371,23 +373,20 @@ class StatusMessage(threading.Thread):
         self.times += 1
         sublime_status_message(u'{0}{1}'.format(self.msg, '.' * dots))
 
-status_messager = None
-
 def show_status_message_process(msg, isok = None):
     """
     Same as show_status_message, but shows permanently until called with isok not None
     """
-    global status_messager
     if isok is not None:
-        if status_messager:
-            status_messager.cancel()
+        if StatusMessage.me:
+            StatusMessage.me.cancel()
         show_status_message(msg, isok)
     else:
-        if status_messager:
-            status_messager.cancel()
+        if StatusMessage.me:
+            StatusMessage.me.cancel()
 
-        status_messager = StatusMessage(msg)
-        status_messager.start()
+        StatusMessage.me = StatusMessage(msg)
+        StatusMessage.me.start()
 
 def is_haskell_source(view = None):
     if not view:

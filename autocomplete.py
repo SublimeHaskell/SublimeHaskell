@@ -662,7 +662,7 @@ class InspectorAgent(threading.Thread):
     def run(self):
         # Compile the CabalInspector:
         # TODO: Where to compile it?
-        show_status_message_process(InspectorAgent.CABALMSG)
+        show_status_message(InspectorAgent.CABALMSG)
 
         exit_code, out, err = call_and_wait(['ghc',
             '--make', CABAL_INSPECTOR_SOURCE_PATH,
@@ -670,15 +670,17 @@ class InspectorAgent(threading.Thread):
             '-outputdir', CABAL_INSPECTOR_OBJ_DIR])
 
         if exit_code != 0:
-            show_status_message_process(InspectorAgent.CABALMSG, False)
+            log('Compiling Haskell FAIL')
+            show_status_message(InspectorAgent.CABALMSG, False)
             error_msg = u"SublimeHaskell: Failed to compile CabalInspector\n{0}".format(err)
             wait_for_window(lambda w: self.show_errors(w, error_msg))
         else:
-            show_status_message_process(InspectorAgent.CABALMSG, True)
+            log('Compiling Haskell OK')
+            show_status_message(InspectorAgent.CABALMSG, True)
         # Continue anyway
 
         # Compile the ModuleInspector:
-        show_status_message_process(InspectorAgent.MODULEMSG)
+        show_status_message(InspectorAgent.MODULEMSG)
 
         exit_code, out, err = call_and_wait(['ghc',
             '--make', MODULE_INSPECTOR_SOURCE_PATH,
@@ -686,12 +688,12 @@ class InspectorAgent(threading.Thread):
             '-outputdir', MODULE_INSPECTOR_OBJ_DIR])
 
         if exit_code != 0:
-            show_status_message_process(InspectorAgent.MODULEMSG, False)
+            show_status_message(InspectorAgent.MODULEMSG, False)
             error_msg = u"SublimeHaskell: Failed to compile ModuleInspector\n{0}".format(err)
             wait_for_window(lambda w: self.show_errors(w, error_msg))
             return
 
-        show_status_message_process(InspectorAgent.MODULEMSG, True)
+        show_status_message(InspectorAgent.MODULEMSG, True)
 
         # For first time, inspect all open folders and files
         wait_for_window(lambda w: self.mark_all_files(w))
