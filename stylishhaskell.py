@@ -30,4 +30,4 @@ class SublimeHaskellStylish(sublime_plugin.TextCommand):
                 sublime.error_message("SublimeHaskell: stylisg-haskell was not found!")
 
     def is_enabled(self):
-        return is_enabled_haskell_command(False)
+        return is_enabled_haskell_command(self.view, False)

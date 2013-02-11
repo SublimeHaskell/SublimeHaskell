@@ -81,7 +81,7 @@ class SublimeHaskellShowType(sublime_plugin.TextCommand):
         view.window().run_command('show_panel', {'panel': 'output.' + TYPE_PANEL_NAME})
 
     def is_enabled(self):
-        return is_enabled_haskell_command(False)
+        return is_enabled_haskell_command(self.view, False)
 
 
 # Works only with the cursor being in the name of a toplevel function so far.
