@@ -3,6 +3,7 @@ import os
 import sublime_plugin
 
 from sublime_haskell_common import *
+from symbols import *
 
 def ghci_info(module, name):
     """
@@ -46,6 +47,21 @@ def ghci_info(module, name):
                 result['type'] = matched.group('type')
                 return result
     return None
+
+def ghci_info_symbol(module_name, symbol_name):
+    r = ghci_info(module_name, symbol_name)
+    if not r:
+        return None
+    if 'what' not in r:
+        return None
+    if r['what'] == 'function':
+        return Function(r['name'], None, r['type'])
+    elif r['what'] == 'class':
+        return Class(r['name'], None, r['ctx'] if 'ctx' in r else None, r['args'])
+    elif r['what'] == 'data':
+        return Data(r['name'], None, r['ctx'] if 'ctx' in r else None, r['args'])
+    else:
+        return None
 
 def ghci_package_db():
     dev = get_setting_async('use_cabal_dev')

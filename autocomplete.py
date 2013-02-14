@@ -7,7 +7,8 @@ import threading
 import time
 
 from sublime_haskell_common import *
-from ghci import ghci_info
+from ghci import ghci_info, ghci_info_symbol
+import symbols
 from haskell_docs import haskell_docs
 
 # If true, files that have not changed will not be re-inspected.
@@ -114,6 +115,9 @@ class AutoCompletion(object):
         #     name - name of executable
         self.projects_lock = threading.Lock()
         self.projects = {}
+
+        # Storage of information
+        self.storage = symbols.Storage()
 
         # keywords
         # TODO: keywords can't appear anywhere, we can suggest in right places
