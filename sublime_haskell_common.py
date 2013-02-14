@@ -39,11 +39,14 @@ def preload_settings():
 sublime_haskell_settings = {}
 
 
-def is_enabled_haskell_command(view = None, must_be_project=True, must_be_main=False):
+def is_enabled_haskell_command(view = None, must_be_project=True, must_be_main=False, must_be_file = False):
     """Returns True if command for .hs can be invoked"""
     window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
 
-    if not window or not view or not file_shown_in_view:
+    if not window or not view:
+        return False
+
+    if must_be_file and not file_shown_in_view:
         return False
 
     syntax_file_for_view = view.settings().get('syntax').lower()
@@ -390,8 +393,5 @@ def show_status_message_process(msg, isok = None):
         status_messager.start()
 
 def is_haskell_source(view = None):
-    if not view:
-        view = sublime.active_window().active_view()
-    syntax_file_for_view = view.settings().get('syntax').lower()
-    return 'haskell' in syntax_file_for_view
+    return is_enabled_haskell_command(view, False)
 
