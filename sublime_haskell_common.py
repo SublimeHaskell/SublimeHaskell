@@ -348,11 +348,12 @@ def crlf2lf(s):
     return s.replace('\r\n', '\n')
 
 class StatusMessage(threading.Thread):
-    me = None
+    messages = {}
 
-    def __init__(self, msg):
+    def __init__(self, msg, timeout):
         super(StatusMessage, self).__init__()
         self.interval = 0.5
+        self.timeout = timeout
         self.msg = msg
         self.times = 0
         self.event = threading.Event()
@@ -374,22 +375,26 @@ class StatusMessage(threading.Thread):
     def update_message(self):
         dots = self.times % 4
         self.times += 1
+        self.timeout -= self.interval
         sublime_status_message(u'{0}{1}'.format(self.msg, '.' * dots))
+        if self.timeout <= 0:
+            self.cancel()
 
-def show_status_message_process(msg, isok = None):
+def show_status_message_process(msg, isok = None, timeout = 60):
     """
     Same as show_status_message, but shows permanently until called with isok not None
     """
     if isok is not None:
-        if StatusMessage.me:
-            StatusMessage.me.cancel()
+        if msg in StatusMessage.messages:
+            StatusMessage.messages[msg].cancel()
+            del StatusMessage.messages[msg]
         show_status_message(msg, isok)
     else:
-        if StatusMessage.me:
-            StatusMessage.me.cancel()
+        if msg in StatusMessage.messages:
+            StatusMessage.messages[msg].cancel()
 
-        StatusMessage.me = StatusMessage(msg)
-        StatusMessage.me.start()
+        StatusMessage.messages[msg] = StatusMessage(msg, timeout)
+        StatusMessage.messages[msg].start()
 
 def is_haskell_source(view = None):
     return is_enabled_haskell_command(view, False)

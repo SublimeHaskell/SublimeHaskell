@@ -673,12 +673,10 @@ class InspectorAgent(threading.Thread):
             '-outputdir', CABAL_INSPECTOR_OBJ_DIR])
 
         if exit_code != 0:
-            log('Compiling Haskell FAIL')
             show_status_message(InspectorAgent.CABALMSG, False)
             error_msg = u"SublimeHaskell: Failed to compile CabalInspector\n{0}".format(err)
             wait_for_window(lambda w: self.show_errors(w, error_msg))
         else:
-            log('Compiling Haskell OK')
             show_status_message(InspectorAgent.CABALMSG, True)
         # Continue anyway
 
