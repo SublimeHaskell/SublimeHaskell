@@ -84,5 +84,13 @@
     {
         "caption": "SublimeHaskell: Reinspect all",
         "command": "sublime_haskell_reinspect_all"
+    },
+    {
+        "caption": "SublimeHaskell: Go to next error",
+        "command": "sublime_haskell_next_error"
+    },
+    {
+        "caption": "SublimeHaskell: Go to previous error",
+        "command": "sublime_haskell_previous_error"
     }
 ]
