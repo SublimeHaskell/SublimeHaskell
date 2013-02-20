@@ -1,0 +1,6 @@
+<snippet>
+    <content><![CDATA[data ${1:Type} = ${1:Constructor} deriving (${2:Eq, Show})]]></content>
+    <tabTrigger>data</tabTrigger>
+    <scope>source.haskell</scope>
+    <description>data declaration</description>
+</snippet>
