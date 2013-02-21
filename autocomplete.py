@@ -7,8 +7,8 @@ import threading
 import time
 
 from sublime_haskell_common import *
-from ghci import ghci_info, ghci_info_symbol
 import symbols
+from ghci import ghci_info, ghci_info_symbol
 from haskell_docs import haskell_docs
 
 # If true, files that have not changed will not be re-inspected.
@@ -83,29 +83,6 @@ class AutoCompletion(object):
     def __init__(self):
         self.language_completions = []
         self.module_completions = set()
-        # Module info (dictionary: filename => info)
-        # info is:
-        #   moduleName - name of module
-        #   exportList - list of export (strings)
-        #   imports - list of import (strings), where import is:
-        #     importName - name of imported module
-        #     qualified - is import qualified?
-        #     as - alias of module (string or null)
-        #   declarations - list of declarations, where declaration is:
-        #     info - type info (string "(data)", "(type)" or "(class)")
-        #     identifier - declaration identifier
-        self.info_lock = threading.Lock()
-        self.info = {}
-        # Standard module completions (dictionary: module name => info):
-        # info is:
-        #   moduleName - name of module
-        #   detailed - is info detailed?
-        #   declarations - list of declarations, where declaration is:
-        #     name - name
-        #     docs - info from haskell_docs
-        #     other info from ghci_info
-        self.std_info_lock = threading.Lock()
-        self.std_info = {}
 
         # Currently used projects
         # name => project where project is:
@@ -117,35 +94,26 @@ class AutoCompletion(object):
         self.projects = {}
 
         # Storage of information
-        self.storage = symbols.Storage()
+        self.database = symbols.Database()
 
         # keywords
         # TODO: keywords can't appear anywhere, we can suggest in right places
         self.keyword_completions = map(
-            lambda k: (k + '\t(keyrowd)', k),
+            lambda k: (k + '\t(keyword)', k),
             ['case', 'data', 'instance', 'type', 'where', 'deriving', 'import', 'module'])
 
     def clear_inspected(self):
-        self.info = {}
-        self.std_info = {}
+        # self.info = {}
+        # self.std_info = {}
         self.projects = {}
+        self.database = symbols.Database()
 
     def unalias_module_name(self, view, alias):
         "Get module names by alias"
         current_file_name = view.file_name()
-        if current_file_name in self.info:
-            current_info = self.info[current_file_name]
-            if 'imports' in current_info:
-                return [m['importName'] for m in current_info['imports'] if m['as'] == alias]
-        return []
-
-    def current_file_imports(self, view):
-        "Get module imports for current file"
-        current_file_name = view.file_name()
-        if current_file_name in self.info:
-            current_info = self.info[current_file_name]
-            if 'imports' in current_info:
-                return [m['importName'] for m in current_info['imports']]
+        with self.database.files_lock:
+            if current_file_name in self.database.files:
+                return self.database.files[current_file_name].unalias(alias)
         return []
 
     def get_completions(self, view, prefix, locations):
@@ -156,7 +124,7 @@ class AutoCompletion(object):
         # Contents of the line under the first cursor
         line_contents = get_line_contents(view, locations[0])
 
-        # If the current line is an import line, gives us (My.Module, My.Module.asd)
+        # If the current line is an import line, gives us (My.Module, ident)
         (qualified_module, symbol_name) = get_qualified_symbol(line_contents)
         qualified_prefix = '{0}.{1}'.format(qualified_module, symbol_name) if qualified_module else symbol_name
 
@@ -167,81 +135,42 @@ class AutoCompletion(object):
         if qualified_module:
             completions.extend(self.get_module_completions_for(qualified_prefix))
 
-        with self.info_lock:
+        moduleImports = []
 
-            moduleImports = []
-            # Use completion only from qualified_module
-            if qualified_module:
-                if current_file_name in self.info:
-                    current_info = self.info[current_file_name]
-                    if 'imports' in current_info:
-                        # if qualified_module is alias, find its original name
-                        # e.g. for 'import Data.Text as T' return 'Data.Text' for 'T'
-                        moduleImports.extend([m['importName'] for m in current_info['imports'] if m['as'] == qualified_module])
-                moduleImports.append(qualified_module)
-            else:
-                # add keywords
-                completions.extend(self.keyword_completions)
+        with self.database.files_lock:
+            if current_file_name in self.database.files:
+                cur_info = self.database.files[current_file_name]
 
-                # list of imports, imported unqualified
-                if current_file_name in self.info:
-                    current_info = self.info[current_file_name]
-                    if 'imports' in current_info:
-                        moduleImports.extend([m['importName'] for m in current_info['imports'] if not m['qualified']])
-                        # Prelude imported implicitly as unqualified
-                        if 'Prelude' not in current_info['imports']:
-                            moduleImports.append('Prelude')
-                        completions.extend(self.get_module_completions_for(qualified_prefix, [m['importName'] for m in current_info['imports']]))
+                if qualified_module:
+                    # If symbol is qualified, use completions from module specified
+                    moduleImports.append(qualified_module)
+                    moduleImports.extend([i.module for i in cur_info.imports.values() if i.import_as == qualified_module])
+                else:
+                    # Otherwise, use completions from all importred unqualified modules and from this module
+                    moduleImports.append(cur_info.name)
+                    moduleImports.append('Prelude')
+                    moduleImports.extend([i.module for i in cur_info.imports.values() if not i.is_qualified])
+                    # Add keyword completions and module completions
+                    completions.extend(self.keyword_completions)
+                    completions.extend(self.get_module_completions_for(qualified_prefix, [i.module for i in cur_info.imports.values()]))
 
-        for mi in moduleImports:
-            completions.extend(self.info_completions(mi))
-            completions.extend(self.std_info_completions(mi))
+        for mi in set(moduleImports):
+            completions.extend(self.completions_for(mi, current_file_name))
 
         return list(set(completions))
 
-    def replace_string(self, v):
-        if not get_setting_async('snippet_replace'):
-            return v['name']
-        if 'what' not in v:
-            return v['name']
-        if v['what'] == 'function':
-            return v['name']
-        # Map k a -> Map ${1:k} ${2:a}
-        result = [v['name']]
-        i = 1
-        for arg in v['args']:
-            result.append("${" + str(i) + ":" + arg + "}")
-            i += 1
-
-        return ' '.join(result)
-
-    def std_info_completions(self, module_name):
-        result = []
-        with self.std_info_lock:
-            if module_name in self.std_info:
-                for v in self.std_info[module_name]['declarations']:
-                    if 'what' in v:
-                        if v['what'] == 'function':
-                            result.append((v['name'] + '\t' + v['type'], v['name']))
-                        else:
-                            result.append((v['name'] + '\t' + ' '.join(v['args']), self.replace_string(v)))
-                    else:
-                        result.append((v['name'] + '\t' + module_name, v['name']))
-        return result
-
-    def info_completions(self, module_name):
-        result = []
-        with self.info_lock:
-            for file_info in self.info.values():
-                if 'error' in file_info:
-                    # There was an error parsing this file; skip it
-                    continue
-                if file_info['moduleName'] == module_name:
-                    for d in file_info['declarations']:
-                        identifier = d['identifier']
-                        declaration_info = d['info']
-                        result.append((identifier + '\t' + declaration_info, identifier))
-        return result
+    def completions_for(self, module_name, filename = None):
+        """
+        Returns completions for module
+        """
+        with self.database.modules_lock:
+            if module_name not in self.database.modules:
+                return []
+            # TODO: Show all possible completions?
+            module = symbols.get_visible_module(self.database.modules[module_name], filename)
+            if not module:
+                return []
+            return map(lambda d: d.suggest(), module.declarations.values())
 
     def get_import_completions(self, view, prefix, locations):
 
@@ -262,8 +191,7 @@ class AutoCompletion(object):
                 module_name = match_import_list.group('module')
                 import_list_completions = []
 
-                import_list_completions.extend(self.info_completions(module_name))
-                import_list_completions.extend(self.std_info_completions(module_name))
+                import_list_completions.extend(self.completions_for(module_name, view.file_name()))
 
                 return import_list_completions
 
@@ -272,7 +200,7 @@ class AutoCompletion(object):
                 (qualified, pref) = match_import.groups()
                 import_completions = self.get_module_completions_for(pref)
 
-                # Right after "import "? Propose "qualified" as well!
+                # Right after "import " Propose "qualified" as well!
                 qualified_match = IMPORT_QUALIFIED_POSSIBLE_RE.match(line_contents)
                 if qualified_match:
                     qualified_prefix = qualified_match.group('qualifiedprefix')
@@ -291,18 +219,19 @@ class AutoCompletion(object):
             """
             suffix = mname.split('.')[(len(qualified_prefix.split('.')) - 1):]
             # Sublime replaces full module name with suffix, if it contains no dots?
-            if len(suffix) == 1:
-                return mname
-            return '.'.join(suffix)
+            return suffix[0]
+
         module_list = modules if modules else self.module_completions
-        return list(set((m + '\t(module)', module_next_name(m)) for m in module_list if m.startswith(qualified_prefix)))
-        # return list(set((unicode(module_next_name(m)),) * 2 for m in module_list if m.startswith(qualified_prefix)))
+        return list(set((module_next_name(m) + '\t(module)', module_next_name(m)) for m in module_list if m.startswith(qualified_prefix)))
+
 
 
 autocompletion = AutoCompletion()
 
-# Show autocompletion popup
+
+
 class SublimeHaskellComplete(sublime_plugin.TextCommand):
+    """ Shows autocompletion popup """
     def run(self, edit, characters):
         for region in self.view.sel():
             self.view.insert(edit, region.end(), characters)
@@ -318,25 +247,32 @@ class SublimeHaskellComplete(sublime_plugin.TextCommand):
     def is_enabled(self):
         return is_enabled_haskell_command(self.view, False)
 
+
+
 class SublimeHaskellBrowseDeclarations(sublime_plugin.WindowCommand):
+    """
+    Show all available declarations from current cabal and opened projects
+    """
     def run(self):
         self.names = []
         self.declarations = []
-        for f, v in autocompletion.info.items():
-            if 'declarations' in v:
-                for d in v['declarations']:
-                    self.names.append(d['identifier'])
-                    self.declarations.append('{0}: {1} {2}'.format(v['moduleName'], d['identifier'], d['info']))
-        for m, decls in autocompletion.std_info.items():
-            for decl in decls['declarations']:
-                self.names.append(decl['name'])
-                if 'what' in decl:
-                    if decl['what'] == 'function':
-                        self.declarations.append('{0}: {1} :: {2}'.format(m, decl['name'], decl['type']))
-                    else:
-                        self.declarations.append('{0}: {1} {2}'.format(m, decl['name'], ' '.join(decl['args'])))
-                else:
-                    self.declarations.append('{0}: {1}'.format(m, decl['name']))
+
+        # (module, ident) => symbols.Declaration
+        decls = {}
+
+        with autocompletion.database.cabal_modules_lock:
+            for m in autocompletion.database.get_cabal_modules().values():
+                for decl in m.declarations.values():
+                    decls[(m.name, decl.name)] = decl
+
+        with autocompletion.database.files_lock:
+            for m in autocompletion.database.files.values():
+                for decl in m.declarations.values():
+                    decls[(m.name, decl.name)] = decl
+
+        for decl in decls.values():
+            self.names.append(decl.name)
+            self.declarations.append(decl.brief())
 
         self.window.show_quick_panel(self.declarations, self.on_done)
 
@@ -355,15 +291,18 @@ class SublimeHaskellBrowseDeclarations(sublime_plugin.WindowCommand):
         return is_enabled_haskell_command(None, False)
 
 
+
 class SublimeHaskellGoToAnyDeclaration(sublime_plugin.WindowCommand):
     def run(self):
         self.files = []
         self.declarations = []
-        for f, v in autocompletion.info.items():
-            if 'declarations' in v:
-                for d in v['declarations']:
-                    self.files.append([f, str(d['line']), str(d['column'])])
-                    self.declarations.append([d['identifier'] + ' ' + d['info'], v['moduleName'] + ':' + str(d['line']) + ':' + str(d['column'])])
+
+        with autocompletion.database.files_lock:
+            for f, m in autocompletion.database.files.items():
+                for decl in m.declarations.values():
+                    self.files.append([f, str(decl.location.line), str(decl.location.column)])
+                    self.declarations.append([decl.brief(), '{0}:{1}:{2}'.format(decl.module.name, decl.location.line, decl.location.column)])
+
         self.window.show_quick_panel(self.declarations, self.on_done)
 
     def on_done(self, idx):
@@ -375,115 +314,89 @@ class SublimeHaskellGoToAnyDeclaration(sublime_plugin.WindowCommand):
         return is_enabled_haskell_command(None, False)
 
 
+
 class SublimeHaskellReinspectAll(sublime_plugin.WindowCommand):
     def run(self):
         autocompletion.clear_inspected()
         SublimeHaskellAutocomplete.inspector.mark_all_files(self.window)
 
 
+
 class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
+    """
+    Show information about selected symbol
+    
+    """
     def run(self, edit):
         word_region = self.view.word(self.view.sel()[0])
         preline = get_line_contents_before_region(self.view, word_region)
         (module_word, ident) = get_qualified_symbol(preline)
 
-        modules = []
-        imported_modules = autocompletion.current_file_imports(self.view)
+        current_file_name = self.view.file_name()
 
-        if module_word:
-            modules = [module_word]
-            modules.extend(autocompletion.unalias_module_name(self.view, module_word))
+        candidates = []
 
-        ident = self.view.substr(word_region)
-        full_qualified_name = '.'.join([module_word, ident]) if module_word else ident
+        with autocompletion.database.symbols_lock:
+            if ident not in autocompletion.database.symbols:
+                show_status_message('Symbol {0} not found'.format(ident), False)
+                return
 
-        candidates = {}
+            decls = autocompletion.database.symbols[ident]
 
-        def is_module_imported(module_name):
-            if module_word:
-                return module_name in modules
-            else:
-                return module_name in imported_modules
+            modules_dict = symbols.declarations_modules(decls, lambda ms: symbols.get_visible_module(ms, current_file_name)).values()
 
-        for f, v in autocompletion.info.items():
-            if 'declarations' in v:
-                for d in v['declarations']:
-                    if d['identifier'] == ident:
-                        candidates['.'.join([v['moduleName'], ident])] = (v['moduleName'], d, is_module_imported(v['moduleName']))
+            with autocompletion.database.files_lock:
+                if current_file_name in autocompletion.database.files:
+                    cur_info = autocompletion.database.files[current_file_name]
 
-        for m, v in autocompletion.std_info.items():
-            if 'declarations' in v:
-                for d in v['declarations']:
-                    if d['name'] == ident:
-                        candidates['.'.join([v['moduleName'], ident])] = (v['moduleName'], d, is_module_imported(v['moduleName']))
+                    if not module_word:
+                        # this module declaration
+                        candidates.extend([m.declarations[ident] for m in modules_dict if symbols.is_this_module(cur_info, m) and ident in m.declarations])
+                    if not candidates:
+                        # declarations from imported modules
+                        candidates.extend([m.declarations[ident] for m in modules_dict if symbols.is_imported_module(cur_info, m, module_word) and ident in m.declarations])
+                    if not candidates:
+                        # show all possible candidates
+                        candidates.extend([m.declarations[ident] for m in modules_dict if ident in m.declarations])
 
-        preferred_candidates = [c for c in candidates.itervalues() if c[2]]
-        other_candidates = [c for c in candidates.itervalues() if not c[2]]
+                # No info about imports for this file, just add all declarations
+                else:
+                    candidates.extend([m.declarations[ident] for m in modules_dict if ident in m.declarations])
 
-        if not self.try_candidates(preferred_candidates):
-            self.try_candidates(other_candidates)
+        if not candidates:
+            show_status_message('Symbol {0} not found'.format(ident), False)
+            return
 
-    def try_candidates(self, candidates):
-        if len(candidates) == 0:
-            return False
         if len(candidates) == 1:
             self.show_symbol_info(candidates[0])
-            return True
-        # many candidates
+            return
+
         self.candidates = candidates
-        def candidate_name(candidate):
-            (module_name, decl, _) = candidate
-            decl_name = decl['identifier'] if 'identifier' in decl else decl['name']
-            return '.'.join([module_name, decl_name])
-        names = [candidate_name(c) for c in candidates]
-        self.view.window().show_quick_panel(names, self.on_done)
+        self.view.window().show_quick_panel([[c.qualified_name()] for c in candidates], self.on_done)
 
     def on_done(self, idx):
         if idx == -1:
             return
         self.show_symbol_info(self.candidates[idx])
 
-    def show_symbol_info(self, symbol):
+    def show_symbol_info(self, decl):
         output_view = self.view.window().get_output_panel('sublime_haskell_symbol_info')
         output_view.set_read_only(False)
 
-        (module_name, decl, _) = symbol
-
-        info_text = []
-        if 'info' in decl:
-            # Try to load docs anyway
-            docs_info = haskell_docs(module_name, decl['identifier'])
-            docs = docs_info if docs_info else ''
-            info_text.extend([
-                '{0} {1}'.format(decl['identifier'], decl['info']),
-                module_name,
-                docs])
-        elif 'name' in decl:
-            if 'what' not in decl: # info is not detailed
-                decl_info = ghci_info(module_name, decl['name'])
-                if decl_info:
-                    decl.update(decl_info)
-                docs_info = haskell_docs(module_name, decl['name'])
+        if decl.what == 'declaration' and not decl.location:
+            # Try to load detailed info
+            decl_detailed = ghci_info_symbol(decl.module.name, decl.name)
+            if decl_detailed:
+                docs_info = haskell_docs(decl.module.name, decl.name)
                 if docs_info:
-                    decl['docs'] = docs_info
-            if 'what' not in decl: # failed to load info
-                info_text.extend([decl['name']])
-            else:
-                docs = decl.get('docs', '')
+                    decl_detailed.docs = docs_info
 
-                if decl['what'] == 'function':
-                    info_text.extend([
-                        '{0} :: {1}'.format(decl['name'], decl['type']),
-                        module_name,
-                        docs])
-                else:
-                    info_text.extend([
-                        ' '.join([decl['what'], decl['name'], ' '.join(decl['args'])]),
-                        module_name,
-                        docs])
+                autocompletion.database.add_declaration(decl_detailed, decl.module)
+                decl = decl_detailed
 
+        # TODO: Move to separate command for Sublime Text 3
         edit = output_view.begin_edit()
-        output_view.insert(edit, output_view.size(), '\n'.join(info_text))
+        output_view.insert(edit, output_view.size(), decl.detailed())
         output_view.end_edit(edit)
 
         output_view.sel().clear()
@@ -492,61 +405,87 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
         self.view.window().run_command('show_panel', {
             'panel': 'output.' + 'sublime_haskell_symbol_info' })
 
+
+
 class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
     def run(self, edit):
         word_region = self.view.word(self.view.sel()[0])
         preline = get_line_contents_before_region(self.view, word_region)
         (module_word, ident) = get_qualified_symbol(preline)
 
-        modules = []
+        full_name = '.'.join([module_word, ident]) if module_word else ident
 
-        if module_word:  # Get modules by alias
-            modules = [module_word]
-            modules.extend(autocompletion.unalias_module_name(self.view, module_word))
+        current_file_name = self.view.file_name()
+        current_project = get_cabal_project_dir_of_file(current_file_name)
 
-        full_qualified_name = '.'.join([module_word, ident]) if module_word else ident # goto module
-
-        self.module_files = []
         module_candidates = []
-        self.files = []
         candidates = []
 
-        for f, v in autocompletion.info.items():
-            if full_qualified_name == v['moduleName']:
-                self.module_files.append(f)
-                module_candidates.append([full_qualified_name, f])
-            if not module_word or v['moduleName'] in modules:
-                if 'declarations' in v:
-                    for d in v['declarations']:
-                        if d['identifier'] == ident:
-                            self.files.append([f, str(d['line']), str(d['column'])])
-                            candidates.append([d['identifier'] + ' ' + d['info'], v['moduleName'] + ':' + str(d['line']) + ':' + str(d['column'])])
+        with autocompletion.database.symbols_lock:
+            if ident not in autocompletion.database.symbols:
+                show_status_message('Declaration for {0} not found'.format(ident), False)
+                return
 
-        if len(module_candidates) == 0 and len(candidates) == 0:
-            show_status_message('Go To Declaration: identifier not fount: {0}'.format(full_qualified_name), False)
+            decls = autocompletion.database.symbols[ident]
+
+            modules_dict = symbols.flatten(symbols.declarations_modules(decls, lambda ms: filter(symbols.is_by_sources, ms)).values())
+
+            with autocompletion.database.files_lock:
+                if current_file_name in autocompletion.database.files:
+                    cur_info = autocompletion.database.files[current_file_name]
+
+                    if not module_word:
+                        # this module declarations
+                        candidates.extend([m.declarations[ident] for m in modules_dict if symbols.is_this_module(cur_info, m) and ident in m.declarations])
+                    if not candidates:
+                        # declarations from imported modules within this project
+                        candidates.extend([m.declarations[ident] for m in modules_dict if symbols.is_imported_module(cur_info, m, module_word) and symbols.is_within_project(m, cur_info.location.project) and ident in m.declarations])
+                    if not candidates:
+                        # declarations from imported modules within other projects
+                        candidates.extend([m.declarations[ident] for m in modules_dict if symbols.is_imported_module(cur_info, m, module_word) and ident in m.declarations])
+                    if not candidates:
+                        # show all possible candidates
+                        candidates.extend([m.declarations[ident] for m in modules_dict if ident in declarations])
+
+                # No info about imports for this file, just add all declarations
+                else:
+                    candidates.extend([m.declarations[ident] for m in modules_dict if ident in declarations])
+
+        with autocompletion.database.modules_lock:
+            if full_name in autocompletion.database.modules:
+                modules = filter(symbols.is_by_sources, autocompletion.database.modules[full_name])
+
+                # Find module in this project
+                module_candidates.extend([m for m in modules if symbols.is_within_project(m, current_project)])
+                if not module_candidates:
+                    # Modules from other projects
+                    module_candidates.extend(modules)
+
+        if not candidates and not module_candidates:
+            show_status_message('Declaration for {0} not found'.format(ident), False)
             return
 
-        if len(module_candidates) + len(candidates) == 1:
+        if len(candidates) + len(module_candidates) == 1:
             if len(module_candidates) == 1:
-                self.view.window().open_file(self.module_files[0])
+                self.view.window().open_file(module_candidates[0].location.filename)
                 return
             if len(candidates) == 1:
-                self.view.window().open_file(':'.join(self.files[0]), sublime.ENCODED_POSITION)
+                self.view.window().open_file(candidates[0].location.position(), sublime.ENCODED_POSITION)
                 return
 
         # many candidates
-        self.view.window().show_quick_panel(candidates + module_candidates, self.on_done)
+        self.select_candidates = [([c.name, c.location.position()], True) for c in candidates] + [([m.name, m.location.filename], False) for m in module_candidates]
+        self.view.window().show_quick_panel([c[0] for c in self.select_candidates], self.on_done)
 
     def on_done(self, idx):
         if idx == -1:
             return
 
-        files_len = len(self.files)
-
-        if idx < files_len:
-            self.view.window().open_file(':'.join(self.files[idx]), sublime.ENCODED_POSITION)
+        selected = self.select_candidates[idx]
+        if selected[1]:
+            self.view.window().open_file(selected[0][1], sublime.ENCODED_POSITION)
         else:
-            self.view.window().open_file(self.module_files[idx - files_len])
+            self.view.window().open_file(selected[0][1])
 
     def is_enabled(self):
         return is_enabled_haskell_command(self.view, False)
@@ -564,10 +503,9 @@ class StandardInspectorAgent(threading.Thread):
         self.init_ghcmod_completions()
 
         # Load general info about all standard modules
-        show_status_message('Updating standard modules')
-        for m in autocompletion.module_completions.copy():
-            self._load_standard_module(m)
-        show_status_message('Updating standard modules', True)
+        # with status_message('Updating standard modules'):
+        #     for m in autocompletion.module_completions.copy():
+        #         self._load_standard_module(m)
 
         while True:
             load_modules = []
@@ -576,16 +514,15 @@ class StandardInspectorAgent(threading.Thread):
                 self.modules_to_load = []
 
             if len(load_modules) > 0:
-                show_status_message('Updating standard modules extended info')
-                try:
-                    for m in load_modules:            
-                        self._load_standard_module(m)
-                    for m in load_modules:
-                        self._load_standard_module_detailed(m)
-                except:
-                    show_status_message('Updating standard modules extended info', False)
-                    continue
-                show_status_message('Updating standard modules extended info', True)
+                with status_message('Updating standard modules extended info') as s:
+                    try:
+                        for m in load_modules:            
+                            self._load_standard_module(m)
+                        # for m in load_modules:
+                        #     self._load_standard_module_detailed(m)
+                    except:
+                        s.fail()
+                        continue
 
     def load_module_info(self, module_name):
         with self.modules_lock:
@@ -597,52 +534,47 @@ class StandardInspectorAgent(threading.Thread):
         if not get_setting_async('enable_ghc_mod'):
             return
 
-        show_status_message('Updating ghc_mod completions')
-
-        # Init LANGUAGE completions
-        autocompletion.language_completions = call_ghcmod_and_wait(['lang']).splitlines()
-        # Init import module completion
-        autocompletion.module_completions = set(call_ghcmod_and_wait(['list']).splitlines())
-
-        show_status_message('Updating ghc_mod completions', True)
+        with status_message('Updating ghc_mod completions'):
+            # Init LANGUAGE completions
+            autocompletion.language_completions = call_ghcmod_and_wait(['lang']).splitlines()
+            # Init import module completion
+            autocompletion.module_completions = set(call_ghcmod_and_wait(['list']).splitlines())
 
     def _load_standard_module(self, module_name):
-        if module_name not in autocompletion.std_info:
+        if module_name not in autocompletion.database.get_cabal_modules():
             try:
                 module_contents = call_ghcmod_and_wait(['browse', module_name]).splitlines()
-                module_info = {
-                    'moduleName': module_name,
-                    'detailed': False,
-                    'declarations': [] }
+                m = symbols.Module(module_name, cabal = symbols.current_cabal())
                 for name in module_contents:
-                    module_info['declarations'].append({ 'name': name })
+                    m.add_declaration(symbols.Declaration(name))
 
-                with autocompletion.std_info_lock:
-                    autocompletion.std_info[module_name] = module_info
-            except Exception:
-                pass
+                autocompletion.database.add_module(m)
+
+            except Exception as e:
+                log('Inspecting in-cabal module {0} failed: {1}'.format(module_name, e))
 
     def _load_standard_module_detailed(self, module_name):
-        if not autocompletion.std_info[module_name]['detailed']:
-            msg = 'Loading info for {0}'.format(module_name)
-            begin_time = time.clock()
-            log('loading detailed info for standard module {0}'.format(module_name))
-            show_status_message(msg)
-            decls = autocompletion.std_info[module_name]['declarations'][:]
-            for cts in decls:
-                cts_info = ghci_info(module_name, cts['name'])
-                if cts_info:
-                    cts.update(cts_info)
-                docs_info = haskell_docs(module_name, cts['name'])
-                if docs_info:
-                    cts['docs'] = docs_info
-            with autocompletion.std_info_lock:
-                autocompletion.std_info[module_name]['declarations'] = decls
-                autocompletion.std_info[module_name]['detailed'] = True
-            show_status_message(msg, True)
-            end_time = time.clock()
-            log('loaded detailed info for standard module {0} within {1} seconds'.format(module_name, end_time - begin_time))
+        if module_name in autocompletion.database.get_cabal_modules():
+            try:
+                msg = 'Loading info for {0}'.format(module_name)
+                begin_time = time.clock()
+                log('loading detailed info for standard module {0}'.format(module_name))
 
+                with status_message(msg):
+                    in_module = autocompletion.database.get_cabal_modules()[module_name]
+                    decls = in_module.declarations.keys()
+                    for decl in decls:
+                        # Need to load extended info only if it wasn't loaded before
+                        if in_module.declarations[decl].what == 'declaration':
+                            decl_symbol = ghci_info_symbol(module_name, decl)
+                            if decl_symbol:
+                                decl_symbol.docs = haskell_docs(module_name, decl)
+                                autocompletion.database.add_declaration(decl_symbol, in_module)
+
+                end_time = time.clock()
+                log('loaded detailed info for standard module {0} within {1} seconds'.format(module_name, end_time - begin_time))
+            except Exception as e:
+                log('Detailed inspecting in-cabal module {0} failed: {1}'.format(module_name, e))
 
 
 class InspectorAgent(threading.Thread):
@@ -665,36 +597,32 @@ class InspectorAgent(threading.Thread):
     def run(self):
         # Compile the CabalInspector:
         # TODO: Where to compile it?
-        show_status_message(InspectorAgent.CABALMSG)
+        with status_message(InspectorAgent.CABALMSG) as s:
 
-        exit_code, out, err = call_and_wait(['ghc',
-            '--make', CABAL_INSPECTOR_SOURCE_PATH,
-            '-o', CABAL_INSPECTOR_EXE_PATH,
-            '-outputdir', CABAL_INSPECTOR_OBJ_DIR])
+            exit_code, out, err = call_and_wait(['ghc',
+                '--make', CABAL_INSPECTOR_SOURCE_PATH,
+                '-o', CABAL_INSPECTOR_EXE_PATH,
+                '-outputdir', CABAL_INSPECTOR_OBJ_DIR])
 
-        if exit_code != 0:
-            show_status_message(InspectorAgent.CABALMSG, False)
-            error_msg = u"SublimeHaskell: Failed to compile CabalInspector\n{0}".format(err)
-            wait_for_window(lambda w: self.show_errors(w, error_msg))
-        else:
-            show_status_message(InspectorAgent.CABALMSG, True)
-        # Continue anyway
+            if exit_code != 0:
+                s.fail()
+                error_msg = u"SublimeHaskell: Failed to compile CabalInspector\n{0}".format(err)
+                wait_for_window(lambda w: self.show_errors(w, error_msg))
+                # Continue anyway
 
         # Compile the ModuleInspector:
-        show_status_message(InspectorAgent.MODULEMSG)
+        with status_message(InspectorAgent.MODULEMSG) as s:
 
-        exit_code, out, err = call_and_wait(['ghc',
-            '--make', MODULE_INSPECTOR_SOURCE_PATH,
-            '-o', MODULE_INSPECTOR_EXE_PATH,
-            '-outputdir', MODULE_INSPECTOR_OBJ_DIR])
+            exit_code, out, err = call_and_wait(['ghc',
+                '--make', MODULE_INSPECTOR_SOURCE_PATH,
+                '-o', MODULE_INSPECTOR_EXE_PATH,
+                '-outputdir', MODULE_INSPECTOR_OBJ_DIR])
 
-        if exit_code != 0:
-            show_status_message(InspectorAgent.MODULEMSG, False)
-            error_msg = u"SublimeHaskell: Failed to compile ModuleInspector\n{0}".format(err)
-            wait_for_window(lambda w: self.show_errors(w, error_msg))
-            return
-
-        show_status_message(InspectorAgent.MODULEMSG, True)
+            if exit_code != 0:
+                s.fail()
+                error_msg = u"SublimeHaskell: Failed to compile ModuleInspector\n{0}".format(err)
+                wait_for_window(lambda w: self.show_errors(w, error_msg))
+                return
 
         # For first time, inspect all open folders and files
         wait_for_window(lambda w: self.mark_all_files(w))
@@ -746,18 +674,19 @@ class InspectorAgent(threading.Thread):
         # Process all files within the Cabal project:
         # TODO: Only process files within the .cabal file's "src" directory.
         (project_name, cabal_file) = get_cabal_in_dir(cabal_dir)
-        show_status_message_process('Reinspecting ({0}/{1}) {2}'.format(index, count, project_name))
-        # set project and read cabal
-        if cabal_file and project_name:
-            self._refresh_project_info(cabal_dir, project_name, cabal_file)
 
-        files_in_dir = list_files_in_dir_recursively(cabal_dir)
-        haskell_source_files = [x for x in files_in_dir if x.endswith('.hs') and ('dist/build/autogen' not in x)]
-        for filename in haskell_source_files:
-            self._refresh_module_info(filename)
-        end_time = time.clock()
-        show_status_message_process('Reinspecting ({0}/{1}) {2}'.format(index, count, project_name), True)
-        log('total inspection time: {0} seconds'.format(end_time - begin_time))
+        with status_message_process('Reinspecting ({0}/{1}) {2}'.format(index, count, project_name)) as s:
+
+            # set project and read cabal
+            if cabal_file and project_name:
+                self._refresh_project_info(cabal_dir, project_name, cabal_file)
+
+            files_in_dir = list_files_in_dir_recursively(cabal_dir)
+            haskell_source_files = [x for x in files_in_dir if x.endswith('.hs') and ('dist/build/autogen' not in x)]
+            for filename in haskell_source_files:
+                self._refresh_module_info(filename)
+            end_time = time.clock()
+            log('total inspection time: {0} seconds'.format(end_time - begin_time))
 
     def _refresh_project_info(self, cabal_dir, project_name, cabal_file):
         exit_code, out, err = call_and_wait(
@@ -803,24 +732,49 @@ class InspectorAgent(threading.Thread):
                         if 'importName' in mi:
                             InspectorAgent.std_inspector.load_module_info(mi['importName'])
 
-                # Remember when this info was collected.
-                new_info['inspectedAt'] = modification_time
-                # Dump the currently-known module info to disk:
-                formatted_json = json.dumps(autocompletion.info, indent=2)
-                with open(OUTPUT_PATH, 'w') as f:
-                    f.write(formatted_json)
-                with autocompletion.info_lock:
-                    autocompletion.info[filename] = new_info
-                autocompletion.module_completions.add(new_info['moduleName'])
+                # # Remember when this info was collected.
+                # new_info['inspectedAt'] = modification_time
+                # # Dump the currently-known module info to disk:
+                # formatted_json = json.dumps(autocompletion.info, indent=2)
+                # with open(OUTPUT_PATH, 'w') as f:
+                #     f.write(formatted_json)
+                # with autocompletion.info_lock:
+                #     autocompletion.info[filename] = new_info
+                # autocompletion.module_completions.add(new_info['moduleName'])
+
+                try:
+                    def make_import(import_info):
+                        import_name = import_info['importName']
+                        ret = symbols.Import(import_name, import_info['qualified'], import_info['as'])
+                        return (import_name, ret)
+
+                    module_imports = dict(map(make_import, new_info['imports']))
+                    import_list = new_info['exportList'] if ('exportList' in new_info and new_info['exportList'] is not None) else []
+                    new_module = symbols.Module(new_info['moduleName'], import_list, module_imports, {}, filename)
+                    for d in new_info['declarations']:
+                        # TODO: Get specific declaration info by 'info' member?
+                        new_decl = symbols.Declaration(d['identifier'])
+                        new_decl.location = symbols.Location(filename, d['line'], d['column'])
+                        new_module.add_declaration(new_decl)
+
+                    autocompletion.database.add_file(filename, new_module)
+
+                    for i in new_module.imports.values():
+                        InspectorAgent.std_inspector.load_module_info(i.module)
+
+                except Exception as e:
+                    log('Inspecting file {0} failed: {1}'.format(filename, e))
 
     def _get_inspection_time_of_file(self, filename):
         """Return the time that a file was last inspected.`
         Return zero if it has never been inspected."""
-        with autocompletion.info_lock:
-            try:
-                return autocompletion.info[filename]['inspectedAt']
-            except KeyError:
-                return 0.0
+        # TODO: Implement!
+        return 0.0
+        # with autocompletion.info_lock:
+        #     try:
+        #         return autocompletion.info[filename]['inspectedAt']
+        #     except KeyError:
+        #         return 0.0
 
 
 def list_files_in_dir_recursively(base_dir):
@@ -903,7 +857,6 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 
         begin_time = time.clock()
         # Only suggest symbols if the current file is part of a Cabal project.
-        # TODO: Only suggest symbols from within this project.
 
         completions = autocompletion.get_import_completions(view, prefix, locations)
 

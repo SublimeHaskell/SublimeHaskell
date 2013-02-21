@@ -267,7 +267,7 @@ def call_ghcmod_and_wait(arg_list, filename=None):
 
         return out
 
-    except OSError, e:
+    except OSError as e:
         if e.errno == errno.ENOENT:
             output_error(sublime.active_window(),
                 "SublimeHaskell: ghc-mod was not found!\n"
@@ -399,3 +399,30 @@ def show_status_message_process(msg, isok = None, timeout = 60):
 def is_haskell_source(view = None):
     return is_enabled_haskell_command(view, False)
 
+class with_status_message(object):
+    def __init__(self, msg, isok, show_message):
+        self.msg = msg
+        self.isok = isok
+        self.show_message = show_message
+
+    def __enter__(self):
+        self.show_message(self.msg)
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if type:
+            self.show_message(self.msg, False)
+        else:
+            self.show_message(self.msg, self.isok)
+
+    def ok(self):
+        self.isok = True
+
+    def fail(self):
+        self.isok = False
+
+def status_message(msg, isok = True):
+    return with_status_message(msg, isok, show_status_message)
+
+def status_message_process(msg, isok = True):
+    return with_status_message(msg, isok, show_status_message_process)

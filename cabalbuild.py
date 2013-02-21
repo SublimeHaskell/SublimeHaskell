@@ -274,8 +274,6 @@ class SublimeHaskellRun(SublimeHaskellBaseCommand):
 
         hide_output(self.window)
 
-        show_status_message_process('Running '.format(name))
-
         # Run in thread
         thread = Thread(
             target=run_binary,
@@ -284,16 +282,16 @@ class SublimeHaskellRun(SublimeHaskellBaseCommand):
 
 
 def run_binary(name, bin_file, base_dir):
-    exit_code, out, err = call_and_wait(bin_file, cwd=base_dir)
-    window = sublime.active_window()
-    if not window:
-        return
-    if exit_code == 0:
-        show_status_message_process('Running {0}'.format(name), True)
-        sublime.set_timeout(lambda: write_output(window, out, base_dir), 0)
-    else:
-        show_status_message_process('Running {0}'.format(name), False)
-        sublime.set_timeout(lambda: write_output(window, err, base_dir), 0)
+    with status_message_process('Running {0}'.format(name)) as s:
+        exit_code, out, err = call_and_wait(bin_file, cwd=base_dir)
+        window = sublime.active_window()
+        if not window:
+            return
+        if exit_code == 0:
+            sublime.set_timeout(lambda: write_output(window, out, base_dir), 0)
+        else:
+            s.fail()
+            sublime.set_timeout(lambda: write_output(window, err, base_dir), 0)
 
 
 def write_output(window, text, base_dir):

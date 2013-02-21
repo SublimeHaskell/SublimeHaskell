@@ -3,7 +3,7 @@ import os
 import sublime_plugin
 
 from sublime_haskell_common import *
-from symbols import *
+import symbols
 
 def ghci_info(module, name):
     """
@@ -23,7 +23,7 @@ def ghci_info(module, name):
     stdout = crlf2lf(stdout)
     if exit_code == 0:
         functionRegex = '{0}\s+::\s+(?P<type>.*?)(\s+--(.*))?$'.format(name)
-        dataRegex = '(?P<what>data)\s+((?P<ctx>(.*))=>\s+)?{0}\s+(?P<args>(\w+\s+)*)='.format(name)
+        dataRegex = '(?P<what>(type|data))\s+((?P<ctx>(.*))=>\s+)?{0}\s+(?P<args>(\w+\s+)*)='.format(name)
         classRegex = '(?P<what>class)\s+((?P<ctx>(.*))=>\s+)?{0}\s+(?P<args>(\w+\s+)*)(.*)where$'.format(name)
 
         result = {
@@ -55,11 +55,13 @@ def ghci_info_symbol(module_name, symbol_name):
     if 'what' not in r:
         return None
     if r['what'] == 'function':
-        return Function(r['name'], None, r['type'])
+        return symbols.Function(r['name'], r['type'])
     elif r['what'] == 'class':
-        return Class(r['name'], None, r['ctx'] if 'ctx' in r else None, r['args'])
+        return symbols.Class(r['name'], r['ctx'] if 'ctx' in r else None, r['args'])
     elif r['what'] == 'data':
-        return Data(r['name'], None, r['ctx'] if 'ctx' in r else None, r['args'])
+        return symbols.Data(r['name'], r['ctx'] if 'ctx' in r else None, r['args'])
+    elif r['what'] == 'type':
+        return symbols.Type(r['name'], r['ctx'] if 'ctx' in r else None, r['args'])
     else:
         return None
 
