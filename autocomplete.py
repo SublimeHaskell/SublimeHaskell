@@ -44,14 +44,13 @@ IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>\w+(\.\w+)*)(
 
 def get_line_contents(view, location):
     """
-    Returns the contents of the line at the given location.
+    Returns contents of line at the given location.
     """
     return view.substr(sublime.Region(view.line(location).a, location))
 
-
 def get_line_contents_before_region(view, region):
     """
-    Returns the of the line before the given region (including it).
+    Returns contents of line before the given region (including it).
     """
     return view.substr(sublime.Region(view.line(region).a, region.b))
 
@@ -68,14 +67,24 @@ def get_qualified_name(s):
 def get_qualified_symbol(line):
     """
     Get module context of symbol and symbol itself
-    Returns (module, name), where module (or one of) can be None
+    Returns (module, name, is_import_list), where module (or one of) can be None
     """
     res = IMPORT_SYMBOL_RE.search(line)
     if res:
-        return (res.group('module'), res.group('identifier'))
+        return (res.group('module'), res.group('identifier'), True)
     res = SYMBOL_RE.search(line)
     # res always match
-    return (res.group('module'), res.group('identifier'))
+    return (res.group('module'), res.group('identifier'), False)
+
+def get_qualified_symbol_at_region(view, region):
+    """
+    Get module context of symbol and symbol itself for line before (and with) word on region
+    Returns (module, name), where module (or one of) can be None
+    """
+    word_region = view.word(region)
+    preline = get_line_contents_before_region(view, word_region)
+    return get_qualified_symbol(preline)
+
 
 # Autocompletion data
 class AutoCompletion(object):
@@ -125,14 +134,14 @@ class AutoCompletion(object):
         line_contents = get_line_contents(view, locations[0])
 
         # If the current line is an import line, gives us (My.Module, ident)
-        (qualified_module, symbol_name) = get_qualified_symbol(line_contents)
+        (qualified_module, symbol_name, is_import_list) = get_qualified_symbol(line_contents)
         qualified_prefix = '{0}.{1}'.format(qualified_module, symbol_name) if qualified_module else symbol_name
 
         # The list of completions we're going to assemble
         completions = []
 
         # Complete with modules too
-        if qualified_module:
+        if qualified_module and not is_import_list:
             completions.extend(self.get_module_completions_for(qualified_prefix))
 
         moduleImports = []
@@ -230,14 +239,26 @@ autocompletion = AutoCompletion()
 
 
 
+def can_complete_qualified_symbol(info):
+    """
+    Helper function, returns whether sublime_haskell_complete can run for (module, symbol, is_import_list)
+    """
+    (module_name, symbol_name, is_import_list) = info
+    if not module_name:
+        return False
+
+    if is_import_list:
+        return module_name in autocompletion.module_completions
+    else:
+        return (filter(lambda m: m.startswith(module_name), autocompletion.module_completions) != [])
+
 class SublimeHaskellComplete(sublime_plugin.TextCommand):
     """ Shows autocompletion popup """
     def run(self, edit, characters):
         for region in self.view.sel():
             self.view.insert(edit, region.end(), characters)
-        line = get_line_contents_before_region(self.view, self.view.sel()[0])
-        (module_name, symbol_name) = get_qualified_symbol(line)
-        if module_name and module_name in autocompletion.module_completions:
+
+        if can_complete_qualified_symbol(get_qualified_symbol_at_region(self.view, self.view.sel()[0])):
             self.view.run_command("hide_auto_complete")
             sublime.set_timeout(self.do_complete, 1)
 
@@ -328,9 +349,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
     
     """
     def run(self, edit):
-        word_region = self.view.word(self.view.sel()[0])
-        preline = get_line_contents_before_region(self.view, word_region)
-        (module_word, ident) = get_qualified_symbol(preline)
+        (module_word, ident, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
 
         current_file_name = self.view.file_name()
 
@@ -409,9 +428,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
 
 class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
     def run(self, edit):
-        word_region = self.view.word(self.view.sel()[0])
-        preline = get_line_contents_before_region(self.view, word_region)
-        (module_word, ident) = get_qualified_symbol(preline)
+        (module_word, ident, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
 
         full_name = '.'.join([module_word, ident]) if module_word else ident
 
@@ -911,5 +928,17 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             return get_setting('auto_completion_popup')
         elif key == 'is_haskell_source':
             return is_haskell_source(view)
+        elif key == "is_module_completion" or key == "is_import_completion":
+            chars = {
+                "is_module_completion": '.',
+                "is_import_completion": '(' }
+
+            region = view.sel()[0]
+            if region.a != region.b:
+                return False
+            word_region = view.word(region)
+            preline = get_line_contents_before_region(view, word_region)
+            preline += chars[key]
+            return can_complete_qualified_symbol(get_qualified_symbol(preline))
         else:
             return False
