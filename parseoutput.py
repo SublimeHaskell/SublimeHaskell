@@ -1,8 +1,10 @@
 import os
 import re
 import sublime
+import sublime_plugin
 import time
 from threading import Thread
+from collections import defaultdict
 
 from sublime_haskell_common import log, are_paths_equal, call_and_wait, get_setting_async, show_status_message_process, show_status_message
 
@@ -18,6 +20,12 @@ output_regex = re.compile(
 
 # Extract the filename, line, column, and description from an error message:
 result_file_regex = r'^(\S*?): line (\d+), column (\d+):$'
+
+
+# Global list of errors. Used e.g. for jumping to the next one.
+# Properly assigned being a defaultdict in clear_error_marks().
+# Structure: ERRORS[filename][m.line] = OutputMessage()
+ERRORS = {}
 
 
 def filename_of_path(p):
@@ -59,6 +67,22 @@ class OutputMessage(object):
         region = view.line(point)
         region = trim_region(view, region)
         return region
+
+
+def clear_error_marks():
+    global ERRORS
+
+    listdict = lambda: defaultdict(list)
+    ERRORS = defaultdict(listdict)
+
+
+def set_global_error_messages(messages):
+    global ERRORS
+
+    clear_error_marks()
+
+    for m in messages:
+        ERRORS[m.filename][m.line].append(m)
 
 
 def run_build_thread(view, cabal_project_dir, msg, cmd, on_done):
@@ -131,6 +155,9 @@ def parse_output_messages_and_show(view, msg, base_dir, exit_code, stderr):
     # The unparseable part (for other errors)
     unparsable = output_regex.sub('', stderr).strip()
 
+    # Set global error list
+    set_global_error_messages(parsed_messages)
+
     # If we couldn't parse any messages, just show the stderr
     # Otherwise the parsed errors and the unparsable stderr remainder
     outputs = []
@@ -179,6 +206,50 @@ message_levels = {
         'icon': 'grey_x'
     }
 }
+
+
+# These next and previous commands were shamelessly copied
+# from the great SublimeClang plugin.
+
+class SublimeHaskellNextError(sublime_plugin.TextCommand):
+    def run(self, edit):
+        print "SublimeHaskellNextError"
+        v = self.view
+        fn = v.file_name().encode("utf-8")
+        line, column = v.rowcol(v.sel()[0].a)
+        gotoline = -1
+        if fn in ERRORS:
+            for errLine in ERRORS[fn]:
+                if errLine > line:
+                    gotoline = errLine
+                    break
+            # No next line: Wrap around if possible
+            if gotoline == -1 and len(ERRORS[fn]) > 0:
+                gotoline = ERRORS[fn].keys()[0]
+        if gotoline != -1:
+            v.window().open_file("%s:%d" % (fn, gotoline), sublime.ENCODED_POSITION)
+        else:
+            sublime.status_message("No more errors or warnings!")
+
+
+class SublimeHaskellPreviousError(sublime_plugin.TextCommand):
+    def run(self, edit):
+        v = self.view
+        fn = v.file_name().encode("utf-8")
+        line, column = v.rowcol(v.sel()[0].a)
+        gotoline = -1
+        if fn in ERRORS:
+            for errLine in ERRORS[fn]:
+                if errLine < line:
+                    gotoline = errLine
+            # No previous line: Wrap around if possible
+            if gotoline == -1 and len(ERRORS[fn]) > 0:
+                gotoline = ERRORS[fn].keys()[-1]
+        if gotoline != -1:
+            v.window().open_file("%s:%d" % (fn, gotoline), sublime.ENCODED_POSITION)
+        else:
+            sublime.status_message("No more errors or warnings!")
+
 
 
 def region_key(name):

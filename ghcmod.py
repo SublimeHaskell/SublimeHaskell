@@ -4,7 +4,7 @@ import sublime_plugin
 from threading import Thread
 
 from sublime_haskell_common import log, is_enabled_haskell_command, get_haskell_command_window_view_file_project, call_ghcmod_and_wait
-from parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output
+from parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages
 
 
 def lint_as_hints(msgs):
@@ -117,6 +117,9 @@ def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb
         parsed = parse_output_messages(file_dir, out)
         for p in parsed:
             parsed_messages.append((cmd, p))
+
+        # Set global error list
+        set_global_error_messages(parsed)
 
     if alter_messages_cb:
         alter_messages_cb(parsed_messages)

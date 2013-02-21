@@ -4,15 +4,42 @@
 	"completions":
 	[
 		"class",
+		"default",
 		"deriving",
+		"do",
+		"forall",
+		"foreign",
+		"hiding",
+		"infix",
+		"infixl",
+		"infixr",
 		"instance",
-		"LANGUAGE",
+		"let",
+		"mdo",
 		"module",
 		"newtype",
 		"qualified",
+		"rec",
 		"type",
 		"undefined",
 		"where",
+		// Pragmas, see http://www.haskell.org/ghc/docs/latest/html/users_guide/pragmas.html
+		"CONLIKE",
+		"DEPRECATED",
+		"INCLUDE",
+		"INLINABLE",
+		"INLINE",
+		"LANGUAGE",
+		"LINE",
+		"NOINLINE",
+		"OPTIONS_GHC",
+		"RULES",
+		"SOURCE",
+		"SPECIALIZE",
+		"UNPACK",
+		"WARNING",
+		// Others
+		"ANN",
 		{ "trigger": "import", "contents": "import $0" }
 	]
 }

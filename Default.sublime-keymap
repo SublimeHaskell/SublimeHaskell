@@ -14,5 +14,16 @@
         "args": {"characters": "("},
         "keys": ["("],
         "context": [ { "key": "is_haskell_source" }, { "key": "auto_completion_popup" } ]
+    },
+    // Same keybindings as SublimeClang
+    {
+        "command": "sublime_haskell_next_error",
+        "keys": ["alt+d", "alt+e"],
+        "context": [ { "key": "is_haskell_source" } ]
+    },
+    {
+        "command": "sublime_haskell_previous_error",
+        "keys": ["alt+shift+d", "alt+shift+e"],
+        "context": [ { "key": "is_haskell_source" } ]
     }
 ]

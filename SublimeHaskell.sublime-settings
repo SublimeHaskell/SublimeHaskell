@@ -69,5 +69,5 @@
 	"snippet_replace": true,
 
 	// Auto autocompletion popup on '.' in import list
-	"auto_completion_popup": true
+	"auto_completion_popup": false
 }
