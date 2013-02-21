@@ -752,10 +752,17 @@ class InspectorAgent(threading.Thread):
                     import_list = new_info['exportList'] if ('exportList' in new_info and new_info['exportList'] is not None) else []
                     new_module = symbols.Module(new_info['moduleName'], import_list, module_imports, {}, filename)
                     for d in new_info['declarations']:
-                        # TODO: Get specific declaration info by 'info' member?
-                        new_decl = symbols.Declaration(d['identifier'])
-                        new_decl.location = symbols.Location(filename, d['line'], d['column'])
-                        new_module.add_declaration(new_decl)
+                        location = symbols.Location(filename, d['line'], d['column'])
+                        if d['what'] == 'function':
+                            new_module.add_declaration(symbols.Function(d['name'], d['type'], None, location))
+                        elif d['what'] == 'type':
+                            new_module.add_declaration(symbols.Type(d['name'], d['context'], d['args'], None, location))
+                        elif d['what'] == 'data':
+                            new_module.add_declaration(symbols.Data(d['name'], d['context'], d['args'], None, location))
+                        elif d['what'] == 'class':
+                            new_module.add_declaration(symbols.Class(d['name'], d['context'], d['args'], None, location))
+                        else:
+                            new_module.add_declaration(symbols.Declaration(d['name'], 'declaration', None, location))
 
                     autocompletion.database.add_file(filename, new_module)
 

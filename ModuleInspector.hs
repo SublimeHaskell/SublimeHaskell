@@ -46,18 +46,23 @@ instance Json.ToJSON ImportInfo where
 -- | Information about a single type or function declaration.
 data DeclarationInfo = DeclarationInfo
     { _declLocation :: H.SrcLoc
+    , _declarationWhat :: String
     , _nameOfDeclaration :: String
-    , _typeInfo :: String
+    , _functionType :: Maybe String
+    , _typeContext :: Maybe [String]
+    , _typeArgs :: Maybe [String]
     }
     deriving (Show)
 
 instance Json.ToJSON DeclarationInfo where
-    toJSON (DeclarationInfo (H.SrcLoc _ l c) name typeInfo) = Json.object
-        [ "info" .= typeInfo
-        , "identifier" .= name
-        , "line" .= l
-        , "column" .= c
-        ]
+    toJSON (DeclarationInfo (H.SrcLoc _ l c) what name funType ctx args) = Json.object [
+        "line" .= l,
+        "column" .= c,
+        "what" .= what,
+        "name" .= name,
+        "type" .= funType,
+        "context" .= ctx,
+        "args" .= args]
 
 -- | Process a single file's contents.
 analyzeModule :: String -> Either String ModuleInfo
@@ -69,7 +74,7 @@ analyzeModule source = case H.parseFileContents source of
             { _moduleName = moduleName
             , _exportList = Nothing
             , _imports = map infoOfImport imports
-            , _declarations = concatMap nameOfDecl declarations
+            , _declarations = concatMap declInfo declarations
             }
 
 -- | Get module name for import
@@ -79,17 +84,21 @@ infoOfImport d = ImportInfo (mname (H.importModule d)) (H.importQualified d) (fm
 
 -- | Get the relevant information about of a top-level declaration.
 -- Return Nothing if the declaration is not interesting.
-nameOfDecl :: H.Decl -> [DeclarationInfo]
-nameOfDecl decl = case decl of
+declInfo :: H.Decl -> [DeclarationInfo]
+declInfo decl = case decl of
     H.TypeSig loc names typeSignature -> map
         (\n -> DeclarationInfo
             loc
+            "function"
             (identOfName n)
-            (":: " ++ H.prettyPrint typeSignature))
+            (Just $ H.prettyPrint typeSignature)
+            Nothing
+            Nothing)
         names
-    H.TypeDecl loc n _ _ -> [DeclarationInfo loc (identOfName n) "(type)"]
-    H.DataDecl loc _ _ n _ _ _ -> [DeclarationInfo loc (identOfName n) "(data)"]
-    H.ClassDecl loc _ n _ _ _ -> [DeclarationInfo loc (identOfName n) "(class)"]
+    H.TypeDecl loc n args _ -> [DeclarationInfo loc "type" (identOfName n) Nothing Nothing (Just $ map H.prettyPrint args)]
+    H.DataDecl loc _ ctx n args _ _ -> [DeclarationInfo loc "data" (identOfName n) Nothing (Just $ map H.prettyPrint ctx) (Just $ map H.prettyPrint args)]
+    H.GDataDecl loc _ ctx n args _ _ _ -> [DeclarationInfo loc "data" (identOfName n) Nothing (Just $ map H.prettyPrint ctx) (Just $ map H.prettyPrint args)]
+    H.ClassDecl loc ctx n args _ _ -> [DeclarationInfo loc "class" (identOfName n) Nothing (Just $ map H.prettyPrint ctx) (Just $ map H.prettyPrint args)]
     _ -> []
 
 identOfName :: H.Name -> String

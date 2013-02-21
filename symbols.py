@@ -129,7 +129,16 @@ class TypeBase(Declaration):
         return ('{0}\t{1}'.format(self.name, ' '.join(self.args)), self.snippet())
 
     def brief(self):
-        return ' '.join([self.name] + self.args)
+        brief_parts = []
+        if self.context:
+            if len(self.context) == 1:
+                brief_parts.append('{0} =>'.format(self.context[0]))
+            else:
+                brief_parts.append('({0}) =>'.format(', '.join(self.context)))
+        brief_parts.append(self.name)
+        if self.args:
+            brief_parts.append(' '.join(self.args))
+        return ' '.join(brief_parts)
 
 class Type(TypeBase):
     """
@@ -143,14 +152,14 @@ class Data(TypeBase):
     Haskell data declaration
     """
     def __init__(self, name, context, args, docs = None, location = None, module = None):
-        super(Type, self).__init__(name, 'data', context, args, docs, location, module)
+        super(Data, self).__init__(name, 'data', context, args, docs, location, module)
 
 class Class(Declaration):
     """
     Haskell class declaration
     """
     def __init__(self, name, context, args, docs = None, location = None, module = None):
-        super(Type, self).__init__(name, 'class', context, args, docs, location, module)
+        super(Class, self).__init__(name, 'class', context, args, docs, location, module)
 
 def update_with(l, r, default_value, f):
     """
