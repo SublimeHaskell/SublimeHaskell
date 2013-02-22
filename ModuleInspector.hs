@@ -4,7 +4,6 @@
 -- type signature.
 module Main where
 
-import Control.Monad
 import qualified Control.Exception as E
 
 import qualified Data.Aeson as Json
@@ -89,7 +88,7 @@ analyzeModule source = case H.parseFileContents source of
             { _moduleName = moduleName
             , _exportList = Nothing
             , _imports = map infoOfImport imports
-            , _declarations = concatMap declInfo declarations
+            , _declarations = collectDeclInfo declarations
             }
 
 -- | Get module name for import
@@ -97,8 +96,18 @@ infoOfImport :: H.ImportDecl -> ImportInfo
 infoOfImport d = ImportInfo (mname (H.importModule d)) (H.importQualified d) (fmap mname $ H.importAs d) where
     mname (H.ModuleName n) = n
 
+-- | Collect information about declarations
+-- Prefer info from declInfo and use defInfo only if declInfo returns nothing about declaration
+collectDeclInfo :: [H.Decl] -> [DeclarationInfo]
+collectDeclInfo decls = infos ++ defs where
+    infos = concatMap declInfo decls
+    names = map _nameOfDeclaration infos
+    defs = filter noInfo $ concatMap defInfo decls
+    noInfo :: DeclarationInfo -> Bool
+    noInfo d = _nameOfDeclaration d `notElem` names
+
+
 -- | Get the relevant information about of a top-level declaration.
--- Return Nothing if the declaration is not interesting.
 declInfo :: H.Decl -> [DeclarationInfo]
 declInfo decl = case decl of
     H.TypeSig loc names typeSignature -> map
@@ -116,6 +125,12 @@ declInfo decl = case decl of
     H.GDataDecl loc _ ctx n args _ _ _ -> [DeclarationInfo loc "data" (identOfName n) Nothing (Just $ map H.prettyPrint ctx) (Just $ map H.prettyPrint args) Nothing]
     H.ClassDecl loc ctx n args _ _ -> [DeclarationInfo loc "class" (identOfName n) Nothing (Just $ map H.prettyPrint ctx) (Just $ map H.prettyPrint args) Nothing]
     _ -> []
+
+-- | Get function declarations by pattern bindings
+defInfo :: H.Decl -> [DeclarationInfo]
+defInfo (H.FunBind []) = []
+defInfo (H.FunBind (H.Match loc n _ _ _ _ : _)) = [DeclarationInfo loc "function" (identOfName n) Nothing Nothing Nothing Nothing]
+defInfo _ = []
 
 identOfName :: H.Name -> String
 identOfName name = case name of

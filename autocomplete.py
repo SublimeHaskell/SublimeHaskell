@@ -289,10 +289,11 @@ class SublimeHaskellBrowseDeclarations(sublime_plugin.WindowCommand):
         # (module, ident) => symbols.Declaration
         decls = {}
 
-        with autocompletion.database.cabal_modules_lock:
-            for m in autocompletion.database.get_cabal_modules().values():
-                for decl in m.declarations.values():
-                    decls[(m.name, decl.name)] = decl
+        # Takes toooo much time
+        # with autocompletion.database.cabal_modules_lock:
+        #     for m in autocompletion.database.get_cabal_modules().values():
+        #         for decl in m.declarations.values():
+        #             decls[(m.name, decl.name)] = decl
 
         with autocompletion.database.files_lock:
             for m in autocompletion.database.files.values():
@@ -301,7 +302,7 @@ class SublimeHaskellBrowseDeclarations(sublime_plugin.WindowCommand):
 
         for decl in decls.values():
             self.names.append(decl.name)
-            self.declarations.append(decl.brief())
+            self.declarations.append(decl.module.name + ': ' + decl.brief())
 
         self.window.show_quick_panel(self.declarations, self.on_done)
 
