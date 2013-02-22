@@ -154,7 +154,7 @@ class Data(TypeBase):
     def __init__(self, name, context, args, docs = None, location = None, module = None):
         super(Data, self).__init__(name, 'data', context, args, docs, location, module)
 
-class Class(Declaration):
+class Class(TypeBase):
     """
     Haskell class declaration
     """

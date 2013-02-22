@@ -187,7 +187,7 @@ class AutoCompletion(object):
             if module_name not in self.database.modules:
                 return []
             # TODO: Show all possible completions?
-            return completions_for_module(symbols.get_visible_module(self.database.modules[module_name], filename), filename)
+            return self.completions_for_module(symbols.get_visible_module(self.database.modules[module_name], filename), filename)
 
     def get_import_completions(self, view, prefix, locations):
 
