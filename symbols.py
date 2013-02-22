@@ -105,7 +105,7 @@ class Function(Declaration):
         return ('{0}\t{1}'.format(self.name, self.type), self.name)
 
     def brief(self):
-        return '{0} :: {1}'.format(self.name, self.type)
+        return '{0} :: {1}'.format(self.name, self.type if self.type else '?')
 
 class TypeBase(Declaration):
     """
