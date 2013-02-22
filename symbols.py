@@ -99,13 +99,13 @@ class Function(Declaration):
     """
     def __init__(self, name, function_type, docs = None, location = None, module = None):
         super(Function, self).__init__(name, 'function', docs, location, module)
-        self.type = function_type
+        self.type = function_type if function_type else '?'
 
     def suggest(self):
         return ('{0}\t{1}'.format(self.name, self.type), self.name)
 
     def brief(self):
-        return '{0} :: {1}'.format(self.name, self.type if self.type else '?')
+        return '{0} :: {1}'.format(self.name, self.type)
 
 class TypeBase(Declaration):
     """
