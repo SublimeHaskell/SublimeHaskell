@@ -283,7 +283,7 @@ class SublimeHaskellBrowseDeclarations(sublime_plugin.WindowCommand):
     Show all available declarations from current cabal and opened projects
     """
     def run(self):
-        self.names = []
+        self.decls = []
         self.declarations = []
 
         # (module, ident) => symbols.Declaration
@@ -301,7 +301,7 @@ class SublimeHaskellBrowseDeclarations(sublime_plugin.WindowCommand):
                     decls[(m.name, decl.name)] = decl
 
         for decl in decls.values():
-            self.names.append(decl.name)
+            self.decls.append(decl)
             self.declarations.append(decl.module.name + ': ' + decl.brief())
 
         self.window.show_quick_panel(self.declarations, self.on_done)
@@ -312,10 +312,12 @@ class SublimeHaskellBrowseDeclarations(sublime_plugin.WindowCommand):
         view = self.window.active_view()
         if not view:
             return
-        edit = view.begin_edit()
-        for r in view.sel():
-            view.replace(edit, r, self.names[idx])
-        view.end_edit(edit)
+
+        decl = self.decls[idx]
+
+        view.run_command('sublime_haskell_symbol_info', {
+            'filename': decl.location.filename,
+            'decl': decl.name })
 
     def is_enabled(self):
         return is_enabled_haskell_command(None, False)
@@ -352,12 +354,25 @@ class SublimeHaskellReinspectAll(sublime_plugin.WindowCommand):
 
 
 
+
 class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
     """
     Show information about selected symbol
     
     """
-    def run(self, edit):
+    def run(self, edit, filename = None, decl = None):
+        if decl and filename:
+            with autocompletion.database.files_lock:
+                if filename in autocompletion.database.files:
+                    m = autocompletion.database.files[filename]
+                    if decl in m.declarations:
+                        self.show_symbol_info(m.declarations[decl])
+                    else:
+                        show_status_message('Symbol {0} not found in {1}'.format(decl, filename))
+                else:
+                    show_status_message('No info about module in {0}'.format(filename))
+            return
+
         (module_word, ident, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
 
         current_file_name = self.view.file_name()

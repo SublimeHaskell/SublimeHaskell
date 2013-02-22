@@ -262,7 +262,7 @@ def call_ghcmod_and_wait(arg_list, filename=None):
     try:
         command = try_attach_sandbox(['ghc-mod'] + arg_list + ghc_opts_args)
 
-        log('running ghc-mod: {0}'.format(command))
+        # log('running ghc-mod: {0}'.format(command))
 
         exit_code, out, err = call_and_wait(command, cwd=(ghc_cwd or os.getcwd()))
 
