@@ -6,7 +6,7 @@ import sublime_plugin
 import threading
 import time
 
-from sublime_haskell_common import PACKAGE_PATH, get_setting, get_cabal_project_dir_of_file, call_and_wait, call_ghcmod_and_wait, log, wait_for_window, output_error, get_settings, is_enabled_haskell_command, get_cabal_in_dir, is_haskell_source
+from sublime_haskell_common import PACKAGE_PATH, get_setting, get_cabal_project_dir_of_file, call_and_wait, call_ghcmod_and_wait, log, wait_for_window, output_error, get_settings, is_enabled_haskell_command, get_cabal_in_dir, with_status_message, show_status_message, SublimeHaskellError, is_haskell_source
 
 # Completion text longer than this is ellipsized:
 MAX_COMPLETION_LENGTH = 37
@@ -34,8 +34,8 @@ IMPORT_RE = re.compile(r'.*import(\s+qualified)?\s+')
 IMPORT_RE_PREFIX = re.compile(r'^\s*import(\s+qualified)?\s+(.*)$')
 IMPORT_QUALIFIED_POSSIBLE_RE = re.compile(r'.*import\s+(?P<qualifiedprefix>\S*)$')
 
-# Checks if a word contains only alhanums, -, and _
-NO_SPECIAL_CHARS_RE = re.compile(r'^(\w|[\-])*$')
+# Checks if a word contains only alhanums, -, and _, and dot
+NO_SPECIAL_CHARS_RE = re.compile(r'^(\w|[\-\.])*$')
 
 # Get symbol qualified prefix and its name
 SYMBOL_RE = re.compile(r'((?P<module>\w+(\.\w+)*)\.)?(?P<identifier>\w*)$')
@@ -109,6 +109,12 @@ class AutoCompletion(object):
         self.projects_lock = threading.Lock()
         self.projects = {}
 
+        # keywords
+        # TODO: keywords can't appear anywhere, we can suggest in right places
+        self.keyword_completions = map(
+            lambda k: (k + '\t(keyrowd)', k),
+            ['case', 'data', 'instance', 'type', 'where', 'deriving', 'import', 'module'])
+
     def clear_inspected(self):
         self.info = {}
         self.std_info = {}
@@ -155,11 +161,17 @@ class AutoCompletion(object):
                         moduleImports.extend([m['importName'] for m in current_info['imports'] if m['as'] == qualified_module])
                 moduleImports.append(qualified_module)
             else:
+                # add keywords
+                completions.extend(self.keyword_completions)
+
                 # list of imports, imported unqualified
                 if current_file_name in self.info:
                     current_info = self.info[current_file_name]
                     if 'imports' in current_info:
                         moduleImports.extend([m['importName'] for m in current_info['imports'] if not m['qualified']])
+                        # Prelude imported implicitly as unqualified
+                        if 'Prelude' not in current_info['imports']:
+                            moduleImports.append('Prelude')
                         completions.extend(self.get_module_completions_for(qualified_prefix, [m['importName'] for m in current_info['imports']]))
 
             for file_name, file_info in self.info.items():
@@ -171,9 +183,9 @@ class AutoCompletion(object):
                 if file_info['moduleName'] in moduleImports:
                     for d in file_info['declarations']:
                         identifier = d['identifier']
-                        #declaration_info = d['info']
+                        declaration_info = d['info']
                         # TODO: Show the declaration info somewhere.
-                        completions.append((identifier[:MAX_COMPLETION_LENGTH], identifier))
+                        completions.append((identifier + '\t' + declaration_info, identifier))
 
             # PRELUDE: Add the Prelude to the imports if it is not imported manually
             # This is also done before the call to the ModuleInspector.
@@ -190,7 +202,7 @@ class AutoCompletion(object):
                     std_module = self.std_info[mi]
 
                     for v in std_module:
-                        completions.append((v[:MAX_COMPLETION_LENGTH], v))
+                        completions.append((v + '\t' + mi, v))
 
         return list(set(completions))
 
@@ -217,11 +229,12 @@ class AutoCompletion(object):
                         if file_info['moduleName'] == module_name:
                             for d in file_info['declarations']:
                                 identifier = d['identifier']
-                                import_list_completions.append((identifier[:MAX_COMPLETION_LENGTH], identifier))
+                                declaration_info = d['info']
+                                import_list_completions.append((identifier + '\t' + declaration_info, identifier))
                 with self.std_info_lock:
                     if module_name in self.std_info:
                         for v in self.std_info[module_name]:
-                            import_list_completions.append((v[:MAX_COMPLETION_LENGTH], v))
+                            import_list_completions.append((v + '\t' + module_name, v))
 
                 return import_list_completions
 
@@ -245,11 +258,16 @@ class AutoCompletion(object):
         def module_next_name(mname):
             """
             Returns next name for prefix
-            pref = Control.Con, mname = Control.Concurrent.MVar, result = Concurrent
+            pref = Control.Con, mname = Control.Concurrent.MVar, result = Concurrent.MVar
             """
-            return mname.split('.')[len(qualified_prefix.split('.')) - 1]
+            suffix = mname.split('.')[(len(qualified_prefix.split('.')) - 1):]
+            # Sublime replaces full module name with suffix, if it contains no dots?
+            if len(suffix) == 1:
+                return mname
+            return '.'.join(suffix)
         module_list = modules if modules else self.module_completions
-        return list(set((unicode(module_next_name(m)),) * 2 for m in module_list if m.startswith(qualified_prefix)))
+        return list(set((m + '\t(module)', module_next_name(m)) for m in module_list if m.startswith(qualified_prefix)))
+        # return list(set((unicode(module_next_name(m)),) * 2 for m in module_list if m.startswith(qualified_prefix)))
 
 
 autocompletion = AutoCompletion()
@@ -399,10 +417,13 @@ class InspectorAgent(threading.Thread):
         self.dirty_files_lock = threading.Lock()
         self.dirty_files = []
 
+    CABALMSG = 'Compiling Haskell CabalInspector'
+    MODULEMSG = 'Compiling Haskell ModuleInspector'
+
     def run(self):
         # Compile the CabalInspector:
         # TODO: Where to compile it?
-        sublime.set_timeout(lambda: sublime.status_message('Compiling Haskell CabalInspector...'), 0)
+        show_status_message(InspectorAgent.CABALMSG)
 
         exit_code, out, err = call_and_wait(['ghc',
             '--make', CABAL_INSPECTOR_SOURCE_PATH,
@@ -410,14 +431,16 @@ class InspectorAgent(threading.Thread):
             '-outputdir', CABAL_INSPECTOR_OBJ_DIR])
 
         if exit_code != 0:
+            show_status_message(InspectorAgent.CABALMSG, False)
             error_msg = u"SublimeHaskell: Failed to compile CabalInspector\n{0}".format(err)
             wait_for_window(lambda w: self.show_errors(w, error_msg))
         else:
+            show_status_message(InspectorAgent.CABALMSG, True)
             sublime.set_timeout(lambda: sublime.status_message('Compiling Haskell CabalInspector' + u" \u2714"), 0)
         # Continue anyway
 
         # Compile the ModuleInspector:
-        sublime.set_timeout(lambda: sublime.status_message('Compiling Haskell ModuleInspector...'), 0)
+        show_status_message(InspectorAgent.MODULEMSG)
 
         exit_code, out, err = call_and_wait(['ghc',
             '--make', MODULE_INSPECTOR_SOURCE_PATH,
@@ -425,11 +448,12 @@ class InspectorAgent(threading.Thread):
             '-outputdir', MODULE_INSPECTOR_OBJ_DIR])
 
         if exit_code != 0:
+            show_status_message(InspectorAgent.MODULEMSG, False)
             error_msg = u"SublimeHaskell: Failed to compile ModuleInspector\n{0}".format(err)
             wait_for_window(lambda w: self.show_errors(w, error_msg))
             return
 
-        sublime.set_timeout(lambda: sublime.status_message('Compiling Haskell ModuleInspector' + u" \u2714"), 0)
+        show_status_message(InspectorAgent.MODULEMSG, True)
 
         # For first time, inspect all open folders and files
         wait_for_window(lambda w: self.mark_all_files(w))
@@ -453,8 +477,8 @@ class InspectorAgent(threading.Thread):
             # Eliminate duplicate project directories:
             cabal_dirs = list(set(cabal_dirs))
             standalone_files = list(set(standalone_files))
-            for d in cabal_dirs:
-                self._refresh_all_module_info(d)
+            for i, d in enumerate(cabal_dirs):
+                self._refresh_all_module_info(d, i + 1, len(cabal_dirs))
             for f in standalone_files:
                 self._refresh_module_info(f)
             time.sleep(AGENT_SLEEP_DURATION)
@@ -467,7 +491,6 @@ class InspectorAgent(threading.Thread):
             self.dirty_files.extend(folder_files)
 
     def show_errors(self, window, error_text):
-        sublime.set_timeout(lambda: sublime.status_message('Compiling Haskell ModuleInspector' + u" \u2717"), 0)
         sublime.set_timeout(lambda: output_error(window, error_text), 0)
 
     def mark_file_dirty(self, filename):
@@ -475,13 +498,14 @@ class InspectorAgent(threading.Thread):
         with self.dirty_files_lock:
             self.dirty_files.append(filename)
 
-    def _refresh_all_module_info(self, cabal_dir):
+    def _refresh_all_module_info(self, cabal_dir, index, count):
         "Rebuild module information for all files under the specified directory."
         begin_time = time.clock()
         log('reinspecting project ({0})'.format(cabal_dir))
         # Process all files within the Cabal project:
         # TODO: Only process files within the .cabal file's "src" directory.
         (project_name, cabal_file) = get_cabal_in_dir(cabal_dir)
+        show_status_message('Reinspecting ({0}/{1}) {2}'.format(index, count, project_name))
         # set project and read cabal
         if cabal_file and project_name:
             self._refresh_project_info(cabal_dir, project_name, cabal_file)
@@ -491,6 +515,7 @@ class InspectorAgent(threading.Thread):
         for filename in haskell_source_files:
             self._refresh_module_info(filename)
         end_time = time.clock()
+        show_status_message('Reinspecting ({0}/{1}) {2}'.format(index, count, project_name), True)
         log('total inspection time: {0} seconds'.format(end_time - begin_time))
 
     def _refresh_project_info(self, cabal_dir, project_name, cabal_file):
@@ -675,7 +700,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         # into completion because that wipes all default Sublime completions:
         # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
         # TODO: work around this
-        comp = [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0])]
+        comp = [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0].split('\t')[0])]
         if get_setting('inhibit_completions'):
             return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         return comp
