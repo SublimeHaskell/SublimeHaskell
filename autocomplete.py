@@ -23,6 +23,9 @@ CABAL_INSPECTOR_OBJ_DIR = os.path.join(PACKAGE_PATH, 'obj')
 
 OUTPUT_PATH = os.path.join(PACKAGE_PATH, 'module_info.cache')
 
+# ModuleInspector output
+MODULE_INSPECTOR_RE = re.compile(r'ModuleInfo:(?P<result>.+)')
+
 # The agent sleeps this long between inspections.
 AGENT_SLEEP_DURATION = 5.0
 
@@ -84,7 +87,6 @@ def get_qualified_symbol_at_region(view, region):
     word_region = view.word(region)
     preline = get_line_contents_before_region(view, word_region)
     return get_qualified_symbol(preline)
-
 
 # Autocompletion data
 class AutoCompletion(object):
@@ -156,9 +158,10 @@ class AutoCompletion(object):
                     moduleImports.extend([i.module for i in cur_info.imports.values() if i.import_as == qualified_module])
                 else:
                     # Otherwise, use completions from all importred unqualified modules and from this module
-                    moduleImports.append(cur_info.name)
                     moduleImports.append('Prelude')
                     moduleImports.extend([i.module for i in cur_info.imports.values() if not i.is_qualified])
+                    # Add this module as well
+                    completions.extend(self.completions_for_module(cur_info, current_file_name))
                     # Add keyword completions and module completions
                     completions.extend(self.keyword_completions)
                     completions.extend(self.get_module_completions_for(qualified_prefix, [i.module for i in cur_info.imports.values()]))
@@ -168,6 +171,14 @@ class AutoCompletion(object):
 
         return list(set(completions))
 
+    def completions_for_module(self, module, filename = None):
+        """
+        Returns completions for module
+        """
+        if not module:
+            return []
+        return map(lambda d: d.suggest(), module.declarations.values())
+
     def completions_for(self, module_name, filename = None):
         """
         Returns completions for module
@@ -176,10 +187,7 @@ class AutoCompletion(object):
             if module_name not in self.database.modules:
                 return []
             # TODO: Show all possible completions?
-            module = symbols.get_visible_module(self.database.modules[module_name], filename)
-            if not module:
-                return []
-            return map(lambda d: d.suggest(), module.declarations.values())
+            return completions_for_module(symbols.get_visible_module(self.database.modules[module_name], filename), filename)
 
     def get_import_completions(self, view, prefix, locations):
 
@@ -520,9 +528,9 @@ class StandardInspectorAgent(threading.Thread):
         self.init_ghcmod_completions()
 
         # Load general info about all standard modules
-        # with status_message('Updating standard modules'):
-        #     for m in autocompletion.module_completions.copy():
-        #         self._load_standard_module(m)
+        with status_message('Updating standard modules'):
+            for m in autocompletion.module_completions.copy():
+                self._load_standard_module(m)
 
         while True:
             load_modules = []
@@ -632,6 +640,7 @@ class InspectorAgent(threading.Thread):
 
             exit_code, out, err = call_and_wait(['ghc',
                 '--make', MODULE_INSPECTOR_SOURCE_PATH,
+                '-package', 'ghc',
                 '-o', MODULE_INSPECTOR_EXE_PATH,
                 '-outputdir', MODULE_INSPECTOR_OBJ_DIR])
 
@@ -736,11 +745,18 @@ class InspectorAgent(threading.Thread):
             inspection_time = self._get_inspection_time_of_file(filename)
             if modification_time <= inspection_time:
                 return
+
+        ghc_opts = get_setting_async('ghc_opts')
+        ghc_opts_args = [ghc_opts] if ghc_opts else []
+
         exit_code, stdout, stderr = call_and_wait(
-            [MODULE_INSPECTOR_EXE_PATH, filename])
+            [MODULE_INSPECTOR_EXE_PATH, filename] + ghc_opts_args)
+
+        module_inspector_out = MODULE_INSPECTOR_RE.search(stdout)
+
         # Update only when module is ok
-        if exit_code == 0:
-            new_info = json.loads(stdout)
+        if exit_code == 0 and module_inspector_out:
+            new_info = json.loads(module_inspector_out.group('result'))
 
             if 'error' not in new_info:
                 # # Load standard modules
@@ -771,15 +787,15 @@ class InspectorAgent(threading.Thread):
                     for d in new_info['declarations']:
                         location = symbols.Location(filename, d['line'], d['column'])
                         if d['what'] == 'function':
-                            new_module.add_declaration(symbols.Function(d['name'], d['type'], None, location))
+                            new_module.add_declaration(symbols.Function(d['name'], d['type'], d['docs'], location))
                         elif d['what'] == 'type':
-                            new_module.add_declaration(symbols.Type(d['name'], d['context'], d['args'], None, location))
+                            new_module.add_declaration(symbols.Type(d['name'], d['context'], d['args'], d['docs'], location))
                         elif d['what'] == 'data':
-                            new_module.add_declaration(symbols.Data(d['name'], d['context'], d['args'], None, location))
+                            new_module.add_declaration(symbols.Data(d['name'], d['context'], d['args'], d['docs'], location))
                         elif d['what'] == 'class':
-                            new_module.add_declaration(symbols.Class(d['name'], d['context'], d['args'], None, location))
+                            new_module.add_declaration(symbols.Class(d['name'], d['context'], d['args'], d['docs'], location))
                         else:
-                            new_module.add_declaration(symbols.Declaration(d['name'], 'declaration', None, location))
+                            new_module.add_declaration(symbols.Declaration(d['name'], 'declaration', d['docs'], location))
 
                     autocompletion.database.add_file(filename, new_module)
 

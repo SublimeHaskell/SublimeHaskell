@@ -4,12 +4,25 @@
 -- type signature.
 module Main where
 
+import Control.Monad
+import qualified Control.Exception as E
+
 import qualified Data.Aeson as Json
 import           Data.Aeson ((.=))
+import qualified Data.Map as M
+import Data.Maybe (fromMaybe, listToMaybe)
+import Data.List (intercalate)
 import qualified Data.Text.Lazy.Encoding as T
 import qualified Data.Text.Lazy.IO as T
 import qualified Language.Haskell.Exts as H
 import qualified System.Environment as Environment
+
+import qualified Name (Name, getOccString, occNameString)
+import qualified Module (moduleNameString)
+import qualified SrcLoc as Loc
+import qualified HsDecls
+import qualified HsBinds
+import qualified Documentation.Haddock as Doc
 
 -- | All the information extracted from a codebase.
 data ModuleInfo = ModuleInfo
@@ -51,18 +64,20 @@ data DeclarationInfo = DeclarationInfo
     , _functionType :: Maybe String
     , _typeContext :: Maybe [String]
     , _typeArgs :: Maybe [String]
+    , _declDocs :: Maybe String
     }
     deriving (Show)
 
 instance Json.ToJSON DeclarationInfo where
-    toJSON (DeclarationInfo (H.SrcLoc _ l c) what name funType ctx args) = Json.object [
+    toJSON (DeclarationInfo (H.SrcLoc _ l c) what name funType ctx args docs) = Json.object [
         "line" .= l,
         "column" .= c,
         "what" .= what,
         "name" .= name,
         "type" .= funType,
         "context" .= ctx,
-        "args" .= args]
+        "args" .= args,
+        "docs" .= docs]
 
 -- | Process a single file's contents.
 analyzeModule :: String -> Either String ModuleInfo
@@ -93,12 +108,13 @@ declInfo decl = case decl of
             (identOfName n)
             (Just $ H.prettyPrint typeSignature)
             Nothing
+            Nothing
             Nothing)
         names
-    H.TypeDecl loc n args _ -> [DeclarationInfo loc "type" (identOfName n) Nothing Nothing (Just $ map H.prettyPrint args)]
-    H.DataDecl loc _ ctx n args _ _ -> [DeclarationInfo loc "data" (identOfName n) Nothing (Just $ map H.prettyPrint ctx) (Just $ map H.prettyPrint args)]
-    H.GDataDecl loc _ ctx n args _ _ _ -> [DeclarationInfo loc "data" (identOfName n) Nothing (Just $ map H.prettyPrint ctx) (Just $ map H.prettyPrint args)]
-    H.ClassDecl loc ctx n args _ _ -> [DeclarationInfo loc "class" (identOfName n) Nothing (Just $ map H.prettyPrint ctx) (Just $ map H.prettyPrint args)]
+    H.TypeDecl loc n args _ -> [DeclarationInfo loc "type" (identOfName n) Nothing Nothing (Just $ map H.prettyPrint args) Nothing]
+    H.DataDecl loc _ ctx n args _ _ -> [DeclarationInfo loc "data" (identOfName n) Nothing (Just $ map H.prettyPrint ctx) (Just $ map H.prettyPrint args) Nothing]
+    H.GDataDecl loc _ ctx n args _ _ _ -> [DeclarationInfo loc "data" (identOfName n) Nothing (Just $ map H.prettyPrint ctx) (Just $ map H.prettyPrint args) Nothing]
+    H.ClassDecl loc ctx n args _ _ -> [DeclarationInfo loc "class" (identOfName n) Nothing (Just $ map H.prettyPrint ctx) (Just $ map H.prettyPrint args) Nothing]
     _ -> []
 
 identOfName :: H.Name -> String
@@ -106,16 +122,76 @@ identOfName name = case name of
     H.Ident s -> s
     H.Symbol s -> s
 
+-- | Get Map from declaration name to its documentation
+documentationMap :: Doc.Interface -> M.Map String String
+documentationMap iface = M.fromList $ concatMap toDoc $ Doc.ifaceExportItems iface where
+    toDoc :: Doc.ExportItem Name.Name -> [(String, String)]
+    toDoc (Doc.ExportDecl decl docs _ _) = maybe [] (zip (extractNames decl) . repeat) $ extractDocs docs
+    toDoc _ = []
+
+    extractNames :: HsDecls.LHsDecl Name.Name -> [String]
+    extractNames (Loc.L _ d) = case d of
+        HsDecls.TyClD ty -> [locatedName $ HsDecls.tcdLName ty]
+        HsDecls.SigD sig -> case sig of
+            HsBinds.TypeSig names _ -> map locatedName names
+            HsBinds.GenericSig names _ -> map locatedName names
+            _ -> []
+        _ -> []
+
+    extractDocs :: Doc.DocForDecl Name.Name -> Maybe String
+    extractDocs (mbDoc, _) = fmap printDoc $ Doc.documentationDoc mbDoc where
+        printDoc :: Doc.Doc Name.Name -> String
+        printDoc Doc.DocEmpty = ""
+        printDoc (Doc.DocAppend l r) = printDoc l ++ printDoc r
+        printDoc (Doc.DocString s) = s
+        printDoc (Doc.DocParagraph p) = printDoc p
+        printDoc (Doc.DocIdentifier i) = Name.getOccString i
+        printDoc (Doc.DocIdentifierUnchecked (m, i)) = Module.moduleNameString m ++ "." ++ Name.occNameString i
+        printDoc (Doc.DocModule m) = m
+        printDoc (Doc.DocWarning w) = printDoc w
+        printDoc (Doc.DocEmphasis e) = printDoc e
+        printDoc (Doc.DocMonospaced m) = printDoc m
+        printDoc (Doc.DocUnorderedList lst) = concatMap printDoc lst -- Is this right?
+        printDoc (Doc.DocOrderedList lst) = concatMap printDoc lst -- And this
+        printDoc (Doc.DocDefList defs) = concatMap (\(l, r) -> printDoc l ++ " = " ++ printDoc r) defs -- ?
+        printDoc (Doc.DocCodeBlock code) = printDoc code
+        printDoc (Doc.DocHyperlink link) = fromMaybe (Doc.hyperlinkUrl link) (Doc.hyperlinkLabel link)
+        printDoc (Doc.DocPic pic) = pic
+        printDoc (Doc.DocAName a) = a
+        printDoc (Doc.DocProperty prop) = prop
+        printDoc (Doc.DocExamples exs) = unlines $ map showExample exs where
+            showExample (Doc.Example expr results) = expr ++ " => " ++ intercalate ", " results
+
+    locatedName :: Loc.Located Name.Name -> String
+    locatedName (Loc.L _ nm) = Name.getOccString nm
+
+-- | Adds documentation to declaration
+addDoc :: M.Map String String -> DeclarationInfo -> DeclarationInfo
+addDoc docsMap decl = decl { _declDocs = M.lookup (_nameOfDeclaration decl) docsMap }
+
+-- | Adds documentations to ModuleInfo
+addDocs :: M.Map String String -> ModuleInfo -> ModuleInfo
+addDocs docsMap info = info { _declarations = map (addDoc docsMap) (_declarations info) }
+
 -- | Analyze the specified file and dump the collected information to stdout.
 main :: IO ()
 main = do
     programName <- Environment.getProgName
     args <- Environment.getArgs
     case args of
-        [filename] -> do
+        [filename] -> main' filename []
+        [filename, ghcopts] -> main' filename [Doc.Flag_OptGhc ghcopts]
+        _ -> putStrLn ("Usage: " ++ programName ++ " FILENAME [GHCOPTS]")
+    where
+        main' :: FilePath -> [Doc.Flag] -> IO ()
+        main' filename opts = do
+            let
+                noReturn :: E.SomeException -> IO [Doc.Interface]
+                noReturn _ = return []
             source <- readFile filename
+            docsMap <- fmap (fmap documentationMap . listToMaybe) $ E.catch (Doc.createInterfaces opts [filename]) noReturn
             let output = case analyzeModule source of
                     Left excuse -> Json.toJSON $ Json.object ["error" .= excuse]
-                    Right info -> Json.toJSON info
+                    Right info -> Json.toJSON $ maybe id addDocs docsMap info
+            T.putStr "ModuleInfo:" -- workardound, Haddock prints to output, so this string is used to find result
             T.putStrLn . T.decodeUtf8 . Json.encode $ output
-        _ -> putStrLn ("Usage: " ++ programName ++ " FILENAME")

@@ -33,6 +33,7 @@ def preload_settings():
     get_setting('show_output_window')
     get_setting('enable_ghc_mod')
     get_setting('snippet_replace')
+    get_setting('ghc_opts')
 
 # SublimeHaskell settings dictionary
 # used to retrieve it async from any thread
@@ -255,8 +256,11 @@ def call_ghcmod_and_wait(arg_list, filename=None):
 
     ghc_cwd = (get_cabal_project_dir_of_file(filename) or os.path.dirname(filename)) if filename else None
 
+    ghc_opts = get_setting_async('ghc_opts')
+    ghc_opts_args = ["-g", ghc_opts] if ghc_opts else []
+
     try:
-        command = try_attach_sandbox(['ghc-mod'] + arg_list)
+        command = try_attach_sandbox(['ghc-mod'] + arg_list + ghc_opts_args)
 
         log('running ghc-mod: {0}'.format(command))
 

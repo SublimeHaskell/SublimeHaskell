@@ -129,7 +129,7 @@ class TypeBase(Declaration):
         return ('{0}\t{1}'.format(self.name, ' '.join(self.args)), self.snippet())
 
     def brief(self):
-        brief_parts = []
+        brief_parts = [self.what]
         if self.context:
             if len(self.context) == 1:
                 brief_parts.append('{0} =>'.format(self.context[0]))
