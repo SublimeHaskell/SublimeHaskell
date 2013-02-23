@@ -10,7 +10,7 @@ def ghci_info(module, name):
     Returns info for name as dictionary with fields:
     'module' -> module
     'name' -> name
-    'what' -> one of 'function', 'class' or 'data'
+    'what' -> one of 'function', 'class', 'data', 'type' or 'newtype'
     'type' -> type of function (e.g. 'Monad m => (a -> m b) -> [a] -> m [b]' for mapM)
     'args' -> args of 'class' or 'data', list of names (e.g. ['k', 'a'] for Data.Map.Map)
     'ctx' -> context of 'class' or 'data'
@@ -25,7 +25,7 @@ def ghci_info(module, name):
     stdout = crlf2lf(stdout)
     if exit_code == 0:
         functionRegex = '{0}\s+::\s+(?P<type>.*?)(\s+--(.*))?$'.format(name)
-        dataRegex = '(?P<what>(type|data))\s+((?P<ctx>(.*))=>\s+)?{0}\s+(?P<args>(\w+\s+)*)='.format(name)
+        dataRegex = '(?P<what>(newtype|type|data))\s+((?P<ctx>(.*))=>\s+)?{0}\s+(?P<args>(\w+\s+)*)='.format(name)
         classRegex = '(?P<what>class)\s+((?P<ctx>(.*))=>\s+)?{0}\s+(?P<args>(\w+\s+)*)(.*)where$'.format(name)
 
         result = {
@@ -64,6 +64,8 @@ def ghci_info_symbol(module_name, symbol_name):
         return symbols.Data(r['name'], r['ctx'] if 'ctx' in r else None, r['args'])
     elif r['what'] == 'type':
         return symbols.Type(r['name'], r['ctx'] if 'ctx' in r else None, r['args'])
+    elif r['what'] == 'newtype':
+        return symbols.Newtype(r['name'], r['ctx'] if 'ctx' in r else None, r['args'])
     else:
         return None
 

@@ -121,10 +121,14 @@ declInfo decl = case decl of
             Nothing)
         names
     H.TypeDecl loc n args _ -> [DeclarationInfo loc "type" (identOfName n) Nothing Nothing (Just $ map H.prettyPrint args) Nothing]
-    H.DataDecl loc _ ctx n args _ _ -> [DeclarationInfo loc "data" (identOfName n) Nothing (Just $ map H.prettyPrint ctx) (Just $ map H.prettyPrint args) Nothing]
-    H.GDataDecl loc _ ctx n args _ _ _ -> [DeclarationInfo loc "data" (identOfName n) Nothing (Just $ map H.prettyPrint ctx) (Just $ map H.prettyPrint args) Nothing]
+    H.DataDecl loc dataOrNew ctx n args _ _ -> [DeclarationInfo loc (toStr dataOrNew) (identOfName n) Nothing (Just $ map H.prettyPrint ctx) (Just $ map H.prettyPrint args) Nothing]
+    H.GDataDecl loc dataOrNew ctx n args _ _ _ -> [DeclarationInfo loc (toStr dataOrNew) (identOfName n) Nothing (Just $ map H.prettyPrint ctx) (Just $ map H.prettyPrint args) Nothing]
     H.ClassDecl loc ctx n args _ _ -> [DeclarationInfo loc "class" (identOfName n) Nothing (Just $ map H.prettyPrint ctx) (Just $ map H.prettyPrint args) Nothing]
     _ -> []
+    where
+        toStr :: H.DataOrNew -> String
+        toStr H.DataType = "data"
+        toStr H.NewType = "newtype"
 
 -- | Get function declarations by pattern bindings
 defInfo :: H.Decl -> [DeclarationInfo]

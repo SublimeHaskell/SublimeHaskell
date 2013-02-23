@@ -10,6 +10,7 @@ from sublime_haskell_common import *
 import symbols
 from ghci import ghci_info, ghci_info_symbol
 from haskell_docs import haskell_docs
+from ghcmod import ghcmod_browse_module
 
 # If true, files that have not changed will not be re-inspected.
 CHECK_MTIME = True
@@ -426,16 +427,22 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
         output_view = self.view.window().get_output_panel('sublime_haskell_symbol_info')
         output_view.set_read_only(False)
 
-        if decl.what == 'declaration' and not decl.location:
-            # Try to load detailed info
-            decl_detailed = ghci_info_symbol(decl.module.name, decl.name)
-            if decl_detailed:
-                docs_info = haskell_docs(decl.module.name, decl.name)
-                if docs_info:
-                    decl_detailed.docs = docs_info
+        # Symbol from cabal, try to load detailed info with ghci
+        if not decl.location:
+            decl_detailed = None
+            decl_docs = None
+            if decl.what == 'declaration':
+                decl_detailed = ghci_info_symbol(decl.module.name, decl.name)
+            if not decl.docs:
+                decl_docs = haskell_docs(decl.module.name, decl.name)
 
+            # Replace declaration with new one
+            if decl_detailed:
+                decl_detailed.docs = decl_docs
                 autocompletion.database.add_declaration(decl_detailed, decl.module)
                 decl = decl_detailed
+            else:
+                decl.docs = decl_docs
 
         # TODO: Move to separate command for Sublime Text 3
         edit = output_view.begin_edit()
@@ -584,11 +591,7 @@ class StandardInspectorAgent(threading.Thread):
     def _load_standard_module(self, module_name):
         if module_name not in autocompletion.database.get_cabal_modules():
             try:
-                module_contents = call_ghcmod_and_wait(['browse', module_name]).splitlines()
-                m = symbols.Module(module_name, cabal = symbols.current_cabal())
-                for name in module_contents:
-                    m.add_declaration(symbols.Declaration(name))
-
+                m = ghcmod_browse_module(module_name)
                 autocompletion.database.add_module(m)
 
             except Exception as e:
@@ -806,6 +809,8 @@ class InspectorAgent(threading.Thread):
                             new_module.add_declaration(symbols.Function(d['name'], d['type'], d['docs'], location))
                         elif d['what'] == 'type':
                             new_module.add_declaration(symbols.Type(d['name'], d['context'], d['args'], d['docs'], location))
+                        elif d['what'] == 'newtype':
+                            new_module.add_declaration(symbols.Newtype(d['name'], d['context'], d['args'], d['docs'], location))
                         elif d['what'] == 'data':
                             new_module.add_declaration(symbols.Data(d['name'], d['context'], d['args'], d['docs'], location))
                         elif d['what'] == 'class':

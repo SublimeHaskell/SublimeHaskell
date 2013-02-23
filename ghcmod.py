@@ -1,10 +1,12 @@
 import os
+import re
 import sublime
 import sublime_plugin
 from threading import Thread
 
 from sublime_haskell_common import log, is_enabled_haskell_command, get_haskell_command_window_view_file_project, call_ghcmod_and_wait
 from parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages
+import symbols
 
 
 def lint_as_hints(msgs):
@@ -134,3 +136,41 @@ def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb
     exit_code = 0 if all_cmds_successful else 1
 
     show_output_result_text(view, msg, output_text, exit_code, file_dir)
+
+def ghcmod_browse_module(module_name, cabal = None):
+    if not cabal:
+        cabal = symbols.current_cabal()
+    contents = call_ghcmod_and_wait(['browse', '-d', module_name]).splitlines()
+    m = symbols.Module(module_name, cabal = cabal)
+
+    functionRegex = r'(?P<name>\w+)\s+::\s+(?P<type>.*)'
+    typeRegex = r'(?P<what>(class|type|data|newtype))\s+(?P<name>\w+)(\s+(?P<args>\w+(\s+\w+)*))?'
+
+    def toDecl(line):
+        matched = re.search(functionRegex, line)
+        if matched:
+            return symbols.Function(matched.group('name'), matched.group('type'))
+        else:
+            matched = re.search(typeRegex, line)
+            if matched:
+                decl_type = matched.group('what')
+                decl_name = matched.group('name')
+                decl_args = matched.group('args')
+                decl_args = decl_args.split() if decl_args else []
+
+                if decl_type == 'class':
+                    return symbols.Class(decl_name, None, decl_args)
+                elif decl_type == 'data':
+                    return symbols.Data(decl_name, None, decl_args)
+                elif decl_type == 'type':
+                    return symbols.Type(decl_name, None, decl_args)
+                elif decl_type == 'newtype':
+                    return symbols.Newtype(decl_name, None, decl_args)
+            else:
+                return symbols.Declaration(line)
+
+    decls = map(toDecl, contents)
+    for decl in decls:
+        m.add_declaration(decl)
+
+    return m

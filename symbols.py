@@ -147,6 +147,13 @@ class Type(TypeBase):
     def __init__(self, name, context, args, docs = None, location = None, module = None):
         super(Type, self).__init__(name, 'type', context, args, docs, location, module)
 
+class Newtype(TypeBase):
+    """
+    Haskell newtype synonym
+    """
+    def __init__(self, name, context, args, docs = None, location = None, module = None):
+        super(Newtype, self).__init__(name, 'newtype', context, args, docs, location, module)
+
 class Data(TypeBase):
     """
     Haskell data declaration
