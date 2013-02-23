@@ -28,7 +28,7 @@ OUTPUT_PATH = os.path.join(PACKAGE_PATH, 'module_info.cache')
 MODULE_INSPECTOR_RE = re.compile(r'ModuleInfo:(?P<result>.+)')
 
 # The agent sleeps this long between inspections.
-AGENT_SLEEP_DURATION = 5.0
+AGENT_SLEEP_TIMEOUT = 60.0
 
 # Checks if we are in a LANGUAGE pragma.
 LANGUAGE_RE = re.compile(r'.*{-#\s+LANGUAGE.*')
@@ -635,6 +635,8 @@ class InspectorAgent(threading.Thread):
         self.dirty_files_lock = threading.Lock()
         self.dirty_files = []
 
+        self.reinspect_event = threading.Event()
+
     CABALMSG = 'Compiling Haskell CabalInspector'
     MODULEMSG = 'Compiling Haskell ModuleInspector'
 
@@ -695,7 +697,8 @@ class InspectorAgent(threading.Thread):
                 self._refresh_all_module_info(d, i + 1, len(cabal_dirs))
             for f in standalone_files:
                 self._refresh_module_info(f)
-            time.sleep(AGENT_SLEEP_DURATION)
+            self.reinspect_event.wait(AGENT_SLEEP_TIMEOUT)
+            self.reinspect_event.clear()
 
     def mark_all_files(self, window):
         folder_files = []
@@ -703,6 +706,7 @@ class InspectorAgent(threading.Thread):
             folder_files.extend(list_files_in_dir_recursively(folder))
         with self.dirty_files_lock:
             self.dirty_files.extend(folder_files)
+        self.reinspect_event.set()
 
     def show_errors(self, window, error_text):
         sublime.set_timeout(lambda: output_error(window, error_text), 0)
@@ -711,6 +715,7 @@ class InspectorAgent(threading.Thread):
         "Report that a file should be reinspected."
         with self.dirty_files_lock:
             self.dirty_files.append(filename)
+        self.reinspect_event.set()
 
     def _refresh_all_module_info(self, cabal_dir, index, count):
         "Rebuild module information for all files under the specified directory."
