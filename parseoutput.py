@@ -90,7 +90,7 @@ def run_build_thread(view, cabal_project_dir, msg, cmd, on_done):
 
 
 def run_chain_build_thread(view, cabal_project_dir, msg, cmds, on_done):
-    show_status_message_process(msg)
+    show_status_message_process(msg, priority = 3)
     thread = Thread(
         target=wait_for_chain_to_complete,
         args=(view, cabal_project_dir, msg, cmds, on_done))

@@ -547,6 +547,8 @@ class StandardInspectorAgent(threading.Thread):
         self.modules_lock = threading.Lock()
         self.modules_to_load = []
 
+        self.update_event = threading.Event()
+
     def run(self):
         self.init_ghcmod_completions()
 
@@ -562,19 +564,21 @@ class StandardInspectorAgent(threading.Thread):
                 self.modules_to_load = []
 
             if len(load_modules) > 0:
-                with status_message('Updating standard modules extended info') as s:
-                    try:
-                        for m in load_modules:            
-                            self._load_standard_module(m)
-                        # for m in load_modules:
-                        #     self._load_standard_module_detailed(m)
-                    except:
-                        s.fail()
-                        continue
+                try:
+                    for m in load_modules:            
+                        self._load_standard_module(m)
+                    # for m in load_modules:
+                    #     self._load_standard_module_detailed(m)
+                except:
+                    continue
+
+            self.update_event.wait(AGENT_SLEEP_TIMEOUT)
+            self.update_event.clear()
 
     def load_module_info(self, module_name):
         with self.modules_lock:
             self.modules_to_load.append(module_name)
+        self.update_event.set()
 
     # Gets available LANGUAGE options and import modules from ghc-mod
     def init_ghcmod_completions(self):

@@ -4,6 +4,7 @@ import os
 import sublime
 import subprocess
 import threading
+import time
 
 # Maximum seconds to wait for window to appear
 # This dirty hack is used in wait_for_window function
@@ -353,11 +354,17 @@ def crlf2lf(s):
 
 class StatusMessage(threading.Thread):
     messages = {}
+    # List of ((priority, time), StatusMessage)
+    # At start, messages adds itself to list, at cancel - removes
+    # First element of list is message with highest priority
+    priorities_lock = threading.Lock()
+    priorities = []
 
-    def __init__(self, msg, timeout):
+    def __init__(self, msg, timeout, priority):
         super(StatusMessage, self).__init__()
         self.interval = 0.5
         self.timeout = timeout
+        self.priority = priority
         self.msg = msg
         self.times = 0
         self.event = threading.Event()
@@ -365,11 +372,15 @@ class StatusMessage(threading.Thread):
         self.timer = None
 
     def run(self):
-        self.update_message()
-        while self.event.is_set():
-            self.timer = threading.Timer(self.interval, self.update_message)
-            self.timer.start()
-            self.timer.join()
+        self.add_to_priorities()
+        try:
+            self.update_message()
+            while self.event.is_set():
+                self.timer = threading.Timer(self.interval, self.update_message)
+                self.timer.start()
+                self.timer.join()
+        finally:
+            self.remove_from_priorities()
 
     def cancel(self):
         self.event.clear()
@@ -380,13 +391,31 @@ class StatusMessage(threading.Thread):
         dots = self.times % 4
         self.times += 1
         self.timeout -= self.interval
-        sublime_status_message(u'{0}{1}'.format(self.msg, '.' * dots))
+
+        if self.is_highest_priority():
+            sublime_status_message(u'{0}{1}'.format(self.msg, '.' * dots))
+    
         if self.timeout <= 0:
             self.cancel()
 
-def show_status_message_process(msg, isok = None, timeout = 60):
+    def add_to_priorities(self):
+        with StatusMessage.priorities_lock:
+            StatusMessage.priorities.append(((self.priority, time.clock()), self))
+            StatusMessage.priorities.sort(lambda l, r: cmp(r, l))
+
+    def remove_from_priorities(self):
+        with StatusMessage.priorities_lock:
+            StatusMessage.priorities = [(i, msg) for i, msg in StatusMessage.priorities if msg != self]
+
+    def is_highest_priority(self):
+        with StatusMessage.priorities_lock:
+            return StatusMessage.priorities[0][1] == self
+
+def show_status_message_process(msg, isok = None, timeout = 60, priority = 0):
     """
     Same as show_status_message, but shows permanently until called with isok not None
+    There can be only one message process in time, message with highest priority is shown
+    For example, when building project, there must be only message about building
     """
     if isok is not None:
         if msg in StatusMessage.messages:
@@ -397,7 +426,7 @@ def show_status_message_process(msg, isok = None, timeout = 60):
         if msg in StatusMessage.messages:
             StatusMessage.messages[msg].cancel()
 
-        StatusMessage.messages[msg] = StatusMessage(msg, timeout)
+        StatusMessage.messages[msg] = StatusMessage(msg, timeout, priority)
         StatusMessage.messages[msg].start()
 
 def is_haskell_source(view = None):
@@ -428,5 +457,5 @@ class with_status_message(object):
 def status_message(msg, isok = True):
     return with_status_message(msg, isok, show_status_message)
 
-def status_message_process(msg, isok = True):
-    return with_status_message(msg, isok, show_status_message_process)
+def status_message_process(msg, isok = True, timeout = 60, priority = 0):
+    return with_status_message(msg, isok, lambda m, ok = None: show_status_message_process(m, ok, timeout, priority))
