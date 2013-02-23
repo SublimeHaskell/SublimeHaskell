@@ -257,7 +257,7 @@ def call_ghcmod_and_wait(arg_list, filename=None):
     ghc_cwd = (get_cabal_project_dir_of_file(filename) or os.path.dirname(filename)) if filename else None
 
     ghc_opts = get_setting_async('ghc_opts')
-    ghc_opts_args = ["-g", ghc_opts] if ghc_opts else []
+    ghc_opts_args = ["-g", ' '.join(ghc_opts)] if ghc_opts else []
 
     try:
         command = try_attach_sandbox(['ghc-mod'] + arg_list + ghc_opts_args)

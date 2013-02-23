@@ -19,7 +19,9 @@ def ghci_info(module, name):
         ":m + " + module,
         ":i " + module + "." + name,
         ":q"]
-    (exit_code, stdout, stderr) = call_and_wait_with_input(ghci_append_package_db(['ghci']), "\n".join(ghci_cmd))
+    ghc_opts = get_setting_async('ghc_opts')
+
+    (exit_code, stdout, stderr) = call_and_wait_with_input(ghci_append_package_db(['ghci'] + ghc_opts), "\n".join(ghci_cmd))
     stdout = crlf2lf(stdout)
     if exit_code == 0:
         functionRegex = '{0}\s+::\s+(?P<type>.*?)(\s+--(.*))?$'.format(name)

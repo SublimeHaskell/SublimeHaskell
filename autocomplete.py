@@ -763,7 +763,7 @@ class InspectorAgent(threading.Thread):
                 return
 
         ghc_opts = get_setting_async('ghc_opts')
-        ghc_opts_args = [ghc_opts] if ghc_opts else []
+        ghc_opts_args = [' '.join(ghc_opts)] if ghc_opts else []
 
         exit_code, stdout, stderr = call_and_wait(
             [MODULE_INSPECTOR_EXE_PATH, filename] + ghc_opts_args)

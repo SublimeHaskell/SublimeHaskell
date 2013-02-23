@@ -72,5 +72,5 @@
 	"auto_completion_popup": false,
 
 	// Additional ghc options for use in ghc-mod and ModuleInspector, for example "-package ghc"
-	"ghc_opts": ""
+	"ghc_opts": []
 }
