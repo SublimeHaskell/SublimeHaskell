@@ -568,7 +568,7 @@ class StandardInspectorAgent(threading.Thread):
                     for m in load_modules:            
                         self._load_standard_module(m)
                     # for m in load_modules:
-                    #     self._load_standard_module_detailed(m)
+                    #     self._load_standard_module_docs(m)
                 except:
                     continue
 
@@ -601,28 +601,22 @@ class StandardInspectorAgent(threading.Thread):
             except Exception as e:
                 log('Inspecting in-cabal module {0} failed: {1}'.format(module_name, e))
 
-    def _load_standard_module_detailed(self, module_name):
+    def _load_standard_module_docs(self, module_name):
         if module_name in autocompletion.database.get_cabal_modules():
             try:
-                msg = 'Loading info for {0}'.format(module_name)
+                msg = 'Loading docs for {0}'.format(module_name)
                 begin_time = time.clock()
-                log('loading detailed info for standard module {0}'.format(module_name))
+                log('loading docs for standard module {0}'.format(module_name))
 
                 with status_message(msg):
                     in_module = autocompletion.database.get_cabal_modules()[module_name]
-                    decls = in_module.declarations.keys()
-                    for decl in decls:
-                        # Need to load extended info only if it wasn't loaded before
-                        if in_module.declarations[decl].what == 'declaration':
-                            decl_symbol = ghci_info_symbol(module_name, decl)
-                            if decl_symbol:
-                                decl_symbol.docs = haskell_docs(module_name, decl)
-                                autocompletion.database.add_declaration(decl_symbol, in_module)
+                    for decl in in_module.declarations.values():
+                        decl.docs = haskell_docs(module_name, decl.name)
 
                 end_time = time.clock()
-                log('loaded detailed info for standard module {0} within {1} seconds'.format(module_name, end_time - begin_time))
+                log('loaded docs for standard module {0} within {1} seconds'.format(module_name, end_time - begin_time))
             except Exception as e:
-                log('Detailed inspecting in-cabal module {0} failed: {1}'.format(module_name, e))
+                log('Loading docs for in-cabal module {0} failed: {1}'.format(module_name, e))
 
 
 class InspectorAgent(threading.Thread):
