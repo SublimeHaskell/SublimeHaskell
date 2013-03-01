@@ -90,10 +90,6 @@
         "command": "sublime_haskell_reinspect_all"
     },
     {
-        "caption": "SublimeHaskell: GHCi",
-        "command": "sublime_haskell_repl_open"
-    },
-    {
         "caption": "SublimeHaskell: Go to next error",
         "command": "sublime_haskell_next_error"
     },

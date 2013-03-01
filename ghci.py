@@ -68,29 +68,3 @@ def ghci_info_symbol(module_name, symbol_name):
         return symbols.Newtype(r['name'], r['ctx'] if 'ctx' in r else None, r['args'])
     else:
         return None
-
-def ghci_package_db():
-    dev = get_setting_async('use_cabal_dev')
-    box = get_setting_async('cabal_dev_sandbox')
-    if dev and box:
-        package_conf = (filter(lambda x: re.match('packages-(.*)\.conf', x), os.listdir(box)) + [None])[0]
-        if package_conf:
-            return os.path.join(box, package_conf)
-    return None
-
-def ghci_append_package_db(cmd):
-    package_conf = ghci_package_db()
-    if package_conf:
-        cmd.extend(['-package-db', package_conf])
-    return cmd
-
-# Opens REPL in SublimeREPL
-class SublimeHaskellReplOpenCommand(sublime_plugin.WindowCommand):
-    def run(self):
-        self.window.run_command("repl_open", {
-            "type": "subprocess",
-            "encoding": "utf8",
-            "cmd": ghci_append_package_db(["ghci"]),
-            "cwd": "$file_path",
-            "external_id": "sublime_haskell",
-            "syntax": "Packages/Haskell/Haskell.tmLanguage" })
