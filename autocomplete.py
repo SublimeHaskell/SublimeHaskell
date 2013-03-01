@@ -553,7 +553,7 @@ class StandardInspectorAgent(threading.Thread):
         self.init_ghcmod_completions()
 
         # Load general info about all standard modules
-        with status_message('Updating standard modules'):
+        with status_message_process('Loading standard modules info'):
             for m in autocompletion.module_completions.copy():
                 self._load_standard_module(m)
 
@@ -723,7 +723,7 @@ class InspectorAgent(threading.Thread):
         # TODO: Only process files within the .cabal file's "src" directory.
         (project_name, cabal_file) = get_cabal_in_dir(cabal_dir)
 
-        with status_message_process('Reinspecting ({0}/{1}) {2}'.format(index, count, project_name)) as s:
+        with status_message_process('Reinspecting ({0}/{1}) {2}'.format(index, count, project_name), priority = 1) as s:
 
             # set project and read cabal
             if cabal_file and project_name:
