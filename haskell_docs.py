@@ -10,7 +10,7 @@ def haskell_docs(module, name):
     """
     try:
         (exit_code, stdout, stderr) = call_and_wait(["haskell-docs", module, name])
-        stdout
+        stdout = crlf2lf(stdout)
         if exit_code == 0:
             ambigousRe = '^Ambiguous module, belongs to more than one package: (.*)$'
             continueRe = '^Continuing anyway... $'
