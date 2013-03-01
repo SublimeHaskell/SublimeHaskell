@@ -14,7 +14,7 @@ def haskell_docs(module, name):
         if exit_code == 0:
             ambigousRe = '^Ambiguous module, belongs to more than one package: (.*)$'
             continueRe = '^Continuing anyway... $'
-            cantFindRe = '^Couldn\'t find name ``{0}\'\' in Haddock interface: {1}$'.format(name, module.replace('.', '\\.'))
+            cantFindRe = '^Couldn\'t find name ``{0}\'\' in Haddock interface: (.*)$'.format(name)
             packageRe = '^Package: (.*)$'
             ignoreRe = '({0})|({1})|({2})|({3})'.format(ambigousRe, continueRe, cantFindRe, packageRe)
 
