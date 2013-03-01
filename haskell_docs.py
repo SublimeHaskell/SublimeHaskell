@@ -1,6 +1,5 @@
 import re
 import os
-import sublime
 import sublime_plugin
 
 from sublime_haskell_common import *
