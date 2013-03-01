@@ -17,10 +17,10 @@ CHECK_MTIME = True
 
 MODULE_INSPECTOR_SOURCE_PATH = os.path.join(PACKAGE_PATH, 'ModuleInspector.hs')
 MODULE_INSPECTOR_EXE_PATH = os.path.join(PACKAGE_PATH, 'ModuleInspector')
-MODULE_INSPECTOR_OBJ_DIR = os.path.join(PACKAGE_PATH, 'obj')
+MODULE_INSPECTOR_OBJ_DIR = os.path.join(PACKAGE_PATH, 'obj/ModuleInspector')
 CABAL_INSPECTOR_SOURCE_PATH = os.path.join(PACKAGE_PATH, 'CabalInspector.hs')
 CABAL_INSPECTOR_EXE_PATH = os.path.join(PACKAGE_PATH, 'CabalInspector')
-CABAL_INSPECTOR_OBJ_DIR = os.path.join(PACKAGE_PATH, 'obj')
+CABAL_INSPECTOR_OBJ_DIR = os.path.join(PACKAGE_PATH, 'obj/CabalInspector')
 
 OUTPUT_PATH = os.path.join(PACKAGE_PATH, 'module_info.cache')
 
