@@ -205,6 +205,16 @@ def current_cabal():
     else:
         return 'cabal'
 
+def cabal_name_by_sandbox(sandbox):
+    if not sandbox:
+        return current_cabal()
+    return sandbox
+
+def sandbox_by_cabal_name(cabal):
+    if cabal == 'cabal':
+        return None
+    return cabal
+
 class Database(object):
     """
     Database contains storages and indexes to allow fast access to module and symbol info in several storages

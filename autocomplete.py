@@ -94,7 +94,9 @@ class AutoCompletion(object):
     """Information for completion"""
     def __init__(self):
         self.language_completions = []
-        self.module_completions = set()
+        # cabal name => set of modules, where cabal name is 'cabal' for cabal or sandbox path for cabal-devs
+        self.module_completions_lock = threading.Lock()
+        self.module_completions = {}
 
         # Currently used projects
         # name => project where project is:
@@ -239,9 +241,16 @@ class AutoCompletion(object):
             # Sublime replaces full module name with suffix, if it contains no dots?
             return suffix[0]
 
-        module_list = modules if modules else self.module_completions
+        module_list = modules if modules else self.get_current_module_completions()
         return list(set((module_next_name(m) + '\t(module)', module_next_name(m)) for m in module_list if m.startswith(qualified_prefix)))
 
+    def get_current_module_completions(self):
+        with self.module_completions_lock:
+            cabal = symbols.current_cabal()
+            if cabal not in self.module_completions:
+                # TODO: update modules info!
+                return set()
+            return self.module_completions[cabal].copy()
 
 
 autocompletion = AutoCompletion()
@@ -257,9 +266,9 @@ def can_complete_qualified_symbol(info):
         return False
 
     if is_import_list:
-        return module_name in autocompletion.module_completions
+        return module_name in autocompletion.get_current_module_completions()
     else:
-        return (filter(lambda m: m.startswith(module_name), autocompletion.module_completions) != [])
+        return (filter(lambda m: m.startswith(module_name), autocompletion.get_current_module_completions()) != [])
 
 class SublimeHaskellComplete(sublime_plugin.TextCommand):
     """ Shows autocompletion popup """
@@ -544,18 +553,18 @@ class StandardInspectorAgent(threading.Thread):
     def __init__(self):
         super(StandardInspectorAgent, self).__init__()
         self.daemon = True
+
         self.modules_lock = threading.Lock()
         self.modules_to_load = []
+
+        self.cabal_lock = threading.Lock()
+        self.cabal_to_load = []
 
         self.update_event = threading.Event()
 
     def run(self):
         self.init_ghcmod_completions()
-
-        # Load general info about all standard modules
-        with status_message_process('Loading standard modules info'):
-            for m in autocompletion.module_completions.copy():
-                self._load_standard_module(m)
+        self.load_module_completions()
 
         while True:
             load_modules = []
@@ -565,10 +574,19 @@ class StandardInspectorAgent(threading.Thread):
 
             if len(load_modules) > 0:
                 try:
-                    for m in load_modules:            
+                    for m in load_modules:
                         self._load_standard_module(m)
-                    # for m in load_modules:
-                    #     self._load_standard_module_docs(m)
+                except:
+                    continue
+
+            with self.cabal_lock:
+                load_cabal = self.cabal_to_load
+                self.cabal_to_load = []
+
+            if len(load_cabal) > 0:
+                try:
+                    for c in load_cabal:
+                        self.load_module_completions(c)
                 except:
                     continue
 
@@ -580,22 +598,56 @@ class StandardInspectorAgent(threading.Thread):
             self.modules_to_load.append(module_name)
         self.update_event.set()
 
+    def load_cabal_info(self, cabal_name = None):
+        if not cabal_name:
+            cabal_name = symbols.current_cabal()
+
+        with self.cabal_lock:
+            self.cabal_to_load.append(cabal_name)
+        self.update_event.set()
+
     # Gets available LANGUAGE options and import modules from ghc-mod
     def init_ghcmod_completions(self):
 
         if not get_setting_async('enable_ghc_mod'):
             return
 
-        with status_message('Updating ghc_mod completions'):
-            # Init LANGUAGE completions
-            autocompletion.language_completions = call_ghcmod_and_wait(['lang']).splitlines()
-            # Init import module completion
-            autocompletion.module_completions = set(call_ghcmod_and_wait(['list']).splitlines())
+        # Init LANGUAGE completions
+        autocompletion.language_completions = call_ghcmod_and_wait(['lang']).splitlines()
 
-    def _load_standard_module(self, module_name):
+    # Load modules info for cabal/cabal-dev specified
+    def load_module_completions(self, cabal = None):
+        if not get_setting_async('enable_ghc_mod'):
+            return
+
+        if not cabal:
+            cabal = symbols.current_cabal()
+
+        with status_message_process('Loading standard modules info for {0}'.format(cabal)):
+            modules = None
+            with autocompletion.module_completions_lock:
+                if cabal in autocompletion.module_completions:
+                    return
+                autocompletion.module_completions[cabal] = set(call_ghcmod_and_wait(['list'], sandbox = symbols.sandbox_by_cabal_name(cabal)).splitlines())
+                modules = autocompletion.module_completions[cabal].copy()
+
+            begin_time = time.clock()
+            log('loading standard modules info for {0}'.format(cabal))
+
+            for m in modules:
+                self._load_standard_module(m, cabal)
+
+            end_time = time.clock()
+            log('loading standard modules info for {0} within {1} seconds'.format(cabal, end_time - begin_time))
+
+
+    def _load_standard_module(self, module_name, cabal = None):
+        if not cabal:
+            cabal = symbols.current_cabal()
+
         if module_name not in autocompletion.database.get_cabal_modules():
             try:
-                m = ghcmod_browse_module(module_name)
+                m = ghcmod_browse_module(module_name, sandbox = symbols.sandbox_by_cabal_name(cabal))
                 autocompletion.database.add_module(m)
 
             except Exception as e:
@@ -883,7 +935,9 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
                 self.set_cabal_status(view)
 
         if not same:
-            # TODO: Changed completion settings!
+            # TODO: Changed completion settings! Update autocompletion data properly
+            # For now at least try to load cabal modules info
+            InspectorAgent.std_inspector.load_cabal_info()
             pass
 
     def get_special_completions(self, view, prefix, locations):
@@ -902,7 +956,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         if get_setting('auto_complete_imports'):
             match_import = IMPORT_RE.match(line_contents)
             if match_import:
-                import_completions = [(unicode(c),) * 2 for c in autocompletion.module_completions]
+                import_completions = [(unicode(c),) * 2 for c in autocompletion.get_current_module_completions()]
 
                 # Right after "import "? Propose "qualified" as well!
                 qualified_match = IMPORT_QUALIFIED_POSSIBLE_RE.match(line_contents)

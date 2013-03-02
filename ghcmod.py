@@ -137,11 +137,9 @@ def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb
 
     show_output_result_text(view, msg, output_text, exit_code, file_dir)
 
-def ghcmod_browse_module(module_name, cabal = None):
-    if not cabal:
-        cabal = symbols.current_cabal()
-    contents = call_ghcmod_and_wait(['browse', '-d', module_name]).splitlines()
-    m = symbols.Module(module_name, cabal = cabal)
+def ghcmod_browse_module(module_name, sandbox = None):
+    contents = call_ghcmod_and_wait(['browse', '-d', module_name], sandbox = sandbox).splitlines()
+    m = symbols.Module(module_name, cabal = symbols.cabal_name_by_sandbox(sandbox))
 
     functionRegex = r'(?P<name>\w+)\s+::\s+(?P<type>.*)'
     typeRegex = r'(?P<what>(class|type|data|newtype))\s+(?P<name>\w+)(\s+(?P<args>\w+(\s+\w+)*))?'

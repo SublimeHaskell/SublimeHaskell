@@ -189,19 +189,20 @@ def are_paths_equal(path, other_path):
     return path == other_path
 
 
-def attach_sandbox(cmd):
+def attach_sandbox(cmd, sandbox = None):
     """Attach sandbox arguments to command"""
-    sand = get_setting_async('cabal_dev_sandbox')
-    if len(sand) > 0:
-        return cmd + ['-s', sand]
+    if not sandbox:
+        sandbox = get_setting_async('cabal_dev_sandbox')
+    if len(sandbox) > 0:
+        return cmd + ['-s', sandbox]
     return cmd
 
 
-def try_attach_sandbox(cmd):
+def try_attach_sandbox(cmd, sandbox = None):
     """Attach sandbox if use_cabal_dev enabled"""
     if not get_setting_async('use_cabal_dev'):
         return cmd
-    return attach_sandbox(cmd)
+    return attach_sandbox(cmd, sandbox)
 
 
 def get_settings():
@@ -249,7 +250,7 @@ def set_setting(key, value):
     get_settings().set(key, value)
 
 
-def call_ghcmod_and_wait(arg_list, filename=None):
+def call_ghcmod_and_wait(arg_list, filename=None, sandbox = None):
     """
     Calls ghc-mod with the given arguments.
     Shows a sublime error message if ghc-mod is not available.
@@ -261,7 +262,7 @@ def call_ghcmod_and_wait(arg_list, filename=None):
     ghc_opts_args = ["-g", ' '.join(ghc_opts)] if ghc_opts else []
 
     try:
-        command = try_attach_sandbox(['ghc-mod'] + arg_list + ghc_opts_args)
+        command = try_attach_sandbox(['ghc-mod'] + arg_list + ghc_opts_args, sandbox)
 
         # log('running ghc-mod: {0}'.format(command))
 
