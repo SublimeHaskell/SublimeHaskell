@@ -3,9 +3,14 @@ import sublime
 import sublime_plugin
 from threading import Thread
 
-from sublime_haskell_common import *
-from parseoutput import run_chain_build_thread
-from autocomplete import autocompletion
+if int(sublime.version()) < 3000:
+    from sublime_haskell_common import *
+    from parseoutput import run_chain_build_thread
+    from autocomplete import autocompletion
+else:
+    from SublimeHaskell.sublime_haskell_common import *
+    from SublimeHaskell.parseoutput import run_chain_build_thread
+    from SublimeHaskell.autocomplete import autocompletion
 
 OUTPUT_PANEL_NAME = "haskell_run_output"
 
@@ -301,9 +306,8 @@ def write_output(window, text, base_dir):
     # Configure Sublime's error message parsing:
     output_view.settings().set("result_base_dir", base_dir)
     # Write to the output buffer:
-    edit = output_view.begin_edit()
-    output_view.insert(edit, 0, text)
-    output_view.end_edit(edit)
+    output_view.run_command('sublime_haskell_output_text', {
+        'text': text })
     # Set the selection to the beginning of the view so that "next result" works:
     output_view.sel().clear()
     output_view.sel().add(sublime.Region(0))

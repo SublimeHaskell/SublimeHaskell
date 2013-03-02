@@ -1,6 +1,11 @@
 import threading
+import sublime
 
-from sublime_haskell_common import *
+if int(sublime.version()) < 3000:
+    from sublime_haskell_common import *
+else:
+    from SublimeHaskell.sublime_haskell_common import *
+    from functools import reduce
 
 class Location(object):
     """
@@ -363,7 +368,7 @@ def is_by_sources(module):
     return module.location is not None
 
 def flatten(lsts):
-    return reduce(lambda l, r: l + r, lsts)
+    return reduce(lambda l, r: list(l) + list(r), lsts)
 
 def get_source_modules(modules, filename = None):
     """

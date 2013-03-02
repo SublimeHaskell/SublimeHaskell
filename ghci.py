@@ -1,9 +1,14 @@
 import re
 import os
+import sublime
 import sublime_plugin
 
-from sublime_haskell_common import *
-import symbols
+if int(sublime.version()) < 3000:
+    from sublime_haskell_common import *
+    import symbols
+else:
+    from SublimeHaskell.sublime_haskell_common import *
+    import SublimeHaskell.symbols as symbols
 
 def ghci_info(module, name):
     """

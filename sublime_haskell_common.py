@@ -2,6 +2,7 @@ import errno
 import fnmatch
 import os
 import sublime
+import sublime_plugin
 import subprocess
 import threading
 import time
@@ -11,7 +12,7 @@ import time
 MAX_WAIT_FOR_WINDOW = 10
 
 # The path to where this package is installed:
-PACKAGE_PATH = os.path.join(sublime.packages_path(), 'SublimeHaskell')
+PACKAGE_PATH = None
 
 # Panel for SublimeHaskell errors
 SUBLIME_ERROR_PANEL_NAME = 'haskell_sublime_load'
@@ -79,6 +80,12 @@ def get_haskell_command_window_view_file_project(view = None):
     return window, view, file_name
 
 
+def decode_bytes(s):
+    if int(sublime.version()) < 3000:
+        return s
+    return s.decode()
+
+
 def call_and_wait(command, **popen_kwargs):
     return call_and_wait_with_input(command, None, **popen_kwargs)
 
@@ -107,7 +114,7 @@ def call_and_wait_with_input(command, input_string, **popen_kwargs):
         **popen_kwargs)
     stdout, stderr = process.communicate(input_string)
     exit_code = process.wait()
-    return (exit_code, stdout, stderr)
+    return (exit_code, decode_bytes(stdout), decode_bytes(stderr))
 
 
 def log(message):
@@ -223,8 +230,6 @@ def get_setting(key, default=None):
         get_settings().add_on_change(key, lambda: update_setting(key))
     return result
 
-preload_settings()
-
 
 def update_setting(key):
     "Updates setting as it was changed"
@@ -248,7 +253,6 @@ def set_setting(key, value):
     """Set setting and update dictionary"""
     sublime_haskell_settings[key] = value
     get_settings().set(key, value)
-
 
 def call_ghcmod_and_wait(arg_list, filename=None, sandbox = None):
     """
@@ -300,14 +304,26 @@ def wait_for_window(on_appear, seconds_to_wait=MAX_WAIT_FOR_WINDOW):
     sublime.set_timeout(lambda: wait_for_window_callback(on_appear, seconds_to_wait), 0)
 
 
+
+class SublimeHaskellOutputText(sublime_plugin.TextCommand):
+    """
+    Helper command to output text to any view
+    TODO: Is there any default command for this purpose?
+    """
+    def run(self, edit, text = None):
+        if not text:
+            return
+        self.view.insert(edit, self.view.size(), text)
+
+
+
 def output_error(window, text):
     "Write text to Sublime's output panel with important information about SublimeHaskell error during load"
     output_view = window.get_output_panel(SUBLIME_ERROR_PANEL_NAME)
     output_view.set_read_only(False)
 
-    edit = output_view.begin_edit()
-    output_view.insert(edit, 0, text)
-    output_view.end_edit(edit)
+    output_view.run_command('sublime_haskell_output_text', {
+        'text': text})
 
     output_view.set_read_only(True)
 
@@ -402,7 +418,7 @@ class StatusMessage(threading.Thread):
     def add_to_priorities(self):
         with StatusMessage.priorities_lock:
             StatusMessage.priorities.append(((self.priority, time.clock()), self))
-            StatusMessage.priorities.sort(lambda l, r: cmp(r, l))
+            StatusMessage.priorities.sort(key = lambda x: (-x[0][0], x[0][1], x[1]))
 
     def remove_from_priorities(self):
         with StatusMessage.priorities_lock:
@@ -460,3 +476,15 @@ def status_message(msg, isok = True):
 
 def status_message_process(msg, isok = True, timeout = 60, priority = 0):
     return with_status_message(msg, isok, lambda m, ok = None: show_status_message_process(m, ok, timeout, priority))
+
+def sublime_haskell_package_path():
+    return os.path.join(sublime.packages_path(), 'SublimeHaskell')
+
+
+def plugin_loaded():
+    global PACKAGE_PATH
+    PACKAGE_PATH = sublime_haskell_package_path()
+    preload_settings()
+    
+if int(sublime.version()) < 3000:
+    plugin_loaded()
