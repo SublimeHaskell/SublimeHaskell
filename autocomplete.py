@@ -9,15 +9,15 @@ import time
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     import symbols
-    from ghci import ghci_info, ghci_info_symbol
+    from ghci import ghci_info
     from haskell_docs import haskell_docs
-    from ghcmod import ghcmod_browse_module
+    from ghcmod import ghcmod_browse_module, ghcmod_info
 else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.symbols as symbols
-    from SublimeHaskell.ghci import ghci_info, ghci_info_symbol
+    from SublimeHaskell.ghci import ghci_info
     from SublimeHaskell.haskell_docs import haskell_docs
-    from SublimeHaskell.ghcmod import ghcmod_browse_module
+    from SublimeHaskell.ghcmod import ghcmod_browse_module, ghcmod_info
 
 
 # If true, files that have not changed will not be re-inspected.
@@ -254,7 +254,7 @@ class AutoCompletion(object):
 
     def get_current_module_completions(self):
         with self.module_completions_lock:
-            cabal = symbols.current_cabal()
+            cabal = current_cabal()
             if cabal not in self.module_completions:
                 # TODO: update modules info!
                 return set()
@@ -449,7 +449,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
             decl_detailed = None
             decl_docs = None
             if decl.what == 'declaration':
-                decl_detailed = ghci_info_symbol(decl.module.name, decl.name)
+                decl_detailed = ghci_info(decl.module.name, decl.name)
             if not decl.docs:
                 decl_docs = haskell_docs(decl.module.name, decl.name)
 
@@ -471,6 +471,8 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
         self.view.window().run_command('show_panel', {
             'panel': 'output.' + 'sublime_haskell_symbol_info' })
 
+    def is_enabled(self):
+        return is_enabled_haskell_command(self.view, False)
 
 
 class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
@@ -607,7 +609,7 @@ class StandardInspectorAgent(threading.Thread):
 
     def load_cabal_info(self, cabal_name = None):
         if not cabal_name:
-            cabal_name = symbols.current_cabal()
+            cabal_name = current_cabal()
 
         with self.cabal_lock:
             self.cabal_to_load.append(cabal_name)
@@ -628,14 +630,14 @@ class StandardInspectorAgent(threading.Thread):
             return
 
         if not cabal:
-            cabal = symbols.current_cabal()
+            cabal = current_cabal()
 
         with status_message_process('Loading standard modules info for {0}'.format(cabal)):
             modules = None
             with autocompletion.module_completions_lock:
                 if cabal in autocompletion.module_completions:
                     return
-                autocompletion.module_completions[cabal] = set(call_ghcmod_and_wait(['list'], sandbox = symbols.sandbox_by_cabal_name(cabal)).splitlines())
+                autocompletion.module_completions[cabal] = set(call_ghcmod_and_wait(['list'], cabal = cabal).splitlines())
                 modules = autocompletion.module_completions[cabal].copy()
 
             begin_time = time.clock()
@@ -650,11 +652,11 @@ class StandardInspectorAgent(threading.Thread):
 
     def _load_standard_module(self, module_name, cabal = None):
         if not cabal:
-            cabal = symbols.current_cabal()
+            cabal = current_cabal()
 
         if module_name not in autocompletion.database.get_cabal_modules():
             try:
-                m = ghcmod_browse_module(module_name, sandbox = symbols.sandbox_by_cabal_name(cabal))
+                m = ghcmod_browse_module(module_name, cabal = cabal)
                 autocompletion.database.add_module(m)
 
             except Exception as e:
@@ -870,7 +872,14 @@ class InspectorAgent(threading.Thread):
                     for d in new_info['declarations']:
                         location = symbols.Location(filename, d['line'], d['column'])
                         if d['what'] == 'function':
-                            new_module.add_declaration(symbols.Function(d['name'], d['type'], d['docs'], location))
+                            function_type = d['type']
+                            if not function_type:
+                                # No type signature, try get type with ghcmod_info
+                                info = ghcmod_info(filename, new_module.name, d['name'])
+                                if info:
+                                    function_type = info.type
+
+                            new_module.add_declaration(symbols.Function(d['name'], function_type, d['docs'], location))
                         elif d['what'] == 'type':
                             new_module.add_declaration(symbols.Type(d['name'], d['context'], d['args'], d['docs'], location))
                         elif d['what'] == 'newtype':

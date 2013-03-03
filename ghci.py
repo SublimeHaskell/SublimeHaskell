@@ -10,6 +10,41 @@ else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.symbols as symbols
 
+def parse_info(name, contents):
+    """
+    Parses result of :i <name> command of ghci and returns derived symbols.Declaration
+    """
+    functionRegex = '{0}\s+::\s+(?P<type>.*?)(\s+--(.*))?$'.format(name)
+    dataRegex = '(?P<what>(newtype|type|data))\s+((?P<ctx>(.*))=>\s+)?{0}\s+(?P<args>(\w+\s+)*)='.format(name)
+    classRegex = '(?P<what>class)\s+((?P<ctx>(.*))=>\s+)?{0}\s+(?P<args>(\w+\s+)*)(.*)where$'.format(name)
+
+    if name[0].isupper():
+        # data, class, type or newtype
+        matched = re.search(dataRegex, contents, re.MULTILINE) or re.search(classRegex, contents, re.MULTILINE)
+        if matched:
+            what = matched.group('what')
+            args = matched.group('args').strip().split(' ') if matched.group('args') else []
+            ctx = matched.group('ctx')
+
+            if what == 'class':
+                return symbols.Class(name, ctx, args)
+            elif what == 'data':
+                return symbols.Data(name, ctx, args)
+            elif what == 'type':
+                return symbols.Type(name, ctx, args)
+            elif what == 'newtype':
+                return symbols.Newtype(name, ctx, args)
+            else:
+                raise RuntimeError('Unknown type of symbol: {0}'.format(what))
+
+    else:
+        # function
+        matched = re.search(functionRegex, contents, re.MULTILINE)
+        if matched:
+            return symbols.Function(name, matched.group('type'))
+
+    return None
+
 def ghci_info(module, name):
     """
     Returns info for name as dictionary with fields:
@@ -29,47 +64,21 @@ def ghci_info(module, name):
     (exit_code, stdout, stderr) = call_and_wait_with_input(ghci_append_package_db(['ghci'] + ghc_opts), "\n".join(ghci_cmd))
     stdout = crlf2lf(stdout)
     if exit_code == 0:
-        functionRegex = '{0}\s+::\s+(?P<type>.*?)(\s+--(.*))?$'.format(name)
-        dataRegex = '(?P<what>(newtype|type|data))\s+((?P<ctx>(.*))=>\s+)?{0}\s+(?P<args>(\w+\s+)*)='.format(name)
-        classRegex = '(?P<what>class)\s+((?P<ctx>(.*))=>\s+)?{0}\s+(?P<args>(\w+\s+)*)(.*)where$'.format(name)
+        return parse_info(name, stdout)
 
-        result = {
-            'module': module,
-            'name': name }
-
-        if name[0].isupper():
-            # data or class
-            matched = re.search(dataRegex, stdout, re.MULTILINE) or re.search(classRegex, stdout, re.MULTILINE)
-            if matched:
-                result['what'] = matched.group('what')
-                result['args'] = matched.group('args').strip().split(' ') if matched.group('args') else []
-                if matched.group('ctx'):
-                    result['ctx'] = matched.group('ctx')
-                return result
-        else:
-            # function
-            matched = re.search(functionRegex, stdout, re.MULTILINE)
-            if matched:
-                result['what'] = 'function'
-                result['type'] = matched.group('type')
-                return result
     return None
 
-def ghci_info_symbol(module_name, symbol_name):
-    r = ghci_info(module_name, symbol_name)
-    if not r:
-        return None
-    if 'what' not in r:
-        return None
-    if r['what'] == 'function':
-        return symbols.Function(r['name'], r['type'])
-    elif r['what'] == 'class':
-        return symbols.Class(r['name'], r['ctx'] if 'ctx' in r else None, r['args'])
-    elif r['what'] == 'data':
-        return symbols.Data(r['name'], r['ctx'] if 'ctx' in r else None, r['args'])
-    elif r['what'] == 'type':
-        return symbols.Type(r['name'], r['ctx'] if 'ctx' in r else None, r['args'])
-    elif r['what'] == 'newtype':
-        return symbols.Newtype(r['name'], r['ctx'] if 'ctx' in r else None, r['args'])
-    else:
-        return None
+def ghci_package_db():
+    dev = get_setting('use_cabal_dev')
+    box = get_setting('cabal_dev_sandbox')
+    if dev and box:
+        package_conf = (filter(lambda x: re.match('packages-(.*)\.conf', x), os.listdir(box)) + [None])[0]
+        if package_conf:
+            return os.path.join(box, package_conf)
+    return None
+
+def ghci_append_package_db(cmd):
+    package_conf = ghci_package_db()
+    if package_conf:
+        cmd.extend(['-package-db', package_conf])
+    return cmd

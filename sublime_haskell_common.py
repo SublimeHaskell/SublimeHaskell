@@ -196,6 +196,34 @@ def are_paths_equal(path, other_path):
     return path == other_path
 
 
+def current_cabal():
+    """
+    Returns current cabal-dev sandbox or 'cabal'
+    """
+    if get_setting_async('use_cabal_dev'):
+        return get_setting_async('cabal_dev_sandbox')
+    else:
+        return 'cabal'
+
+def current_sandbox():
+    """
+    Returns current cabal-def sandbox or None
+    """
+    if get_setting_async('use_cabal_dev'):
+        return get_setting_async('cabal_dev_sandbox')
+    else:
+        return None
+
+def cabal_name_by_sandbox(sandbox):
+    if not sandbox:
+        return current_cabal()
+    return sandbox
+
+def sandbox_by_cabal_name(cabal):
+    if cabal == 'cabal':
+        return None
+    return cabal
+
 def attach_sandbox(cmd, sandbox = None):
     """Attach sandbox arguments to command"""
     if not sandbox:
@@ -210,6 +238,18 @@ def try_attach_sandbox(cmd, sandbox = None):
     if not get_setting_async('use_cabal_dev'):
         return cmd
     return attach_sandbox(cmd, sandbox)
+
+
+def attach_cabal_sandbox(cmd, cabal = None):
+    """
+    Attach sandbox if cabal is sandbox path, attach nothing on 'cabal',
+    and attach sandbox by settings on None
+    """
+    if not cabal:
+        cabal = current_cabal()
+    if cabal == 'cabal':
+        return cmd
+    return cmd + ['-s', cabal]
 
 
 def get_settings():
@@ -254,7 +294,8 @@ def set_setting(key, value):
     sublime_haskell_settings[key] = value
     get_settings().set(key, value)
 
-def call_ghcmod_and_wait(arg_list, filename=None, sandbox = None):
+
+def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
     """
     Calls ghc-mod with the given arguments.
     Shows a sublime error message if ghc-mod is not available.
@@ -266,7 +307,7 @@ def call_ghcmod_and_wait(arg_list, filename=None, sandbox = None):
     ghc_opts_args = ["-g", ' '.join(ghc_opts)] if ghc_opts else []
 
     try:
-        command = try_attach_sandbox(['ghc-mod'] + arg_list + ghc_opts_args, sandbox)
+        command = attach_cabal_sandbox(['ghc-mod'] + arg_list + ghc_opts_args, cabal)
 
         # log('running ghc-mod: {0}'.format(command))
 
@@ -275,7 +316,7 @@ def call_ghcmod_and_wait(arg_list, filename=None, sandbox = None):
         if exit_code != 0:
             raise Exception("ghc-mod exited with status %d and stderr: %s" % (exit_code, err))
 
-        return out
+        return crlf2lf(out)
 
     except OSError as e:
         if e.errno == errno.ENOENT:
@@ -366,7 +407,7 @@ def with_status_message(msg, action):
 def crlf2lf(s):
     " CRLF -> LF "
     if not s:
-        return None
+        return ''
     return s.replace('\r\n', '\n')
 
 class StatusMessage(threading.Thread):
