@@ -70,11 +70,11 @@
         "command": "sublime_haskell_stylish"
     },
     {
-        "caption": "SublimeHaskell: Go To Any Declaration",
+        "caption": "SublimeHaskell: Go to Any Declaration",
         "command": "sublime_haskell_go_to_any_declaration"
     },
     {
-        "caption": "SublimeHaskell: Go To Declaration",
+        "caption": "SublimeHaskell: Go to Declaration",
         "command": "sublime_haskell_go_to_declaration"
     },
     {
