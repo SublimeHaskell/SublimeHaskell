@@ -27,7 +27,7 @@
 				</dict>
 			</dict>
 			<key>match</key>
-			<string>([a-zA-Z_-]+)(:)\s+</string>
+			<string>^\s*([a-zA-Z_-]+)(:)\s+</string>
 			<key>name</key>
 			<string>entity.cabal</string>
 		</dict>
@@ -46,9 +46,15 @@
 				</dict>
 			</dict>
 			<key>match</key>
-			<string>(?i)(executable|library|test-suite)\s+(\w+)</string>
+			<string>^(?i)(executable|library|test-suite)\s+(\w+)\s*$</string>
 			<key>name</key>
 			<string>entity.cabal</string>
+		</dict>
+		<dict>
+			<key>match</key>
+			<string>^(?i)library\s*$</string>
+			<key>name</key>
+			<string>keyword.entity.cabal</string>
 		</dict>
 	</array>
 	<key>scopeName</key>
