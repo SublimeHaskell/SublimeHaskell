@@ -99,13 +99,13 @@ class Function(Declaration):
     """
     def __init__(self, name, function_type, docs = None, location = None, module = None):
         super(Function, self).__init__(name, 'function', docs, location, module)
-        self.type = function_type if function_type else '?'
+        self.type = function_type
 
     def suggest(self):
         return ('{0}\t{1}'.format(self.name, self.type), self.name)
 
     def brief(self):
-        return '{0} :: {1}'.format(self.name, self.type)
+        return '{0} :: {1}'.format(self.name, self.type if self.type else '?')
 
 class TypeBase(Declaration):
     """
@@ -195,25 +195,6 @@ def same_declaration(l, r):
     same_mod = l.module and r.module and same_module(l.module, r.module)
     nowhere = (not l.module) and (not r.module)
     return l.name == r.name and (same_mod or nowhere)
-
-def current_cabal():
-    """
-    Returns current cabal-dev sandbox or 'cabal'
-    """
-    if get_setting_async('use_cabal_dev'):
-        return get_setting_async('cabal_dev_sandbox')
-    else:
-        return 'cabal'
-
-def cabal_name_by_sandbox(sandbox):
-    if not sandbox:
-        return current_cabal()
-    return sandbox
-
-def sandbox_by_cabal_name(cabal):
-    if cabal == 'cabal':
-        return None
-    return cabal
 
 class Database(object):
     """

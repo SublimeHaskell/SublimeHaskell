@@ -6,6 +6,7 @@ from threading import Thread
 
 from sublime_haskell_common import log, is_enabled_haskell_command, get_haskell_command_window_view_file_project, call_ghcmod_and_wait
 from parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages
+from ghci import parse_info
 import symbols
 
 
@@ -137,9 +138,12 @@ def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb
 
     show_output_result_text(view, msg, output_text, exit_code, file_dir)
 
-def ghcmod_browse_module(module_name, sandbox = None):
-    contents = call_ghcmod_and_wait(['browse', '-d', module_name], sandbox = sandbox).splitlines()
-    m = symbols.Module(module_name, cabal = symbols.cabal_name_by_sandbox(sandbox))
+def ghcmod_browse_module(module_name, cabal = None):
+    """
+    Returns symbols.Module with all declarations
+    """
+    contents = call_ghcmod_and_wait(['browse', '-d', module_name], cabal = cabal).splitlines()
+    m = symbols.Module(module_name, cabal = cabal)
 
     functionRegex = r'(?P<name>\w+)\s+::\s+(?P<type>.*)'
     typeRegex = r'(?P<what>(class|type|data|newtype))\s+(?P<name>\w+)(\s+(?P<args>\w+(\s+\w+)*))?'
@@ -172,3 +176,12 @@ def ghcmod_browse_module(module_name, sandbox = None):
         m.add_declaration(decl)
 
     return m
+
+def ghcmod_info(filename, module_name, symbol_name, cabal = None):
+    """
+    Uses ghc-mod info filename module_name symbol_name to get symbol info
+    """
+    contents = call_ghcmod_and_wait(['info', filename, module_name, symbol_name], cabal = cabal)
+    # TODO: Returned symbol doesn't contain location
+    # But in fact we use ghcmod_info only to retrieve type of symbol
+    return parse_info(symbol_name, contents)
