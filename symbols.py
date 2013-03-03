@@ -96,6 +96,13 @@ class Declaration(Symbol):
         if self.docs:
             info.extend(['', self.docs])
 
+        if self.location:
+            info.append('')
+            if self.location.project:
+                info.append('Defined in {0} at {1}'.format(self.location.project, self.location.position()))
+            else:
+                info.append('Defined at {0}'.format(self.location.position()))
+
         return '\n'.join(info)
 
 class Function(Declaration):
