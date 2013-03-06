@@ -64,8 +64,8 @@ def ghci_info(module, name):
     return None
 
 def ghci_package_db():
-    dev = get_setting('use_cabal_dev')
-    box = get_setting('cabal_dev_sandbox')
+    dev = get_setting_async('use_cabal_dev')
+    box = get_setting_async('cabal_dev_sandbox')
     if dev and box:
         package_conf = (filter(lambda x: re.match('packages-(.*)\.conf', x), os.listdir(box)) + [None])[0]
         if package_conf:
