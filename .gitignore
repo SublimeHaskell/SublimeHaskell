@@ -2,6 +2,9 @@
 # vim swap files
 .*.sw[a-z]
 
+# vim temporary
+*~
+
 # haskell's junk
 dist
 cabal-dev

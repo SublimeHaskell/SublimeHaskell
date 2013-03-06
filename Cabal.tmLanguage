@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>fileTypes</key>
+	<array>
+		<string>cabal</string>
+	</array>
+	<key>keyEquivalent</key>
+	<string>^~C</string>
+	<key>name</key>
+	<string>Cabal</string>
+	<key>patterns</key>
+	<array>
+		<dict>
+			<key>captures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>constant.other.cabal</string>
+				</dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>punctuation.entity.cabal</string>
+				</dict>
+			</dict>
+			<key>match</key>
+			<string>^\s*([a-zA-Z_-]+)(:)\s+</string>
+			<key>name</key>
+			<string>entity.cabal</string>
+		</dict>
+		<dict>
+			<key>captures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.entity.cabal</string>
+				</dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>string.cabal</string>
+				</dict>
+			</dict>
+			<key>match</key>
+			<string>^(?i)(executable|library|test-suite)\s+(\w+)\s*$</string>
+			<key>name</key>
+			<string>entity.cabal</string>
+		</dict>
+		<dict>
+			<key>match</key>
+			<string>^(?i)library\s*$</string>
+			<key>name</key>
+			<string>keyword.entity.cabal</string>
+		</dict>
+	</array>
+	<key>scopeName</key>
+	<string>source.cabal</string>
+	<key>uuid</key>
+	<string>22F622A3-4F1D-4D66-999F-10D42FBFFC4D</string>
+</dict>
+</plist>

@@ -7,12 +7,13 @@ Requirements
 Necessary:
 * ghc and a recent Haskell Platform (>= 2012 should do fine)
 * cabal
-* Cabal packages: base, bytestring, aeson, haskell-src-exts (`cabal install aeson haskell-src-exts`)
+* Cabal packages: base, bytestring, aeson, haskell-src-exts, haddock (`cabal install aeson haskell-src-exts haddock`)
 
 Optional, but useful:
 * ghc-mod (for import and LANGUAGE completions and type inference, `cabal install ghc-mod`)
 * stylish-haskell (for code prettification, `cabal install stylish-haskell`)
 * cabal-dev if you want to use it
+* haskell_docs
 
 Installation
 ------------
@@ -31,6 +32,8 @@ All source files in the project are scanned when the change. Any symbols that th
 To use cabal-dev instead of cabal, set use_cabal_dev to true (or use command "Switch Cabal/Cabal-Dev") and specify cabal-dev absolute path. Completion list will be rescanned and build will use cabal-dev.
 
 Stylish-haskell can be used to stylish file or selected text.
+
+Use Ctrl-Shift-R to go to declaration and Ctrl-K-I to show symbol info with documentation
 
 Keybindings
 -----------
