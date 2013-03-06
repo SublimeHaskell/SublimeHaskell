@@ -1,7 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- Currently only exports top-level functions with handwritten
--- type signature.
 module Main where
 
 import qualified Control.Exception as E
@@ -134,6 +132,29 @@ declInfo decl = case decl of
 defInfo :: H.Decl -> [DeclarationInfo]
 defInfo (H.FunBind []) = []
 defInfo (H.FunBind (H.Match loc n _ _ _ _ : _)) = [DeclarationInfo loc "function" (identOfName n) Nothing Nothing Nothing Nothing]
+defInfo (H.PatBind loc pat _ _ _) = map (\name -> DeclarationInfo loc "function" (identOfName name) Nothing Nothing Nothing Nothing) $ names pat where
+    names :: H.Pat -> [H.Name]
+    names (H.PVar n) = [n]
+    names (H.PNeg n) = names n
+    names (H.PNPlusK n _) = [n]
+    names (H.PInfixApp l _ r) = names l ++ names r
+    names (H.PApp _ ns) = concatMap names ns
+    names (H.PTuple ns) = concatMap names ns
+    names (H.PList ns) = concatMap names ns
+    names (H.PParen n) = names n
+    names (H.PRec _ pf) = concatMap fieldNames pf
+    names (H.PAsPat n ns) = n : names ns
+    names H.PWildCard = []
+    names (H.PIrrPat n) = names n
+    names (H.PatTypeSig _ n _) = names n
+    names (H.PViewPat _ n) = names n
+    names (H.PBangPat n) = names n
+    names _ = []
+
+    fieldNames :: H.PatField -> [H.Name]
+    fieldNames (H.PFieldPat _ n) = names n
+    fieldNames (H.PFieldPun n) = [n]
+    fieldNames H.PFieldWildcard = []
 defInfo _ = []
 
 identOfName :: H.Name -> String
