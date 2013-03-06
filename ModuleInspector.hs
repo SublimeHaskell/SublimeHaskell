@@ -3,6 +3,7 @@
 module Main where
 
 import qualified Control.Exception as E
+import Control.Monad (forM)
 
 import qualified Data.Aeson as Json
 import           Data.Aeson ((.=))
@@ -13,6 +14,7 @@ import qualified Data.Text.Lazy.Encoding as T
 import qualified Data.Text.Lazy.IO as T
 import qualified Language.Haskell.Exts as H
 import qualified System.Environment as Environment
+import qualified System.Directory as Dir
 
 import qualified Name (Name, getOccString, occNameString)
 import qualified Module (moduleNameString)
@@ -227,9 +229,14 @@ main = do
         main' filename opts = do
             let
                 noReturn :: E.SomeException -> IO [Doc.Interface]
-                noReturn _ = return []
+                noReturn e = print e >> return []
             source <- readFile filename
-            docsMap <- fmap (fmap documentationMap . listToMaybe) $ E.catch (Doc.createInterfaces opts [filename]) noReturn
+            absFilename <- Dir.canonicalizePath filename
+            docsMap <- fmap (fmap documentationMap . lookup absFilename) $ do
+                is <- E.catch (Doc.createInterfaces opts [filename]) noReturn
+                forM is $ \i -> do
+                    moduleFile <- Dir.canonicalizePath $ Doc.ifaceOrigFilename i
+                    return (moduleFile, i)
             let output = case analyzeModule source of
                     Left excuse -> Json.toJSON $ Json.object ["error" .= excuse]
                     Right info -> Json.toJSON $ maybe id addDocs docsMap info

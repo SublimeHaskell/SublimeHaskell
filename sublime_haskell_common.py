@@ -294,14 +294,18 @@ def set_setting(key, value):
     sublime_haskell_settings[key] = value
     get_settings().set(key, value)
 
+def get_cwd(filename = None):
+    """
+    Get cwd for filename: cabal project path, file path or os.getcwd()
+    """
+    cwd = (get_cabal_project_dir_of_file(filename) or os.path.dirname(filename)) if filename else os.getcwd()
+    return cwd
 
 def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
     """
     Calls ghc-mod with the given arguments.
     Shows a sublime error message if ghc-mod is not available.
     """
-
-    ghc_cwd = (get_cabal_project_dir_of_file(filename) or os.path.dirname(filename)) if filename else None
 
     ghc_opts = get_setting_async('ghc_opts')
     ghc_opts_args = ["-g", ' '.join(ghc_opts)] if ghc_opts else []
@@ -311,7 +315,7 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
 
         # log('running ghc-mod: {0}'.format(command))
 
-        exit_code, out, err = call_and_wait(command, cwd=(ghc_cwd or os.getcwd()))
+        exit_code, out, err = call_and_wait(command, cwd=get_cwd(filename))
 
         if exit_code != 0:
             raise Exception("ghc-mod exited with status %d and stderr: %s" % (exit_code, err))

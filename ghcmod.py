@@ -187,7 +187,7 @@ def ghcmod_info(filename, module_name, symbol_name, cabal = None):
     """
     Uses ghc-mod info filename module_name symbol_name to get symbol info
     """
-    contents = call_ghcmod_and_wait(['info', filename, module_name, symbol_name], cabal = cabal)
+    contents = call_ghcmod_and_wait(['info', filename, module_name, symbol_name], filename = filename, cabal = cabal)
     # TODO: Returned symbol doesn't contain location
     # But in fact we use ghcmod_info only to retrieve type of symbol
     return parse_info(symbol_name, contents)

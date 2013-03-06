@@ -9,13 +9,13 @@ import time
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     import symbols
-    from ghci import ghci_info
+    from ghci import ghci_info, ghci_package_db
     from haskell_docs import haskell_docs
     from ghcmod import ghcmod_browse_module, ghcmod_info
 else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.symbols as symbols
-    from SublimeHaskell.ghci import ghci_info
+    from SublimeHaskell.ghci import ghci_info, ghci_package_db
     from SublimeHaskell.haskell_docs import haskell_docs
     from SublimeHaskell.ghcmod import ghcmod_browse_module, ghcmod_info
 
@@ -832,10 +832,16 @@ class InspectorAgent(threading.Thread):
                 return
 
         ghc_opts = get_setting_async('ghc_opts')
+        if not ghc_opts:
+            ghc_opts = []
+        package_db = ghci_package_db()
+        if package_db:
+            ghc_opts.append('-package-db {0}'.format(package_db))
+
         ghc_opts_args = [' '.join(ghc_opts)] if ghc_opts else []
 
         exit_code, stdout, stderr = call_and_wait(
-            [MODULE_INSPECTOR_EXE_PATH, filename] + ghc_opts_args)
+            [MODULE_INSPECTOR_EXE_PATH, filename] + ghc_opts_args, cwd = get_cwd(filename))
 
         module_inspector_out = MODULE_INSPECTOR_RE.search(stdout)
 
