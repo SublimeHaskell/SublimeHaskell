@@ -460,6 +460,12 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
                 decl = decl_detailed
             else:
                 decl.docs = decl_docs
+        # Symbol from sources, concrete type if it's not specified
+        else:
+            if decl.what == 'function' and not decl.type:
+                info = ghcmod_info(decl.location.filename, decl.module.name, decl.name)
+                if info:
+                    decl.type = info.type
 
         # TODO: Move to separate command for Sublime Text 3
         output_view.run_command('sublime_haskell_output_text', {
@@ -878,14 +884,7 @@ class InspectorAgent(threading.Thread):
                     for d in new_info['declarations']:
                         location = symbols.Location(filename, d['line'], d['column'])
                         if d['what'] == 'function':
-                            function_type = d['type']
-                            if not function_type:
-                                # No type signature, try get type with ghcmod_info
-                                info = ghcmod_info(filename, new_module.name, d['name'])
-                                if info:
-                                    function_type = info.type
-
-                            new_module.add_declaration(symbols.Function(d['name'], function_type, d['docs'], location))
+                            new_module.add_declaration(symbols.Function(d['name'], d['type'], d['docs'], location))
                         elif d['what'] == 'type':
                             new_module.add_declaration(symbols.Type(d['name'], d['context'], d['args'], d['docs'], location))
                         elif d['what'] == 'newtype':
