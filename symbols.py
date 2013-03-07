@@ -14,10 +14,6 @@ class Location(object):
         self.line = line
         self.column = column
 
-    def position(self):
-        """ Returns filename:line:column """
-        return ':'.join([self.filename, str(self.line), str(self.column)])
-
 class Symbol(object):
     """
     Haskell symbol: module, function, data, class etc.
@@ -38,6 +34,9 @@ class Import(object):
         self.is_qualified = is_qualified
         self.import_as = import_as
 
+    def dump(self):
+        return self.__dict__
+
 class Module(Symbol):
     """
     Haskell module symbol
@@ -50,6 +49,10 @@ class Module(Symbol):
         self.imports = imports.copy()
         # Dictionary from name to Symbol
         self.declarations = declarations.copy()
+
+        for decl in self.declarations.values():
+            decl.module = self
+
         # Cabal path or 'cabal'
         self.cabal = cabal
 

@@ -8,6 +8,7 @@ import time
 
 from sublime_haskell_common import *
 import symbols
+import cache
 from ghci import ghci_info, ghci_package_db
 from haskell_docs import haskell_docs
 from ghcmod import ghcmod_browse_module, ghcmod_info
@@ -632,6 +633,8 @@ class StandardInspectorAgent(threading.Thread):
             cabal = current_cabal()
 
         with status_message_process('Loading standard modules info for {0}'.format(cabal)):
+            cache.load_cabal_cache(autocompletion.database, cabal)
+
             modules = None
             with autocompletion.module_completions_lock:
                 if cabal in autocompletion.module_completions:
@@ -647,6 +650,8 @@ class StandardInspectorAgent(threading.Thread):
 
             end_time = time.clock()
             log('loading standard modules info for {0} within {1} seconds'.format(cabal, end_time - begin_time))
+
+            cache.dump_cabal_cache(autocompletion.database, cabal)
 
 
     def _load_standard_module(self, module_name, cabal = None):
