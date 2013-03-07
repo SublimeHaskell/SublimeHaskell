@@ -11,17 +11,16 @@ class Location(object):
     """
     Location in file at line
     """
-    def __init__(self, filename, line, column, project = None):
+    def __init__(self, filename, line, column, project = None, modified_time = None):
         if not project:
             project = get_cabal_project_dir_of_file(filename)
+        if not modified_time:
+            modified_time = os.stat(filename).st_mtime
         self.project = project
         self.filename = filename
         self.line = line
         self.column = column
-
-    def position(self):
-        """ Returns filename:line:column """
-        return ':'.join([self.filename, str(self.line), str(self.column)])
+        self.modified_time = modified_time
 
 class Symbol(object):
     """
@@ -43,18 +42,28 @@ class Import(object):
         self.is_qualified = is_qualified
         self.import_as = import_as
 
+    def dump(self):
+        return self.__dict__
+
+def module_location(filename):
+    return Location(filename, 1, 1)
+
 class Module(Symbol):
     """
     Haskell module symbol
     """
-    def __init__(self, module_name, exports = [], imports = {}, declarations = {}, filename = None, cabal = None):
-        super(Module, self).__init__('module', module_name, None, Location(filename, 1, 1, get_cabal_project_dir_of_file(filename)) if filename else None)
+    def __init__(self, module_name, exports = [], imports = {}, declarations = {}, location = None, cabal = None):
+        super(Module, self).__init__('module', module_name, None, location)
         # List of strings
         self.exports = exports
         # Dictionary from module name to Import object
         self.imports = imports.copy()
         # Dictionary from name to Symbol
         self.declarations = declarations.copy()
+
+        for decl in self.declarations.values():
+            decl.module = self
+
         # Cabal path or 'cabal'
         self.cabal = cabal
 
@@ -241,6 +250,10 @@ class Database(object):
             if cabal not in self.cabal_modules:
                 self.cabal_modules[cabal] = {}
             return self.cabal_modules[cabal]
+
+    def get_project_modules(self, project_name):
+        with self.files_lock:
+            return dict((f, m) for f, m in self.files.items() if m.location.project == project_name)
 
     def add_indexes_for_module(self, new_module):
         def append_return(l, r):
