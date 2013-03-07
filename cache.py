@@ -45,10 +45,10 @@ class SymbolsEncoder(json.JSONEncoder):
 
 def symbol_serializers():
     return {
-        symbols.Location: ('location', ['filename', 'line', 'column', 'project']),
+        symbols.Location: ('location', ['filename', 'line', 'column', 'project', 'modified_time']),
         symbols.Symbol: ('symbol', ['what', 'name', 'docs', 'location']),
         symbols.Import: ('import', ['module', 'is_qualified', 'import_as']),
-        symbols.Module: ('module', ['name', 'exports', 'imports', 'declarations', 'filename', 'cabal']),
+        symbols.Module: ('module', ['name', 'exports', 'imports', 'declarations', 'location', 'cabal']),
         symbols.Declaration: ('declaration', ['name', 'what', 'docs', 'location']),
         symbols.Function: ('function', ['name', 'type', 'docs', 'location']),
         symbols.TypeBase: ('typebase', ['name', 'what', 'context', 'args', 'docs', 'location']),
@@ -89,8 +89,8 @@ def dump_cabal_cache(database, cabal_name = None):
 
 def dump_project_cache(database, project_name):
     formatted_json = None
+    project_modules = database.get_project_modules(project_name)
     with database.files_lock:
-        project_modules = dict((f, m) for f, m in database.files.items() if m.location.project == project_name)
         project_json = os.path.join(PROJECTS_CACHE_PATH, escape_path(project_name) + '.json')
         formatted_json = encode_json(project_modules, indent = 2)
     with open(project_json, 'w') as f:
@@ -118,7 +118,7 @@ def load_project_cache(database, project_name):
             formatted_json = f.read()
     if formatted_json:
         project_modules = decode_json(formatted_json)
-        for m in project_modules:
+        for m in project_modules.values():
             database.add_file(m.location.filename, m)
 
 def plugin_loaded():

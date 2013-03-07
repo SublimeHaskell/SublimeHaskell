@@ -459,6 +459,9 @@ class StatusMessage(threading.Thread):
             else:
                 return False
 
+    def change_message(self, new_msg):
+        self.msg = new_msg
+
 def show_status_message_process(msg, isok = None, timeout = 60, priority = 0):
     """
     Same as show_status_message, but shows permanently until called with isok not None
@@ -501,6 +504,13 @@ class with_status_message(object):
 
     def fail(self):
         self.isok = False
+
+    def change_message(self, new_msg):
+        if self.msg in StatusMessage.messages:
+            StatusMessage.messages[self.msg].change_message(new_msg)
+
+    def percentage_message(self, current, total = 100):
+        self.change_message('{0} ({1}%)'.format(self.msg, int(current * 100 / total)))
 
 def status_message(msg, isok = True):
     return with_status_message(msg, isok, show_status_message)

@@ -632,26 +632,34 @@ class StandardInspectorAgent(threading.Thread):
         if not cabal:
             cabal = current_cabal()
 
-        with status_message_process('Loading standard modules info for {0}'.format(cabal)):
-            cache.load_cabal_cache(autocompletion.database, cabal)
 
-            modules = None
-            with autocompletion.module_completions_lock:
-                if cabal in autocompletion.module_completions:
-                    return
-                autocompletion.module_completions[cabal] = set(call_ghcmod_and_wait(['list'], cabal = cabal).splitlines())
-                modules = autocompletion.module_completions[cabal].copy()
+        try:
+            with status_message_process('Loading standard modules info for {0}'.format(cabal)) as s:
+                cache.load_cabal_cache(autocompletion.database, cabal)
 
-            begin_time = time.clock()
-            log('loading standard modules info for {0}'.format(cabal))
+                modules = None
+                with autocompletion.module_completions_lock:
+                    if cabal in autocompletion.module_completions:
+                        return
+                    autocompletion.module_completions[cabal] = set(call_ghcmod_and_wait(['list'], cabal = cabal).splitlines())
+                    modules = autocompletion.module_completions[cabal].copy()
 
-            for m in modules:
-                self._load_standard_module(m, cabal)
+                begin_time = time.clock()
+                log('loading standard modules info for {0}'.format(cabal))
 
-            end_time = time.clock()
-            log('loading standard modules info for {0} within {1} seconds'.format(cabal, end_time - begin_time))
+                loaded_modules = 0
+                for m in modules:
+                    self._load_standard_module(m, cabal)
+                    loaded_modules += 1
+                    s.percentage_message(loaded_modules, len(modules))
 
-            cache.dump_cabal_cache(autocompletion.database, cabal)
+                end_time = time.clock()
+                log('loading standard modules info for {0} within {1} seconds'.format(cabal, end_time - begin_time))
+
+                cache.dump_cabal_cache(autocompletion.database, cabal)
+
+        except Exception as e:
+            log('loading standard modules info for {0} failed with {1}'.format(cabal, e))
 
 
     def _load_standard_module(self, module_name, cabal = None):
@@ -789,6 +797,7 @@ class InspectorAgent(threading.Thread):
         (project_name, cabal_file) = get_cabal_in_dir(cabal_dir)
 
         with status_message_process('Reinspecting ({0}/{1}) {2}'.format(index, count, project_name), priority = 1) as s:
+            cache.load_project_cache(autocompletion.database, cabal_dir)
 
             # set project and read cabal
             if cabal_file and project_name:
@@ -796,10 +805,15 @@ class InspectorAgent(threading.Thread):
 
             files_in_dir = list_files_in_dir_recursively(cabal_dir)
             haskell_source_files = [x for x in files_in_dir if x.endswith('.hs') and ('dist/build/autogen' not in x)]
+            filenames_loaded = 0
             for filename in haskell_source_files:
-                self._refresh_module_info(filename)
+                self._refresh_module_info(filename, False)
+                filenames_loaded += 1
+                s.percentage_message(filenames_loaded, len(haskell_source_files))
             end_time = time.clock()
             log('total inspection time: {0} seconds'.format(end_time - begin_time))
+
+            cache.dump_project_cache(autocompletion.database, cabal_dir)
 
     def _refresh_project_info(self, cabal_dir, project_name, cabal_file):
         exit_code, out, err = call_and_wait(
@@ -817,7 +831,7 @@ class InspectorAgent(threading.Thread):
                             'executables': new_info['executables'],
                         }
 
-    def _refresh_module_info(self, filename):
+    def _refresh_module_info(self, filename, standalone = True):
         "Rebuild module information for the specified file."
         # TODO: Only do this within Haskell files in Cabal projects.
         # TODO: Skip this file if it hasn't changed since it was last inspected.
@@ -827,11 +841,12 @@ class InspectorAgent(threading.Thread):
         if not filename.endswith('.hs'):
             return
 
-        modification_time = os.stat(filename).st_mtime
-        if CHECK_MTIME:
-            inspection_time = self._get_inspection_time_of_file(filename)
-            if modification_time <= inspection_time:
-                return
+        with autocompletion.database.files_lock:
+            if filename in autocompletion.database.files:
+                modification_time = os.stat(filename).st_mtime
+                inspection_time = autocompletion.database.files[filename].location.modified_time
+                if modification_time <= inspection_time:
+                    return
 
         ghc_opts = get_setting_async('ghc_opts')
         if not ghc_opts:
@@ -858,16 +873,6 @@ class InspectorAgent(threading.Thread):
                         if 'importName' in mi:
                             InspectorAgent.std_inspector.load_module_info(mi['importName'])
 
-                # # Remember when this info was collected.
-                # new_info['inspectedAt'] = modification_time
-                # # Dump the currently-known module info to disk:
-                # formatted_json = json.dumps(autocompletion.info, indent=2)
-                # with open(OUTPUT_PATH, 'w') as f:
-                #     f.write(formatted_json)
-                # with autocompletion.info_lock:
-                #     autocompletion.info[filename] = new_info
-                # autocompletion.module_completions.add(new_info['moduleName'])
-
                 try:
                     def make_import(import_info):
                         import_name = import_info['importName']
@@ -876,7 +881,7 @@ class InspectorAgent(threading.Thread):
 
                     module_imports = dict(map(make_import, new_info['imports']))
                     import_list = new_info['exportList'] if ('exportList' in new_info and new_info['exportList'] is not None) else []
-                    new_module = symbols.Module(new_info['moduleName'], import_list, module_imports, {}, filename)
+                    new_module = symbols.Module(new_info['moduleName'], import_list, module_imports, {}, symbols.module_location(filename))
                     for d in new_info['declarations']:
                         location = symbols.Location(filename, d['line'], d['column'])
                         if d['what'] == 'function':
@@ -893,6 +898,10 @@ class InspectorAgent(threading.Thread):
                             new_module.add_declaration(symbols.Declaration(d['name'], 'declaration', d['docs'], location))
 
                     autocompletion.database.add_file(filename, new_module)
+
+                    if standalone:
+                        # Do we need save cache for standalone files?
+                        pass
 
                     for i in new_module.imports.values():
                         InspectorAgent.std_inspector.load_module_info(i.module)
