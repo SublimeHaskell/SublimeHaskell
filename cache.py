@@ -1,8 +1,13 @@
 import json
 import os
+import sublime
 
-from sublime_haskell_common import *
-import symbols
+if int(sublime.version()) < 3000:
+    from sublime_haskell_common import *
+    import symbols
+else:
+    from SublimeHaskell.sublime_haskell_common import *
+    import SublimeHaskell.symbols as symbols
 
 CACHE_PATH = None
 CABAL_CACHE_PATH = None
@@ -71,7 +76,7 @@ def escape_path(path):
         folders.append(name)
         (base, name) = os.path.split(base)
     if base:
-        folders.append(filter(lambda c: c.isalpha() or c.isdigit(), base))
+        folders.append(''.join(filter(lambda c: c.isalpha() or c.isdigit(), base)))
     folders.reverse()
     return '.'.join(folders)
 
