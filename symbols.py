@@ -22,6 +22,10 @@ class Location(object):
         self.column = column
         self.modified_time = modified_time
 
+    def position(self):
+        """ Returns filename:line:column """
+        return ':'.join([self.filename, str(self.line), str(self.column)])
+
 class Symbol(object):
     """
     Haskell symbol: module, function, data, class etc.
