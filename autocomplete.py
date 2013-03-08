@@ -486,7 +486,7 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
 
             decls = decl_symbols[ident]
 
-            modules_dict = symbols.flatten(decl_symbols.declarations_modules(decls, lambda ms: filter(symbols.is_by_sources, ms)).values())
+            modules_dict = symbols.flatten(symbols.declarations_modules(decls, lambda ms: filter(symbols.is_by_sources, ms)).values())
 
             with autocompletion.database.files as files:
                 if current_file_name in files:
