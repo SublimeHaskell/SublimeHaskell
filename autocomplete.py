@@ -511,13 +511,13 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
 
         with autocompletion.database.modules as modules:
             if full_name in modules:
-                modules = filter(symbols.is_by_sources, modules[full_name])
+                modules_list = filter(symbols.is_by_sources, modules[full_name])
 
                 # Find module in this project
-                module_candidates.extend([m for m in modules if symbols.is_within_project(m, current_project)])
+                module_candidates.extend([m for m in modules_list if symbols.is_within_project(m, current_project)])
                 if not module_candidates:
                     # Modules from other projects
-                    module_candidates.extend(modules)
+                    module_candidates.extend(modules_list)
 
         if not candidates and not module_candidates:
             show_status_message('Declaration for {0} not found'.format(ident), False)
