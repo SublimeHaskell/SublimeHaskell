@@ -44,7 +44,7 @@ projects_being_built = set()
 # Base command
 class SublimeHaskellBaseCommand(sublime_plugin.WindowCommand):
     def is_enabled(self):
-        return len(autocompletion.projects) > 0
+        return len(autocompletion.projects.object) > 0
 
     def build(self, command, use_cabal_dev=None):
         select_project(
@@ -55,7 +55,7 @@ class SublimeHaskellBaseCommand(sublime_plugin.WindowCommand):
 # Select project from list
 # on_selected accepts name of project and directory of project
 def select_project(window, on_selected):
-    ps = autocompletion.projects.items()
+    ps = autocompletion.projects.object.items()
 
     def run_selected(psel):
         on_selected(psel[0], psel[1]['dir'])
