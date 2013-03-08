@@ -534,5 +534,5 @@ class LockedObject(object):
         self.object_lock.__enter__()
         return self.object
 
-    def __exit__(self):
+    def __exit__(self, type, value, traceback):
         self.object_lock.__exit__()

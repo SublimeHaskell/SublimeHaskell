@@ -96,8 +96,7 @@ class AutoCompletion(object):
     def __init__(self):
         self.language_completions = []
         # cabal name => set of modules, where cabal name is 'cabal' for cabal or sandbox path for cabal-devs
-        self.module_completions_lock = threading.Lock()
-        self.module_completions = {}
+        self.module_completions = LockedObject({})
 
         # Currently used projects
         # name => project where project is:
@@ -105,8 +104,7 @@ class AutoCompletion(object):
         #   cabal - cabal file
         #   executables - list of executables where executable is
         #     name - name of executable
-        self.projects_lock = threading.Lock()
-        self.projects = {}
+        self.projects = LockedObject({})
 
         # Storage of information
         self.database = symbols.Database()
@@ -120,15 +118,15 @@ class AutoCompletion(object):
     def clear_inspected(self):
         # self.info = {}
         # self.std_info = {}
-        self.projects = {}
+        self.projects.object = {}
         self.database = symbols.Database()
 
     def unalias_module_name(self, view, alias):
         "Get module names by alias"
         current_file_name = view.file_name()
-        with self.database.files_lock:
-            if current_file_name in self.database.files:
-                return self.database.files[current_file_name].unalias(alias)
+        with self.database.files as files:
+            if current_file_name in files:
+                return files[current_file_name].unalias(alias)
         return []
 
     def get_completions(self, view, prefix, locations):
@@ -152,9 +150,9 @@ class AutoCompletion(object):
 
         moduleImports = []
 
-        with self.database.files_lock:
-            if current_file_name in self.database.files:
-                cur_info = self.database.files[current_file_name]
+        with self.database.files as files:
+            if current_file_name in files:
+                cur_info = files[current_file_name]
 
                 if qualified_module:
                     # If symbol is qualified, use completions from module specified
@@ -187,11 +185,11 @@ class AutoCompletion(object):
         """
         Returns completions for module
         """
-        with self.database.modules_lock:
-            if module_name not in self.database.modules:
+        with self.database.modules as modules:
+            if module_name not in modules:
                 return []
             # TODO: Show all possible completions?
-            return self.completions_for_module(symbols.get_visible_module(self.database.modules[module_name], filename), filename)
+            return self.completions_for_module(symbols.get_visible_module(modules[module_name], filename), filename)
 
     def get_import_completions(self, view, prefix, locations):
 
@@ -246,12 +244,12 @@ class AutoCompletion(object):
         return list(set((module_next_name(m) + '\t(module)', module_next_name(m)) for m in module_list if m.startswith(qualified_prefix)))
 
     def get_current_module_completions(self):
-        with self.module_completions_lock:
+        with self.module_completions as module_completions:
             cabal = current_cabal()
-            if cabal not in self.module_completions:
+            if cabal not in module_completions:
                 # TODO: update modules info!
                 return set()
-            return self.module_completions[cabal].copy()
+            return module_completions[cabal].copy()
 
 
 autocompletion = AutoCompletion()
@@ -300,14 +298,8 @@ class SublimeHaskellBrowseDeclarations(sublime_plugin.WindowCommand):
         # (module, ident) => symbols.Declaration
         decls = {}
 
-        # Takes toooo much time
-        # with autocompletion.database.cabal_modules_lock:
-        #     for m in autocompletion.database.get_cabal_modules().values():
-        #         for decl in m.declarations.values():
-        #             decls[(m.name, decl.name)] = decl
-
-        with autocompletion.database.files_lock:
-            for m in autocompletion.database.files.values():
+        with autocompletion.database.files as files:
+            for m in files.values():
                 for decl in m.declarations.values():
                     decls[(m.name, decl.name)] = decl
 
@@ -340,8 +332,8 @@ class SublimeHaskellGoToAnyDeclaration(sublime_plugin.WindowCommand):
         self.files = []
         self.declarations = []
 
-        with autocompletion.database.files_lock:
-            for f, m in autocompletion.database.files.items():
+        with autocompletion.database.files as files:
+            for f, m in files.items():
                 for decl in m.declarations.values():
                     self.files.append([f, str(decl.location.line), str(decl.location.column)])
                     self.declarations.append([decl.brief(), '{0}:{1}:{2}'.format(decl.module.name, decl.location.line, decl.location.column)])
@@ -373,9 +365,9 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
     """
     def run(self, edit, filename = None, decl = None):
         if decl and filename:
-            with autocompletion.database.files_lock:
-                if filename in autocompletion.database.files:
-                    m = autocompletion.database.files[filename]
+            with autocompletion.database.files as files:
+                if filename in files:
+                    m = files[filename]
                     if decl in m.declarations:
                         self.show_symbol_info(m.declarations[decl])
                     else:
@@ -390,18 +382,18 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
 
         candidates = []
 
-        with autocompletion.database.symbols_lock:
-            if ident not in autocompletion.database.symbols:
+        with autocompletion.database.symbols as decl_symbols:
+            if ident not in decl_symbols:
                 show_status_message('Symbol {0} not found'.format(ident), False)
                 return
 
-            decls = autocompletion.database.symbols[ident]
+            decls = decl_symbols[ident]
 
             modules_dict = symbols.declarations_modules(decls, lambda ms: symbols.get_visible_module(ms, current_file_name)).values()
 
-            with autocompletion.database.files_lock:
-                if current_file_name in autocompletion.database.files:
-                    cur_info = autocompletion.database.files[current_file_name]
+            with autocompletion.database.files as files:
+                if current_file_name in files:
+                    cur_info = files[current_file_name]
 
                     if not module_word:
                         # this module declaration
@@ -487,18 +479,18 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
         module_candidates = []
         candidates = []
 
-        with autocompletion.database.symbols_lock:
-            if ident not in autocompletion.database.symbols:
+        with autocompletion.database.symbols as decl_symbols:
+            if ident not in decl_symbols:
                 show_status_message('Declaration for {0} not found'.format(ident), False)
                 return
 
-            decls = autocompletion.database.symbols[ident]
+            decls = decl_symbols[ident]
 
-            modules_dict = symbols.flatten(symbols.declarations_modules(decls, lambda ms: filter(symbols.is_by_sources, ms)).values())
+            modules_dict = symbols.flatten(decl_symbols.declarations_modules(decls, lambda ms: filter(symbols.is_by_sources, ms)).values())
 
-            with autocompletion.database.files_lock:
-                if current_file_name in autocompletion.database.files:
-                    cur_info = autocompletion.database.files[current_file_name]
+            with autocompletion.database.files as files:
+                if current_file_name in files:
+                    cur_info = files[current_file_name]
 
                     if not module_word:
                         # this module declarations
@@ -517,9 +509,9 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
                 else:
                     candidates.extend([m.declarations[ident] for m in modules_dict if ident in declarations])
 
-        with autocompletion.database.modules_lock:
-            if full_name in autocompletion.database.modules:
-                modules = filter(symbols.is_by_sources, autocompletion.database.modules[full_name])
+        with autocompletion.database.modules as modules:
+            if full_name in modules:
+                modules = filter(symbols.is_by_sources, modules[full_name])
 
                 # Find module in this project
                 module_candidates.extend([m for m in modules if symbols.is_within_project(m, current_project)])
@@ -638,11 +630,11 @@ class StandardInspectorAgent(threading.Thread):
                 cache.load_cabal_cache(autocompletion.database, cabal)
 
                 modules = None
-                with autocompletion.module_completions_lock:
-                    if cabal in autocompletion.module_completions:
+                with autocompletion.module_completions as module_completions:
+                    if cabal in module_completions:
                         return
-                    autocompletion.module_completions[cabal] = set(call_ghcmod_and_wait(['list'], cabal = cabal).splitlines())
-                    modules = autocompletion.module_completions[cabal].copy()
+                    module_completions[cabal] = set(call_ghcmod_and_wait(['list'], cabal = cabal).splitlines())
+                    modules = module_completions[cabal].copy()
 
                 begin_time = time.clock()
                 log('loading standard modules info for {0}'.format(cabal))
@@ -824,8 +816,8 @@ class InspectorAgent(threading.Thread):
 
             if 'error' not in new_info:
                 if 'executables' in new_info:
-                    with autocompletion.projects_lock:
-                        autocompletion.projects[project_name] = {
+                    with autocompletion.projects as projects:
+                        projects[project_name] = {
                             'dir': cabal_dir,
                             'cabal': os.path.basename(cabal_file),
                             'executables': new_info['executables'],
@@ -841,10 +833,10 @@ class InspectorAgent(threading.Thread):
         if not filename.endswith('.hs'):
             return
 
-        with autocompletion.database.files_lock:
-            if filename in autocompletion.database.files:
+        with autocompletion.database.files as files:
+            if filename in files:
                 modification_time = os.stat(filename).st_mtime
-                inspection_time = autocompletion.database.files[filename].location.modified_time
+                inspection_time = files[filename].location.modified_time
                 if modification_time <= inspection_time:
                     return
 
