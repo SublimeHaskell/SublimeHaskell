@@ -911,16 +911,8 @@ class InspectorAgent(threading.Thread):
                 except Exception as e:
                     log('Inspecting file {0} failed: {1}'.format(filename, e))
 
-    def _get_inspection_time_of_file(self, filename):
-        """Return the time that a file was last inspected.`
-        Return zero if it has never been inspected."""
-        # TODO: Implement!
-        return 0.0
-        # with autocompletion.info_lock:
-        #     try:
-        #         return autocompletion.info[filename]['inspectedAt']
-        #     except KeyError:
-        #         return 0.0
+            else:
+                log('ModuleInspector returns error: {0}'.format(new_info['error']))
 
 
 def list_files_in_dir_recursively(base_dir):
