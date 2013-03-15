@@ -386,13 +386,50 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
             return
 
         (module_word, ident, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+        full_name = '{0}.{1}'.format(module_word, ident) if module_word else ident
 
         current_file_name = self.view.file_name()
 
         candidates = []
 
+        browse_for_module = False
+        browse_module_candidate = None
+        with autocompletion.database.modules as modules:
+            if full_name in modules:
+                # Browse symbols in module
+                browse_for_module = True
+                browse_module_candidate = symbols.get_preferred_module(modules[full_name], current_file_name)
+
+        if browse_for_module:
+            if browse_module_candidate:
+                self.browse_module(browse_module_candidate)
+                return
+            else:
+                show_status_message("No info about module {0}".format(full_name))
+                return
+
         with autocompletion.database.symbols as decl_symbols:
             if ident not in decl_symbols:
+                # Sometimes ghc-mod returns no info about module, but module exists
+                # So there are no info about valid symbol
+                # But if user sure, that symbol exists, he can force to call for ghci to get info
+                import_list = []
+                with autocompletion.database.files as files:
+                    if current_file_name in files:
+                        import_list.extend(files[current_file_name].imports.keys())
+
+                if module_word:
+                    # Full qualified name, just call to info
+                    info = ghci_info(module_word, ident)
+                    if info:
+                        self.show_symbol_info(info)
+                        return
+                elif import_list:
+                    # Allow user to select module
+                    self.candidates = [(m, ident) for m in import_list]
+                    self.view.window().show_quick_panel(['{0}.{1}'.format(m, ident) for m in import_list], self.on_candidate_selected)
+                    return
+
                 show_status_message('Symbol {0} not found'.format(ident), False)
                 return
 
@@ -434,6 +471,17 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
             return
         self.show_symbol_info(self.candidates[idx])
 
+    def on_candidate_selected(self, idx):
+        if idx == -1:
+            return
+
+        (module_name, ident_name) = self.candidates[idx]
+        info = ghci_info(module_name, ident_name)
+        if info:
+            self.show_symbol_info(info)
+        else:
+            show_status_message("Can't get info for {0}.{1}".format(module_name, ident_name), False)
+
     def show_symbol_info(self, decl):
         output_view = self.view.window().get_output_panel('sublime_haskell_symbol_info')
         output_view.set_read_only(False)
@@ -470,6 +518,12 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
 
         self.view.window().run_command('show_panel', {
             'panel': 'output.' + 'sublime_haskell_symbol_info' })
+
+    def browse_module(self, module):
+        with autocompletion.database.modules as modules:
+            decls = module.declarations.values()
+            self.candidates = decls
+            self.view.window().show_quick_panel([[decl.brief(), decl.docs] if decl.docs else [decl.brief()] for decl in decls], self.on_done)
 
     def is_enabled(self):
         return is_enabled_haskell_command(self.view, False)
