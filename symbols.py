@@ -232,67 +232,63 @@ class Database(object):
         # Dictionary from 'cabal' or cabal-dev path to modules dictionary, where
         # modules dictionary is dictionary from module name to Module
         # Every module is unique in such dictionary
-        self.cabal_modules = {}
-        self.cabal_modules_lock = threading.Lock()
+        self.cabal_modules = LockedObject({})
 
         # Dictionary from filename to Module defined in this file
-        self.files = {}
-        self.files_lock = threading.Lock()
+        self.files = LockedObject({})
 
         # Indexes: dictionary from module name to list of Modules
-        self.modules = {}
-        self.modules_lock = threading.Lock()
+        self.modules = LockedObject({})
 
         # Indexes: dictionary from symbol name to list of Symbols to support Go To Definition
-        self.symbols = {}
-        self.symbols_lock = threading.Lock()
+        self.symbols = LockedObject({})
 
     def get_cabal_modules(self, cabal = None):
         if not cabal:
             cabal = current_cabal()
-        with self.cabal_modules_lock:
-            if cabal not in self.cabal_modules:
-                self.cabal_modules[cabal] = {}
-            return self.cabal_modules[cabal]
+        with self.cabal_modules as cabal_modules:
+            if cabal not in cabal_modules:
+                cabal_modules[cabal] = {}
+            return cabal_modules[cabal]
 
     def get_project_modules(self, project_name):
-        with self.files_lock:
-            return dict((f, m) for f, m in self.files.items() if m.location.project == project_name)
+        with self.files as files:
+            return dict((f, m) for f, m in files.items() if m.location.project == project_name)
 
     def add_indexes_for_module(self, new_module):
         def append_return(l, r):
             l.append(r)
             return l
 
-        with self.modules_lock:
-            if new_module.name not in self.modules:
-                self.modules[new_module.name] = []
-            self.modules[new_module.name].append(new_module)
+        with self.modules as modules:
+            if new_module.name not in modules:
+                modules[new_module.name] = []
+            modules[new_module.name].append(new_module)
 
-        with self.symbols_lock:
-            update_with(self.symbols, new_module.declarations, [], append_return)
+        with self.symbols as decl_symbols:
+            update_with(decl_symbols, new_module.declarations, [], append_return)
 
     def remove_indexes_for_module(self, old_module):
         def remove_return(l, r):
             return [x for x in l if not same_declaration(x, r)]
 
-        with self.modules_lock:
-            if old_module.name in self.modules:
-                self.modules[old_module.name] = [m for m in self.modules[old_module.name] if not same_module(old_module, m)]
+        with self.modules as modules:
+            if old_module.name in modules:
+                modules[old_module.name] = [m for m in modules[old_module.name] if not same_module(old_module, m)]
 
-        with self.symbols_lock:
-            update_with(self.symbols, old_module.declarations, [], remove_return)
+        with self.symbols as decl_symbols:
+            update_with(decl_symbols, old_module.declarations, [], remove_return)
 
     def add_indexes_for_declaration(self, new_declaration):
-        with self.symbols_lock:
-            if new_declaration.name not in self.symbols:
-                self.symbols[new_declaration.name] = []
-            self.symbols[new_declaration.name].append(new_declaration)
+        with self.symbols as decl_symbols:
+            if new_declaration.name not in decl_symbols:
+                decl_symbols[new_declaration.name] = []
+            decl_symbols[new_declaration.name].append(new_declaration)
 
     def remove_indexes_for_declaration(self, old_declaration):
-        with self.symbols_lock:
-            if old_declaration.name in self.symbols:
-                self.symbols[old_declaration.name] = [d for d in self.symbols[old_declaration.name] if not same_declaration(d, old_declaration)]
+        with self.symbols as decl_symbols:
+            if old_declaration.name in decl_symbols:
+                decl_symbols[old_declaration.name] = [d for d in decl_symbols[old_declaration.name] if not same_declaration(d, old_declaration)]
 
     def add_module(self, new_module, cabal = None):
         """
@@ -301,28 +297,29 @@ class Database(object):
         if not cabal:
             cabal = current_cabal()
 
-        with self.cabal_modules_lock:
-            if cabal not in self.cabal_modules:
-                self.cabal_modules[cabal] = {}
-            if new_module.name in self.cabal_modules[cabal]:
-                old_module = self.modules[cabal][new_module.name]
+        with self.cabal_modules as cabal_modules:
+            if cabal not in cabal_modules:
+                cabal_modules[cabal] = {}
+            if new_module.name in cabal_modules[cabal]:
+                old_module = self.modules.object[cabal][new_module.name]
                 self.remove_indexes_for_module(old_module)
-                del self.modules[cabal][new_module.name]
-            if new_module.name not in self.cabal_modules[cabal]:
-                self.cabal_modules[cabal][new_module.name] = new_module
+                with self.modules as modules:
+                    del modules[cabal][new_module.name]
+            if new_module.name not in cabal_modules[cabal]:
+                cabal_modules[cabal][new_module.name] = new_module
                 self.add_indexes_for_module(new_module)
 
     def add_file(self, filename, file_module):
         """
         Adds module defined in file and updates indexes
         """
-        with self.files_lock:
-            if filename in self.files:
-                old_module = self.files[filename]
+        with self.files as files:
+            if filename in files:
+                old_module = files[filename]
                 self.remove_indexes_for_module(old_module)
-                del self.files[filename]
-            if filename not in self.files:
-                self.files[filename] = file_module
+                del files[filename]
+            if filename not in files:
+                files[filename] = file_module
                 self.add_indexes_for_module(file_module)
 
     def add_declaration(self, new_declaration, module):
@@ -336,8 +333,8 @@ class Database(object):
             self.add_indexes_for_declaration(new_declaration)
 
         if module.location:
-            with self.files_lock:
-                if module.location.filename not in self.files:
+            with self.files as files:
+                if module.location.filename not in files:
                     raise RuntimeError("Can't add declaration: no file {0}".format(module.location.filename))
                 add_decl_to_module()
         elif module.cabal:

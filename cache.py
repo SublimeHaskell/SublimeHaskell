@@ -85,7 +85,7 @@ def dump_cabal_cache(database, cabal_name = None):
         cabal_name = current_cabal()
     formatted_json = None
     cabal_modules = database.get_cabal_modules(cabal_name)
-    with database.cabal_modules_lock:
+    with database.cabal_modules:
         cabal_path = escape_path(cabal_name) if cabal_name != 'cabal' else 'cabal'
         cabal_json = os.path.join(CABAL_CACHE_PATH, cabal_path + '.json')
         formatted_json = encode_json(cabal_modules, indent = 2)
@@ -95,7 +95,7 @@ def dump_cabal_cache(database, cabal_name = None):
 def dump_project_cache(database, project_name):
     formatted_json = None
     project_modules = database.get_project_modules(project_name)
-    with database.files_lock:
+    with database.files:
         project_json = os.path.join(PROJECTS_CACHE_PATH, escape_path(project_name) + '.json')
         formatted_json = encode_json(project_modules, indent = 2)
     with open(project_json, 'w') as f:
