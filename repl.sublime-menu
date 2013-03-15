@@ -1,0 +1,19 @@
+[
+     {
+        "id": "tools",
+        "children":
+        [{
+            "caption": "SublimeREPL",
+            "mnemonic": "r",
+            "id": "SublimeREPL",
+            "children":
+            [
+                {"command": "sublime_haskell_repl_open",
+                "caption": "SublimeHaskell",
+                "id": "repl_sublime_haskell",
+                "mnemonic": "s"
+                }
+            ]
+        }]
+    }
+]

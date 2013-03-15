@@ -25,7 +25,7 @@ class SublimeHaskellStylish(sublime_plugin.TextCommand):
             for region in regions:
                 self.view.sel().add(region)
 
-        except OSError, e:
+        except OSError as e:
             if e.errno == errno.ENOENT:
                 sublime.error_message("SublimeHaskell: stylisg-haskell was not found!")
 

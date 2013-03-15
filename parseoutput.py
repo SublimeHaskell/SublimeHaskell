@@ -6,7 +6,7 @@ import time
 from threading import Thread
 from collections import defaultdict
 
-from sublime_haskell_common import log, are_paths_equal, call_and_wait, get_setting_async
+from sublime_haskell_common import log, are_paths_equal, call_and_wait, get_setting_async, show_status_message_process, show_status_message
 
 ERROR_PANEL_NAME = 'haskell_error_checker'
 
@@ -90,7 +90,7 @@ def run_build_thread(view, cabal_project_dir, msg, cmd, on_done):
 
 
 def run_chain_build_thread(view, cabal_project_dir, msg, cmds, on_done):
-    sublime.status_message(msg + '...')
+    show_status_message_process(msg, priority = 3)
     thread = Thread(
         target=wait_for_chain_to_complete,
         args=(view, cabal_project_dir, msg, cmds, on_done))
@@ -138,10 +138,8 @@ def show_output_result_text(view, msg, text, exit_code, base_dir):
     success_message = 'SUCCEEDED' if success else 'FAILED'
     output = u'{0}\n\nBuild {1}'.format(text, success_message)
 
-    if success:
-        sublime.set_timeout(lambda: sublime.status_message(msg + u" \u2714"), 0)
-    else:
-        sublime.set_timeout(lambda: sublime.status_message(msg + u" \u2717"), 0)
+    show_status_message_process(msg, success)
+    if not success:
         if get_setting_async('show_output_window'):
             sublime.set_timeout(lambda: write_output(view, output, base_dir), 0)
 
