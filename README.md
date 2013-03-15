@@ -35,6 +35,8 @@ Stylish-haskell can be used to stylish file or selected text.
 
 Use Ctrl-Shift-R to go to declaration and Ctrl-K-I to show symbol info with documentation
 
+Command 'SublimeHaskell: Browse module' is similar to ghci's browse command
+
 Keybindings
 -----------
 You can add key bindings for type inference to `Key Bindings - User`:
