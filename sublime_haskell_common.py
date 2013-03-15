@@ -454,7 +454,13 @@ class StatusMessage(threading.Thread):
 
     def is_highest_priority(self):
         with StatusMessage.priorities_lock:
-            return StatusMessage.priorities[0][1] == self
+            if StatusMessage.priorities:
+                return StatusMessage.priorities[0][1] == self
+            else:
+                return False
+
+    def change_message(self, new_msg):
+        self.msg = new_msg
 
 def show_status_message_process(msg, isok = None, timeout = 60, priority = 0):
     """
@@ -499,8 +505,34 @@ class with_status_message(object):
     def fail(self):
         self.isok = False
 
+    def change_message(self, new_msg):
+        if self.msg in StatusMessage.messages:
+            StatusMessage.messages[self.msg].change_message(new_msg)
+
+    def percentage_message(self, current, total = 100):
+        self.change_message('{0} ({1}%)'.format(self.msg, int(current * 100 / total)))
+
 def status_message(msg, isok = True):
     return with_status_message(msg, isok, show_status_message)
 
 def status_message_process(msg, isok = True, timeout = 60, priority = 0):
     return with_status_message(msg, isok, lambda m, ok = None: show_status_message_process(m, ok, timeout, priority))
+
+class LockedObject(object):
+    """
+    Object with lock
+    x = LockedObject(some_value)
+    with x as v:
+        v...
+    """
+
+    def __init__(self, obj):
+        self.object_lock = threading.Lock()
+        self.object = obj
+
+    def __enter__(self):
+        self.object_lock.__enter__()
+        return self.object
+
+    def __exit__(self, type, value, traceback):
+        self.object_lock.__exit__()
