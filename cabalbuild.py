@@ -3,9 +3,14 @@ import sublime
 import sublime_plugin
 from threading import Thread
 
-from sublime_haskell_common import log, get_cabal_project_dir_and_name_of_view, call_and_wait, get_setting, get_setting_async, set_setting, save_settings, get_haskell_command_window_view_file_project, attach_sandbox, output_error
-from parseoutput import run_chain_build_thread
-from autocomplete import autocompletion
+if int(sublime.version()) < 3000:
+    from sublime_haskell_common import *
+    from parseoutput import run_chain_build_thread
+    from autocomplete import autocompletion
+else:
+    from SublimeHaskell.sublime_haskell_common import *
+    from SublimeHaskell.parseoutput import run_chain_build_thread
+    from SublimeHaskell.autocomplete import autocompletion
 
 OUTPUT_PANEL_NAME = "haskell_run_output"
 
@@ -39,7 +44,7 @@ projects_being_built = set()
 # Base command
 class SublimeHaskellBaseCommand(sublime_plugin.WindowCommand):
     def is_enabled(self):
-        return len(autocompletion.projects) > 0
+        return len(autocompletion.projects.object) > 0
 
     def build(self, command, use_cabal_dev=None):
         select_project(
@@ -50,7 +55,7 @@ class SublimeHaskellBaseCommand(sublime_plugin.WindowCommand):
 # Select project from list
 # on_selected accepts name of project and directory of project
 def select_project(window, on_selected):
-    ps = autocompletion.projects.items()
+    ps = autocompletion.projects.object.items()
 
     def run_selected(psel):
         on_selected(psel[0], psel[1]['dir'])
@@ -86,8 +91,8 @@ def run_build(view, project_name, project_dir, command, use_cabal_dev=None):
     # We compare the project_name for simplicity (projects with same
     # names are of course possible, but unlikely, so we let them wait)
     if project_name in projects_being_built:
-        print "SublimeHaskell: Not building '%s' because it is already being built" % project_name
-        sublime.status_message('SublimeHaskell: Already building %s' % project_name)
+        log("Not building '%s' because it is already being built" % project_name)
+        sublime_status_message('Already building %s' % project_name)
         return
     # Set project as building
     projects_being_built.add(project_name)
@@ -140,7 +145,7 @@ class SublimeHaskellSwitchCabalDev(sublime_plugin.WindowCommand):
 
         # No candboxes
         if len(sandboxes) == 0:
-            sublime.status_message('SublimeHaskell: There is nothing to switch to')
+            sublime_status_message('There is nothing to switch to')
             set_setting('use_cabal_dev', False)
             save_settings()
             return
@@ -152,7 +157,7 @@ class SublimeHaskellSwitchCabalDev(sublime_plugin.WindowCommand):
                 now_using = 'Cabal'
             else:
                 now_using = 'Cabal-Dev'
-            sublime.status_message('SublimeHaskell: Switched to ' + now_using)
+            sublime_status_message('Switched to ' + now_using)
             save_settings()
             return
 
@@ -247,7 +252,7 @@ class SublimeHaskellRun(SublimeHaskellBaseCommand):
 
         # Nothing to run
         if len(ps) == 0:
-            sublime.status_message('SublimeHaskell: Nothing to run')
+            sublime_status_message('Nothing to run')
             return
 
         cabal_project_dir, cabal_project_name = get_cabal_project_dir_and_name_of_view(self.window.active_view())
@@ -274,8 +279,6 @@ class SublimeHaskellRun(SublimeHaskellBaseCommand):
 
         hide_output(self.window)
 
-        sublime.status_message('SublimeHaskell: Running ' + name + "...")
-
         # Run in thread
         thread = Thread(
             target=run_binary,
@@ -284,16 +287,16 @@ class SublimeHaskellRun(SublimeHaskellBaseCommand):
 
 
 def run_binary(name, bin_file, base_dir):
-    exit_code, out, err = call_and_wait(bin_file, cwd=base_dir)
-    window = sublime.active_window()
-    if not window:
-        return
-    if exit_code == 0:
-        sublime.set_timeout(lambda: sublime.status_message('SublimeHaskell: Running ' + name + u" \u2714"), 0)
-        sublime.set_timeout(lambda: write_output(window, out, base_dir), 0)
-    else:
-        sublime.set_timeout(lambda: sublime.status_message('SublimeHaskell: Running ' + name + u" \u2717"), 0)
-        sublime.set_timeout(lambda: write_output(window, err, base_dir), 0)
+    with status_message_process('Running {0}'.format(name), priority = 5) as s:
+        exit_code, out, err = call_and_wait(bin_file, cwd=base_dir)
+        window = sublime.active_window()
+        if not window:
+            return
+        if exit_code == 0:
+            sublime.set_timeout(lambda: write_output(window, out, base_dir), 0)
+        else:
+            s.fail()
+            sublime.set_timeout(lambda: write_output(window, err, base_dir), 0)
 
 
 def write_output(window, text, base_dir):
@@ -303,9 +306,8 @@ def write_output(window, text, base_dir):
     # Configure Sublime's error message parsing:
     output_view.settings().set("result_base_dir", base_dir)
     # Write to the output buffer:
-    edit = output_view.begin_edit()
-    output_view.insert(edit, 0, text)
-    output_view.end_edit(edit)
+    output_view.run_command('sublime_haskell_output_text', {
+        'text': text })
     # Set the selection to the beginning of the view so that "next result" works:
     output_view.sel().clear()
     output_view.sel().add(sublime.Region(0))

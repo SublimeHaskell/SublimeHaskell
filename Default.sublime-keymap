@@ -2,17 +2,18 @@
     { "keys": ["ctrl+shift+r"], "context": [ {"key" : "is_haskell_source" } ], "command": "sublime_haskell_go_to_declaration" },
     { "keys": ["ctrl+k", "ctrl+h", "ctrl+t"], "context": [ {"key" : "is_haskell_source" } ], "command": "sublime_haskell_show_type" },
     { "keys": ["ctrl+k", "ctrl+h", "ctrl+i"], "context": [ {"key" : "is_haskell_source" } ], "command": "sublime_haskell_insert_type" },
+    { "keys": ["ctrl+k", "ctrl+i"], "context": [ {"key" : "is_haskell_source" } ], "command": "sublime_haskell_symbol_info" },
     {
         "command": "sublime_haskell_complete",
         "args": {"characters": "."},
         "keys": ["."],
-        "context": [ { "key": "is_haskell_source" }, { "key": "auto_completion_popup" } ]
+        "context": [ { "key": "is_haskell_source" }, { "key": "auto_completion_popup" }, { "key": "is_module_completion" } ]
     },
     {
         "command": "sublime_haskell_complete",
         "args": {"characters": "("},
         "keys": ["("],
-        "context": [ { "key": "is_haskell_source" }, { "key": "auto_completion_popup" } ]
+        "context": [ { "key": "is_haskell_source" }, { "key": "auto_completion_popup" }, { "key": "is_import_completion" } ]
     },
     // Same keybindings as SublimeClang
     {

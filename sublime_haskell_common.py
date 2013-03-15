@@ -2,14 +2,17 @@ import errno
 import fnmatch
 import os
 import sublime
+import sublime_plugin
 import subprocess
+import threading
+import time
 
 # Maximum seconds to wait for window to appear
 # This dirty hack is used in wait_for_window function
 MAX_WAIT_FOR_WINDOW = 10
 
 # The path to where this package is installed:
-PACKAGE_PATH = os.path.join(sublime.packages_path(), 'SublimeHaskell')
+PACKAGE_PATH = None
 
 # Panel for SublimeHaskell errors
 SUBLIME_ERROR_PANEL_NAME = 'haskell_sublime_load'
@@ -30,6 +33,9 @@ def preload_settings():
     get_setting('cabal_dev_sandbox_list')
     get_setting('enable_auto_build')
     get_setting('show_output_window')
+    get_setting('enable_ghc_mod')
+    get_setting('snippet_replace')
+    get_setting('ghc_opts')
 
 # SublimeHaskell settings dictionary
 # used to retrieve it async from any thread
@@ -74,6 +80,12 @@ def get_haskell_command_window_view_file_project(view = None):
     return window, view, file_name
 
 
+def decode_bytes(s):
+    if int(sublime.version()) < 3000:
+        return s
+    return s.decode()
+
+
 def call_and_wait(command, **popen_kwargs):
     return call_and_wait_with_input(command, None, **popen_kwargs)
 
@@ -102,7 +114,7 @@ def call_and_wait_with_input(command, input_string, **popen_kwargs):
         **popen_kwargs)
     stdout, stderr = process.communicate(input_string)
     exit_code = process.wait()
-    return (exit_code, stdout, stderr)
+    return (exit_code, decode_bytes(stdout), decode_bytes(stderr))
 
 
 def log(message):
@@ -184,19 +196,60 @@ def are_paths_equal(path, other_path):
     return path == other_path
 
 
-def attach_sandbox(cmd):
+def current_cabal():
+    """
+    Returns current cabal-dev sandbox or 'cabal'
+    """
+    if get_setting_async('use_cabal_dev'):
+        return get_setting_async('cabal_dev_sandbox')
+    else:
+        return 'cabal'
+
+def current_sandbox():
+    """
+    Returns current cabal-def sandbox or None
+    """
+    if get_setting_async('use_cabal_dev'):
+        return get_setting_async('cabal_dev_sandbox')
+    else:
+        return None
+
+def cabal_name_by_sandbox(sandbox):
+    if not sandbox:
+        return current_cabal()
+    return sandbox
+
+def sandbox_by_cabal_name(cabal):
+    if cabal == 'cabal':
+        return None
+    return cabal
+
+def attach_sandbox(cmd, sandbox = None):
     """Attach sandbox arguments to command"""
-    sand = get_setting_async('cabal_dev_sandbox')
-    if len(sand) > 0:
-        return cmd + ['-s', sand]
+    if not sandbox:
+        sandbox = get_setting_async('cabal_dev_sandbox')
+    if len(sandbox) > 0:
+        return cmd + ['-s', sandbox]
     return cmd
 
 
-def try_attach_sandbox(cmd):
+def try_attach_sandbox(cmd, sandbox = None):
     """Attach sandbox if use_cabal_dev enabled"""
     if not get_setting_async('use_cabal_dev'):
         return cmd
-    return attach_sandbox(cmd)
+    return attach_sandbox(cmd, sandbox)
+
+
+def attach_cabal_sandbox(cmd, cabal = None):
+    """
+    Attach sandbox if cabal is sandbox path, attach nothing on 'cabal',
+    and attach sandbox by settings on None
+    """
+    if not cabal:
+        cabal = current_cabal()
+    if cabal == 'cabal':
+        return cmd
+    return cmd + ['-s', cabal]
 
 
 def get_settings():
@@ -216,8 +269,6 @@ def get_setting(key, default=None):
         sublime_haskell_settings[key] = result
         get_settings().add_on_change(key, lambda: update_setting(key))
     return result
-
-preload_settings()
 
 
 def update_setting(key):
@@ -243,28 +294,35 @@ def set_setting(key, value):
     sublime_haskell_settings[key] = value
     get_settings().set(key, value)
 
+def get_cwd(filename = None):
+    """
+    Get cwd for filename: cabal project path, file path or os.getcwd()
+    """
+    cwd = (get_cabal_project_dir_of_file(filename) or os.path.dirname(filename)) if filename else os.getcwd()
+    return cwd
 
-def call_ghcmod_and_wait(arg_list, filename=None):
+def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
     """
     Calls ghc-mod with the given arguments.
     Shows a sublime error message if ghc-mod is not available.
     """
 
-    ghc_cwd = (get_cabal_project_dir_of_file(filename) or os.path.dirname(filename)) if filename else None
+    ghc_opts = get_setting_async('ghc_opts')
+    ghc_opts_args = ["-g", ' '.join(ghc_opts)] if ghc_opts else []
 
     try:
-        command = try_attach_sandbox(['ghc-mod'] + arg_list)
+        command = attach_cabal_sandbox(['ghc-mod'] + arg_list + ghc_opts_args, cabal)
 
-        log('running ghc-mod: {0}'.format(command))
+        # log('running ghc-mod: {0}'.format(command))
 
-        exit_code, out, err = call_and_wait(command, cwd=(ghc_cwd or os.getcwd()))
+        exit_code, out, err = call_and_wait(command, cwd=get_cwd(filename))
 
         if exit_code != 0:
             raise Exception("ghc-mod exited with status %d and stderr: %s" % (exit_code, err))
 
-        return out
+        return crlf2lf(out)
 
-    except OSError, e:
+    except OSError as e:
         if e.errno == errno.ENOENT:
             output_error(sublime.active_window(),
                 "SublimeHaskell: ghc-mod was not found!\n"
@@ -291,18 +349,219 @@ def wait_for_window(on_appear, seconds_to_wait=MAX_WAIT_FOR_WINDOW):
     sublime.set_timeout(lambda: wait_for_window_callback(on_appear, seconds_to_wait), 0)
 
 
+
+class SublimeHaskellOutputText(sublime_plugin.TextCommand):
+    """
+    Helper command to output text to any view
+    TODO: Is there any default command for this purpose?
+    """
+    def run(self, edit, text = None):
+        if not text:
+            return
+        self.view.insert(edit, self.view.size(), text)
+
+
+
 def output_error(window, text):
     "Write text to Sublime's output panel with important information about SublimeHaskell error during load"
     output_view = window.get_output_panel(SUBLIME_ERROR_PANEL_NAME)
     output_view.set_read_only(False)
 
-    edit = output_view.begin_edit()
-    output_view.insert(edit, 0, text)
-    output_view.end_edit(edit)
+    output_view.run_command('sublime_haskell_output_text', {
+        'text': text})
 
     output_view.set_read_only(True)
 
     window.run_command('show_panel', {'panel': 'output.' + SUBLIME_ERROR_PANEL_NAME})
 
+class SublimeHaskellError(RuntimeError):
+    def __init__(self, what):
+        self.reason = what
+
+def sublime_status_message(msg):
+    """
+    Pure msg with 'SublimeHaskell' prefix and set_timeout
+    """
+    sublime.set_timeout(lambda: sublime.status_message(u'SublimeHaskell: {0}'.format(msg)), 0)
+
+def show_status_message(msg, isok = None):
+    """
+    Show status message with check mark (isok = true), ballot x (isok = false) or ... (isok = None)
+    """
+    mark = u'...'
+    if isok is not None:
+        mark = u' \u2714' if isok else u' \u2718'
+    sublime_status_message(u'{0}{1}'.format(msg, mark))
+
+def with_status_message(msg, action):
+    """
+    Show status message for action with check mark or with ballot x
+    Returns whether action exited properly
+    """
+    try:
+        show_status_message(msg)
+        action()
+        show_status_message(msg, True)
+        return True
+    except SublimeHaskellError as e:
+        show_status_message(msg, False)
+        log(e.reason)
+        return False
+
+def crlf2lf(s):
+    " CRLF -> LF "
+    if not s:
+        return ''
+    return s.replace('\r\n', '\n')
+
+class StatusMessage(threading.Thread):
+    messages = {}
+    # List of ((priority, time), StatusMessage)
+    # At start, messages adds itself to list, at cancel - removes
+    # First element of list is message with highest priority
+    priorities_lock = threading.Lock()
+    priorities = []
+
+    def __init__(self, msg, timeout, priority):
+        super(StatusMessage, self).__init__()
+        self.interval = 0.5
+        self.timeout = timeout
+        self.priority = priority
+        self.msg = msg
+        self.times = 0
+        self.event = threading.Event()
+        self.event.set()
+        self.timer = None
+
+    def run(self):
+        self.add_to_priorities()
+        try:
+            self.update_message()
+            while self.event.is_set():
+                self.timer = threading.Timer(self.interval, self.update_message)
+                self.timer.start()
+                self.timer.join()
+        finally:
+            self.remove_from_priorities()
+
+    def cancel(self):
+        self.event.clear()
+        if self.timer:
+            self.timer.cancel()
+
+    def update_message(self):
+        dots = self.times % 4
+        self.times += 1
+        self.timeout -= self.interval
+
+        if self.is_highest_priority():
+            sublime_status_message(u'{0}{1}'.format(self.msg, '.' * dots))
+    
+        if self.timeout <= 0:
+            self.cancel()
+
+    def add_to_priorities(self):
+        with StatusMessage.priorities_lock:
+            StatusMessage.priorities.append(((self.priority, time.clock()), self))
+            StatusMessage.priorities.sort(key = lambda x: (-x[0][0], x[0][1], x[1]))
+
+    def remove_from_priorities(self):
+        with StatusMessage.priorities_lock:
+            StatusMessage.priorities = [(i, msg) for i, msg in StatusMessage.priorities if msg != self]
+
+    def is_highest_priority(self):
+        with StatusMessage.priorities_lock:
+            if StatusMessage.priorities:
+                return StatusMessage.priorities[0][1] == self
+            else:
+                return False
+
+    def change_message(self, new_msg):
+        self.msg = new_msg
+
+def show_status_message_process(msg, isok = None, timeout = 60, priority = 0):
+    """
+    Same as show_status_message, but shows permanently until called with isok not None
+    There can be only one message process in time, message with highest priority is shown
+    For example, when building project, there must be only message about building
+    """
+    if isok is not None:
+        if msg in StatusMessage.messages:
+            StatusMessage.messages[msg].cancel()
+            del StatusMessage.messages[msg]
+        show_status_message(msg, isok)
+    else:
+        if msg in StatusMessage.messages:
+            StatusMessage.messages[msg].cancel()
+
+        StatusMessage.messages[msg] = StatusMessage(msg, timeout, priority)
+        StatusMessage.messages[msg].start()
+
 def is_haskell_source(view = None):
     return is_enabled_haskell_command(view, False)
+
+class with_status_message(object):
+    def __init__(self, msg, isok, show_message):
+        self.msg = msg
+        self.isok = isok
+        self.show_message = show_message
+
+    def __enter__(self):
+        self.show_message(self.msg)
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if type:
+            self.show_message(self.msg, False)
+        else:
+            self.show_message(self.msg, self.isok)
+
+    def ok(self):
+        self.isok = True
+
+    def fail(self):
+        self.isok = False
+
+    def change_message(self, new_msg):
+        if self.msg in StatusMessage.messages:
+            StatusMessage.messages[self.msg].change_message(new_msg)
+
+    def percentage_message(self, current, total = 100):
+        self.change_message('{0} ({1}%)'.format(self.msg, int(current * 100 / total)))
+
+def status_message(msg, isok = True):
+    return with_status_message(msg, isok, show_status_message)
+
+def status_message_process(msg, isok = True, timeout = 60, priority = 0):
+    return with_status_message(msg, isok, lambda m, ok = None: show_status_message_process(m, ok, timeout, priority))
+
+def sublime_haskell_package_path():
+    return os.path.join(sublime.packages_path(), 'SublimeHaskell')
+
+
+def plugin_loaded():
+    global PACKAGE_PATH
+    PACKAGE_PATH = sublime_haskell_package_path()
+    preload_settings()
+    
+if int(sublime.version()) < 3000:
+    plugin_loaded()
+
+class LockedObject(object):
+    """
+    Object with lock
+    x = LockedObject(some_value)
+    with x as v:
+        v...
+    """
+
+    def __init__(self, obj):
+        self.object_lock = threading.Lock()
+        self.object = obj
+
+    def __enter__(self):
+        self.object_lock.__enter__()
+        return self.object
+
+    def __exit__(self, type, value, traceback):
+        self.object_lock.__exit__()

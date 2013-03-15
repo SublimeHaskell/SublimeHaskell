@@ -2,7 +2,10 @@ import sublime
 import sublime_plugin
 import re
 
-from sublime_haskell_common import call_ghcmod_and_wait, is_enabled_haskell_command
+if int(sublime.version()) < 3000:
+    from sublime_haskell_common import call_ghcmod_and_wait, is_enabled_haskell_command
+else:
+    from SublimeHaskell.sublime_haskell_common import call_ghcmod_and_wait, is_enabled_haskell_command
 
 # Used to find out the module name.
 MODULE_RE_STR = r'module\s+([^\s\(]*)'  # "module" followed by everything that is neither " " nor "("
@@ -36,7 +39,7 @@ class SublimeHaskellShowType(sublime_plugin.TextCommand):
         module_region = view.find(MODULE_RE_STR, 0)
 
         if module_region is None:
-            sublime.status_message("SublimeHaskell: Could not determine module name!")
+            show_status_message("Could not determine module name", False)
             return None
 
         # RE must match; there is only one group in the RE.
@@ -46,7 +49,7 @@ class SublimeHaskellShowType(sublime_plugin.TextCommand):
         out = call_ghcmod_and_wait(ghcmod_args, filename)
 
         if not out:
-            sublime.status_message("ghc-mod %s returned nothing" % ' '.join(ghcmod_args))
+            sublime_status_message("ghc-mod %s returned nothing" % ' '.join(ghcmod_args))
             return None
 
         # ghc-mod type returns the type of the expression at at the given row/col.
@@ -56,7 +59,7 @@ class SublimeHaskellShowType(sublime_plugin.TextCommand):
         result_type = types[0]['type']  # innermost expression's type
 
         if not result_type:
-            sublime.error_message("ghc-mod type returned unexpected output")
+            sublime.error_message("SublimeHaskell: ghc-mod type returned unexpected output")
             return None
 
         return result_type
@@ -72,9 +75,8 @@ class SublimeHaskellShowType(sublime_plugin.TextCommand):
         output_view = view.window().get_output_panel(TYPE_PANEL_NAME)
         output_view.set_read_only(False)
         # Write to the output buffer:
-        edit = output_view.begin_edit()
-        output_view.insert(edit, 0, text)
-        output_view.end_edit(edit)
+        output_view.run_command('sublime_haskell_output_text', {
+            'text': text })
         # Set the selection to the beginning of the view so that "next result" works:
         output_view.set_read_only(True)
         # Show the results panel:

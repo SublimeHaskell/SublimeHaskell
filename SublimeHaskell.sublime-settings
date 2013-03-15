@@ -65,6 +65,12 @@
 	// Inhibit default Sublime word completions
 	"inhibit_completions": false,
 
+	// Replace data and class with snippet
+	"snippet_replace": true,
+
 	// Auto autocompletion popup on '.' in import list
-	"auto_completion_popup": false
+	"auto_completion_popup": false,
+
+	// Additional ghc options for use in ghc-mod and ModuleInspector, for example "-package ghc"
+	"ghc_opts": []
 }

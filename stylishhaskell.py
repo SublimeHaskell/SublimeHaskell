@@ -2,7 +2,10 @@ import errno
 import sublime
 import sublime_plugin
 
-from sublime_haskell_common import is_enabled_haskell_command, call_and_wait_with_input
+if int(sublime.version()) < 3000:
+    from sublime_haskell_common import is_enabled_haskell_command, call_and_wait_with_input
+else:
+    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, call_and_wait_with_input
 
 
 class SublimeHaskellStylish(sublime_plugin.TextCommand):
@@ -25,7 +28,7 @@ class SublimeHaskellStylish(sublime_plugin.TextCommand):
             for region in regions:
                 self.view.sel().add(region)
 
-        except OSError, e:
+        except OSError as e:
             if e.errno == errno.ENOENT:
                 sublime.error_message("SublimeHaskell: stylisg-haskell was not found!")
 

@@ -56,6 +56,12 @@
 			<key>name</key>
 			<string>keyword.entity.cabal</string>
 		</dict>
+		<dict>
+			<key>match</key>
+			<string>--.*$</string>
+			<key>name</key>
+			<string>comment.cabal</string>
+		</dict>
 	</array>
 	<key>scopeName</key>
 	<string>source.cabal</string>
