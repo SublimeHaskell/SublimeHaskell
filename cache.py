@@ -1,12 +1,17 @@
 import json
 import os
+import sublime
 
-from sublime_haskell_common import *
-import symbols
+if int(sublime.version()) < 3000:
+    from sublime_haskell_common import *
+    import symbols
+else:
+    from SublimeHaskell.sublime_haskell_common import *
+    import SublimeHaskell.symbols as symbols
 
-CACHE_PATH = os.path.join(PACKAGE_PATH, 'cache')
-CABAL_CACHE_PATH = os.path.join(CACHE_PATH, 'cabal')
-PROJECTS_CACHE_PATH = os.path.join(CACHE_PATH, 'projects')
+CACHE_PATH = None
+CABAL_CACHE_PATH = None
+PROJECTS_CACHE_PATH = None
 
 def swap_dict(d):
     """
@@ -71,7 +76,7 @@ def escape_path(path):
         folders.append(name)
         (base, name) = os.path.split(base)
     if base:
-        folders.append(filter(lambda c: c.isalpha() or c.isdigit(), base))
+        folders.append(''.join(filter(lambda c: c.isalpha() or c.isdigit(), base)))
     folders.reverse()
     return '.'.join(folders)
 
@@ -122,6 +127,16 @@ def load_project_cache(database, project_name):
             database.add_file(m.location.filename, m)
 
 def plugin_loaded():
+    global CACHE_PATH
+    global CABAL_CACHE_PATH
+    global PROJECTS_CACHE_PATH
+
+    package_path = sublime_haskell_package_path()
+
+    CACHE_PATH = os.path.join(package_path, 'cache')
+    CABAL_CACHE_PATH = os.path.join(CACHE_PATH, 'cabal')
+    PROJECTS_CACHE_PATH = os.path.join(CACHE_PATH, 'projects')
+
     if not os.path.exists(CACHE_PATH):
         os.mkdir(CACHE_PATH)
         os.mkdir(CABAL_CACHE_PATH)

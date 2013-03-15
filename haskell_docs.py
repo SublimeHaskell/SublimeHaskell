@@ -1,8 +1,12 @@
 import re
 import os
+import sublime
 import sublime_plugin
 
-from sublime_haskell_common import *
+if int(sublime.version()) < 3000:
+    from sublime_haskell_common import *
+else:
+    from SublimeHaskell.sublime_haskell_common import *
 
 def haskell_docs(module, name):
     """
@@ -19,7 +23,7 @@ def haskell_docs(module, name):
             ignoreRe = '({0})|({1})|({2})|({3})'.format(ambigousRe, continueRe, cantFindRe, packageRe)
 
             # Remove debug messages
-            result = filter(lambda l: not re.match(ignoreRe, l), stdout.splitlines())
+            result = list(filter(lambda l: not re.match(ignoreRe, l), stdout.splitlines()))
             return '\n'.join(result)
     except OSError as e:
         if e.errno == errno.ENOENT:

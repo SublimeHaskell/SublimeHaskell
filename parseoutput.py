@@ -6,7 +6,10 @@ import time
 from threading import Thread
 from collections import defaultdict
 
-from sublime_haskell_common import log, are_paths_equal, call_and_wait, get_setting_async, show_status_message_process, show_status_message
+if int(sublime.version()) < 3000:
+    from sublime_haskell_common import log, are_paths_equal, call_and_wait, get_setting_async, show_status_message_process, show_status_message
+else:
+    from SublimeHaskell.sublime_haskell_common import log, are_paths_equal, call_and_wait, get_setting_async, show_status_message_process, show_status_message
 
 ERROR_PANEL_NAME = 'haskell_error_checker'
 
@@ -184,9 +187,9 @@ def mark_messages_in_views(errors):
             # Unsaved files have no file name
             if view_filename is None:
                 continue
-            errors_in_view = filter(
+            errors_in_view = list(filter(
                 lambda x: are_paths_equal(view_filename, x.filename),
-                errors)
+                errors))
             mark_messages_in_view(errors_in_view, v)
     end_time = time.clock()
     log('total time to mark {0} diagnostics: {1} seconds'.format(
@@ -213,7 +216,7 @@ message_levels = {
 
 class SublimeHaskellNextError(sublime_plugin.TextCommand):
     def run(self, edit):
-        print "SublimeHaskellNextError"
+        log("SublimeHaskellNextError")
         v = self.view
         fn = v.file_name().encode("utf-8")
         line, column = v.rowcol(v.sel()[0].a)
@@ -283,10 +286,8 @@ def write_output(view, text, cabal_project_dir):
     output_view.settings().set("result_file_regex", result_file_regex)
     output_view.settings().set("result_base_dir", cabal_project_dir)
     # Write to the output buffer:
-    edit = output_view.begin_edit()
-    #output_view.insert(edit, 0, text)
-    output_view.insert(edit, output_view.size(), text)
-    output_view.end_edit(edit)
+    output_view.run_command('sublime_haskell_output_text', {
+        'text': text })
     # Set the selection to the beginning of the view so that "next result" works:
     output_view.sel().clear()
     output_view.sel().add(sublime.Region(0))

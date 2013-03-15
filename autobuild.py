@@ -1,6 +1,10 @@
+import sublime
 import sublime_plugin
 
-from sublime_haskell_common import attach_sandbox, get_cabal_project_dir_and_name_of_view, get_setting
+if int(sublime.version()) < 3000:
+    from sublime_haskell_common import attach_sandbox, get_cabal_project_dir_and_name_of_view, get_setting
+else:
+    from SublimeHaskell.sublime_haskell_common import attach_sandbox, get_cabal_project_dir_and_name_of_view, get_setting
 
 
 class SublimeHaskellAutobuild(sublime_plugin.EventListener):
