@@ -372,7 +372,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
     Show information about selected symbol
     
     """
-    def run(self, edit, filename = None, decl = None):
+    def run(self, edit, filename = None, module_name = None, decl = None):
         if decl and filename:
             with autocompletion.database.files as files:
                 if filename in files:
@@ -384,6 +384,19 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
                 else:
                     show_status_message('No info about module in {0}'.format(filename))
             return
+
+        if decl and module_name:
+            cur_cabal = current_cabal()
+            with autocompletion.database.cabal_modules as cabal_modules:
+                modules = cabal_modules[cur_cabal]
+                if module_name in modules:
+                    m = modules[module_name]
+                    if decl in m.declarations:
+                        self.show_symbol_info(m.declarations[decl])
+                    else:
+                        show_status_message('Symbol {0} not found in {1}'.format(decl, ))
+                else:
+                    show_status_message('No info about module {0}'.format(module_name))
 
         (module_word, ident, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
         full_name = '{0}.{1}'.format(module_word, ident) if module_word else ident
@@ -402,7 +415,9 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
 
         if browse_for_module:
             if browse_module_candidate:
-                self.browse_module(browse_module_candidate)
+                self.view.window().run_command('sublime_haskell_browse_module', {
+                    'module_name': browse_module_candidate.name,
+                    'filename': current_file_name })
                 return
             else:
                 show_status_message("No info about module {0}".format(full_name))
@@ -528,6 +543,59 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
     def is_enabled(self):
         return is_enabled_haskell_command(self.view, False)
 
+
+
+class SublimeHaskellBrowseModule(sublime_plugin.WindowCommand):
+    """
+    Browse module symbols
+    """
+    def run(self, module_name = None, filename = None):
+        if module_name:
+            with autocompletion.database.modules as modules:
+                if module_name not in modules:
+                    show_status_message('Module {0} not found'.format(module_name), False)
+                    return
+
+                current_file_name = filename if filename else self.window.active_view().file_name()
+
+                module_candidate = symbols.get_preferred_module(modules[module_name], current_file_name)
+
+                decls = module_candidate.declarations.values()
+                self.candidates = decls
+                self.window.show_quick_panel([[decl.brief(), decl.docs] if decl.docs else [decl.brief()] for decl in decls], self.on_symbol_selected)
+                return
+
+        cur_cabal = current_cabal()
+
+        self.candidates = []
+
+        with autocompletion.database.files as files:
+            for fname, m in files.items():
+                self.candidates.append([m.name, fname])
+
+        with autocompletion.database.cabal_modules as cabal_modules:
+            for m in cabal_modules[cur_cabal].values():
+                self.candidates.append([m.name])
+
+        self.candidates.sort(key = lambda c: c[0])
+
+        self.window.show_quick_panel(self.candidates, self.on_done)
+
+    def on_done(self, idx):
+        if idx == -1:
+            return
+
+        module_name = self.candidates[idx][0]
+        self.window.run_command('sublime_haskell_browse_module', {
+            'module_name': module_name })
+
+    def on_symbol_selected(self, idx):
+        if idx == -1:
+            return
+
+        self.window.active_view().run_command('sublime_haskell_symbol_info', {
+            'module_name': self.candidates[idx].module.name,
+            'decl': self.candidates[idx].name })
 
 class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
     def run(self, edit):

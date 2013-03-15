@@ -26,6 +26,10 @@
         "command": "sublime_haskell_symbol_info"
     },
     {
+        "caption": "SublimeHaskell: Browse module",
+        "command": "sublime_haskell_browse_module"
+    },
+    {
         "caption": "SublimeHaskell: Build",
         "command": "sublime_haskell_build"
     },
