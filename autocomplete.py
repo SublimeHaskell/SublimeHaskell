@@ -6,24 +6,33 @@ import sublime_plugin
 import threading
 import time
 
-from sublime_haskell_common import *
-import symbols
-import cache
-from ghci import ghci_info, ghci_package_db
-from haskell_docs import haskell_docs
-from ghcmod import ghcmod_browse_module, ghcmod_info
+if int(sublime.version()) < 3000:
+    from sublime_haskell_common import *
+    import symbols
+    import cache
+    from ghci import ghci_info, ghci_package_db
+    from haskell_docs import haskell_docs
+    from ghcmod import ghcmod_browse_module, ghcmod_info
+else:
+    from SublimeHaskell.sublime_haskell_common import *
+    import SublimeHaskell.symbols as symbols
+    import SublimeHaskell.cache as cache
+    from SublimeHaskell.ghci import ghci_info, ghci_package_db
+    from SublimeHaskell.haskell_docs import haskell_docs
+    from SublimeHaskell.ghcmod import ghcmod_browse_module, ghcmod_info
+
 
 # If true, files that have not changed will not be re-inspected.
 CHECK_MTIME = True
 
-MODULE_INSPECTOR_SOURCE_PATH = os.path.join(PACKAGE_PATH, 'ModuleInspector.hs')
-MODULE_INSPECTOR_EXE_PATH = os.path.join(PACKAGE_PATH, 'ModuleInspector')
-MODULE_INSPECTOR_OBJ_DIR = os.path.join(PACKAGE_PATH, 'obj/ModuleInspector')
-CABAL_INSPECTOR_SOURCE_PATH = os.path.join(PACKAGE_PATH, 'CabalInspector.hs')
-CABAL_INSPECTOR_EXE_PATH = os.path.join(PACKAGE_PATH, 'CabalInspector')
-CABAL_INSPECTOR_OBJ_DIR = os.path.join(PACKAGE_PATH, 'obj/CabalInspector')
+MODULE_INSPECTOR_SOURCE_PATH = None
+MODULE_INSPECTOR_EXE_PATH = None
+MODULE_INSPECTOR_OBJ_DIR = None
+CABAL_INSPECTOR_SOURCE_PATH = None
+CABAL_INSPECTOR_EXE_PATH = None
+CABAL_INSPECTOR_OBJ_DIR = None
 
-OUTPUT_PATH = os.path.join(PACKAGE_PATH, 'module_info.cache')
+OUTPUT_PATH = None
 
 # ModuleInspector output
 MODULE_INSPECTOR_RE = re.compile(r'ModuleInfo:(?P<result>.+)')
@@ -66,7 +75,7 @@ def get_qualified_name(s):
     if len(s) == 0:
         return ('', '')
     quals = s.split()[-1].split('.')
-    filtered = map(lambda s: filter(lambda c: c.isalpha() or c.isdigit() or c == '_', s), quals)
+    filtered = map(lambda s: list(filter(lambda c: c.isalpha() or c.isdigit() or c == '_', s)), quals)
     return ('.'.join(filtered[0:len(filtered) - 1]), '.'.join(filtered))
 
 def get_qualified_symbol(line):
@@ -267,7 +276,7 @@ def can_complete_qualified_symbol(info):
     if is_import_list:
         return module_name in autocompletion.get_current_module_completions()
     else:
-        return (filter(lambda m: m.startswith(module_name), autocompletion.get_current_module_completions()) != [])
+        return list(filter(lambda m: m.startswith(module_name), autocompletion.get_current_module_completions()) != [])
 
 class SublimeHaskellComplete(sublime_plugin.TextCommand):
     """ Shows autocompletion popup """
@@ -353,7 +362,7 @@ class SublimeHaskellGoToAnyDeclaration(sublime_plugin.WindowCommand):
 class SublimeHaskellReinspectAll(sublime_plugin.WindowCommand):
     def run(self):
         autocompletion.clear_inspected()
-        SublimeHaskellAutocomplete.inspector.mark_all_files(self.window)
+        inspector.mark_all_files(self.window)
 
 
 
@@ -453,9 +462,8 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
                     decl.type = info.type
 
         # TODO: Move to separate command for Sublime Text 3
-        edit = output_view.begin_edit()
-        output_view.insert(edit, output_view.size(), decl.detailed())
-        output_view.end_edit(edit)
+        output_view.run_command('sublime_haskell_output_text', {
+            'text': decl.detailed() })
 
         output_view.sel().clear()
         output_view.set_read_only(True)
@@ -486,7 +494,7 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
 
             decls = decl_symbols[ident]
 
-            modules_dict = symbols.flatten(symbols.declarations_modules(decls, lambda ms: filter(symbols.is_by_sources, ms)).values())
+            modules_dict = symbols.flatten(symbols.declarations_modules(decls, lambda ms: list(filter(symbols.is_by_sources, ms))).values())
 
             with autocompletion.database.files as files:
                 if current_file_name in files:
@@ -511,7 +519,7 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
 
         with autocompletion.database.modules as modules:
             if full_name in modules:
-                modules_list = filter(symbols.is_by_sources, modules[full_name])
+                modules_list = list(filter(symbols.is_by_sources, modules[full_name]))
 
                 # Find module in this project
                 module_candidates.extend([m for m in modules_list if symbols.is_within_project(m, current_project)])
@@ -684,10 +692,12 @@ class StandardInspectorAgent(threading.Thread):
                 log('Loading docs for in-cabal module {0} failed: {1}'.format(module_name, e))
 
 
-class InspectorAgent(threading.Thread):
-    std_inspector = StandardInspectorAgent()
-    std_inspector.start()
 
+std_inspector = None
+
+
+
+class InspectorAgent(threading.Thread):
     def __init__(self):
         # Call the superclass constructor:
         super(InspectorAgent, self).__init__()
@@ -863,7 +873,7 @@ class InspectorAgent(threading.Thread):
                 if 'imports' in new_info:
                     for mi in new_info['imports']:
                         if 'importName' in mi:
-                            InspectorAgent.std_inspector.load_module_info(mi['importName'])
+                            std_inspector.load_module_info(mi['importName'])
 
                 try:
                     def make_import(import_info):
@@ -896,21 +906,13 @@ class InspectorAgent(threading.Thread):
                         pass
 
                     for i in new_module.imports.values():
-                        InspectorAgent.std_inspector.load_module_info(i.module)
+                        std_inspector.load_module_info(i.module)
 
                 except Exception as e:
                     log('Inspecting file {0} failed: {1}'.format(filename, e))
 
-    def _get_inspection_time_of_file(self, filename):
-        """Return the time that a file was last inspected.`
-        Return zero if it has never been inspected."""
-        # TODO: Implement!
-        return 0.0
-        # with autocompletion.info_lock:
-        #     try:
-        #         return autocompletion.info[filename]['inspectedAt']
-        #     except KeyError:
-        #         return 0.0
+            else:
+                log('ModuleInspector returns error: {0}'.format(new_info['error']))
 
 
 def list_files_in_dir_recursively(base_dir):
@@ -923,10 +925,12 @@ def list_files_in_dir_recursively(base_dir):
     return files
 
 
-class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
-    inspector = InspectorAgent()
-    inspector.start()
 
+inspector = None
+
+
+
+class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
     def __init__(self):
         self.local_settings = {
             'enable_ghc_mod': None,
@@ -957,7 +961,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         if not same:
             # TODO: Changed completion settings! Update autocompletion data properly
             # For now at least try to load cabal modules info
-            InspectorAgent.std_inspector.load_cabal_info()
+            std_inspector.load_cabal_info()
             pass
 
     def get_special_completions(self, view, prefix, locations):
@@ -1024,7 +1028,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         self.set_cabal_status(view)
         filename = view.file_name()
         if filename:
-            SublimeHaskellAutocomplete.inspector.mark_file_dirty(filename)
+            inspector.mark_file_dirty(filename)
 
     def on_load(self, view):
         self.set_cabal_status(view)
@@ -1035,7 +1039,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
     def on_post_save(self, view):
         filename = view.file_name()
         if filename:
-            SublimeHaskellAutocomplete.inspector.mark_file_dirty(filename)
+            inspector.mark_file_dirty(filename)
 
     def on_query_context(self, view, key, operator, operand, match_all):
         if key == 'auto_completion_popup':
@@ -1056,3 +1060,35 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             return can_complete_qualified_symbol(get_qualified_symbol(preline))
         else:
             return False
+
+
+
+def plugin_loaded():
+    global MODULE_INSPECTOR_SOURCE_PATH
+    global MODULE_INSPECTOR_EXE_PATH
+    global MODULE_INSPECTOR_OBJ_DIR
+    global CABAL_INSPECTOR_SOURCE_PATH
+    global CABAL_INSPECTOR_EXE_PATH
+    global CABAL_INSPECTOR_OBJ_DIR
+    global OUTPUT_PATH
+
+    package_path = sublime_haskell_package_path()
+
+    MODULE_INSPECTOR_SOURCE_PATH = os.path.join(package_path, 'ModuleInspector.hs')
+    MODULE_INSPECTOR_EXE_PATH = os.path.join(package_path, 'ModuleInspector')
+    MODULE_INSPECTOR_OBJ_DIR = os.path.join(package_path, 'obj/ModuleInspector')
+    CABAL_INSPECTOR_SOURCE_PATH = os.path.join(package_path, 'CabalInspector.hs')
+    CABAL_INSPECTOR_EXE_PATH = os.path.join(package_path, 'CabalInspector')
+    CABAL_INSPECTOR_OBJ_DIR = os.path.join(package_path, 'obj/CabalInspector')
+    OUTPUT_PATH = os.path.join(package_path, 'module_info.cache')
+
+    global std_inspector
+    std_inspector = StandardInspectorAgent()
+    std_inspector.start()
+
+    global inspector
+    inspector = InspectorAgent()
+    inspector.start()
+
+if int(sublime.version()) < 3000:
+    plugin_loaded()
