@@ -197,12 +197,14 @@ documentationMap iface = M.fromList $ concatMap toDoc $ Doc.ifaceExportItems ifa
         printDoc (Doc.DocOrderedList lst) = concatMap printDoc lst -- And this
         printDoc (Doc.DocDefList defs) = concatMap (\(l, r) -> printDoc l ++ " = " ++ printDoc r) defs -- ?
         printDoc (Doc.DocCodeBlock code) = printDoc code
-        printDoc (Doc.DocHyperlink link) = fromMaybe (Doc.hyperlinkUrl link) (Doc.hyperlinkLabel link)
         printDoc (Doc.DocPic pic) = pic
         printDoc (Doc.DocAName a) = a
-        printDoc (Doc.DocProperty prop) = prop
         printDoc (Doc.DocExamples exs) = unlines $ map showExample exs where
             showExample (Doc.Example expr results) = expr ++ " => " ++ intercalate ", " results
+        -- TODO these two are not in haddock-2.11.1 (HP 2012.4)
+        -- but exist in 2.13.*
+        -- printDoc (Doc.DocHyperlink link) = fromMaybe (Doc.hyperlinkUrl link) (Doc.hyperlinkLabel link)
+        -- printDoc (Doc.DocProperty prop) = prop
 
     locatedName :: Loc.Located Name.Name -> String
     locatedName (Loc.L _ nm) = Name.getOccString nm
