@@ -406,6 +406,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
                         show_status_message('Symbol {0} not found in {1}'.format(decl, ))
                 else:
                     show_status_message('No info about module {0}'.format(module_name))
+            return
 
         (module_word, ident, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
         full_name = '{0}.{1}'.format(module_word, ident) if module_word else ident
