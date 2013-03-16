@@ -13,6 +13,7 @@ if int(sublime.version()) < 3000:
     from ghci import ghci_info, ghci_package_db
     from haskell_docs import haskell_docs
     from ghcmod import ghcmod_browse_module, ghcmod_info
+    from hdevtools import hdevtools_info
 else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.symbols as symbols
@@ -55,6 +56,14 @@ NO_SPECIAL_CHARS_RE = re.compile(r'^(\w|[\-\.])*$')
 SYMBOL_RE = re.compile(r'((?P<module>\w+(\.\w+)*)\.)?(?P<identifier>\w*)$')
 # Get symbol module scope and its name within import statement
 IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>\w+(\.\w+)*)(\s+as\s+(?P<as>\w+))?\s*\(.*?(?P<identifier>\w*)$')
+
+def symbol_info(filename, module_name, symbol_name, cabal = None):
+    result = None
+    if get_setting_async('enable_hdevtools'):
+        result = hdevtools_info(filename, symbol_name, cabal = cabal)
+    if not result:
+        result = symbol_info(filename, module_name, symbol_name, cabal = cabal)
+    return result
 
 def get_line_contents(view, location):
     """

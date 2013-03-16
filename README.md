@@ -14,6 +14,7 @@ Optional, but useful:
 * stylish-haskell (for code prettification, `cabal install stylish-haskell`)
 * cabal-dev if you want to use it
 * haskell_docs
+* hdevtools (for type inference, `cabal install hdevtools`)
 
 Installation
 ------------

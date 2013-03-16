@@ -34,6 +34,7 @@ def preload_settings():
     get_setting('enable_auto_build')
     get_setting('show_output_window')
     get_setting('enable_ghc_mod')
+    get_setting('enable_hdevtools')
     get_setting('snippet_replace')
     get_setting('ghc_opts')
 
@@ -89,6 +90,24 @@ def decode_bytes(s):
 def call_and_wait(command, **popen_kwargs):
     return call_and_wait_with_input(command, None, **popen_kwargs)
 
+def call_no_wait(command, **popen_kwargs):
+    """Run the specified command with no block"""
+    if subprocess.mswindows:
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        popen_kwargs['startupinfo'] = startupinfo
+
+    extended_env = dict(os.environ)
+    PATH = os.getenv('PATH') or ""
+    extended_env['PATH'] = ':'.join(get_setting_async('add_to_PATH', []) + [PATH])
+
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        stdin=subprocess.PIPE,
+        env=extended_env,
+        **popen_kwargs)
 
 def call_and_wait_with_input(command, input_string, **popen_kwargs):
     """Run the specified command, block until it completes, and return
@@ -293,6 +312,10 @@ def set_setting(key, value):
     """Set setting and update dictionary"""
     sublime_haskell_settings[key] = value
     get_settings().set(key, value)
+    save_settings()
+
+def set_setting_async(key, value):
+    sublime.set_timeout(lambda: set_setting(key, value), 0)
 
 def get_cwd(filename = None):
     """
@@ -329,7 +352,6 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
                 + "It is used for LANGUAGE and import autocompletions and type inference.\n"
                 + "Try adjusting the 'add_to_PATH' setting.\n"
                 + "You can also turn this off using the 'enable_ghc_mod' setting.")
-
 
 def wait_for_window_callback(on_appear, seconds_to_wait):
     window = sublime.active_window()
