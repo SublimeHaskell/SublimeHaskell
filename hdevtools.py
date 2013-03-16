@@ -25,7 +25,7 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
 
     package_db = ghci_package_db()
     if package_db:
-        ghs_opts.append('-package_db {0}'.format(package_db))
+        ghc_opts.append('-package-db {0}'.format(package_db))
 
     source_dir = get_source_dir(filename)
     ghc_opts.append('-i {0}'.format(source_dir))
