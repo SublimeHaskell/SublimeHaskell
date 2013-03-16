@@ -1,6 +1,7 @@
 import errno
 import fnmatch
 import os
+import json
 import sublime
 import sublime_plugin
 import subprocess
@@ -17,6 +18,8 @@ PACKAGE_PATH = None
 # Panel for SublimeHaskell errors
 SUBLIME_ERROR_PANEL_NAME = 'haskell_sublime_load'
 
+# Used to detect hs-source-dirs for project
+CABAL_INSPECTOR_EXE_PATH = None
 
 # Setting can't be get from not main threads
 # So we using a trick:
@@ -317,6 +320,37 @@ def set_setting(key, value):
 def set_setting_async(key, value):
     sublime.set_timeout(lambda: set_setting(key, value), 0)
 
+def get_source_dir(filename):
+    """
+    Get root of hs-source-dirs for filename in project
+    """
+    if not filename:
+        return os.getcwd()
+
+    (cabal_dir, project_name) = get_cabal_project_dir_and_name_of_file(filename)
+    if not cabal_dir:
+        return os.path.dirname(filename)
+
+    cabal_file = get_cabal_in_dir(cabal_dir)
+    exit_code, out, err = call_and_wait([CABAL_INSPECTOR_EXE_PATH, cabal_file])
+
+    if exit_code == 0:
+        info = json.loads(out)
+
+        dirs = ["."]
+
+        if 'error' not in info:
+            dirs.extend(info['source-dirs'])
+
+        paths = [os.path.normpath(os.path.join(cabal_dir, d)) for d in dirs]
+        paths.sort(key = lambda p: -len(p))
+
+        for p in paths:
+            if filename.startswith(p):
+                return p
+
+    return os.path.dirname(filename)
+
 def get_cwd(filename = None):
     """
     Get cwd for filename: cabal project path, file path or os.getcwd()
@@ -331,14 +365,17 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
     """
 
     ghc_opts = get_setting_async('ghc_opts')
-    ghc_opts_args = ["-g", ' '.join(ghc_opts)] if ghc_opts else []
+    ghc_opts_args = []
+    if ghc_opts:
+        for opt in ghc_opts:
+            ghc_opts_args.extend(["-g", opt])
 
     try:
         command = attach_cabal_sandbox(['ghc-mod'] + arg_list + ghc_opts_args, cabal)
 
         # log('running ghc-mod: {0}'.format(command))
 
-        exit_code, out, err = call_and_wait(command, cwd=get_cwd(filename))
+        exit_code, out, err = call_and_wait(command, cwd=get_source_dir(filename))
 
         if exit_code != 0:
             raise Exception("ghc-mod exited with status %d and stderr: %s" % (exit_code, err))
@@ -563,7 +600,9 @@ def sublime_haskell_package_path():
 
 def plugin_loaded():
     global PACKAGE_PATH
+    global CABAL_INSPECTOR_EXE_PATH
     PACKAGE_PATH = sublime_haskell_package_path()
+    CABAL_INSPECTOR_EXE_PATH = os.path.join(PACKAGE_PATH, 'CabalInspector')
     preload_settings()
     
 if int(sublime.version()) < 3000:

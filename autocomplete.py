@@ -992,7 +992,7 @@ class InspectorAgent(threading.Thread):
         ghc_opts_args = [' '.join(ghc_opts)] if ghc_opts else []
 
         exit_code, stdout, stderr = call_and_wait(
-            [MODULE_INSPECTOR_EXE_PATH, filename] + ghc_opts_args, cwd = get_cwd(filename))
+            [MODULE_INSPECTOR_EXE_PATH, filename] + ghc_opts_args, cwd = get_source_dir(filename))
 
         module_inspector_out = MODULE_INSPECTOR_RE.search(stdout)
 

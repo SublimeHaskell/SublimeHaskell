@@ -12,6 +12,7 @@ else:
     from SublimeHaskell.autocomplete import autocompletion
     from SublimeHaskell.hdevtools import hdevtools_type
     from SublimeHaskell.ghcmod import ghcmod_type
+    from functools import reduce
 
 # Used to find out the module name.
 MODULE_RE_STR = r'module\s+([^\s\(]*)'  # "module" followed by everything that is neither " " nor "("
@@ -24,7 +25,6 @@ GHCMOD_TYPE_LINE_RE = re.compile(r'(?P<startrow>\d+) (?P<startcol>\d+) (?P<endro
 # Name of the sublime panel in which type information is shown.
 TYPE_PANEL_NAME = 'haskell_type_panel'
 
-
 def parse_ghc_mod_type_line(l):
     """
     Returns the `groupdict()` of GHCMOD_TYPE_LINE_RE matching the given line,
@@ -33,17 +33,44 @@ def parse_ghc_mod_type_line(l):
     match = GHCMOD_TYPE_LINE_RE.match(l)
     return match and match.groupdict()
 
+def tabs_offset(view, point):
+    """
+    Returns count of '\t' before point in line multiplied by 7
+    8 is size of type as supposed by ghc-mod, to every '\t' will add 7 to column
+    Subtract this value to get sublime column by ghc-mod column, add to get ghc-mod column by sublime column
+    """
+    cur_line = view.substr(view.line(point))
+    return len(filter(lambda ch: ch == '\t', cur_line)) * 7
+
+def sublime_column_to_type_column(view, line, column):
+    cur_line = view.substr(view.line(view.text_point(line, column)))
+    return column + len(filter(lambda ch: ch == '\t', cur_line)) * 7 + 1
+
+def type_column_to_sublime_column(view, line, column):
+    cur_line = view.substr(view.line(view.text_point(line - 1, 0)))
+    col = 1
+    real_col = 0
+    for c in cur_line:
+        col += (8 if c == '\t' else 1)
+        real_col += 1
+        if col >= column:
+            return real_col
+    return real_col
+
 class FilePosition(object):
     def __init__(self, line, column):
         self.line = line
         self.column = column
 
     def point(self, view):
-        return view.text_point(self.line - 1, self.column - 1)
+        # Note, that sublime suppose that '\t' is 'tab_size' length
+        # But '\t' is one character
+        return view.text_point(self.line - 1, type_column_to_sublime_column(view, self.line, self.column))
 
 def position_by_point(view, point):
+    tabs = tabs_offset(view, point)
     (r, c) = view.rowcol(point)
-    return FilePosition(r + 1, c + 1)
+    return FilePosition(r + 1, c + 1 + tabs)
 
 class RegionType(object):
     def __init__(self, typename, start, end = None):
@@ -88,6 +115,7 @@ def parse_type_output(s):
 
 def haskell_type(filename, module_name, line, column, cabal = None):
     result = None
+
     if get_setting_async('enable_hdevtools'):
         result = hdevtools_type(filename, line, column, cabal = cabal)
     if not result:
@@ -107,6 +135,8 @@ class SublimeHaskellShowType(sublime_plugin.TextCommand):
             (r, c) = self.view.rowcol(self.view.sel()[0].b)
             line = r + 1
             column = c + 1
+
+        column = sublime_column_to_type_column(self.view, r, c)
 
         module_name = None
         with autocompletion.database.files as files:

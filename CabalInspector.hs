@@ -12,12 +12,14 @@ import Distribution.PackageDescription.Parse
 import qualified System.Environment as Environment
 
 data CabalInfo = CabalInfo {
-    cabalExecutables :: [CabalExecutable] }
+    cabalExecutables :: [CabalExecutable],
+    cabalSourceDirs :: [FilePath] }
         deriving (Show)
 
 instance Json.ToJSON CabalInfo where
     toJSON info = Json.object [
-        "executables" .= cabalExecutables info]
+        "executables" .= cabalExecutables info,
+        "source-dirs" .= cabalSourceDirs info]
 
 data CabalExecutable = CabalExecutable {
     executableName :: String,
@@ -31,7 +33,9 @@ instance Json.ToJSON CabalExecutable where
 
 analyzeCabal :: String -> Either String CabalInfo
 analyzeCabal source = case parsePackageDescription source of
-    ParseOk _ r -> Right $ CabalInfo $ map (uncurry CabalExecutable . second (exeName . condTreeData)) $ condExecutables r
+    ParseOk _ r -> Right CabalInfo {
+        cabalExecutables = map (uncurry CabalExecutable . second (exeName . condTreeData)) $ condExecutables r,
+        cabalSourceDirs = maybe [] (hsSourceDirs . libBuildInfo . condTreeData) $ condLibrary r }
     ParseFailed e -> Left $ "Parse failed: " ++ show e
 
 main :: IO ()

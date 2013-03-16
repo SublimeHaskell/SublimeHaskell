@@ -27,7 +27,13 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
     if package_db:
         ghs_opts.append('-package_db {0}'.format(package_db))
 
-    ghc_opts_args = ["-g", ' '.join(ghc_opts)] if ghc_opts else []
+    source_dir = get_source_dir(filename)
+    ghc_opts.append('-i {0}'.format(source_dir))
+
+    ghc_opts_args = []
+    if ghc_opts:
+        for opt in ghc_opts:
+            ghc_opts_args.extend(["-g", opt])
 
     if hdevtools_socket:
         arg_list.append('--socket={0}'.format(hdevtools_socket))
@@ -35,7 +41,7 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
     try:
         command = ['hdevtools'] + arg_list + ghc_opts_args
 
-        exit_code, out, err = call_and_wait(['hdevtools'] + arg_list + ghc_opts_args)
+        exit_code, out, err = call_and_wait(['hdevtools'] + arg_list + ghc_opts_args, cwd = source_dir)
 
         if exit_code != 0:
             raise Exception("hdevtools exited with status %d and stderr: %s" % (exit_code, err))
