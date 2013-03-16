@@ -331,7 +331,7 @@ def get_source_dir(filename):
     if not cabal_dir:
         return os.path.dirname(filename)
 
-    cabal_file = get_cabal_in_dir(cabal_dir)
+    cabal_file = get_cabal_in_dir(cabal_dir)[1]
     exit_code, out, err = call_and_wait([CABAL_INSPECTOR_EXE_PATH, cabal_file])
 
     if exit_code == 0:
