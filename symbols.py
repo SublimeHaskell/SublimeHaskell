@@ -341,7 +341,7 @@ class Database(object):
                     raise RuntimeError("Can't add declaration: no file {0}".format(module.location.filename))
                 add_decl_to_module()
         elif module.cabal:
-            if module.name not in self.cabal_modules[module.cabal]:
+            if module.name not in self.cabal_modules.object[module.cabal]:
                 raise RuntimeError("Can't add declaration: no module {0}".format(module.name))
             add_decl_to_module()
         else:
