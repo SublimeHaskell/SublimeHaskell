@@ -60,6 +60,10 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
 
         return None
 
+    except Exception as e:
+        log('calling to hdevtools fails with {0}'.format(e))
+        return None
+
 def admin(cmds, wait = False, **popen_kwargs):
     hdevtools_socket = get_setting_async('hdevtools_socket')
 
@@ -116,5 +120,5 @@ def plugin_loaded():
 def plugin_unloaded():
     admin(["--stop-server"])
 
-if int(sublime.version()) < 3000:
+def start_hdevtools():
     plugin_loaded()

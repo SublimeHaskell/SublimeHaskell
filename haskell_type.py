@@ -51,10 +51,10 @@ def type_column_to_sublime_column(view, line, column):
     col = 1
     real_col = 0
     for c in cur_line:
-        col += (8 if c == '\t' else 1)
-        real_col += 1
         if col >= column:
             return real_col
+        col += (8 if c == '\t' else 1)
+        real_col += 1
     return real_col
 
 class FilePosition(object):

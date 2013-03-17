@@ -13,7 +13,7 @@ if int(sublime.version()) < 3000:
     from ghci import ghci_info, ghci_package_db
     from haskell_docs import haskell_docs
     from ghcmod import ghcmod_browse_module, ghcmod_info
-    from hdevtools import hdevtools_info
+    from hdevtools import hdevtools_info, start_hdevtools
 else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.symbols as symbols
@@ -21,6 +21,7 @@ else:
     from SublimeHaskell.ghci import ghci_info, ghci_package_db
     from SublimeHaskell.haskell_docs import haskell_docs
     from SublimeHaskell.ghcmod import ghcmod_browse_module, ghcmod_info
+    from SublimeHaskell.hdevtools import hdevtools_info, start_hdevtools
 
 
 # If true, files that have not changed will not be re-inspected.
@@ -846,6 +847,8 @@ class InspectorAgent(threading.Thread):
     MODULEMSG = 'Compiling Haskell ModuleInspector'
 
     def run(self):
+        start_hdevtools()
+
         # Compile the CabalInspector:
         # TODO: Where to compile it?
         with status_message(InspectorAgent.CABALMSG) as s:
