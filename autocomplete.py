@@ -416,23 +416,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
 
         candidates = []
 
-        browse_for_module = False
-        browse_module_candidate = None
-        with autocompletion.database.modules as modules:
-            if full_name in modules:
-                # Browse symbols in module
-                browse_for_module = True
-                browse_module_candidate = symbols.get_preferred_module(modules[full_name], current_file_name)
-
-        if browse_for_module:
-            if browse_module_candidate:
-                self.view.window().run_command('sublime_haskell_browse_module', {
-                    'module_name': browse_module_candidate.name,
-                    'filename': current_file_name })
-                return
-            else:
-                show_status_message("No info about module {0}".format(full_name))
-                return
+        imported_symbol_not_found = False
 
         with autocompletion.database.symbols as decl_symbols:
             if ident not in decl_symbols:
@@ -474,12 +458,33 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
                         # declarations from imported modules
                         candidates.extend([m.declarations[ident] for m in modules_dict if symbols.is_imported_module(cur_info, m, module_word) and ident in m.declarations])
                     if not candidates:
+                        imported_symbol_not_found = True
                         # show all possible candidates
                         candidates.extend([m.declarations[ident] for m in modules_dict if ident in m.declarations])
 
                 # No info about imports for this file, just add all declarations
                 else:
                     candidates.extend([m.declarations[ident] for m in modules_dict if ident in m.declarations])
+
+        if imported_symbol_not_found:
+            browse_for_module = False
+            browse_module_candidate = None
+            with autocompletion.database.modules as modules:
+                if full_name in modules:
+                    # Browse symbols in module
+                    browse_for_module = True
+                    browse_module_candidate = symbols.get_preferred_module(modules[full_name], current_file_name)
+
+            if browse_for_module:
+                if browse_module_candidate:
+                    self.view.window().run_command('sublime_haskell_browse_module', {
+                        'module_name': browse_module_candidate.name,
+                        'filename': current_file_name })
+                    return
+                else:
+                    show_status_message("No info about module {0}".format(full_name))
+                    return
+
 
         if not candidates:
             show_status_message('Symbol {0} not found'.format(ident), False)
