@@ -339,7 +339,7 @@ def get_source_dir(filename):
     if not cabal_dir:
         return os.path.dirname(filename)
 
-    cabal_file = get_cabal_in_dir(cabal_dir)
+    _project_name, cabal_file = get_cabal_in_dir(cabal_dir)
     exit_code, out, err = call_and_wait([CABAL_INSPECTOR_EXE_PATH, cabal_file])
 
     if exit_code == 0:
