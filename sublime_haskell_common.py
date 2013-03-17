@@ -85,10 +85,18 @@ def get_haskell_command_window_view_file_project(view = None):
 
 
 def decode_bytes(s):
+    if s is None:
+        return None
     if int(sublime.version()) < 3000:
         return s
     return s.decode()
 
+def encode_bytes(s):
+    if s is None:
+        return None
+    if int(sublime.version()) < 3000:
+        return s
+    return s.encode()
 
 def call_and_wait(command, **popen_kwargs):
     return call_and_wait_with_input(command, None, **popen_kwargs)
@@ -134,7 +142,7 @@ def call_and_wait_with_input(command, input_string, **popen_kwargs):
         stdin=subprocess.PIPE,
         env=extended_env,
         **popen_kwargs)
-    stdout, stderr = process.communicate(input_string)
+    stdout, stderr = process.communicate(encode_bytes(input_string))
     exit_code = process.wait()
     return (exit_code, decode_bytes(stdout), decode_bytes(stderr))
 
