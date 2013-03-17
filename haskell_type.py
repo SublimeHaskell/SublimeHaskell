@@ -40,11 +40,11 @@ def tabs_offset(view, point):
     Subtract this value to get sublime column by ghc-mod column, add to get ghc-mod column by sublime column
     """
     cur_line = view.substr(view.line(point))
-    return len(filter(lambda ch: ch == '\t', cur_line)) * 7
+    return len(list(filter(lambda ch: ch == '\t', cur_line))) * 7
 
 def sublime_column_to_type_column(view, line, column):
     cur_line = view.substr(view.line(view.text_point(line, column)))
-    return column + len(filter(lambda ch: ch == '\t', cur_line)) * 7 + 1
+    return column + len(list(filter(lambda ch: ch == '\t', cur_line))) * 7 + 1
 
 def type_column_to_sublime_column(view, line, column):
     cur_line = view.substr(view.line(view.text_point(line - 1, 0)))
