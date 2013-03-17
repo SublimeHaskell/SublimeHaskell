@@ -97,7 +97,7 @@ def hdevtools_info(filename, symbol_name, cabal = None):
     Uses hdevtools info filename symbol_name to get symbol info
     """
     contents = call_hdevtools_and_wait(['info', filename, symbol_name], filename = filename, cabal = cabal)
-    return parse_info(symbol_name, contents)
+    return parse_info(symbol_name, contents) if contents else None
 
 def hdevtools_check(filename, cabal = None):
     """

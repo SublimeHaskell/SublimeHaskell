@@ -119,8 +119,9 @@ def haskell_type(filename, module_name, line, column, cabal = None):
     if get_setting_async('enable_hdevtools'):
         result = hdevtools_type(filename, line, column, cabal = cabal)
     if not result:
-        result = ghcmod_type(filename, module_name, line, column, cabal = cabal)
-    return parse_type_output(result)
+        if module_name:
+            result = ghcmod_type(filename, module_name, line, column, cabal = cabal)
+    return parse_type_output(result) if result else None
 
 class SublimeHaskellShowType(sublime_plugin.TextCommand):
     def run(self, edit, filename = None, line = None, column = None):
