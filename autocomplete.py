@@ -985,6 +985,8 @@ class InspectorAgent(threading.Thread):
                 if modification_time <= inspection_time:
                     return
 
+        hdevtools_enabled = get_setting_async('enable_hdevtools')
+
         ghc_opts = get_setting_async('ghc_opts')
         if not ghc_opts:
             ghc_opts = []
@@ -1022,6 +1024,11 @@ class InspectorAgent(threading.Thread):
                     for d in new_info['declarations']:
                         location = symbols.Location(filename, d['line'], d['column'])
                         if d['what'] == 'function':
+                            if not d['type'] and hdevtools_enabled:
+                                # Try to get type with hdevtools only
+                                info_typed = hdevtools_info(filename, d['name'])
+                                if info_typed:
+                                    d['type'] = info_typed.type
                             new_module.add_declaration(symbols.Function(d['name'], d['type'], d['docs'], location))
                         elif d['what'] == 'type':
                             new_module.add_declaration(symbols.Type(d['name'], d['context'], d['args'], d['docs'], location))
