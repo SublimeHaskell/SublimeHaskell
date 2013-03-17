@@ -136,10 +136,11 @@ class TypeBase(Declaration):
     """
     Haskell type, data or class
     """
-    def __init__(self, name, decl_type, context, args, docs = None, location = None, module = None):
+    def __init__(self, name, decl_type, context, args, definition = None, docs = None, location = None, module = None):
         super(TypeBase, self).__init__(name, decl_type, docs, location, module)
         self.context = context
         self.args = args
+        self.definition = definition
 
     def snippet(self):
         result = [self.name]
@@ -163,35 +164,37 @@ class TypeBase(Declaration):
         brief_parts.append(self.name)
         if self.args:
             brief_parts.append(' '.join(self.args))
+        if self.definition:
+            brief_parts.append(' = {0}'.format(self.definition))
         return ' '.join(brief_parts)
 
 class Type(TypeBase):
     """
     Haskell type synonym
     """
-    def __init__(self, name, context, args, docs = None, location = None, module = None):
-        super(Type, self).__init__(name, 'type', context, args, docs, location, module)
+    def __init__(self, name, context, args, definition = None, docs = None, location = None, module = None):
+        super(Type, self).__init__(name, 'type', context, args, definition, docs, location, module)
 
 class Newtype(TypeBase):
     """
     Haskell newtype synonym
     """
-    def __init__(self, name, context, args, docs = None, location = None, module = None):
-        super(Newtype, self).__init__(name, 'newtype', context, args, docs, location, module)
+    def __init__(self, name, context, args, definition = None, docs = None, location = None, module = None):
+        super(Newtype, self).__init__(name, 'newtype', context, args, definition, docs, location, module)
 
 class Data(TypeBase):
     """
     Haskell data declaration
     """
-    def __init__(self, name, context, args, docs = None, location = None, module = None):
-        super(Data, self).__init__(name, 'data', context, args, docs, location, module)
+    def __init__(self, name, context, args, definition = None, docs = None, location = None, module = None):
+        super(Data, self).__init__(name, 'data', context, args, definition, docs, location, module)
 
 class Class(TypeBase):
     """
     Haskell class declaration
     """
     def __init__(self, name, context, args, docs = None, location = None, module = None):
-        super(Class, self).__init__(name, 'class', context, args, docs, location, module)
+        super(Class, self).__init__(name, 'class', context, args, None, docs, location, module)
 
 def update_with(l, r, default_value, f):
     """

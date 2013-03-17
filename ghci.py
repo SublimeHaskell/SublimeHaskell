@@ -15,8 +15,8 @@ def parse_info(name, contents):
     Parses result of :i <name> command of ghci and returns derived symbols.Declaration
     """
     functionRegex = '{0}\s+::\s+(?P<type>.*?)(\s+--(.*))?$'.format(name)
-    dataRegex = '(?P<what>(newtype|type|data))\s+((?P<ctx>(.*))=>\s+)?{0}\s+(?P<args>(\w+\s+)*)='.format(name)
-    classRegex = '(?P<what>class)\s+((?P<ctx>(.*))=>\s+)?{0}\s+(?P<args>(\w+\s+)*)(.*)where$'.format(name)
+    dataRegex = '(?P<what>(newtype|type|data))\s+((?P<ctx>(.*))=>\s+)?(?P<name>\S+)\s+(?P<args>(\w+\s+)*)=(\s*(?P<def>.*)\s+-- Defined)?'
+    classRegex = '(?P<what>class)\s+((?P<ctx>(.*))=>\s+)?(?P<name>\S+)\s+(?P<args>(\w+\s+)*)(.*)where$'
 
     if name[0].isupper():
         # data, class, type or newtype
@@ -25,15 +25,18 @@ def parse_info(name, contents):
             what = matched.group('what')
             args = matched.group('args').strip().split(' ') if matched.group('args') else []
             ctx = matched.group('ctx')
+            definition = matched.group('def')
+            if definition:
+                definition.strip()
 
             if what == 'class':
                 return symbols.Class(name, ctx, args)
             elif what == 'data':
-                return symbols.Data(name, ctx, args)
+                return symbols.Data(name, ctx, args, definition)
             elif what == 'type':
-                return symbols.Type(name, ctx, args)
+                return symbols.Type(name, ctx, args, definition)
             elif what == 'newtype':
-                return symbols.Newtype(name, ctx, args)
+                return symbols.Newtype(name, ctx, args, definition)
             else:
                 raise RuntimeError('Unknown type of symbol: {0}'.format(what))
 
@@ -47,13 +50,7 @@ def parse_info(name, contents):
 
 def ghci_info(module, name):
     """
-    Returns info for name as dictionary with fields:
-    'module' -> module
-    'name' -> name
-    'what' -> one of 'function', 'class', 'data', 'type' or 'newtype'
-    'type' -> type of function (e.g. 'Monad m => (a -> m b) -> [a] -> m [b]' for mapM)
-    'args' -> args of 'class' or 'data', list of names (e.g. ['k', 'a'] for Data.Map.Map)
-    'ctx' -> context of 'class' or 'data'
+    Returns info for name as symbol
     """
     ghci_cmd = [
         ":m + " + module,

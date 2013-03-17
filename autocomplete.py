@@ -1031,11 +1031,11 @@ class InspectorAgent(threading.Thread):
                                     d['type'] = info_typed.type
                             new_module.add_declaration(symbols.Function(d['name'], d['type'], d['docs'], location))
                         elif d['what'] == 'type':
-                            new_module.add_declaration(symbols.Type(d['name'], d['context'], d['args'], d['docs'], location))
+                            new_module.add_declaration(symbols.Type(d['name'], d['context'], d['args'], None, d['docs'], location))
                         elif d['what'] == 'newtype':
-                            new_module.add_declaration(symbols.Newtype(d['name'], d['context'], d['args'], d['docs'], location))
+                            new_module.add_declaration(symbols.Newtype(d['name'], d['context'], d['args'], None, d['docs'], location))
                         elif d['what'] == 'data':
-                            new_module.add_declaration(symbols.Data(d['name'], d['context'], d['args'], d['docs'], location))
+                            new_module.add_declaration(symbols.Data(d['name'], d['context'], d['args'], None, d['docs'], location))
                         elif d['what'] == 'class':
                             new_module.add_declaration(symbols.Class(d['name'], d['context'], d['args'], d['docs'], location))
                         else:
