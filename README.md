@@ -24,6 +24,8 @@ Installation
 
 Usage
 -----
+In short: Press `Shift-Ctrl-P` and type `haskell` to explore all commends.
+
 When editing Haskell source files that are part of a Cabal project, automatic error highlighting and enhanced auto-completion are available.
 
 Each time you save, any errors in your program will be listed at the bottom of the window and highlighted in the source code.
