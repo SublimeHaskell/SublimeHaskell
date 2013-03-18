@@ -10,11 +10,11 @@ Necessary:
 * Cabal packages: base, bytestring, aeson, haskell-src-exts, haddock (`cabal install aeson haskell-src-exts haddock`)
 
 Optional, but useful:
-* ghc-mod (for import and LANGUAGE completions and type inference, `cabal install ghc-mod`)
-* stylish-haskell (for code prettification, `cabal install stylish-haskell`)
-* cabal-dev if you want to use it
-* haskell_docs
-* hdevtools (for type inference, `cabal install hdevtools`)
+* [ghc-mod](http://hackage.haskell.org/package/ghc-mod) (for import and LANGUAGE completions and type inference, `cabal install ghc-mod`)
+* [stylish-haskell](https://github.com/jaspervdj/stylish-haskell) (for code prettification, `cabal install stylish-haskell`)
+* [cabal-dev](http://hackage.haskell.org/package/cabal-dev) if you want to use it
+* [haskell-docs](http://hackage.haskell.org/package/haskell-docs) (for reading documentation, `cabal install haskell-docs`)
+* [hdevtools](https://github.com/bitc/hdevtools) (for type inference, `cabal install hdevtools`)
 
 Installation
 ------------
