@@ -68,20 +68,19 @@ def select_project(window, on_selected):
 
     cabal_project_dir, cabal_project_name = get_cabal_project_dir_and_name_of_view(window.active_view())
 
-    # Show current project first
-    def compare(l, r):
-        res = cmp(not (l[0] == cabal_project_name), not (r[0] == cabal_project_name))
-        if res == 0:
-            res = cmp(l[0], r[0])
-        return res
+    # Returns tuple to sort by
+    #   is this project is current? return False to be first on sort
+    #   name of project to sort alphabetically
+    def compare(proj_name):
+        return (proj_name != cabal_project_name, proj_name)
 
-    ps.sort(compare)
+    ps.sort(key = lambda p: compare(p[0]))
 
     def on_done(idx):
         if idx != -1:
             run_selected(ps[idx])
 
-    window.show_quick_panel(map(lambda m: [m[0], m[1]['dir']], ps), on_done)
+    window.show_quick_panel(list(map(lambda m: [m[0], m[1]['dir']], ps)), on_done)
 
 
 def run_build(view, project_name, project_dir, command, use_cabal_dev=None):

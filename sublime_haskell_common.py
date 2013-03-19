@@ -87,16 +87,12 @@ def get_haskell_command_window_view_file_project(view = None):
 def decode_bytes(s):
     if s is None:
         return None
-    if int(sublime.version()) < 3000:
-        return s
-    return s.decode()
+    return s.decode('utf-8')
 
 def encode_bytes(s):
     if s is None:
         return None
-    if int(sublime.version()) < 3000:
-        return s
-    return s.encode()
+    return s.encode('utf-8')
 
 def call_and_wait(command, **popen_kwargs):
     return call_and_wait_with_input(command, None, **popen_kwargs)

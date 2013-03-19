@@ -151,7 +151,8 @@ def parse_output_messages_and_show(view, msg, base_dir, exit_code, stderr):
     """Parse errors and display resulting errors"""
 
     # stderr/stdout can contain unicode characters
-    stderr = stderr.decode('utf-8')
+    # already done in call_and_wait
+    # stderr = stderr.decode('utf-8')
 
     # The process has terminated; parse and display the output:
     parsed_messages = parse_output_messages(base_dir, stderr)
@@ -314,7 +315,7 @@ def parse_output_messages(base_dir, text):
             messy_details.strip(),
             'warning' if 'warning' in messy_details.lower() else 'error')
 
-    return map(to_error, matches)
+    return list(map(to_error, matches))
 
 
 def trim_region(view, region):
