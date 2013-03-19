@@ -112,13 +112,10 @@ def hdevtools_type(filename, line, column, cabal = None):
     """
     return call_hdevtools_and_wait(['type', filename, str(line), str(column)], filename = filename, cabal = cabal)
 
-def plugin_loaded():
+def start_hdevtools():
     thread = threading.Thread(
         target=start_server)
     thread.start()
 
-def plugin_unloaded():
-    admin(["--stop-server"])
-
-def start_hdevtools():
-    plugin_loaded()
+def stop_hdevtools():
+    admin(["--stop-server"])    

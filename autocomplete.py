@@ -13,7 +13,7 @@ if int(sublime.version()) < 3000:
     from ghci import ghci_info, ghci_package_db
     from haskell_docs import haskell_docs
     from ghcmod import ghcmod_browse_module, ghcmod_info
-    from hdevtools import hdevtools_info, start_hdevtools
+    from hdevtools import hdevtools_info, start_hdevtools, stop_hdevtools
 else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.symbols as symbols
@@ -21,7 +21,7 @@ else:
     from SublimeHaskell.ghci import ghci_info, ghci_package_db
     from SublimeHaskell.haskell_docs import haskell_docs
     from SublimeHaskell.ghcmod import ghcmod_browse_module, ghcmod_info
-    from SublimeHaskell.hdevtools import hdevtools_info, start_hdevtools
+    from SublimeHaskell.hdevtools import hdevtools_info, start_hdevtools, stop_hdevtools
 
 
 # If true, files that have not changed will not be re-inspected.
@@ -852,11 +852,6 @@ class InspectorAgent(threading.Thread):
     MODULEMSG = 'Compiling Haskell ModuleInspector'
 
     def run(self):
-        # FIXME: We can't call this in hdevtools because it will be called there twice: module is fully initialized twice
-        # This workaround works well, but how may we call plugin_unloaded in Sublime Text 2?
-        if int(sublime.version()) < 3000:
-            start_hdevtools()
-
         # Compile the CabalInspector:
         # TODO: Where to compile it?
         with status_message(InspectorAgent.CABALMSG) as s:
@@ -1239,6 +1234,13 @@ def plugin_loaded():
     global inspector
     inspector = InspectorAgent()
     inspector.start()
+
+    # TODO: How to stop_hdevtools() in Sublime Text 2?
+    start_hdevtools()
+
+def plugin_unloaded():
+    # Does this work properly on exit?
+    stop_hdevtools()
 
 if int(sublime.version()) < 3000:
     plugin_loaded()
