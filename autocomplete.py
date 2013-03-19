@@ -852,7 +852,10 @@ class InspectorAgent(threading.Thread):
     MODULEMSG = 'Compiling Haskell ModuleInspector'
 
     def run(self):
-        start_hdevtools()
+        # FIXME: We can't call this in hdevtools because it will be called there twice: module is fully initialized twice
+        # This workaround works well, but how may we call plugin_unloaded in Sublime Text 2?
+        if int(sublime.version()) < 3000:
+            start_hdevtools()
 
         # Compile the CabalInspector:
         # TODO: Where to compile it?
