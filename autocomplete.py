@@ -552,7 +552,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
 
     def browse_module(self, module):
         with autocompletion.database.modules as modules:
-            decls = module.declarations.values()
+            decls = list(module.declarations.values())
             self.candidates = decls
             self.view.window().show_quick_panel([[decl.brief(), decl.docs] if decl.docs else [decl.brief()] for decl in decls], self.on_done)
 
@@ -576,8 +576,8 @@ class SublimeHaskellBrowseModule(sublime_plugin.WindowCommand):
 
                 module_candidate = symbols.get_preferred_module(modules[module_name], current_file_name)
 
-                decls = module_candidate.declarations.values()
-                self.candidates = [d for d in decls]
+                decls = list(module_candidate.declarations.values())
+                self.candidates = decls
                 self.window.show_quick_panel([[decl.brief(), decl.docs] if decl.docs else [decl.brief()] for decl in decls], self.on_symbol_selected)
                 return
 
