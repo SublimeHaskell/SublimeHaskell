@@ -13,7 +13,7 @@ Optional, but useful:
 * [ghc-mod](http://hackage.haskell.org/package/ghc-mod) (for import and LANGUAGE completions and type inference, `cabal install ghc-mod`)
 * [stylish-haskell](https://github.com/jaspervdj/stylish-haskell) (for code prettification, `cabal install stylish-haskell`)
 * [cabal-dev](http://hackage.haskell.org/package/cabal-dev) if you want to use it
-* [haskell-docs](http://hackage.haskell.org/package/haskell-docs) (for reading documentation, `cabal install haskell-docs`)
+* [haskell-docs](http://hackage.haskell.org/package/haskell-docs) (for documentation in 'Symbol info' command, `cabal install haskell-docs`)
 * [hdevtools](https://github.com/bitc/hdevtools) (for type inference, `cabal install hdevtools`)
 
 Installation
