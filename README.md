@@ -36,7 +36,7 @@ To use cabal-dev instead of cabal, set use_cabal_dev to true (or use command "Sw
 
 Stylish-haskell can be used to stylish file or selected text.
 
-Use Ctrl-Shift-R to go to declaration and Ctrl-K-I to show symbol info with documentation
+Use Ctrl-Shift-R to go to declaration and Ctrl-K-I to show symbol info with documentation. These command are also available through context menu with right-click.
 
 Command 'SublimeHaskell: Browse module' is similar to ghci's browse command
 
