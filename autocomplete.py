@@ -11,6 +11,7 @@ if int(sublime.version()) < 3000:
     import symbols
     import cache
     import util
+    from ghci import ghci_info
     from haskell_docs import haskell_docs
     from hdevtools import start_hdevtools, stop_hdevtools
 else:
@@ -18,6 +19,7 @@ else:
     import SublimeHaskell.symbols as symbols
     import SublimeHaskell.cache as cache
     import SublimeHaskell.util as util
+    from SublimeHaskell.ghci import ghci_info
     from SublimeHaskell.haskell_docs import haskell_docs
     from SublimeHaskell.hdevtools import start_hdevtools, stop_hdevtools
 
@@ -142,6 +144,7 @@ class AutoCompletion(object):
         "Get all the completions that apply to the current file."
 
         current_file_name = view.file_name()
+        self.current_filename = current_file_name
 
         # Contents of the line under the first cursor
         line_contents = get_line_contents(view, locations[0])
@@ -253,12 +256,24 @@ class AutoCompletion(object):
         return list(set((module_next_name(m) + '\t(module)', module_next_name(m)) for m in module_list if m.startswith(qualified_prefix)))
 
     def get_current_module_completions(self):
+        completions = []
+
+        cabal = current_cabal()
+
+        with self.database.cabal_modules as cabal_modules:
+            if cabal in cabal_modules:
+                completions.extend(list(cabal_modules[cabal].keys()))
+
+        if self.current_filename:
+            (project_path, _) = get_cabal_project_dir_and_name_of_file(self.current_filename)
+            if project_path:
+                completions.extend([m.name for m in self.database.get_project_modules(project_path)])
+
         with self.module_completions as module_completions:
-            cabal = current_cabal()
-            if cabal not in module_completions:
-                # TODO: update modules info!
-                return set()
-            return module_completions[cabal].copy()
+            if cabal in module_completions:
+                completions.extend(module_completions[cabal])
+
+        return set(completions)
 
 
 autocompletion = AutoCompletion()
@@ -276,7 +291,7 @@ def can_complete_qualified_symbol(info):
     if is_import_list:
         return module_name in autocompletion.get_current_module_completions()
     else:
-        return list(filter(lambda m: m.startswith(module_name), autocompletion.get_current_module_completions()) != [])
+        return list(filter(lambda m: m.startswith(module_name), autocompletion.get_current_module_completions())) != []
 
 class SublimeHaskellComplete(sublime_plugin.TextCommand):
     """ Shows autocompletion popup """
@@ -419,8 +434,8 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
                         import_list.extend(files[current_file_name].imports.keys())
 
                 if module_word:
-                    # Full qualified name, just call to info
-                    info = util.symbol_info(module_word, ident)
+                    # Full qualified name, just call to ghci_info
+                    info = ghci_info(module_word, ident)
                     if info:
                         self.show_symbol_info(info)
                         return

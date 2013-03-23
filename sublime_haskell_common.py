@@ -344,7 +344,8 @@ def get_source_dir(filename):
     Get root of hs-source-dirs for filename in project
     """
     if not filename:
-        return os.getcwd()
+        return os.path.expanduser('~')
+        # return os.getcwd()
 
     (cabal_dir, project_name) = get_cabal_project_dir_and_name_of_file(filename)
     if not cabal_dir:
@@ -377,27 +378,28 @@ def get_cwd(filename = None):
     cwd = (get_cabal_project_dir_of_file(filename) or os.path.dirname(filename)) if filename else os.getcwd()
     return cwd
 
-def get_ghc_opts(filename = None):
+def get_ghc_opts(filename = None, add_package_db = True):
     """
     Gets ghc_opts, used in several tools, as list with extra '-package-db' option and '-i' option if filename passed
     """
     ghc_opts = get_setting_async('ghc_opts')
     if not ghc_opts:
         ghc_opts = []
-    package_db = ghci_package_db()
-    if package_db:
-        ghc_opts.append('-package-db {0}'.format(package_db))
+    if add_package_db:
+        package_db = ghci_package_db()
+        if package_db:
+            ghc_opts.append('-package-db {0}'.format(package_db))
 
     if filename:
         ghc_opts.append('-i {0}'.format(get_source_dir(filename)))
 
     return ghc_opts
 
-def get_ghc_opts_args(filename = None):
+def get_ghc_opts_args(filename = None, add_package_db = True):
     """
     Same as ghc_opts, but uses '-g' option for each option
     """
-    opts = get_ghc_opts(filename)
+    opts = get_ghc_opts(filename, add_package_db)
     args = []
     for opt in opts:
         args.extend(["-g", opt])
@@ -409,11 +411,7 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
     Shows a sublime error message if ghc-mod is not available.
     """
 
-    ghc_opts = get_setting_async('ghc_opts')
-    ghc_opts_args = []
-    if ghc_opts:
-        for opt in ghc_opts:
-            ghc_opts_args.extend(["-g", opt])
+    ghc_opts_args = get_ghc_opts_args(filename, add_package_db = False)
 
     try:
         command = attach_cabal_sandbox(['ghc-mod'] + arg_list + ghc_opts_args, cabal)

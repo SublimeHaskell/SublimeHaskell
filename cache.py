@@ -92,11 +92,11 @@ def dump_cabal_cache(database, cabal_name = None):
     with open(cabal_json, 'w') as f:
         f.write(formatted_json)
 
-def dump_project_cache(database, project_name):
+def dump_project_cache(database, project_path):
     formatted_json = None
-    project_modules = database.get_project_modules(project_name)
+    project_modules = database.get_project_modules(project_path)
     with database.files:
-        project_json = os.path.join(PROJECTS_CACHE_PATH, escape_path(project_name) + '.json')
+        project_json = os.path.join(PROJECTS_CACHE_PATH, escape_path(project_path) + '.json')
         formatted_json = encode_json(project_modules, indent = 2)
     with open(project_json, 'w') as f:
         f.write(formatted_json)
@@ -115,9 +115,9 @@ def load_cabal_cache(database, cabal_name = None):
         for m in cabal_modules.values():
             database.add_module(m, cabal_name)
 
-def load_project_cache(database, project_name):
+def load_project_cache(database, project_path):
     formatted_json = None
-    project_json = os.path.join(PROJECTS_CACHE_PATH, escape_path(project_name) + '.json')
+    project_json = os.path.join(PROJECTS_CACHE_PATH, escape_path(project_path) + '.json')
     if os.path.exists(project_json):
         with open(project_json, 'r') as f:
             formatted_json = f.read()
