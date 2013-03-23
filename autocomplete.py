@@ -548,8 +548,6 @@ class SublimeHaskellBrowseModule(sublime_plugin.WindowCommand):
                 decls = list(module_candidate.declarations.values())
                 self.candidates = decls
 
-                for decl in decls:
-                    util.load_docs(decl)
                 self.window.show_quick_panel([[decl.brief(), decl.docs] if decl.docs else [decl.brief()] for decl in decls], self.on_symbol_selected)
                 return
 
