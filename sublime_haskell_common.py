@@ -389,7 +389,7 @@ def get_ghc_opts(filename = None):
         ghc_opts.append('-package-db {0}'.format(package_db))
 
     if filename:
-        ghc_opts.append('-i {0}'.format(common.get_source_dir(filename)))
+        ghc_opts.append('-i {0}'.format(get_source_dir(filename)))
 
     return ghc_opts
 
