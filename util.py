@@ -17,7 +17,7 @@ else:
 
 def symbol_info(filename, module_name, symbol_name, cabal = None):
     result = None
-    if get_setting_async('enable_hdevtools'):
+    if common.get_setting_async('enable_hdevtools'):
         result = hdevtools.hdevtools_info(filename, symbol_name, cabal = cabal)
     if not result:
         result = ghcmod.ghcmod_info(filename, module_name, symbol_name, cabal = cabal)
