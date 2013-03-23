@@ -10,18 +10,16 @@ if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     import symbols
     import cache
-    from ghci import ghci_info, ghci_package_db
+    import util
     from haskell_docs import haskell_docs
-    from ghcmod import ghcmod_browse_module, ghcmod_info
-    from hdevtools import hdevtools_info, start_hdevtools, stop_hdevtools
+    from hdevtools import start_hdevtools, stop_hdevtools
 else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.symbols as symbols
     import SublimeHaskell.cache as cache
-    from SublimeHaskell.ghci import ghci_info, ghci_package_db
+    import SublimeHaskell.util as util
     from SublimeHaskell.haskell_docs import haskell_docs
-    from SublimeHaskell.ghcmod import ghcmod_browse_module, ghcmod_info
-    from SublimeHaskell.hdevtools import hdevtools_info, start_hdevtools, stop_hdevtools
+    from SublimeHaskell.hdevtools import start_hdevtools, stop_hdevtools
 
 
 # If true, files that have not changed will not be re-inspected.
@@ -57,14 +55,6 @@ NO_SPECIAL_CHARS_RE = re.compile(r'^(\w|[\-\.])*$')
 SYMBOL_RE = re.compile(r'((?P<module>\w+(\.\w+)*)\.)?(?P<identifier>\w*)$')
 # Get symbol module scope and its name within import statement
 IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>\w+(\.\w+)*)(\s+as\s+(?P<as>\w+))?\s*\(.*?(?P<identifier>\w*)$')
-
-def symbol_info(filename, module_name, symbol_name, cabal = None):
-    result = None
-    if get_setting_async('enable_hdevtools'):
-        result = hdevtools_info(filename, symbol_name, cabal = cabal)
-    if not result:
-        result = symbol_info(filename, module_name, symbol_name, cabal = cabal)
-    return result
 
 def get_line_contents(view, location):
     """
@@ -430,7 +420,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
 
                 if module_word:
                     # Full qualified name, just call to info
-                    info = ghci_info(module_word, ident)
+                    info = util.symbol_info(module_word, ident)
                     if info:
                         self.show_symbol_info(info)
                         return
@@ -507,7 +497,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
             return
 
         (module_name, ident_name) = self.candidates[idx]
-        info = ghci_info(module_name, ident_name)
+        info = util.symbol_info(module_name, ident_name)
         if info:
             self.show_symbol_info(info)
         else:
@@ -517,28 +507,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
         output_view = self.view.window().get_output_panel('sublime_haskell_symbol_info')
         output_view.set_read_only(False)
 
-        # Symbol from cabal, try to load detailed info with ghci
-        if not decl.location:
-            decl_detailed = None
-            decl_docs = None
-            if decl.what == 'declaration':
-                decl_detailed = ghci_info(decl.module.name, decl.name)
-            if not decl.docs:
-                decl_docs = haskell_docs(decl.module.name, decl.name)
-
-            # Replace declaration with new one
-            if decl_detailed:
-                decl_detailed.docs = decl_docs
-                autocompletion.database.add_declaration(decl_detailed, decl.module)
-                decl = decl_detailed
-            else:
-                decl.docs = decl_docs
-        # Symbol from sources, concrete type if it's not specified
-        else:
-            if decl.what == 'function' and not decl.type:
-                info = ghcmod_info(decl.location.filename, decl.module.name, decl.name)
-                if info:
-                    decl.type = info.type
+        util.refine_decl(decl)
 
         # TODO: Move to separate command for Sublime Text 3
         output_view.run_command('sublime_haskell_output_text', {
@@ -578,6 +547,9 @@ class SublimeHaskellBrowseModule(sublime_plugin.WindowCommand):
 
                 decls = list(module_candidate.declarations.values())
                 self.candidates = decls
+
+                for decl in decls:
+                    util.load_docs(decl)
                 self.window.show_quick_panel([[decl.brief(), decl.docs] if decl.docs else [decl.brief()] for decl in decls], self.on_symbol_selected)
                 return
 
@@ -806,7 +778,7 @@ class StandardInspectorAgent(threading.Thread):
 
         if module_name not in autocompletion.database.get_cabal_modules():
             try:
-                m = ghcmod_browse_module(module_name, cabal = cabal)
+                m = util.browse_module(module_name, cabal = cabal)
                 autocompletion.database.add_module(m)
 
             except Exception as e:
@@ -988,15 +960,7 @@ class InspectorAgent(threading.Thread):
                 if modification_time <= inspection_time:
                     return
 
-        hdevtools_enabled = get_setting_async('enable_hdevtools')
-
-        ghc_opts = get_setting_async('ghc_opts')
-        if not ghc_opts:
-            ghc_opts = []
-        package_db = ghci_package_db()
-        if package_db:
-            ghc_opts.append('-package-db {0}'.format(package_db))
-
+        ghc_opts = get_ghc_opts()
         ghc_opts_args = [' '.join(ghc_opts)] if ghc_opts else []
 
         exit_code, stdout, stderr = call_and_wait(
@@ -1027,12 +991,9 @@ class InspectorAgent(threading.Thread):
                     for d in new_info['declarations']:
                         location = symbols.Location(filename, d['line'], d['column'])
                         if d['what'] == 'function':
-                            if not d['type'] and hdevtools_enabled:
-                                # Try to get type with hdevtools only
-                                info_typed = hdevtools_info(filename, d['name'])
-                                if info_typed:
-                                    d['type'] = info_typed.type
-                            new_module.add_declaration(symbols.Function(d['name'], d['type'], d['docs'], location))
+                            new_function = symbols.Function(d['name'], d['type'], d['docs'], location)
+                            util.refine_type(new_function)
+                            new_module.add_declaration(new_function)
                         elif d['what'] == 'type':
                             new_module.add_declaration(symbols.Type(d['name'], d['context'], d['args'], None, d['docs'], location))
                         elif d['what'] == 'newtype':

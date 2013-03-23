@@ -64,18 +64,3 @@ def ghci_info(module, name):
         return parse_info(name, stdout)
 
     return None
-
-def ghci_package_db():
-    dev = get_setting_async('use_cabal_dev')
-    box = get_setting_async('cabal_dev_sandbox')
-    if dev and box:
-        package_conf = (filter(lambda x: re.match('packages-(.*)\.conf', x), os.listdir(box)) + [None])[0]
-        if package_conf:
-            return os.path.join(box, package_conf)
-    return None
-
-def ghci_append_package_db(cmd):
-    package_conf = ghci_package_db()
-    if package_conf:
-        cmd.extend(['-package-db', package_conf])
-    return cmd

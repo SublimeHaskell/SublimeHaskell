@@ -7,11 +7,11 @@ import threading
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
-    from ghci import ghci_package_db, parse_info
+    from ghci import parse_info
     import symbols
 else:
     from SublimeHaskell.sublime_haskell_common import *
-    from SublimeHaskell.ghci import ghci_package_db, parse_info
+    from SublimeHaskell.ghci import parse_info
     import SublimeHaskell.symbols as symbols
 
 def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
@@ -20,20 +20,8 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
     Shows a sublime error message if hdevtools is not available.
     """
 
-    ghc_opts = get_setting_async('ghc_opts')
+    ghc_opts_args = get_ghc_opts_args(filename)
     hdevtools_socket = get_setting_async('hdevtools_socket')
-
-    package_db = ghci_package_db()
-    if package_db:
-        ghc_opts.append('-package-db {0}'.format(package_db))
-
-    source_dir = get_source_dir(filename)
-    ghc_opts.append('-i {0}'.format(source_dir))
-
-    ghc_opts_args = []
-    if ghc_opts:
-        for opt in ghc_opts:
-            ghc_opts_args.extend(["-g", opt])
 
     if hdevtools_socket:
         arg_list.append('--socket={0}'.format(hdevtools_socket))

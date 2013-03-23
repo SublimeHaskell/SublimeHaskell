@@ -324,6 +324,21 @@ def set_setting(key, value):
 def set_setting_async(key, value):
     sublime.set_timeout(lambda: set_setting(key, value), 0)
 
+def ghci_package_db():
+    dev = get_setting_async('use_cabal_dev')
+    box = get_setting_async('cabal_dev_sandbox')
+    if dev and box:
+        package_conf = (filter(lambda x: re.match('packages-(.*)\.conf', x), os.listdir(box)) + [None])[0]
+        if package_conf:
+            return os.path.join(box, package_conf)
+    return None
+
+def ghci_append_package_db(cmd):
+    package_conf = ghci_package_db()
+    if package_conf:
+        cmd.extend(['-package-db', package_conf])
+    return cmd
+
 def get_source_dir(filename):
     """
     Get root of hs-source-dirs for filename in project
@@ -361,6 +376,32 @@ def get_cwd(filename = None):
     """
     cwd = (get_cabal_project_dir_of_file(filename) or os.path.dirname(filename)) if filename else os.getcwd()
     return cwd
+
+def get_ghc_opts(filename = None):
+    """
+    Gets ghc_opts, used in several tools, as list with extra '-package-db' option and '-i' option if filename passed
+    """
+    ghc_opts = get_setting_async('ghc_opts')
+    if not ghc_opts:
+        ghc_opts = []
+    package_db = ghci_package_db()
+    if package_db:
+        ghc_opts.append('-package-db {0}'.format(package_db))
+
+    if filename:
+        ghc_opts.append('-i {0}'.format(common.get_source_dir(filename)))
+
+    return ghc_opts
+
+def get_ghc_opts_args(filename = None):
+    """
+    Same as ghc_opts, but uses '-g' option for each option
+    """
+    opts = get_ghc_opts(filename)
+    args = []
+    for opt in opts:
+        args.extend(["-g", opt])
+    return args
 
 def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
     """
