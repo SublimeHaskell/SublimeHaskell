@@ -126,6 +126,8 @@ class AutoCompletion(object):
             lambda k: (k + '\t(keyword)', k),
             ['case', 'data', 'instance', 'type', 'where', 'deriving', 'import', 'module'])
 
+        self.current_filename = None
+
     def clear_inspected(self):
         # self.info = {}
         # self.std_info = {}
@@ -205,6 +207,8 @@ class AutoCompletion(object):
 
     def get_import_completions(self, view, prefix, locations):
 
+        self.current_filename = view.file_name()
+
         # Contents of the current line up to the cursor
         line_contents = get_line_contents(view, locations[0])
 
@@ -222,7 +226,7 @@ class AutoCompletion(object):
                 module_name = match_import_list.group('module')
                 import_list_completions = []
 
-                import_list_completions.extend(self.completions_for(module_name, view.file_name()))
+                import_list_completions.extend(self.completions_for(module_name, self.current_filename))
 
                 return import_list_completions
 
@@ -267,7 +271,7 @@ class AutoCompletion(object):
         if self.current_filename:
             (project_path, _) = get_cabal_project_dir_and_name_of_file(self.current_filename)
             if project_path:
-                completions.extend([m.name for m in self.database.get_project_modules(project_path)])
+                completions.extend([m.name for m in self.database.get_project_modules(project_path).values()])
 
         with self.module_completions as module_completions:
             if cabal in module_completions:
