@@ -69,8 +69,9 @@ def load_module_docs(module):
         for decl in module.declarations.values():
             if decl.name in docs:
                 decl.docs = docs[decl.name]
+        return True
 
-    return True
+    return False
 
 def enabled():
     return get_setting_async('enable_hdocs') == True
