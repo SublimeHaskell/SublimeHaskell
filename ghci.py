@@ -48,7 +48,7 @@ def parse_info(name, contents):
 
     return None
 
-def ghci_info(module, name):
+def ghci_info(module, name, cabal = None):
     """
     Returns info for name as symbol
     """
@@ -58,7 +58,7 @@ def ghci_info(module, name):
         ":q"]
     ghc_opts = get_setting_async('ghc_opts')
 
-    (exit_code, stdout, stderr) = call_and_wait_with_input(ghci_append_package_db(['ghci'] + ghc_opts), "\n".join(ghci_cmd))
+    (exit_code, stdout, stderr) = call_and_wait_with_input(ghci_append_package_db(['ghci'] + ghc_opts, cabal = cabal), "\n".join(ghci_cmd))
     stdout = crlf2lf(stdout)
     if exit_code == 0:
         return parse_info(name, stdout)
