@@ -1,6 +1,6 @@
 <snippet>
   <content><![CDATA[
-⤛ 
+⤛
 ]]></content>
   <tabTrigger>-&lt;&lt;</tabTrigger>
   <scope>source.haskell</scope>
