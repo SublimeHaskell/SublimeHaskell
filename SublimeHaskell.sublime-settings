@@ -79,5 +79,9 @@
 	"enable_hdevtools": true,
 
 	// hdevtools socket name or default
-	"hdevtools_socket": ""
+	"hdevtools_socket": "",
+
+	// Enable hdocs, disabled by default since 'hdocs' is not on hackage yet
+	// It can be manually installed from http://github.com/mvoidex/hdocs
+	"enable_hdocs": false
 }

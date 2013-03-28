@@ -39,6 +39,7 @@ def preload_settings():
     get_setting('show_output_window')
     get_setting('enable_ghc_mod')
     get_setting('enable_hdevtools')
+    get_setting('enable_hdocs')
     get_setting('snippet_replace')
     get_setting('ghc_opts')
 
