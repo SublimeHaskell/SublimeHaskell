@@ -39,6 +39,11 @@ class Symbol(object):
         self.docs = docs
         self.location = location
 
+        self.tags = {}
+
+    def full_name(self):
+        return self.module.name + '.' + self.name
+
 class Import(object):
     """
     Haskell import of module

@@ -20,7 +20,7 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
     Shows a sublime error message if hdevtools is not available.
     """
 
-    ghc_opts_args = get_ghc_opts_args(filename)
+    ghc_opts_args = get_ghc_opts_args(filename, cabal = cabal)
     hdevtools_socket = get_setting_async('hdevtools_socket')
     source_dir = get_source_dir(filename)
 
@@ -28,8 +28,6 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
         arg_list.append('--socket={0}'.format(hdevtools_socket))
 
     try:
-        command = ['hdevtools'] + arg_list + ghc_opts_args
-
         exit_code, out, err = call_and_wait(['hdevtools'] + arg_list + ghc_opts_args, cwd = source_dir)
 
         if exit_code != 0:

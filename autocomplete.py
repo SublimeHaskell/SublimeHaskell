@@ -11,6 +11,7 @@ if int(sublime.version()) < 3000:
     import symbols
     import cache
     import util
+    import hdocs
     from ghci import ghci_info
     from haskell_docs import haskell_docs
     from hdevtools import start_hdevtools, stop_hdevtools
@@ -19,6 +20,7 @@ else:
     import SublimeHaskell.symbols as symbols
     import SublimeHaskell.cache as cache
     import SublimeHaskell.util as util
+    import SublimeHaskell.hdocs as hdocs
     from SublimeHaskell.ghci import ghci_info
     from SublimeHaskell.haskell_docs import haskell_docs
     from SublimeHaskell.hdevtools import start_hdevtools, stop_hdevtools
@@ -428,7 +430,53 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
         imported_symbol_not_found = False
 
         with autocompletion.database.symbols as decl_symbols:
-            if ident not in decl_symbols:
+            if ident in decl_symbols:
+
+                decls = decl_symbols[ident] if not module_word else [d for d in decl_symbols[ident] if d.full_name() == full_name]
+
+                modules_dict = symbols.declarations_modules(decls, lambda ms: symbols.get_visible_module(ms, current_file_name)).values()
+
+                with autocompletion.database.files as files:
+                    if current_file_name in files:
+                        cur_info = files[current_file_name]
+
+                        if not module_word:
+                            # this module declaration
+                            candidates.extend([m.declarations[ident] for m in modules_dict if symbols.is_this_module(cur_info, m) and ident in m.declarations])
+                        if not candidates:
+                            # declarations from imported modules
+                            candidates.extend([m.declarations[ident] for m in modules_dict if symbols.is_imported_module(cur_info, m, module_word) and ident in m.declarations])
+                        if not candidates:
+                            imported_symbol_not_found = True
+                            # show all possible candidates
+                            candidates.extend([m.declarations[ident] for m in modules_dict if ident in m.declarations])
+
+                    # No info about imports for this file, just add all declarations
+                    else:
+                        candidates.extend([m.declarations[ident] for m in modules_dict if ident in m.declarations])
+
+            else:
+                imported_symbol_not_found = True
+
+        if imported_symbol_not_found or not candidates:
+            browse_for_module = False
+            browse_module_candidate = None
+            with autocompletion.database.modules as modules:
+                if full_name in modules:
+                    # Browse symbols in module
+                    browse_for_module = True
+                    browse_module_candidate = symbols.get_preferred_module(modules[full_name], current_file_name)
+
+            if browse_for_module:
+                if browse_module_candidate:
+                    self.view.window().run_command('sublime_haskell_browse_module', {
+                        'module_name': browse_module_candidate.name,
+                        'filename': current_file_name })
+                    return
+                else:
+                    show_status_message("No info about module {0}".format(full_name))
+                    return
+            elif not candidates:
                 # Sometimes ghc-mod returns no info about module, but module exists
                 # So there are no info about valid symbol
                 # But if user sure, that symbol exists, he can force to call for ghci to get info
@@ -451,49 +499,6 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
 
                 show_status_message('Symbol {0} not found'.format(ident), False)
                 return
-
-            decls = decl_symbols[ident]
-
-            modules_dict = symbols.declarations_modules(decls, lambda ms: symbols.get_visible_module(ms, current_file_name)).values()
-
-            with autocompletion.database.files as files:
-                if current_file_name in files:
-                    cur_info = files[current_file_name]
-
-                    if not module_word:
-                        # this module declaration
-                        candidates.extend([m.declarations[ident] for m in modules_dict if symbols.is_this_module(cur_info, m) and ident in m.declarations])
-                    if not candidates:
-                        # declarations from imported modules
-                        candidates.extend([m.declarations[ident] for m in modules_dict if symbols.is_imported_module(cur_info, m, module_word) and ident in m.declarations])
-                    if not candidates:
-                        imported_symbol_not_found = True
-                        # show all possible candidates
-                        candidates.extend([m.declarations[ident] for m in modules_dict if ident in m.declarations])
-
-                # No info about imports for this file, just add all declarations
-                else:
-                    candidates.extend([m.declarations[ident] for m in modules_dict if ident in m.declarations])
-
-        if imported_symbol_not_found:
-            browse_for_module = False
-            browse_module_candidate = None
-            with autocompletion.database.modules as modules:
-                if full_name in modules:
-                    # Browse symbols in module
-                    browse_for_module = True
-                    browse_module_candidate = symbols.get_preferred_module(modules[full_name], current_file_name)
-
-            if browse_for_module:
-                if browse_module_candidate:
-                    self.view.window().run_command('sublime_haskell_browse_module', {
-                        'module_name': browse_module_candidate.name,
-                        'filename': current_file_name })
-                    return
-                else:
-                    show_status_message("No info about module {0}".format(full_name))
-                    return
-
 
         if not candidates:
             show_status_message('Symbol {0} not found'.format(ident), False)
@@ -542,7 +547,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
         with autocompletion.database.modules as modules:
             decls = list(module.declarations.values())
             self.candidates = decls
-            self.view.window().show_quick_panel([[decl.brief(), decl.docs] if decl.docs else [decl.brief()] for decl in decls], self.on_done)
+            self.view.window().show_quick_panel([[decl.brief(), decl.docs.splitlines()[0]] if decl.docs else [decl.brief()] for decl in decls], self.on_done)
 
     def is_enabled(self):
         return is_enabled_haskell_command(self.view, False)
@@ -564,10 +569,14 @@ class SublimeHaskellBrowseModule(sublime_plugin.WindowCommand):
 
                 module_candidate = symbols.get_preferred_module(modules[module_name], current_file_name)
 
+                if hdocs.load_module_docs(module_candidate):
+                # FIXME: Not here!
+                    cache.dump_cabal_cache(autocompletion.database, module_candidate.cabal)
+
                 decls = list(module_candidate.declarations.values())
                 self.candidates = decls
 
-                self.window.show_quick_panel([[decl.brief(), decl.docs] if decl.docs else [decl.brief()] for decl in decls], self.on_symbol_selected)
+                self.window.show_quick_panel([[decl.brief(), decl.docs.splitlines()[0]] if decl.docs else [decl.brief()] for decl in decls], self.on_symbol_selected)
                 return
 
         cur_cabal = current_cabal()
@@ -696,6 +705,8 @@ class StandardInspectorAgent(threading.Thread):
         self.cabal_lock = threading.Lock()
         self.cabal_to_load = []
 
+        self.module_docs = LockedObject([])
+
         self.update_event = threading.Event()
 
     def run(self):
@@ -708,12 +719,24 @@ class StandardInspectorAgent(threading.Thread):
                 load_modules = self.modules_to_load
                 self.modules_to_load = []
 
+            cabal = current_cabal()
+
             if len(load_modules) > 0:
                 try:
                     for m in load_modules:
-                        self._load_standard_module(m)
+                        self._load_standard_module(m, cabal)
+                        # self._load_standard_module_docs(m, cabal)
                 except:
                     continue
+
+            load_module_docs = []
+            with self.module_docs as module_docs:
+                load_module_docs = module_docs[:]
+                module_docs[:] = []
+
+            if len(load_module_docs) > 0:
+                for m in load_module_docs:
+                    self._load_standard_module_docs(m, cabal)
 
             with self.cabal_lock:
                 load_cabal = self.cabal_to_load
@@ -726,12 +749,20 @@ class StandardInspectorAgent(threading.Thread):
                 except:
                     continue
 
+            if len(load_modules) > 0:
+                cache.dump_cabal_cache(autocompletion.database)
+
             self.update_event.wait(AGENT_SLEEP_TIMEOUT)
             self.update_event.clear()
 
     def load_module_info(self, module_name):
         with self.modules_lock:
             self.modules_to_load.append(module_name)
+        self.update_event.set()
+
+    def load_module_docs(self, module_name):
+        with self.module_docs as module_docs:
+            module_docs.append(module_name)
         self.update_event.set()
 
     def load_cabal_info(self, cabal_name = None):
@@ -777,6 +808,7 @@ class StandardInspectorAgent(threading.Thread):
                 loaded_modules = 0
                 for m in modules:
                     self._load_standard_module(m, cabal)
+                    # self._load_standard_module_docs(m, cabal)
                     loaded_modules += 1
                     s.percentage_message(loaded_modules, len(modules))
 
@@ -793,7 +825,7 @@ class StandardInspectorAgent(threading.Thread):
         if not cabal:
             cabal = current_cabal()
 
-        if module_name not in autocompletion.database.get_cabal_modules():
+        if module_name not in autocompletion.database.get_cabal_modules(cabal):
             try:
                 m = util.browse_module(module_name, cabal = cabal)
                 autocompletion.database.add_module(m)
@@ -801,22 +833,19 @@ class StandardInspectorAgent(threading.Thread):
             except Exception as e:
                 log('Inspecting in-cabal module {0} failed: {1}'.format(module_name, e))
 
-    def _load_standard_module_docs(self, module_name):
-        if module_name in autocompletion.database.get_cabal_modules():
-            try:
-                msg = 'Loading docs for {0}'.format(module_name)
-                begin_time = time.clock()
-                log('loading docs for standard module {0}'.format(module_name))
+    def _load_standard_module_docs(self, module_name, cabal = None):
+        if not cabal:
+            cabal = current_cabal()
 
-                with status_message(msg):
-                    in_module = autocompletion.database.get_cabal_modules()[module_name]
-                    for decl in in_module.declarations.values():
-                        decl.docs = haskell_docs(module_name, decl.name)
+        with autocompletion.database.cabal_modules as cabal_modules:
+            if module_name in cabal_modules[cabal]:
+                try:
+                    have_docs = all(list(d.docs for d in cabal_modules[cabal][module_name].declarations.values()))
+                    if not have_docs:
+                        hdocs.load_module_docs(cabal_modules[cabal][module_name])
 
-                end_time = time.clock()
-                log('loaded docs for standard module {0} within {1} seconds'.format(module_name, end_time - begin_time))
-            except Exception as e:
-                log('Loading docs for in-cabal module {0} failed: {1}'.format(module_name, e))
+                except Exception as e:
+                    log('Loading docs for in-cabal module {0} failed: {1}'.format(module_name, e))
 
 
 
@@ -834,6 +863,8 @@ class InspectorAgent(threading.Thread):
         # Files that need to be re-inspected:
         self.dirty_files_lock = threading.Lock()
         self.dirty_files = []
+
+        self.active_files = LockedObject([])
 
         self.reinspect_event = threading.Event()
 
@@ -873,14 +904,19 @@ class InspectorAgent(threading.Thread):
 
         # For first time, inspect all open folders and files
         wait_for_window(lambda w: self.mark_all_files(w))
+        self.mark_active_files()
 
         # TODO: If compilation failed, we can't proceed; handle this.
         # Periodically wake up and see if there is anything to inspect.
         while True:
             files_to_reinspect = []
+            files_to_doc = []
             with self.dirty_files_lock:
                 files_to_reinspect = self.dirty_files
                 self.dirty_files = []
+            with self.active_files as active_files:
+                files_to_doc = active_files[:]
+                active_files[:] = []
             # Find the cabal project corresponding to each "dirty" file:
             cabal_dirs = []
             standalone_files = []
@@ -897,8 +933,22 @@ class InspectorAgent(threading.Thread):
                 self._refresh_all_module_info(d, i + 1, len(cabal_dirs))
             for f in standalone_files:
                 self._refresh_module_info(f)
+            for f in files_to_doc:
+                with autocompletion.database.files as files:
+                    if f in files:
+                        for i in files[f].imports.values():
+                            std_inspector.load_module_docs(i.module)
             self.reinspect_event.wait(AGENT_SLEEP_TIMEOUT)
             self.reinspect_event.clear()
+
+    def mark_active_files(self):
+        def mark_active_files_():
+            for w in sublime.windows():
+                for v in w.views():
+                    with self.active_files as active_files:
+                        active_files.append(v.file_name())
+        sublime.set_timeout(lambda: mark_active_files_, 0)
+        self.reinspect_event.set()
 
     def mark_all_files(self, window):
         folder_files = []
@@ -910,6 +960,11 @@ class InspectorAgent(threading.Thread):
 
     def show_errors(self, window, error_text):
         sublime.set_timeout(lambda: output_error(window, error_text), 0)
+
+    def mark_file_active(self, filename):
+        with self.active_files as active_files:
+            active_files.append(filename)
+        self.reinspect_event.set()
 
     def mark_file_dirty(self, filename):
         "Report that a file should be reinspected."
@@ -1152,9 +1207,14 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         filename = view.file_name()
         if filename:
             inspector.mark_file_dirty(filename)
+            inspector.mark_file_active(filename)
 
     def on_load(self, view):
         self.set_cabal_status(view)
+        filename = view.file_name()
+        if filename:
+            inspector.mark_file_dirty(filename)
+            inspector.mark_file_active(filename)
 
     def on_activated(self, view):
         self.set_cabal_status(view)

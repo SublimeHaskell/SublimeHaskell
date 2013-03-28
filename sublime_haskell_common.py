@@ -1,6 +1,7 @@
 import errno
 import fnmatch
 import os
+import re
 import json
 import sublime
 import sublime_plugin
@@ -324,17 +325,19 @@ def set_setting(key, value):
 def set_setting_async(key, value):
     sublime.set_timeout(lambda: set_setting(key, value), 0)
 
-def ghci_package_db():
-    dev = get_setting_async('use_cabal_dev')
-    box = get_setting_async('cabal_dev_sandbox')
+def ghci_package_db(cabal = None):
+    if cabal == 'cabal':
+        return None
+    dev = True if cabal else get_setting_async('use_cabal_dev')
+    box = cabal if cabal else get_setting_async('cabal_dev_sandbox')
     if dev and box:
         package_conf = (filter(lambda x: re.match('packages-(.*)\.conf', x), os.listdir(box)) + [None])[0]
         if package_conf:
             return os.path.join(box, package_conf)
     return None
 
-def ghci_append_package_db(cmd):
-    package_conf = ghci_package_db()
+def ghci_append_package_db(cmd, cabal = None):
+    package_conf = ghci_package_db(cabal)
     if package_conf:
         cmd.extend(['-package-db', package_conf])
     return cmd
@@ -378,7 +381,7 @@ def get_cwd(filename = None):
     cwd = (get_cabal_project_dir_of_file(filename) or os.path.dirname(filename)) if filename else os.getcwd()
     return cwd
 
-def get_ghc_opts(filename = None, add_package_db = True):
+def get_ghc_opts(filename = None, add_package_db = True, cabal = None):
     """
     Gets ghc_opts, used in several tools, as list with extra '-package-db' option and '-i' option if filename passed
     """
@@ -386,7 +389,7 @@ def get_ghc_opts(filename = None, add_package_db = True):
     if not ghc_opts:
         ghc_opts = []
     if add_package_db:
-        package_db = ghci_package_db()
+        package_db = ghci_package_db(cabal = cabal)
         if package_db:
             ghc_opts.append('-package-db {0}'.format(package_db))
 
@@ -395,11 +398,11 @@ def get_ghc_opts(filename = None, add_package_db = True):
 
     return ghc_opts
 
-def get_ghc_opts_args(filename = None, add_package_db = True):
+def get_ghc_opts_args(filename = None, add_package_db = True, cabal = None):
     """
     Same as ghc_opts, but uses '-g' option for each option
     """
-    opts = get_ghc_opts(filename, add_package_db)
+    opts = get_ghc_opts(filename, add_package_db, cabal)
     args = []
     for opt in opts:
         args.extend(["-g", opt])
@@ -411,7 +414,7 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
     Shows a sublime error message if ghc-mod is not available.
     """
 
-    ghc_opts_args = get_ghc_opts_args(filename, add_package_db = False)
+    ghc_opts_args = get_ghc_opts_args(filename, add_package_db = False, cabal = cabal)
 
     try:
         command = attach_cabal_sandbox(['ghc-mod'] + arg_list + ghc_opts_args, cabal)
@@ -527,6 +530,7 @@ class StatusMessage(threading.Thread):
     def __init__(self, msg, timeout, priority):
         super(StatusMessage, self).__init__()
         self.interval = 0.5
+        self.start_timeout = timeout
         self.timeout = timeout
         self.priority = priority
         self.msg = msg
@@ -579,9 +583,11 @@ class StatusMessage(threading.Thread):
                 return False
 
     def change_message(self, new_msg):
+        # There's progress, don't timeout
+        self.timeout = self.start_timeout
         self.msg = new_msg
 
-def show_status_message_process(msg, isok = None, timeout = 60, priority = 0):
+def show_status_message_process(msg, isok = None, timeout = 300, priority = 0):
     """
     Same as show_status_message, but shows permanently until called with isok not None
     There can be only one message process in time, message with highest priority is shown
@@ -634,7 +640,7 @@ class with_status_message(object):
 def status_message(msg, isok = True):
     return with_status_message(msg, isok, show_status_message)
 
-def status_message_process(msg, isok = True, timeout = 60, priority = 0):
+def status_message_process(msg, isok = True, timeout = 300, priority = 0):
     return with_status_message(msg, isok, lambda m, ok = None: show_status_message_process(m, ok, timeout, priority))
 
 def sublime_haskell_package_path():
