@@ -33,11 +33,11 @@ def call_hdocs_and_wait(args, filename = None, cabal = None):
         return None
 
 def module_docs(module_name, cabal = None):
-    contents = call_hdocs_and_wait(['module', module_name], cabal = cabal)
+    contents = call_hdocs_and_wait(['docs', module_name], cabal = cabal)
     return json.loads(contents)
 
 def symbol_docs(module_name, symbol_name, cabal = None):
-    contents = call_hdocs_and_wait(['name', symbol_name, module_name], cabal = cabal)
+    contents = call_hdocs_and_wait(['docs', module_name, symbol_name], cabal = cabal)
     return contents
 
 def load_module_docs(module):
@@ -53,14 +53,3 @@ def load_module_docs(module):
             decl.docs = docs[decl.name]
 
     return True
-
-def start_server():
-    call_hdocs_and_wait(['start'])
-
-def start_hdocs():
-    thread = threading.Thread(
-        target=start_server)
-    thread.start()
-
-def stop_hdocs():
-    hdocs(['stop'])

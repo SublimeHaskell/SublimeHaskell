@@ -854,9 +854,7 @@ class StandardInspectorAgent(threading.Thread):
         with autocompletion.database.cabal_modules as cabal_modules:
             if module_name in cabal_modules[cabal]:
                 try:
-                    have_docs = all(list(d.docs for d in cabal_modules[cabal][module_name].declarations.values()))
-                    if not have_docs:
-                        hdocs.load_module_docs(cabal_modules[cabal][module_name])
+                    hdocs.load_module_docs(cabal_modules[cabal][module_name])
 
                 except Exception as e:
                     log('Loading docs for in-cabal module {0} failed: {1}'.format(module_name, e))
