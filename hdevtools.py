@@ -59,14 +59,30 @@ def admin(cmds, wait = False, **popen_kwargs):
 
     command = ["hdevtools", "admin"] + cmds
 
-    if wait:
-        (exit_code, stdout, stderr) = call_and_wait(command, **popen_kwargs)
-        if exit_code == 0:
-            return stdout
-        return ''
-    else:
-        call_no_wait(command, **popen_kwargs)
-        return ''
+    try:
+        if wait:
+            (exit_code, stdout, stderr) = call_and_wait(command, **popen_kwargs)
+            if exit_code == 0:
+                return stdout
+            return ''
+        else:
+            call_no_wait(command, **popen_kwargs)
+            return ''
+
+    except OSError as e:
+        if e.errno == errno.ENOENT:
+            output_error(sublime.active_window(),
+                "SublimeHaskell: hdevtools was not found!\n"
+                + "It's used for 'symbol info' and type inference\n"
+                + "Try adjusting the 'add_to_PATH' setting.\n"
+                + "'enable_hdevtools' automatically set to False.")
+
+        set_setting_async('enable_hdevtools', False)
+
+        return None
+    except Exception as e:
+        log('calling to hdevtools fails with {0}'.format(e))
+        return None
 
 def is_running():
     r = admin(['--status'], wait = True)

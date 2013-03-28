@@ -149,6 +149,10 @@ def ghcmod_browse_module(module_name, cabal = None):
     Returns symbols.Module with all declarations
     """
     contents = call_ghcmod_and_wait(['browse', '-d', module_name], cabal = cabal).splitlines()
+
+    if not contents:
+        return None
+
     m = symbols.Module(module_name, cabal = cabal)
 
     functionRegex = r'(?P<name>\w+)\s+::\s+(?P<type>.*)'

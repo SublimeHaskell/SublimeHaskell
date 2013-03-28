@@ -415,7 +415,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
                     if decl in m.declarations:
                         self.show_symbol_info(m.declarations[decl])
                     else:
-                        show_status_message('Symbol {0} not found in {1}'.format(decl, ))
+                        show_status_message('Symbol {0} not found in {1}'.format(decl, filename))
                 else:
                     show_status_message('No info about module {0}'.format(module_name))
             return
@@ -494,7 +494,9 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
                 elif import_list:
                     # Allow user to select module
                     self.candidates = [(m, ident) for m in import_list]
-                    self.view.window().show_quick_panel(['{0}.{1}'.format(m, ident) for m in import_list], self.on_candidate_selected)
+                    self.view.window().show_quick_panel([
+                        ['Select imported module', 'from where {0} may be imported'.format(ident)],
+                        ['No, thanks']], self.on_import_selected)
                     return
 
                 show_status_message('Symbol {0} not found'.format(ident), False)
@@ -516,12 +518,16 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
             return
         self.show_symbol_info(self.candidates[idx])
 
+    def on_import_selected(self, idx):
+        if idx == 0: # Yes, select imported module
+            self.view.window().show_quick_panel(['{0}.{1}'.format(i[0], i[1]) for i in self.candidates], self.on_candidate_selected)
+
     def on_candidate_selected(self, idx):
         if idx == -1:
             return
 
         (module_name, ident_name) = self.candidates[idx]
-        info = util.symbol_info(module_name, ident_name)
+        info = util.symbol_info(self.view.file_name(), module_name, ident_name)
         if info:
             self.show_symbol_info(info)
         else:
@@ -607,9 +613,16 @@ class SublimeHaskellBrowseModule(sublime_plugin.WindowCommand):
         if idx == -1:
             return
 
-        self.window.active_view().run_command('sublime_haskell_symbol_info', {
-            'module_name': self.candidates[idx].module.name,
-            'decl': self.candidates[idx].name })
+        candidate = self.candidates[idx]
+
+        if candidate.module.location:
+            self.window.active_view().run_command('sublime_haskell_symbol_info', {
+                'filename': candidate.module.location.filename,
+                'decl': candidate.name })
+        else:
+            self.window.active_view().run_command('sublime_haskell_symbol_info', {
+                'module_name': candidate.module.name,
+                'decl': candidate.name })
 
 class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
     def run(self, edit):
@@ -828,7 +841,8 @@ class StandardInspectorAgent(threading.Thread):
         if module_name not in autocompletion.database.get_cabal_modules(cabal):
             try:
                 m = util.browse_module(module_name, cabal = cabal)
-                autocompletion.database.add_module(m)
+                if m:
+                    autocompletion.database.add_module(m)
 
             except Exception as e:
                 log('Inspecting in-cabal module {0} failed: {1}'.format(module_name, e))
