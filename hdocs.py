@@ -8,6 +8,9 @@ else:
     from SublimeHaskell.sublime_haskell_common import *
 
 def call_hdocs_and_wait(args, filename = None, cabal = None):
+    if not hdocs_enabled():
+        return None
+
     ghc_opts_args = get_ghc_opts_args(filename, cabal = cabal)
     source_dir = get_source_dir(filename)
     
@@ -24,7 +27,7 @@ def call_hdocs_and_wait(args, filename = None, cabal = None):
 
     except OSError as e:
         if e.errno == errno.ENOENT:
-            sublime.set_timeout(lambda: output_error(sublime.active_window(), "SublimeHaskell: hdocs was not found!\n  'enable_hdocs' is set to False"), 0)
+            sublime.set_timeout(lambda: output_error(sublime.active_window(), "SublimeHaskell: hdocs was not found!\n'enable_hdocs' is set to False"), 0)
             set_setting_async('enable_hdocs', False)
 
         return None
@@ -34,7 +37,7 @@ def call_hdocs_and_wait(args, filename = None, cabal = None):
         return None
 
 def module_docs(module_name, cabal = None):
-    if not enabled():
+    if not hdocs_enabled():
         return None
 
     try:
@@ -48,14 +51,13 @@ def module_docs(module_name, cabal = None):
         return None
 
 def symbol_docs(module_name, symbol_name, cabal = None):
-    if not enabled():
+    if not hdocs_enabled():
         return None
 
-    contents = call_hdocs_and_wait(['docs', module_name, symbol_name], cabal = cabal)
-    return contents
+    return call_hdocs_and_wait(['docs', module_name, symbol_name], cabal = cabal)
 
 def load_module_docs(module):
-    if not enabled():
+    if not hdocs_enabled():
         return False
 
     if module.location:
@@ -73,5 +75,5 @@ def load_module_docs(module):
 
     return False
 
-def enabled():
+def hdocs_enabled():
     return get_setting_async('enable_hdocs') == True

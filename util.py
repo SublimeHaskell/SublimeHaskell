@@ -15,13 +15,13 @@ else:
     import SublimeHaskell.sublime_haskell_common as common
     import SublimeHaskell.symbols as symbols
 
-def symbol_info(filename, module_name, symbol_name, cabal = None):
+def symbol_info(filename, module_name, symbol_name, cabal = None, no_ghci = False):
     result = None
-    if common.get_setting_async('enable_hdevtools'):
+    if hdevtools.hdevtools_enabled():
         result = hdevtools.hdevtools_info(filename, symbol_name, cabal = cabal)
-    if not result:
+    if not result and common.get_setting_async('enable_ghc_mod'):
         result = ghcmod.ghcmod_info(filename, module_name, symbol_name, cabal = cabal)
-    if not result and filename:
+    if not result and not filename and not no_ghci:
         result = ghci.ghci_info(module_name, symbol_name, cabal = cabal)
     return result
 
@@ -32,19 +32,15 @@ def load_docs(decl):
     if decl.docs is None:
         decl.docs = haskell_docs.haskell_docs(decl.module.name, decl.name)
 
-def refine_type(decl, hdevtools_only = True):
+def refine_type(decl, no_ghci = True):
     """
     Refine type for sources decl
     """
-    hdevtools_enabled = common.get_setting_async('enable_hdevtools')
+    ghcmod_enabled = common.get_setting_async('enable_ghc_mod')
 
     if decl.location:
         if decl.what == 'function' and not decl.type:
-            info = None
-            if hdevtools_only and hdevtools_enabled:
-                info = hdevtools.hdevtools_info(decl.location.filename, decl.name)
-            else:
-                info = symbol_info(decl.location.filename, decl.module.name, decl.name)
+            info = symbol_info(decl.location.filename, decl.module.name, decl.name, None, no_ghci = no_ghci)
             if info:
                 decl.type = info.type
 

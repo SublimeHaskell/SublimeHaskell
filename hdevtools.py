@@ -19,6 +19,8 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
     Calls hdevtools with the given arguments.
     Shows a sublime error message if hdevtools is not available.
     """
+    if not hdevtools_enabled():
+        return None
 
     ghc_opts_args = get_ghc_opts_args(filename, cabal = cabal)
     hdevtools_socket = get_setting_async('hdevtools_socket')
@@ -37,11 +39,11 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
 
     except OSError as e:
         if e.errno == errno.ENOENT:
-            output_error(sublime.active_window(),
+            sublime.set_timeout(lambda: output_error(sublime.active_window(),
                 "SublimeHaskell: hdevtools was not found!\n"
                 + "It's used for 'symbol info' and type inference\n"
                 + "Try adjusting the 'add_to_PATH' setting.\n"
-                + "'enable_hdevtools' automatically set to False.")
+                + "'enable_hdevtools' automatically set to False."), 0)
 
         set_setting_async('enable_hdevtools', False)
 
@@ -52,6 +54,9 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
         return None
 
 def admin(cmds, wait = False, **popen_kwargs):
+    if not hdevtools_enabled():
+        return None
+
     hdevtools_socket = get_setting_async('hdevtools_socket')
 
     if hdevtools_socket:
@@ -86,7 +91,7 @@ def admin(cmds, wait = False, **popen_kwargs):
 
 def is_running():
     r = admin(['--status'], wait = True)
-    if re.search(r'running', r):
+    if r and re.search(r'running', r):
         return True
     else:
         return False
@@ -106,8 +111,7 @@ def hdevtools_check(filename, cabal = None):
     """
     Uses hdevtools to check file
     """
-    contents = call_hdevtools_and_wait(['check', filename], filename = filename, cabal = cabal)
-    return contents
+    return call_hdevtools_and_wait(['check', filename], filename = filename, cabal = cabal)
 
 def hdevtools_type(filename, line, column, cabal = None):
     """
@@ -122,3 +126,6 @@ def start_hdevtools():
 
 def stop_hdevtools():
     admin(["--stop-server"])    
+
+def hdevtools_enabled():
+    return get_setting_async('enable_hdevtools') == True
