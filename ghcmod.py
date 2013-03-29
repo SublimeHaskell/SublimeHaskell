@@ -5,12 +5,12 @@ import sublime_plugin
 from threading import Thread
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import log, is_enabled_haskell_command, get_haskell_command_window_view_file_project, call_ghcmod_and_wait
+    from sublime_haskell_common import log, is_enabled_haskell_command, get_haskell_command_window_view_file_project, call_ghcmod_and_wait, get_setting_async
     from parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages
     from ghci import parse_info
     import symbols
 else:
-    from SublimeHaskell.sublime_haskell_common import log, is_enabled_haskell_command, get_haskell_command_window_view_file_project, call_ghcmod_and_wait
+    from SublimeHaskell.sublime_haskell_common import log, is_enabled_haskell_command, get_haskell_command_window_view_file_project, call_ghcmod_and_wait, get_setting_async
     from SublimeHaskell.parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages
     from SublimeHaskell.ghci import parse_info
     import SublimeHaskell.symbols as symbols
@@ -201,3 +201,6 @@ def ghcmod_type(filename, module_name, line, column, cabal = None):
     Uses ghc-mod type to infer type
     """
     return call_ghcmod_and_wait(['type', filename, module_name, str(line), str(column)], filename = filename, cabal = cabal)
+
+def ghcmod_enabled():
+    return get_setting_async('enable_ghc_mod') == True

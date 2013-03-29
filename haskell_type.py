@@ -3,15 +3,15 @@ import sublime_plugin
 import re
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import call_ghcmod_and_wait, is_enabled_haskell_command, get_setting_async, show_status_message
+    from sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message
     from autocomplete import autocompletion
-    from hdevtools import hdevtools_type
-    from ghcmod import ghcmod_type
+    from hdevtools import hdevtools_type, hdevtools_enabled
+    from ghcmod import ghcmod_type, ghcmod_enabled
 else:
-    from SublimeHaskell.sublime_haskell_common import call_ghcmod_and_wait, is_enabled_haskell_command, get_setting_async, show_status_message
+    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message
     from SublimeHaskell.autocomplete import autocompletion
-    from SublimeHaskell.hdevtools import hdevtools_type
-    from SublimeHaskell.ghcmod import ghcmod_type
+    from SublimeHaskell.hdevtools import hdevtools_type, hdevtools_enabled
+    from SublimeHaskell.ghcmod import ghcmod_type, ghcmod_enabled
     from functools import reduce
 
 # Used to find out the module name.
@@ -116,11 +116,10 @@ def parse_type_output(s):
 def haskell_type(filename, module_name, line, column, cabal = None):
     result = None
 
-    if get_setting_async('enable_hdevtools'):
+    if hdevtools_enabled():
         result = hdevtools_type(filename, line, column, cabal = cabal)
-    if not result:
-        if module_name:
-            result = ghcmod_type(filename, module_name, line, column, cabal = cabal)
+    if not result and module_name and ghcmod_enabled():
+        result = ghcmod_type(filename, module_name, line, column, cabal = cabal)
     return parse_type_output(result) if result else None
 
 class SublimeHaskellShowType(sublime_plugin.TextCommand):

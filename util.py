@@ -19,7 +19,7 @@ def symbol_info(filename, module_name, symbol_name, cabal = None, no_ghci = Fals
     result = None
     if hdevtools.hdevtools_enabled():
         result = hdevtools.hdevtools_info(filename, symbol_name, cabal = cabal)
-    if not result and common.get_setting_async('enable_ghc_mod'):
+    if not result and ghcmod.ghcmod_enabled():
         result = ghcmod.ghcmod_info(filename, module_name, symbol_name, cabal = cabal)
     if not result and not filename and not no_ghci:
         result = ghci.ghci_info(module_name, symbol_name, cabal = cabal)
@@ -36,8 +36,6 @@ def refine_type(decl, no_ghci = True):
     """
     Refine type for sources decl
     """
-    ghcmod_enabled = common.get_setting_async('enable_ghc_mod')
-
     if decl.location:
         if decl.what == 'function' and not decl.type:
             info = symbol_info(decl.location.filename, decl.module.name, decl.name, None, no_ghci = no_ghci)
