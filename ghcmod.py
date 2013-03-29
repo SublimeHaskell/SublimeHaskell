@@ -24,7 +24,7 @@ def lint_as_hints(msgs):
 
 class SublimeHaskellGhcModCheck(sublime_plugin.WindowCommand):
     def run(self):
-        run_ghcmod('check', 'Checking')
+        run_ghcmod(['check'], 'Checking')
 
     def is_enabled(self):
         return is_enabled_haskell_command(None, False)
@@ -32,7 +32,7 @@ class SublimeHaskellGhcModCheck(sublime_plugin.WindowCommand):
 
 class SublimeHaskellGhcModLint(sublime_plugin.WindowCommand):
     def run(self):
-        run_ghcmod('lint', 'Linting', lint_as_hints)
+        run_ghcmod(['lint', '-h', '-u'], 'Linting', lint_as_hints)
 
     def is_enabled(self):
         return is_enabled_haskell_command(None, False)
@@ -40,7 +40,7 @@ class SublimeHaskellGhcModLint(sublime_plugin.WindowCommand):
 
 class SublimeHaskellGhcModCheckAndLint(sublime_plugin.WindowCommand):
     def run(self):
-        run_ghcmods(['check', 'lint'], 'Checking and Linting', lint_as_hints)
+        run_ghcmods([['check'], ['lint', '-h', '-u']], 'Checking and Linting', lint_as_hints)
 
     def is_enabled(self):
         return is_enabled_haskell_command(None, False)
@@ -60,7 +60,7 @@ def run_ghcmods(cmds, msg, alter_messages_cb=None):
 
     ghc_mod_args = []
     for cmd in cmds:
-        ghc_mod_args.append((cmd, [cmd, file_shown_in_view]))
+        ghc_mod_args.append((cmd, cmd + [file_shown_in_view]))
 
     def show_current_file_first_and_alter(msgs):
         if alter_messages_cb:
@@ -119,7 +119,7 @@ def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb
 
         if not success:
             all_cmds_outputs.append(out)
-            log("ghc-mod %s didn't exit with success on '%s'" % (cmd, filename))
+            log(u"ghc-mod %s didn't exit with success on '%s'" % (u' '.join(cmd), filename))
 
         all_cmds_successful &= success
 
