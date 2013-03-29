@@ -1074,7 +1074,7 @@ class InspectorAgent(threading.Thread):
                     for d in new_info['declarations']:
                         location = symbols.Location(filename, d['line'], d['column'])
                         if d['what'] == 'function':
-                            new_function = symbols.Function(d['name'], d['type'], d['docs'], location)
+                            new_function = symbols.Function(d['name'], d['type'], d['docs'], location, new_module)
                             util.refine_type(new_function)
                             new_module.add_declaration(new_function)
                         elif d['what'] == 'type':
