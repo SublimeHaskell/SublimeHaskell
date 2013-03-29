@@ -51,7 +51,7 @@ def refine_decl(decl):
         load_docs(decl)
 
         if decl.what == 'declaration':
-            decl_detailed = symbol_info(decl.module.name, decl.name)
+            decl_detailed = ghci.ghci_info(decl.module.name, decl.name)
             if decl_detailed:
                 decl.__dict__.update(decl_detailed.__dict__)
 

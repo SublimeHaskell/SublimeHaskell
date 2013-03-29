@@ -644,7 +644,7 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
                 if current_file_name in files:
                     cur_info = files[current_file_name]
 
-                    if not module_word:
+                    if not module_word or module_word == cur_info.name:
                         # this module declarations
                         candidates.extend([m.declarations[ident] for m in modules_dict if symbols.is_this_module(cur_info, m) and ident in m.declarations])
                     if not candidates:
@@ -655,7 +655,7 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
                         candidates.extend([m.declarations[ident] for m in modules_dict if symbols.is_imported_module(cur_info, m, module_word) and ident in m.declarations])
                     if not candidates:
                         # show all possible candidates
-                        candidates.extend([m.declarations[ident] for m in modules_dict if ident in declarations])
+                        candidates.extend([m.declarations[ident] for m in modules_dict if ident in m.declarations])
 
                 # No info about imports for this file, just add all declarations
                 else:
