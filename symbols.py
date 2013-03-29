@@ -134,10 +134,10 @@ class Function(Declaration):
         self.type = function_type
 
     def suggest(self):
-        return ('{0}\t{1}'.format(self.name, self.type), self.name)
+        return (u'{0}\t{1}'.format(self.name, self.type), self.name)
 
     def brief(self):
-        return '{0} :: {1}'.format(self.name, self.type if self.type else '?')
+        return u'{0} :: {1}'.format(self.name, self.type if self.type else u'?')
 
 class TypeBase(Declaration):
     """
@@ -153,27 +153,27 @@ class TypeBase(Declaration):
         result = [self.name]
         i = 1
         for arg in self.args:
-            result.append("${" + str(i) + ":" + arg + "}")
+            result.append(u"${" + str(i) + u":" + arg + u"}")
             i += 1
 
-        return ' '.join(result)
+        return u' '.join(result)
 
     def suggest(self):
-        return ('{0}\t{1}'.format(self.name, ' '.join(self.args)), self.snippet())
+        return (u'{0}\t{1}'.format(self.name, ' '.join(self.args)), self.snippet())
 
     def brief(self):
         brief_parts = [self.what]
         if self.context:
             if len(self.context) == 1:
-                brief_parts.append('{0} =>'.format(self.context[0]))
+                brief_parts.append(u'{0} =>'.format(self.context[0]))
             else:
-                brief_parts.append('({0}) =>'.format(', '.join(self.context)))
+                brief_parts.append(u'({0}) =>'.format(', '.join(self.context)))
         brief_parts.append(self.name)
         if self.args:
-            brief_parts.append(' '.join(self.args))
+            brief_parts.append(u' '.join(self.args))
         if self.definition:
-            brief_parts.append(' = {0}'.format(self.definition))
-        return ' '.join(brief_parts)
+            brief_parts.append(u' = {0}'.format(self.definition))
+        return u' '.join(brief_parts)
 
 class Type(TypeBase):
     """
