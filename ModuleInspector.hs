@@ -15,6 +15,7 @@ import qualified Data.Text.Lazy.IO as T
 import qualified Language.Haskell.Exts as H
 import qualified System.Environment as Environment
 import qualified System.Directory as Dir
+import System.IO
 
 import qualified Name (Name, getOccString, occNameString)
 import qualified Module (moduleNameString)
@@ -222,6 +223,7 @@ addDocs docsMap info = info { _declarations = map (addDoc docsMap) (_declaration
 -- | Analyze the specified file and dump the collected information to stdout.
 main :: IO ()
 main = do
+    hSetEncoding stdout utf8
     programName <- Environment.getProgName
     args <- Environment.getArgs
     case args of
@@ -234,7 +236,7 @@ main = do
             let
                 noReturn :: E.SomeException -> IO [Doc.Interface]
                 noReturn e = print e >> return []
-            source <- readFile filename
+            source <- readFileUtf8 filename
             absFilename <- Dir.canonicalizePath filename
             docsMap <- fmap (fmap documentationMap . lookup absFilename) $ do
                 is <- E.catch (Doc.createInterfaces opts [filename]) noReturn
@@ -246,3 +248,10 @@ main = do
                     Right info -> Json.toJSON $ maybe id addDocs docsMap info
             T.putStr "ModuleInfo:" -- workardound, Haddock prints to output, so this string is used to find result
             T.putStrLn . T.decodeUtf8 . Json.encode $ output
+
+-- | Read file contents in UTF8
+readFileUtf8 :: FilePath -> IO String
+readFileUtf8 f = do
+    h <- openFile f ReadMode
+    hSetEncoding h utf8
+    hGetContents h
