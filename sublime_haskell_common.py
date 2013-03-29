@@ -426,6 +426,10 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
 
         # log('running ghc-mod: {0}'.format(command))
 
+        # Set cwd to user directory
+        # Otherwise ghc-mod will fail with 'cannot satisfy package...'
+        # Seems, that user directory works well
+        # Current source directory is set with -i argument in get_ghc_opts_args
         exit_code, out, err = call_and_wait(command, cwd=get_source_dir(None))
 
         if exit_code != 0:
