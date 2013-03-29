@@ -259,7 +259,7 @@ class Database(object):
         with self.cabal_modules as cabal_modules:
             if cabal not in cabal_modules:
                 cabal_modules[cabal] = {}
-            return cabal_modules[cabal]
+        return LockedObject(self.cabal_modules.object[cabal], self.cabal_modules.object_lock)
 
     def get_project_modules(self, project_name):
         with self.files as files:
@@ -305,7 +305,11 @@ class Database(object):
         Adds module and updates indexes
         """
         if not cabal:
-            cabal = current_cabal()
+            if new_module.cabal:
+                cabal = new_module.cabal
+            else:
+                cabal = current_cabal()
+                new_module.cabal = cabal
 
         with self.cabal_modules as cabal_modules:
             if cabal not in cabal_modules:

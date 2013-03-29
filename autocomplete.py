@@ -266,9 +266,8 @@ class AutoCompletion(object):
 
         cabal = current_cabal()
 
-        with self.database.cabal_modules as cabal_modules:
-            if cabal in cabal_modules:
-                completions.extend(list(cabal_modules[cabal].keys()))
+        with self.database.get_cabal_modules() as cabal_modules:
+            completions.extend(list(cabal_modules.keys()))
 
         if self.current_filename:
             (project_path, _) = get_cabal_project_dir_and_name_of_file(self.current_filename)
@@ -407,11 +406,9 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
             return
 
         if decl and module_name:
-            cur_cabal = current_cabal()
-            with autocompletion.database.cabal_modules as cabal_modules:
-                modules = cabal_modules[cur_cabal]
-                if module_name in modules:
-                    m = modules[module_name]
+            with autocompletion.database.get_cabal_modules() as cabal_modules:
+                if module_name in cabal_modules:
+                    m = cabal_modules[module_name]
                     if decl in m.declarations:
                         self.show_symbol_info(m.declarations[decl])
                     else:
@@ -585,16 +582,14 @@ class SublimeHaskellBrowseModule(sublime_plugin.WindowCommand):
                 self.window.show_quick_panel([[decl.brief(), decl.docs.splitlines()[0]] if decl.docs else [decl.brief()] for decl in decls], self.on_symbol_selected)
                 return
 
-        cur_cabal = current_cabal()
-
         self.candidates = []
 
         with autocompletion.database.files as files:
             for fname, m in files.items():
                 self.candidates.append([m.name, fname])
 
-        with autocompletion.database.cabal_modules as cabal_modules:
-            for m in cabal_modules[cur_cabal].values():
+        with autocompletion.database.get_cabal_modules() as cabal_modules:
+            for m in cabal_modules.values():
                 self.candidates.append([m.name])
 
         self.candidates.sort(key = lambda c: c[0])
@@ -838,23 +833,26 @@ class StandardInspectorAgent(threading.Thread):
         if not cabal:
             cabal = current_cabal()
 
-        if module_name not in autocompletion.database.get_cabal_modules(cabal):
-            try:
-                m = util.browse_module(module_name, cabal = cabal)
-                if m:
-                    autocompletion.database.add_module(m)
+        with autocompletion.database.get_cabal_modules(cabal) as cabal_modules:
+            if module_name in cabal_modules:
+                return
 
-            except Exception as e:
-                log('Inspecting in-cabal module {0} failed: {1}'.format(module_name, e))
+        try:
+            m = util.browse_module(module_name, cabal = cabal)
+            if m:
+                autocompletion.database.add_module(m)
+
+        except Exception as e:
+            log('Inspecting in-cabal module {0} failed: {1}'.format(module_name, e))
 
     def _load_standard_module_docs(self, module_name, cabal = None):
         if not cabal:
             cabal = current_cabal()
 
-        with autocompletion.database.cabal_modules as cabal_modules:
-            if module_name in cabal_modules[cabal]:
+        with autocompletion.database.get_cabal_modules(cabal) as cabal_modules:
+            if module_name in cabal_modules:
                 try:
-                    hdocs.load_module_docs(cabal_modules[cabal][module_name])
+                    hdocs.load_module_docs(cabal_modules[module_name])
 
                 except Exception as e:
                     log('Loading docs for in-cabal module {0} failed: {1}'.format(module_name, e))

@@ -674,8 +674,8 @@ class LockedObject(object):
         v...
     """
 
-    def __init__(self, obj):
-        self.object_lock = threading.Lock()
+    def __init__(self, obj, lock = None):
+        self.object_lock = lock if lock else threading.Lock()
         self.object = obj
 
     def __enter__(self):

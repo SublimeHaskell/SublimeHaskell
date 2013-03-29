@@ -56,10 +56,10 @@ def symbol_serializers():
         symbols.Module: ('module', ['name', 'exports', 'imports', 'declarations', 'location', 'cabal']),
         symbols.Declaration: ('declaration', ['name', 'what', 'docs', 'location']),
         symbols.Function: ('function', ['name', 'type', 'docs', 'location']),
-        symbols.TypeBase: ('typebase', ['name', 'what', 'context', 'args', 'docs', 'location']),
-        symbols.Type: ('type', ['name', 'context', 'args', 'docs', 'location']),
-        symbols.Newtype: ('newtype', ['name', 'context', 'args', 'docs', 'location']),
-        symbols.Data: ('data', ['name', 'context', 'args', 'docs', 'location']),
+        symbols.TypeBase: ('typebase', ['name', 'what', 'context', 'args', 'definition', 'docs', 'location']),
+        symbols.Type: ('type', ['name', 'context', 'args', 'definition', 'docs', 'location']),
+        symbols.Newtype: ('newtype', ['name', 'context', 'args', 'definition', 'docs', 'location']),
+        symbols.Data: ('data', ['name', 'context', 'args', 'definition', 'docs', 'location']),
         symbols.Class: ('class', ['name', 'context', 'args', 'docs', 'location']) }
 
 def encode_json(obj, **kwargs):
@@ -84,8 +84,7 @@ def dump_cabal_cache(database, cabal_name = None):
     if not cabal_name:
         cabal_name = current_cabal()
     formatted_json = None
-    cabal_modules = database.get_cabal_modules(cabal_name)
-    with database.cabal_modules:
+    with database.get_cabal_modules(cabal_name) as cabal_modules:
         cabal_path = escape_path(cabal_name) if cabal_name != 'cabal' else 'cabal'
         cabal_json = os.path.join(CABAL_CACHE_PATH, cabal_path + '.json')
         formatted_json = encode_json(cabal_modules, indent = 2)
@@ -139,7 +138,11 @@ def plugin_loaded():
 
     if not os.path.exists(CACHE_PATH):
         os.mkdir(CACHE_PATH)
+
+    if not os.path.exists(CABAL_CACHE_PATH):
         os.mkdir(CABAL_CACHE_PATH)
+
+    if not os.path.exists(PROJECTS_CACHE_PATH):
         os.mkdir(PROJECTS_CACHE_PATH)
 
 if int(sublime.version()) < 3000:
