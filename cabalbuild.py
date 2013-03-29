@@ -30,7 +30,8 @@ cabal_command = {
     'build_then_warnings': {'steps': [['build'], ['build', '--ghc-options=-fforce-recomp -Wall -fno-code']], 'message': 'Building'},
     'typecheck_then_warnings': {'steps': [['build', '--ghc-options=-c'], ['build', '--ghc-options=-fforce-recomp -Wall -fno-code']], 'message': 'Checking'},
     'rebuild': {'steps': [['clean'], ['configure'], ['build']], 'message': 'Rebuilding'},
-    'install': {'steps': [['install']], 'message': 'Installing'}
+    'install': {'steps': [['install']], 'message': 'Installing'},
+    'test': {'steps': [['test']], 'message': 'Testing'}
 }
 
 
@@ -217,6 +218,9 @@ class SublimeHaskellInstall(SublimeHaskellBaseCommand):
     def run(self):
         self.build('install')
 
+class SublimeHaskellTest(SublimeHaskellBaseCommand):
+    def run(self):
+        self.build('test')
 
 # Auto build current project
 class SublimeHaskellBuildAuto(SublimeHaskellBaseCommand):
