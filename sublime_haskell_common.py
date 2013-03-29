@@ -364,7 +364,11 @@ def get_source_dir(filename):
         dirs = ["."]
 
         if 'error' not in info:
-            dirs.extend(info['source-dirs'])
+            # collect all hs-source-dirs
+            if info['library']:
+                dirs.extend(info['library']['info']['source-dirs'])
+            for i in info['executables']:
+                dirs.extend(i['info']['source-dirs'])
 
         paths = [os.path.normpath(os.path.join(cabal_dir, d)) for d in dirs]
         paths.sort(key = lambda p: -len(p))
@@ -422,7 +426,7 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
 
         # log('running ghc-mod: {0}'.format(command))
 
-        exit_code, out, err = call_and_wait(command, cwd=get_source_dir(filename))
+        exit_code, out, err = call_and_wait(command, cwd=get_source_dir(None))
 
         if exit_code != 0:
             raise Exception("ghc-mod exited with status %d and stderr: %s" % (exit_code, err))

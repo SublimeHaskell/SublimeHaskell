@@ -1019,11 +1019,12 @@ class InspectorAgent(threading.Thread):
             new_info = json.loads(out)
 
             if 'error' not in new_info:
-                if 'executables' in new_info:
+                if 'executables' in new_info and 'library' in new_info:
                     with autocompletion.projects as projects:
                         projects[project_name] = {
                             'dir': cabal_dir,
                             'cabal': os.path.basename(cabal_file),
+                            'library': new_info['library'],
                             'executables': new_info['executables'],
                         }
 
