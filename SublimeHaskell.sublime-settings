@@ -13,6 +13,9 @@
 	// Enable auto build on save
 	"enable_auto_build": true,
 
+	// Enable auto run tests on save, has effect only if auto build enabled (enable_auto_build)
+	"auto_run_tests": true,
+
 	// Enable auto check on save
 	"enable_auto_check": true,
 

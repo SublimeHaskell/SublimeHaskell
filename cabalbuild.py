@@ -1,6 +1,7 @@
 import os
 import sublime
 import sublime_plugin
+import copy
 from threading import Thread
 
 if int(sublime.version()) < 3000:
@@ -19,7 +20,7 @@ cabal_tool = {
     False: {'command': 'cabal', 'message': 'Cabal', 'extra': lambda cmd: cmd},
 }
 
-cabal_command = {
+cabal_config = {
     'clean': {'steps': [['clean']], 'message': 'Cleaning'},
     'configure': {'steps': [['configure', '--enable-tests']], 'message': 'Configure'},
     'build': {'steps': [['build']], 'message': 'Building'},
@@ -29,8 +30,9 @@ cabal_command = {
     # If the incremental build fails, the second step is not executed.
     'build_then_warnings': {'steps': [['build'], ['build', '--ghc-options=-fforce-recomp -Wall -fno-code']], 'message': 'Building'},
     'typecheck_then_warnings': {'steps': [['build', '--ghc-options=-c'], ['build', '--ghc-options=-fforce-recomp -Wall -fno-code']], 'message': 'Checking'},
+    
     'rebuild': {'steps': [['clean'], ['configure', '--enable-tests'], ['build']], 'message': 'Rebuilding'},
-    'install': {'steps': [['install']], 'message': 'Installing'},
+    'install': {'steps': [['install', '--enable-tests']], 'message': 'Installing'},
     'test': {'steps': [['test']], 'message': 'Testing'}
 }
 
@@ -50,7 +52,7 @@ class SublimeHaskellBaseCommand(sublime_plugin.WindowCommand):
     def build(self, command, use_cabal_dev=None, filter_project = None):
         select_project(
             self.window,
-            lambda n, d: run_build(self.window.active_view(), n, d, command, use_cabal_dev),
+            lambda n, d: run_build(self.window.active_view(), n, d, cabal_config[command], use_cabal_dev),
             filter_project = filter_project)
 
 
@@ -87,7 +89,7 @@ def select_project(window, on_selected, filter_project = None):
     window.show_quick_panel(list(map(lambda m: [m[0], m[1]['dir']], ps)), on_done)
 
 
-def run_build(view, project_name, project_dir, command, use_cabal_dev=None):
+def run_build(view, project_name, project_dir, config, use_cabal_dev=None):
     global projects_being_built
 
     # Don't build if a build is already running for this project
@@ -105,7 +107,6 @@ def run_build(view, project_name, project_dir, command, use_cabal_dev=None):
         use_cabal_dev = get_setting_async('use_cabal_dev')
 
     tool = cabal_tool[use_cabal_dev]
-    config = cabal_command[command]
 
     # Title of tool: Cabal, Cabal-Dev
     tool_title = tool['message']
@@ -234,6 +235,7 @@ class SublimeHaskellBuildAuto(SublimeHaskellBaseCommand):
         current_project_dir, current_project_name = get_cabal_project_dir_and_name_of_view(self.window.active_view())
         if current_project_name and current_project_dir:
             build_mode = get_setting('auto_build_mode')
+            run_tests = get_setting('auto_run_tests')
 
             build_command = {
                'normal': 'build',
@@ -245,7 +247,19 @@ class SublimeHaskellBuildAuto(SublimeHaskellBaseCommand):
             if not build_command:
                 output_error(self.window, "SublimeHaskell: invalid auto_build_mode '%s'" % build_mode)
 
-            run_build(self.window.active_view(), current_project_name, current_project_dir, build_command, None)
+            config = copy.deepcopy(cabal_config[build_command])
+
+            if run_tests:
+                has_tests = False
+
+                with autocompletion.projects as projects:
+                    if current_project_name in projects:
+                        has_tests = len(projects[current_project_name]['tests']) > 0
+
+                if has_tests:
+                    config['steps'].extend(cabal_config['test']['steps'])
+
+            run_build(self.window.active_view(), current_project_name, current_project_dir, config, None)
 
 
 class SublimeHaskellRun(SublimeHaskellBaseCommand):
