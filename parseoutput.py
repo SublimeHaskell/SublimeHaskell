@@ -122,10 +122,12 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
         if exit_code != 0:
             break
 
+    errmsg = stderr if stderr else stdout
+
     # Notify UI thread that commands are done
     sublime.set_timeout(on_done, 0)
 
-    parse_output_messages_and_show(view, msg, cabal_project_dir, exit_code, stderr)
+    parse_output_messages_and_show(view, msg, cabal_project_dir, exit_code, errmsg)
 
 
 def format_output_messages(messages):
