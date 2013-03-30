@@ -47,16 +47,19 @@ class SublimeHaskellBaseCommand(sublime_plugin.WindowCommand):
     def is_enabled(self):
         return len(autocompletion.projects.object) > 0
 
-    def build(self, command, use_cabal_dev=None):
+    def build(self, command, use_cabal_dev=None, filter_project = None):
         select_project(
             self.window,
-            lambda n, d: run_build(self.window.active_view(), n, d, command, use_cabal_dev))
+            lambda n, d: run_build(self.window.active_view(), n, d, command, use_cabal_dev),
+            filter_project = filter_project)
 
 
 # Select project from list
 # on_selected accepts name of project and directory of project
-def select_project(window, on_selected):
-    ps = list(autocompletion.projects.object.items())
+# filter_project accepts name of project and project-info as it appears in AutoCompletion object
+#   and returns whether this project must appear in selection list
+def select_project(window, on_selected, filter_project = None):
+    ps = [(name, info) for (name, info) in autocompletion.projects.object.items() if not filter_project or filter_project(name, info)]
 
     def run_selected(psel):
         on_selected(psel[0], psel[1]['dir'])
@@ -220,7 +223,10 @@ class SublimeHaskellInstall(SublimeHaskellBaseCommand):
 
 class SublimeHaskellTest(SublimeHaskellBaseCommand):
     def run(self):
-        self.build('test')
+        def has_tests(name, info):
+            return len(info['tests']) > 0
+
+        self.build('test', filter_project = has_tests)
 
 # Auto build current project
 class SublimeHaskellBuildAuto(SublimeHaskellBaseCommand):
@@ -246,12 +252,13 @@ class SublimeHaskellRun(SublimeHaskellBaseCommand):
     def run(self):
         self.executables = []
         ps = []
-        for p, info in autocompletion.projects.items():
-            for e in info['executables']:
-                ps.append((p + ": " + e['name'], {
-                    'dir': info['dir'],
-                    'name': e['name']
-                }))
+        with autocompletion.projects as projects:
+            for p, info in projects.items():
+                for e in info['executables']:
+                    ps.append((p + ": " + e['name'], {
+                        'dir': info['dir'],
+                        'name': e['name']
+                    }))
 
         # Nothing to run
         if len(ps) == 0:

@@ -1024,7 +1024,7 @@ class InspectorAgent(threading.Thread):
                             'cabal': os.path.basename(cabal_file),
                             'library': new_info['library'],
                             'executables': new_info['executables'],
-                        }
+                            'tests': new_info['tests'] }
 
     def _refresh_module_info(self, filename, standalone = True):
         "Rebuild module information for the specified file."
