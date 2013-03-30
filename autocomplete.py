@@ -577,9 +577,9 @@ class SublimeHaskellBrowseModule(sublime_plugin.WindowCommand):
                     cache.dump_cabal_cache(autocompletion.database, module_candidate.cabal)
 
                 decls = list(module_candidate.declarations.values())
-                self.candidates = decls
+                self.candidates = sorted(decls, key = lambda d: d.brief())
 
-                self.window.show_quick_panel(sorted([[decl.brief(), decl.docs.splitlines()[0]] if decl.docs else [decl.brief()] for decl in decls]), self.on_symbol_selected)
+                self.window.show_quick_panel([[decl.brief(), decl.docs.splitlines()[0]] if decl.docs else [decl.brief()] for decl in self.candidates], self.on_symbol_selected)
                 return
 
         self.candidates = []
