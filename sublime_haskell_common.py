@@ -369,7 +369,7 @@ def get_source_dir(filename):
                 dirs.extend(info['library']['info']['source-dirs'])
             for i in info['executables']:
                 dirs.extend(i['info']['source-dirs'])
-            for t in info['tests']:
+            for i in info['tests']:
                 dirs.extend(i['info']['source-dirs'])
 
         paths = [os.path.abspath(os.path.join(cabal_dir, d)) for d in dirs]
