@@ -166,23 +166,25 @@ class AutoCompletion(object):
 
         moduleImports = []
 
+        cur_info = None
         with self.database.files as files:
             if current_file_name in files:
                 cur_info = files[current_file_name]
 
-                if qualified_module:
-                    # If symbol is qualified, use completions from module specified
-                    moduleImports.append(qualified_module)
-                    moduleImports.extend([i.module for i in cur_info.imports.values() if i.import_as == qualified_module])
-                else:
-                    # Otherwise, use completions from all importred unqualified modules and from this module
-                    moduleImports.append('Prelude')
-                    moduleImports.extend([i.module for i in cur_info.imports.values() if not i.is_qualified])
-                    # Add this module as well
-                    completions.extend(self.completions_for_module(cur_info, current_file_name))
-                    # Add keyword completions and module completions
-                    completions.extend(self.keyword_completions)
-                    completions.extend(self.get_module_completions_for(qualified_prefix, [i.module for i in cur_info.imports.values()]))
+        if cur_info:
+            if qualified_module:
+                # If symbol is qualified, use completions from module specified
+                moduleImports.append(qualified_module)
+                moduleImports.extend([i.module for i in cur_info.imports.values() if i.import_as == qualified_module])
+            else:
+                # Otherwise, use completions from all importred unqualified modules and from this module
+                moduleImports.append('Prelude')
+                moduleImports.extend([i.module for i in cur_info.imports.values() if not i.is_qualified])
+                # Add this module as well
+                completions.extend(self.completions_for_module(cur_info, current_file_name))
+                # Add keyword completions and module completions
+                completions.extend(self.keyword_completions)
+                completions.extend(self.get_module_completions_for(qualified_prefix, [i.module for i in cur_info.imports.values()]))
 
         for mi in set(moduleImports):
             completions.extend(self.completions_for(mi, current_file_name))
