@@ -228,7 +228,7 @@ main = do
     args <- Environment.getArgs
     case args of
         [filename] -> main' filename []
-        [filename, ghcopts] -> main' filename [Doc.Flag_OptGhc ghcopts]
+        (filename:ghcopts) -> main' filename (map Doc.Flag_OptGhc ghcopts)
         _ -> putStrLn ("Usage: " ++ programName ++ " FILENAME [GHCOPTS]")
     where
         main' :: FilePath -> [Doc.Flag] -> IO ()
