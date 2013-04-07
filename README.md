@@ -56,3 +56,24 @@ You can add key bindings for type inference to `Key Bindings - User`:
         "keys": ["ctrl+k", "ctrl+h", "ctrl+i"]
     }
 ```
+
+hdevtools as a Build System
+---------------------------
+
+Save this to your `~/.config/sublime-text-2/Packages/User/hdevtools.sublime-build` to make `hdevtools` a build system:
+
+```json
+{
+  "cmd": ["/home/USERNAME/.cabal/bin/hdevtools", "check", "-g", "-Wall", "$file"],
+  "file_regex": "^(.*?):(\\d+):(\\d+):",
+  "selector": "source.haskell"
+}
+```
+
+You can then build with `Ctrl-B` and jump between the errors with (Shift-)`F4`.
+
+It is also useful to add this to your key bindings to redisplay the error panel at any time:
+
+```json
+  { "keys": ["ctrl+alt+b"], "command": "show_panel", "args": {"panel": "output.exec"} }
+```
