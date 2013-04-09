@@ -127,13 +127,13 @@ def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb
         for p in parsed:
             parsed_messages.append((cmd, p))
 
-        # Set global error list
-        set_global_error_messages(parsed)
-
     if alter_messages_cb:
         alter_messages_cb(parsed_messages)
 
     concated_messages = [m[1] for m in parsed_messages]
+
+    # Set global error list
+    set_global_error_messages(concated_messages)
 
     sublime.set_timeout(lambda: mark_messages_in_views(concated_messages), 0)
 
