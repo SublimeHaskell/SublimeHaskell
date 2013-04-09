@@ -149,17 +149,8 @@ class TypeBase(Declaration):
         self.args = args
         self.definition = definition
 
-    def snippet(self):
-        result = [self.name]
-        i = 1
-        for arg in self.args:
-            result.append(u"${" + str(i) + u":" + arg + u"}")
-            i += 1
-
-        return u' '.join(result)
-
     def suggest(self):
-        return (u'{0}\t{1}'.format(self.name, ' '.join(self.args)), self.snippet())
+        return (u'{0}\t{1}'.format(self.name, ' '.join(self.args)), self.name)
 
     def brief(self):
         brief_parts = [self.what]

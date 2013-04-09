@@ -68,9 +68,6 @@
 	// Inhibit default Sublime word completions
 	"inhibit_completions": false,
 
-	// Replace data and class with snippet
-	"snippet_replace": false,
-
 	// Auto autocompletion popup on '.' in import list
 	"auto_completion_popup": false,
 
