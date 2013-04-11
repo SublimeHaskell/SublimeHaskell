@@ -185,10 +185,11 @@ class SublimeHaskellShowType(sublime_plugin.TextCommand):
 # Works only with the cursor being in the name of a toplevel function so far.
 class SublimeHaskellInsertType(SublimeHaskellShowType):
     def run(self, edit):
+        view = self.view
         result = self.get_best_type(self.get_types())
         if result:
             r = result.region(self.view)
             line_begin = view.line(r).begin()
             indent_region = sublime.Region(line_begin, r.begin())
-            signature = '{0}{1} :: {2}\n'.format(view.substr(indent_region), result.substr(self.view), result.typename)
+            signature = '{0}{1} :: {2}\n'.format(view.substr(indent_region), result.substr(view), result.typename)
             view.insert(edit, line_begin, signature)
