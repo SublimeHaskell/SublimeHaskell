@@ -25,5 +25,10 @@
         "command": "sublime_haskell_previous_error",
         "keys": ["alt+shift+d", "alt+shift+e"],
         "context": [ { "key": "is_haskell_source" } ]
+    },
+    {
+        "keys": ["ctrl+alt+e"],
+        "command": "show_panel",
+        "args": { "panel": "output.haskell_error_checker" }
     }
 ]

@@ -223,15 +223,16 @@ class SublimeHaskellNextError(sublime_plugin.TextCommand):
         v = self.view
         fn = v.file_name().encode("utf-8")
         line, column = v.rowcol(v.sel()[0].a)
+        line += 1
         gotoline = -1
         if fn in ERRORS:
-            for errLine in ERRORS[fn]:
+            for errLine in sorted(ERRORS[fn].keys()):
                 if errLine > line:
                     gotoline = errLine
                     break
             # No next line: Wrap around if possible
             if gotoline == -1 and len(ERRORS[fn]) > 0:
-                gotoline = ERRORS[fn].keys()[0]
+                gotoline = sorted(ERRORS[fn].keys())[0]
         if gotoline != -1:
             v.window().open_file("%s:%d" % (fn, gotoline), sublime.ENCODED_POSITION)
         else:
@@ -243,14 +244,16 @@ class SublimeHaskellPreviousError(sublime_plugin.TextCommand):
         v = self.view
         fn = v.file_name().encode("utf-8")
         line, column = v.rowcol(v.sel()[0].a)
+        line += 1
         gotoline = -1
         if fn in ERRORS:
-            for errLine in ERRORS[fn]:
+            for errLine in sorted(ERRORS[fn].keys(), key = lambda x: -x):
                 if errLine < line:
                     gotoline = errLine
+                    break
             # No previous line: Wrap around if possible
             if gotoline == -1 and len(ERRORS[fn]) > 0:
-                gotoline = ERRORS[fn].keys()[-1]
+                gotoline = sorted(ERRORS[fn].keys())[-1]
         if gotoline != -1:
             v.window().open_file("%s:%d" % (fn, gotoline), sublime.ENCODED_POSITION)
         else:
