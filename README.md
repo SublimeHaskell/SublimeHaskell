@@ -36,26 +36,16 @@ To use cabal-dev instead of cabal, set use_cabal_dev to true (or use command "Sw
 
 Stylish-haskell can be used to stylish file or selected text.
 
-Use Ctrl-Shift-R to go to declaration and Ctrl-K-I to show symbol info with documentation. These command are also available through context menu with right-click.
+Use `Ctrl-Shift-R` to go to declaration and `Ctrl-K-I` to show symbol info with documentation. These command are also available through context menu with right-click.
 
 Command 'SublimeHaskell: Browse module' is similar to ghci's browse command
 
-Keybindings
------------
-You can add key bindings for type inference to `Key Bindings - User`:
+To show inferred types use `Show type` (`ctrl-k ctrl-h ctrl-t`) command.
 
-```json
-    {
-        "command": "haskell_show_type",
-        "context": "source.haskell",
-        "keys": ["ctrl+k", "ctrl+h", "ctrl+t"]
-    },
-    {
-        "command": "haskell_insert_type",
-        "context": "source.haskell",
-        "keys": ["ctrl+k", "ctrl+h", "ctrl+i"]
-    }
-```
+To insert inferred type use `Insert type` (`ctrl-k ctrl-h ctrl-i`).
+
+You can jump between the errors and warnings with `Go to next error` (`alt-d, alt-e`) and `Go to previous error` (`shift-alt-d shift-alt-e`).
+To show hidden error output, use command `Show error panel` (`ctrl-alt-e`)
 
 hdevtools as a Build System
 ---------------------------

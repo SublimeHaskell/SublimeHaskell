@@ -188,7 +188,9 @@ class SublimeHaskellInsertType(SublimeHaskellShowType):
         result = self.get_best_type(self.get_types())
         if result:
             r = result.region(self.view)
-            line_begin = view.line(r).begin()
-            indent_region = sublime.Region(line_begin, r.begin())
-            signature = '{0}{1} :: {2}\n'.format(view.substr(indent_region), result.substr(self.view), result.typename)
-            view.insert(edit, line_begin, signature)
+            name = self.view.substr(self.view.word(r.begin()))
+            line_begin = self.view.line(r).begin()
+            prefix = self.view.substr(sublime.Region(line_begin, r.begin()))
+            indent = re.search('(?P<indent>\s*)', prefix).group('indent')
+            signature = '{0}{1} :: {2}\n'.format(indent, name, result.typename)
+            self.view.insert(edit, line_begin, signature)

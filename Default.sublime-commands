@@ -104,5 +104,10 @@
     {
         "caption": "SublimeHaskell: Go to previous error",
         "command": "sublime_haskell_previous_error"
+    },
+    {
+        "caption": "SublimeHaskell: Show error panel",
+        "command": "show_panel",
+        "args": { "panel": "output.haskell_error_checker" }
     }
 ]
