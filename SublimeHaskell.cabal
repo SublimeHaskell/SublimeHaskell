@@ -34,5 +34,5 @@ executable CabalInspector
   build-depends:
     aeson,
     base,
-    Cabal>=1.16,
+    Cabal,
     text
