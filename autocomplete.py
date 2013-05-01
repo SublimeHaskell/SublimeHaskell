@@ -803,7 +803,10 @@ class StandardInspectorAgent(threading.Thread):
 
         try:
             with status_message_process('Loading standard modules info for {0}'.format(cabal)) as s:
+                cache_begin_time = time.clock()
                 cache.load_cabal_cache(autocompletion.database, cabal)
+                cache_end_time = time.clock()
+                log('loading standard modules cache for {0} within {1} seconds'.format(cabal, cache_end_time - cache_begin_time))
 
                 modules = None
                 with autocompletion.module_completions as module_completions:

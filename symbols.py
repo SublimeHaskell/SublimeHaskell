@@ -306,10 +306,9 @@ class Database(object):
             if cabal not in cabal_modules:
                 cabal_modules[cabal] = {}
             if new_module.name in cabal_modules[cabal]:
-                old_module = self.modules.object[cabal][new_module.name]
+                old_module = cabal_modules[cabal][new_module.name]
                 self.remove_indexes_for_module(old_module)
-                with self.modules as modules:
-                    del modules[cabal][new_module.name]
+                del cabal_modules[cabal][new_module.name]
             if new_module.name not in cabal_modules[cabal]:
                 cabal_modules[cabal][new_module.name] = new_module
                 self.add_indexes_for_module(new_module)
