@@ -90,7 +90,7 @@ class Module(Symbol):
         Unalias module import if any
         Returns list of unaliased modules
         """
-        return [i.module for i in self.imports.items() if i.qualified == module_alias]
+        return [i.module for i in self.imports.items() if i.import_as == module_alias]
 
 class Declaration(Symbol):
     def __init__(self, name, decl_type = 'declaration', docs = None, location = None, module = None):
@@ -381,6 +381,8 @@ def get_source_modules(modules, filename = None):
     For list of modules with same name returns modules, which is defined by sources
     Prefer module in same project as filename if specified
     """
+    project = get_cabal_project_dir_of_file(filename) if filename else None
+
     candidates = flatten([
         filter(lambda m: is_within_project(m, project), modules),
         filter(is_by_sources, modules)])
