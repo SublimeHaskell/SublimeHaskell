@@ -439,7 +439,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
                     if current_file_name in files:
                         cur_info = files[current_file_name]
 
-                        if not module_word:
+                        if not module_word or module_word == cur_info.name:
                             # this module declaration
                             candidates.extend([m.declarations[ident] for m in modules_dict if symbols.is_this_module(cur_info, m) and ident in m.declarations])
                         if not candidates:
