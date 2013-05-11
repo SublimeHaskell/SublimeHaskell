@@ -65,7 +65,7 @@ class OutputMessage(object):
     def find_region_in_view(self, view):
         "Return the Region referred to by this error message."
         # Convert line and column count to zero-based indices:
-        point = view.text_point(self.line - 1, self.column - 1)
+        point = view.text_point(self.line - 1, 0)
         # Return the whole line:
         region = view.line(point)
         region = trim_region(view, region)
