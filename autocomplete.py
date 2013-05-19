@@ -15,6 +15,7 @@ if int(sublime.version()) < 3000:
     from ghci import ghci_info
     from haskell_docs import haskell_docs
     from hdevtools import start_hdevtools, stop_hdevtools
+    import hsdev
 else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.symbols as symbols
@@ -24,6 +25,7 @@ else:
     from SublimeHaskell.ghci import ghci_info
     from SublimeHaskell.haskell_docs import haskell_docs
     from SublimeHaskell.hdevtools import start_hdevtools, stop_hdevtools
+    import SublimeHaskell.hsdev as hsdev
 
 
 # If true, files that have not changed will not be re-inspected.
@@ -37,6 +39,8 @@ CABAL_INSPECTOR_EXE_PATH = None
 CABAL_INSPECTOR_OBJ_DIR = None
 
 OUTPUT_PATH = None
+
+HSDEV_CACHE_PATH = None
 
 # ModuleInspector output
 MODULE_INSPECTOR_RE = re.compile(r'ModuleInfo:(?P<result>.+)')
@@ -794,6 +798,9 @@ class StandardInspectorAgent(threading.Thread):
 
     # Load modules info for cabal/cabal-dev specified
     def load_module_completions(self, cabal = None):
+        # hsdev_process.scan(cabal = cabal)
+        # hsdev_process.cache_dump(path = HSDEV_CACHE_PATH)
+
         if not get_setting_async('enable_ghc_mod'):
             return
 
@@ -883,6 +890,8 @@ class InspectorAgent(threading.Thread):
 
         self.reinspect_event = threading.Event()
 
+        self.hsdev_process = None
+
     CABALMSG = 'Compiling Haskell CabalInspector'
     MODULEMSG = 'Compiling Haskell ModuleInspector'
 
@@ -923,6 +932,10 @@ class InspectorAgent(threading.Thread):
 
         # TODO: If compilation failed, we can't proceed; handle this.
         # Periodically wake up and see if there is anything to inspect.
+
+        # self.hsdev_process = hsdev.HsDev()
+        # self.hsdev_process.load_cache(path = "e:")
+
         while True:
             files_to_reinspect = []
             files_to_doc = []
@@ -988,6 +1001,9 @@ class InspectorAgent(threading.Thread):
         self.reinspect_event.set()
 
     def _refresh_all_module_info(self, cabal_dir, index, count):
+        # hsdev_process.scan(project = cabal_dir)
+        # hsdev_process.cache_dump(path = HSDEV_CACHE_PATH)
+
         "Rebuild module information for all files under the specified directory."
         begin_time = time.clock()
         log('reinspecting project ({0})'.format(cabal_dir))
@@ -1032,6 +1048,8 @@ class InspectorAgent(threading.Thread):
                             'tests': new_info['tests'] }
 
     def _refresh_module_info(self, filename, standalone = True):
+        # hsdev_process.scan(file = filename)
+
         "Rebuild module information for the specified file."
         # TODO: Only do this within Haskell files in Cabal projects.
         # TODO: Skip this file if it hasn't changed since it was last inspected.
@@ -1270,6 +1288,7 @@ def plugin_loaded():
     global CABAL_INSPECTOR_EXE_PATH
     global CABAL_INSPECTOR_OBJ_DIR
     global OUTPUT_PATH
+    global HSDEV_CACHE_PATH
 
     package_path = sublime_haskell_package_path()
 
@@ -1280,6 +1299,7 @@ def plugin_loaded():
     CABAL_INSPECTOR_EXE_PATH = os.path.join(package_path, 'CabalInspector')
     CABAL_INSPECTOR_OBJ_DIR = os.path.join(package_path, 'obj/CabalInspector')
     OUTPUT_PATH = os.path.join(package_path, 'module_info.cache')
+    HSDEV_CACHE_PATH = os.path.join(package_path, 'cache-hsdev')
 
     global std_inspector
     std_inspector = StandardInspectorAgent()
@@ -1288,6 +1308,12 @@ def plugin_loaded():
     global inspector
     inspector = InspectorAgent()
     inspector.start()
+
+    # global hsdev_process
+    # print("HERE")
+    # hsdev_process = hsdev.HsDev()
+    # print("AND HERE")
+    # hsdev_process.load_cache(path = HSDEV_CACHE_PATH)
 
     # TODO: How to stop_hdevtools() in Sublime Text 2?
     start_hdevtools()

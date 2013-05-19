@@ -686,3 +686,20 @@ class LockedObject(object):
 
     def __exit__(self, type, value, traceback):
         self.object_lock.__exit__()
+
+def create_process(command, **kwargs):
+    if subprocess.mswindows:
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        kwargs['startupinfo'] = startupinfo
+
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stdin=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=False,
+        universal_newlines=True,
+        **kwargs)
+
+    return process
