@@ -1220,15 +1220,15 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 
     def on_new(self, view):
         self.set_cabal_status(view)
-        filename = view.file_name()
-        if filename:
+        if is_haskell_source(view):
+            filename = view.file_name()
             inspector.mark_file_dirty(filename)
             inspector.mark_file_active(filename)
 
     def on_load(self, view):
         self.set_cabal_status(view)
-        filename = view.file_name()
-        if filename:
+        if is_haskell_source(view):
+            filename = view.file_name()
             inspector.mark_file_dirty(filename)
             inspector.mark_file_active(filename)
 
@@ -1236,9 +1236,8 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         self.set_cabal_status(view)
 
     def on_post_save(self, view):
-        filename = view.file_name()
-        if filename:
-            inspector.mark_file_dirty(filename)
+        if is_haskell_source(view):
+            inspector.mark_file_dirty(view.file_name())
 
     def on_query_context(self, view, key, operator, operand, match_all):
         if key == 'auto_completion_popup':
