@@ -970,7 +970,7 @@ class InspectorAgent(threading.Thread):
         for folder in window.folders():
             folder_files.extend(list_files_in_dir_recursively(folder))
         with self.dirty_files_lock:
-            self.dirty_files.extend(folder_files)
+            self.dirty_files.extend([f for f in folder_files if f.endswith('.hs')])
         self.reinspect_event.set()
 
     def show_errors(self, window, error_text):
