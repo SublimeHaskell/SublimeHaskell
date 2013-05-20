@@ -8,234 +8,72 @@ import Queue
 import time
 
 import symbols
-from sublime_haskell_common import create_process, log
+from sublime_haskell_common import *
 
-class HsDev(object):
-    def __init__(self):
-        self.process = create_process(["hsdev.exe", "-json"])
+def call_hsdev_and_wait(arg_list, filename = None, cabal = None):
+    try:
+        exit_code, out, err = call_and_wait(['hsdev'] + arg_list)
 
-    def die(self):
-        self.process.terminate()
-
-    def send_dict(self, d):
-        self.process.stdin.write(json.dumps(d))
-        self.process.stdin.write(os.linesep)
-        self.process.stdin.flush()
-
-    def send_cmd(self, cmd, **kwargs):
-        kwargs.update({"cmd": cmd})
-        kwargs = dict((k, v) for (k, v) in kwargs.items() if v is not None)
-        self.send_dict(kwargs)
-
-    def receive(self):
-        s = self.process.stdout.readline()
-        if s is not None:
-            try:
-                return json.loads(s)
-            except:
-                return None
-
-    def receive_ok(self):
-        d = self.receive()
-        if d and 'result' in d and d['result'] == 'ok':
-            return None
-        else:
-            log("result not ok: {0}".format(d))
-
-    def receive_decls(self):
-        d = self.receive()
-        if d and 'declarations' in d:
-            return [parse_declaration(decl) for decl in d['declarations']]
+        return crlf2lf(out)
+    except OSError as e:
         return None
 
-    def receive_modules(self):
-        d = self.receive()
-        if d and 'modules' in d:
-            return [parse_module(m) for m in d['modules']]
-        return None
+def hsdev(arg_list):
+    s = call_hsdev_and_wait(arg_list)
+    return json.loads(s)
 
-    def load_cache(self, **kwargs):
-        self.send_cmd('cache', load = True, **kwargs)
-        self.receive_ok()
+def load_cache(path = None):
+    p = ['-path', path] if path else []
+    return hsdev(['cache', '-load'] + p)
 
-    def save_cache(self, **kwargs):
-        self.send_cmd("cache", dump = True, **kwargs)
-        self.receive_ok()
+def save_cache(path = None):
+    p = ['-path', path] if path else []
+    return hsdev(['cache', '-dump'] + p)
 
-    def scan(self, **kwargs):
-        self.send_cmd("scan", **kwargs)
-        self.receive_ok()
+def scan(cabal = None, project = None, file = None):
+    if cabal:
+        return hsdev(['scan', '-cabal', cabal])
+    if project:
+        return hsdev(['scan', '-project', project])
+    if file:
+        return hsdev(['scan', '-file', file])
+    return hsdev(['scan', '-cabal'])
 
-    def find(self, name, **kwargs):
-        self.send_cmd("find", name = name, **kwargs)
-        return self.receive_decls()
+def find(name):
+    return parse_decls(hsdev(['find', name]))
 
-    def list(self, **kwargs):
-        self.send_cmd("list", **kwargs)
-        d = self.receive()
-        if d and 'params' in d:
-            if 'modules' in d['params']:
-                return d['params']['modules']
-        return None
+def list():
+    return hsdev(['list'])
 
-    def browse(self, module_name, **kwargs):
-        self.send_cmd("browse", module = module_name, **kwargs)
-        ms = self.receive_modules()
-        return ms[0] if ms else None
+def browse(module_name):
+    return parse_modules(hsdev(['browse', module_name]))[0]
 
-    def goto(self, name, srcfile = None):
-        self.send_cmd("goto", name = name, file = srcfile)
-        return self.receive_decls()
+def goto(name, file = None):
+    return parse_decls(hsdev(['goto', name] + (['-file', file] if file else [])))
 
-    def info(self, name, srcfile = None):
-        self.send_cmd("info", name = name, file = srcfile)
-        return self.receive_decls()
+def info(name, file = None):
+    return parse_decls(hsdev(['info', name] + (['-file', file] if file else [])))
 
-    def complete(self, input_str, srcfile = None, module_name = None, cabal = None):
-        self.send_cmd("complete", input = input_str, file = srcfile, module = module_name, cabal = cabal)
-        return self.receive_decls()
+def complete(input, file = None, module_name = None, cabal = None):
+    if file:
+        return parse_decls(hsdev(['complete', input, '-file', file]))
+    return parse_decls(hsdev(
+        ['complete', input] +
+        (['-module', module_name] if module_name else []) +
+        (['-cabal', cabal] if cabal else [])))
 
-    def dump(self, srcfile = None):
-        if srcfile:
-            self.send_cmd("dump", file = srcfile)
-        else:
-            self.send_cmd("dump", files = True)
-        self.receive_ok()
+def exit():
+    return hsdev(['exit'])
 
-    def exit(self):
-        self.send_cmd("exit")
-        self.die()
+def parse_decls(s):
+    if s and 'declarations' in s:
+        return [parse_declaration(decl) for decl in s['declarations']]
+    return None
 
-
-
-# class HsDev(object):
-#     """
-#     HsDev interactive process
-#     """
-#     def __init__(self):
-#         self.process = create_process(["hsdev.exe", "-json"])
-#         self.responses = Queue.Queue()
-#         self.stop_event = threading.Event()
-#         self.read_event = threading.Event()
-#         self.thread = threading.Thread(
-#             target=self.parse_output)
-#         self.thread.daemon = True
-#         self.thread.start()
-
-#     def die(self):
-#         self.process.terminate()
-#         self.stop_event.set()
-
-#     def parse_output(self):
-#         while True:
-#             print("waiting for read_event")
-#             self.read_event.wait()
-#             self.read_event.clear()
-#             if self.stop_event.is_set():
-#                 return
-#             print("reading line")
-#             s = self.process.stdout.readline()
-#             if not s:
-#                 return
-#             try:
-#                 self.responses.put(json.loads(s))
-#             except:
-#                 pass
-
-#     def send_dict(self, d):
-#         print('hsdev command: {0}'.format(d))
-
-#         self.process.stdin.write(json.dumps(d))
-#         self.process.stdin.write(os.linesep)
-#         self.process.stdin.flush()
-
-#         self.read_event.set()
-
-#     def send_cmd(self, cmd, **kwargs):
-#         kwargs.update({"cmd": cmd})
-#         kwargs = dict((k, v) for (k, v) in kwargs.items() if v is not None)
-#         self.send_dict(kwargs)
-
-#     def receive(self):
-#         try:
-#             r = self.responses.get(timeout = 10)
-#             if r and 'error' in r:
-#                 raise RuntimeError(r['error'])
-#             else:
-#                 return r
-#         except Queue.Empty:
-#             return None
-
-#     def receive_ok(self):
-#         d = self.receive()
-#         if d and 'result' in d and d['result'] == "ok":
-#             return None
-#         else:
-#             raise RuntimeError('result not ok: {0}'.format(d))
-
-#     def receive_decls(self):
-#         d = self.receive()
-#         if d and 'declarations' in d:
-#             return [parse_declaration(decl) for decl in d['declarations']]
-#         return None
-
-#     def receive_modules(self):
-#         d = self.receive()
-#         if d and 'modules' in d:
-#             return [parse_module(m) for m in d['modules']]
-#         return None
-
-#     def load_cache(self, **kwargs):
-#         self.send_cmd("cache", load = True, **kwargs)
-#         self.receive_ok()
-
-#     def save_cache(self, **kwargs):
-#         self.send_cmd("cache", dump = True, **kwargs)
-#         self.receive_ok()
-
-#     def scan(self, **kwargs):
-#         self.send_cmd("scan", **kwargs)
-#         self.receive_ok()
-
-#     def find(self, name, **kwargs):
-#         self.send_cmd("find", name = name, **kwargs)
-#         return self.receive_decls()
-
-#     def list(self, **kwargs):
-#         self.send_cmd("list", **kwargs)
-#         d = self.receive()
-#         if d and 'params' in d:
-#             if 'modules' in d['params']:
-#                 return d['params']['modules']
-#         return None
-
-#     def browse(self, module_name, **kwargs):
-#         self.send_cmd("browse", module = module_name, **kwargs)
-#         ms = self.receive_modules()
-#         return ms[0] if ms else None
-
-#     def goto(self, name, srcfile = None):
-#         self.send_cmd("goto", name = name, file = srcfile)
-#         return self.receive_decls()
-
-#     def info(self, name, srcfile = None):
-#         self.send_cmd("info", name = name, file = srcfile)
-#         return self.receive_decls()
-
-#     def complete(self, input_str, srcfile = None, module_name = None, cabal = None):
-#         self.send_cmd("complete", input = input_str, file = srcfile, module = module_name, cabal = cabal)
-#         return self.receive_decls()
-
-#     def dump(self, srcfile = None):
-#         if srcfile:
-#             self.send_cmd("dump", file = srcfile)
-#         else:
-#             self.send_cmd("dump", files = True)
-#         self.receive_ok()
-
-#     def exit(self):
-#         self.send_cmd("exit")
-#         self.die()
+def parse_modules(s):
+    if s and 'modules' in s:
+        return [parse_module(m) for m in s['modules']]
+    return None
 
 def parse_location(d):
     if not d:

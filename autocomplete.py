@@ -798,9 +798,6 @@ class StandardInspectorAgent(threading.Thread):
 
     # Load modules info for cabal/cabal-dev specified
     def load_module_completions(self, cabal = None):
-        # hsdev_process.scan(cabal = cabal)
-        # hsdev_process.cache_dump(path = HSDEV_CACHE_PATH)
-
         if not get_setting_async('enable_ghc_mod'):
             return
 
@@ -890,8 +887,6 @@ class InspectorAgent(threading.Thread):
 
         self.reinspect_event = threading.Event()
 
-        self.hsdev_process = None
-
     CABALMSG = 'Compiling Haskell CabalInspector'
     MODULEMSG = 'Compiling Haskell ModuleInspector'
 
@@ -932,9 +927,6 @@ class InspectorAgent(threading.Thread):
 
         # TODO: If compilation failed, we can't proceed; handle this.
         # Periodically wake up and see if there is anything to inspect.
-
-        # self.hsdev_process = hsdev.HsDev()
-        # self.hsdev_process.load_cache(path = "e:")
 
         while True:
             files_to_reinspect = []
@@ -1001,8 +993,7 @@ class InspectorAgent(threading.Thread):
         self.reinspect_event.set()
 
     def _refresh_all_module_info(self, cabal_dir, index, count):
-        # hsdev_process.scan(project = cabal_dir)
-        # hsdev_process.cache_dump(path = HSDEV_CACHE_PATH)
+        hsdev.scan(project = cabal_dir)
 
         "Rebuild module information for all files under the specified directory."
         begin_time = time.clock()
@@ -1048,7 +1039,7 @@ class InspectorAgent(threading.Thread):
                             'tests': new_info['tests'] }
 
     def _refresh_module_info(self, filename, standalone = True):
-        # hsdev_process.scan(file = filename)
+        hsdev.scan(file = filename)
 
         "Rebuild module information for the specified file."
         # TODO: Only do this within Haskell files in Cabal projects.
@@ -1308,12 +1299,6 @@ def plugin_loaded():
     global inspector
     inspector = InspectorAgent()
     inspector.start()
-
-    # global hsdev_process
-    # print("HERE")
-    # hsdev_process = hsdev.HsDev()
-    # print("AND HERE")
-    # hsdev_process.load_cache(path = HSDEV_CACHE_PATH)
 
     # TODO: How to stop_hdevtools() in Sublime Text 2?
     start_hdevtools()
