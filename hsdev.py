@@ -20,7 +20,7 @@ def call_hsdev_and_wait(arg_list, filename = None, cabal = None):
 
 def hsdev(arg_list):
     s = call_hsdev_and_wait(arg_list)
-    return json.loads(s)
+    return (json.loads(s) if s else None)
 
 def load_cache(path = None):
     p = ['-path', path] if path else []
@@ -66,11 +66,15 @@ def exit():
     return hsdev(['exit'])
 
 def parse_decls(s):
+    if not s:
+        return None
     if s and 'declarations' in s:
         return [parse_declaration(decl) for decl in s['declarations']]
     return None
 
 def parse_modules(s):
+    if not s:
+        return None
     if s and 'modules' in s:
         return [parse_module(m) for m in s['modules']]
     return None
