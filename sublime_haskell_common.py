@@ -432,7 +432,7 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
         # Otherwise ghc-mod will fail with 'cannot satisfy package...'
         # Seems, that user directory works well
         # Current source directory is set with -i argument in get_ghc_opts_args
-        exit_code, out, err = call_and_wait(command, cwd=get_source_dir(None))
+        exit_code, out, err = call_and_wait(command, cwd=get_source_dir(filename))
 
         if exit_code != 0:
             raise Exception("ghc-mod exited with status %d and stderr: %s" % (exit_code, err))
