@@ -1112,6 +1112,9 @@ class InspectorAgent(threading.Thread):
             else:
                 log('ModuleInspector returns error: {0}'.format(new_info['error']))
 
+        else:
+            log('ModuleInspector exited with code {0}. Stderr: {1}'.format(exit_code, stderr))
+
 
 def list_files_in_dir_recursively(base_dir):
     """Return a list of a all files in a directory, recursively.
