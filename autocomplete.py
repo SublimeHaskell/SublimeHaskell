@@ -881,6 +881,7 @@ class InspectorAgent(threading.Thread):
 
         self.active_files = LockedObject([])
 
+        # Event that is set (notified) when files have changed
         self.reinspect_event = threading.Event()
 
     CABALMSG = 'Compiling Haskell CabalInspector'
