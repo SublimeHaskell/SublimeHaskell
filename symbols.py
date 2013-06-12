@@ -13,16 +13,13 @@ class Location(object):
     """
     Location in file at line
     """
-    def __init__(self, filename, line, column, project = None, modified_time = None):
+    def __init__(self, filename, line, column, project = None):
         if not project:
             project = get_cabal_project_dir_of_file(filename)
-        if not modified_time:
-            modified_time = os.stat(filename).st_mtime
         self.project = project
         self.filename = filename
         self.line = line
         self.column = column
-        self.modified_time = modified_time
 
     def position(self):
         """ Returns filename:line:column """
@@ -63,7 +60,7 @@ class Module(Symbol):
     """
     Haskell module symbol
     """
-    def __init__(self, module_name, exports = [], imports = {}, declarations = {}, location = None, cabal = None):
+    def __init__(self, module_name, exports = [], imports = {}, declarations = {}, location = None, cabal = None, last_inspection_time = 0):
         super(Module, self).__init__('module', module_name, None, location)
         # List of strings
         self.exports = exports
@@ -77,6 +74,9 @@ class Module(Symbol):
 
         # Cabal path or 'cabal'
         self.cabal = cabal
+
+        # Time as from time.time()
+        self.last_inspection_time = last_inspection_time
 
     def add_declaration(self, new_declaration):
         if not new_declaration.module:

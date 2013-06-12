@@ -50,10 +50,10 @@ class SymbolsEncoder(json.JSONEncoder):
 
 def symbol_serializers():
     return {
-        symbols.Location: ('location', ['filename', 'line', 'column', 'project', 'modified_time']),
+        symbols.Location: ('location', ['filename', 'line', 'column', 'project']),
         symbols.Symbol: ('symbol', ['what', 'name', 'docs', 'location']),
         symbols.Import: ('import', ['module', 'is_qualified', 'import_as']),
-        symbols.Module: ('module', ['name', 'exports', 'imports', 'declarations', 'location', 'cabal']),
+        symbols.Module: ('module', ['name', 'exports', 'imports', 'declarations', 'location', 'cabal', 'last_inspection_time']),
         symbols.Declaration: ('declaration', ['name', 'what', 'docs', 'location']),
         symbols.Function: ('function', ['name', 'type', 'docs', 'location']),
         symbols.TypeBase: ('typebase', ['name', 'what', 'context', 'args', 'definition', 'docs', 'location']),
