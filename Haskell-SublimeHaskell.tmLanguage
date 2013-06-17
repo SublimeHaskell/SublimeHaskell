@@ -397,6 +397,20 @@
 				</dict>
 			</array>
 		</dict>
+    <dict>
+      <key>comment</key>
+      <string>A workaround for lonely function titles in type declaration. We're exploiting the fact that they are the only possible single-word declarations on a zero-indent.</string>
+      <key>match</key>
+      <string>^([a-z_][a-zA-Z0-9_']*|\([|!%$+\-.,=&lt;/&gt;]+\))\s*$</string>
+      <key>captures</key>
+      <dict>
+        <key>1</key>
+        <dict>
+          <key>name</key>
+          <string>entity.name.function.haskell</string>
+        </dict>
+      </dict>
+    </dict>
 		<dict>
 			<key>match</key>
 			<string>\b(Just|Nothing|Left|Right|True|False|LT|EQ|GT|\(\)|\[\])\b</string>
