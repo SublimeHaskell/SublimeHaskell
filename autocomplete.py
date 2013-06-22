@@ -979,7 +979,7 @@ class InspectorAgent(threading.Thread):
         self.reinspect_event.set()
 
     def show_errors(self, window, error_text):
-        sublime.set_timeout(lambda: output_error(window, error_text), 0)
+        output_error_async(window, error_text)
 
     def mark_file_active(self, filename):
         with self.active_files as active_files:

@@ -96,29 +96,49 @@ def encode_bytes(s):
         return None
     return s.encode('utf-8')
 
-def call_and_wait(command, **popen_kwargs):
-    return call_and_wait_with_input(command, None, **popen_kwargs)
+def call_and_wait(command, split_lines = False, **popen_kwargs):
+    return call_and_wait_with_input(command, None, split_lines, **popen_kwargs)
 
-def call_no_wait(command, **popen_kwargs):
-    """Run the specified command with no block"""
-    if subprocess.mswindows:
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        popen_kwargs['startupinfo'] = startupinfo
+def call_and_wait_tool(command, tool_name, on_result = None, filename = None, on_line = None, **popen_kwargs):
+    tool_enabled = 'enable_{0}'.format(tool_name)
 
-    extended_env = dict(os.environ)
-    PATH = os.getenv('PATH') or ""
-    extended_env['PATH'] = ':'.join(get_setting_async('add_to_PATH', []) + [PATH])
+    if get_setting_async(tool_enabled) != True:
+        return None
 
-    process = subprocess.Popen(
-        command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        stdin=subprocess.PIPE,
-        env=extended_env,
-        **popen_kwargs)
+    source_dir = get_source_dir(filename)
 
-def call_and_wait_with_input(command, input_string, **popen_kwargs):
+    def mk_result(s):
+        return on_result(s) if on_result else s
+
+    try:
+        if on_line:
+            for l in call_and_wait(command, cwd = source_dir, **popen_kwargs):
+                on_line(mk_result(crlf2lf(l)))
+            return None
+        else:
+            exit_code, out, err = call_and_wait(command, cwd = source_dir, **popen_kwargs)
+            out = crlf2lf(out)
+
+            if exit_code != 0:
+                raise Exception('{0} exited with status {1} and stderr: {2}'.format(tool_name, exit_code, err))
+
+            return mk_result(out)
+
+    except OSError as e:
+        if e.errno == errno.ENOENT:
+            output_error_async(sublime.active_window(), "SublimeHaskell: {0} was not found!\n'{1}' is set to False".format(tool_name, tool_enabled))
+            set_setting_async(tool_enabled, False)
+        else:
+            log('{0} fails with {1}'.format(tool_name, e))
+
+        return None
+
+    except Exception as e:
+        log('{0} fails with {1}'.format(tool_name, e))
+
+    return None
+
+def call_and_wait_with_input(command, input_string, split_lines = False, **popen_kwargs):
     """Run the specified command, block until it completes, and return
     the exit code, stdout, and stderr.
     Extends os.environment['PATH'] with the 'add_to_PATH' setting.
@@ -140,10 +160,15 @@ def call_and_wait_with_input(command, input_string, **popen_kwargs):
         stdin=subprocess.PIPE,
         env=extended_env,
         **popen_kwargs)
-    stdout, stderr = process.communicate(encode_bytes(input_string))
-    exit_code = process.wait()
-    return (exit_code, decode_bytes(stdout), decode_bytes(stderr))
 
+    if split_lines:
+        process.stdin.write(encode_bytes(input_string))
+        process.stdin.close()
+        return process.stdout.xreadlines()
+    else:
+        stdout, stderr = process.communicate(encode_bytes(input_string))
+        exit_code = process.wait()
+        return (exit_code, decode_bytes(stdout), decode_bytes(stderr))
 
 def log(message):
     print(u'Sublime Haskell: {0}'.format(message))
@@ -441,7 +466,7 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
 
     except OSError as e:
         if e.errno == errno.ENOENT:
-            output_error(sublime.active_window(),
+            output_error_async(sublime.active_window(),
                 "SublimeHaskell: ghc-mod was not found!\n"
                 + "It is used for LANGUAGE and import autocompletions and type inference.\n"
                 + "Try adjusting the 'add_to_PATH' setting.\n"
@@ -489,6 +514,9 @@ def output_error(window, text):
     output_view.set_read_only(True)
 
     window.run_command('show_panel', {'panel': 'output.' + SUBLIME_ERROR_PANEL_NAME})
+
+def output_error_async(window, text):
+    sublime.set_timeout(lambda: output_error(window, text), 0)
 
 class SublimeHaskellError(RuntimeError):
     def __init__(self, what):

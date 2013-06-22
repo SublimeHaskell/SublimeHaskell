@@ -19,39 +19,13 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
     Calls hdevtools with the given arguments.
     Shows a sublime error message if hdevtools is not available.
     """
-    if not hdevtools_enabled():
-        return None
-
     ghc_opts_args = get_ghc_opts_args(filename, cabal = cabal)
     hdevtools_socket = get_setting_async('hdevtools_socket')
-    source_dir = get_source_dir(filename)
 
     if hdevtools_socket:
         arg_list.append('--socket={0}'.format(hdevtools_socket))
 
-    try:
-        exit_code, out, err = call_and_wait(['hdevtools'] + arg_list + ghc_opts_args, cwd = source_dir)
-
-        if exit_code != 0:
-            raise Exception("hdevtools exited with status %d and stderr: %s" % (exit_code, err))
-
-        return crlf2lf(out)
-
-    except OSError as e:
-        if e.errno == errno.ENOENT:
-            sublime.set_timeout(lambda: output_error(sublime.active_window(),
-                "SublimeHaskell: hdevtools was not found!\n"
-                + "It's used for 'symbol info' and type inference\n"
-                + "Try adjusting the 'add_to_PATH' setting.\n"
-                + "'enable_hdevtools' automatically set to False."), 0)
-
-        set_setting_async('enable_hdevtools', False)
-
-        return None
-
-    except Exception as e:
-        log('calling to hdevtools fails with {0}'.format(e))
-        return None
+    return call_and_wait_tool(['hdevtools'] + arg_list + ghc_opts_args, 'hdevtools', None, filename)
 
 def admin(cmds, wait = False, **popen_kwargs):
     if not hdevtools_enabled():
@@ -76,7 +50,7 @@ def admin(cmds, wait = False, **popen_kwargs):
 
     except OSError as e:
         if e.errno == errno.ENOENT:
-            output_error(sublime.active_window(),
+            output_error_async(sublime.active_window(),
                 "SublimeHaskell: hdevtools was not found!\n"
                 + "It's used for 'symbol info' and type inference\n"
                 + "Try adjusting the 'add_to_PATH' setting.\n"
