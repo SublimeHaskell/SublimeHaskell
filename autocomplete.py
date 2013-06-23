@@ -885,6 +885,7 @@ class InspectorAgent(threading.Thread):
 
         self.active_files = LockedObject([])
 
+        # Event that is set (notified) when files have changed
         self.reinspect_event = threading.Event()
 
     CABALMSG = 'Compiling Haskell CabalInspector'
@@ -1043,7 +1044,6 @@ class InspectorAgent(threading.Thread):
 
         "Rebuild module information for the specified file."
         # TODO: Only do this within Haskell files in Cabal projects.
-        # TODO: Skip this file if it hasn't changed since it was last inspected.
         # TODO: Currently the ModuleInspector only delivers top-level functions
         #       with hand-written type signatures. This code should make that clear.
         # If the file hasn't changed since it was last inspected, do nothing:
@@ -1052,10 +1052,14 @@ class InspectorAgent(threading.Thread):
 
         with autocompletion.database.files as files:
             if filename in files:
+                last_inspection_time = files[filename].last_inspection_time
                 modification_time = os.stat(filename).st_mtime
-                inspection_time = files[filename].location.modified_time
-                if modification_time <= inspection_time:
+                # Skip if we already inspected after last modification
+                if modification_time <= last_inspection_time:
+                    # log('skipping inspecting %s' % filename)
                     return
+                else:
+                    files[filename].last_inspection_time = time.time()
 
         ghc_opts = get_ghc_opts()
         ghc_opts_args = [' '.join(ghc_opts)] if ghc_opts else []
@@ -1084,7 +1088,8 @@ class InspectorAgent(threading.Thread):
 
                     module_imports = dict(map(make_import, new_info['imports']))
                     import_list = new_info['exportList'] if ('exportList' in new_info and new_info['exportList'] is not None) else []
-                    new_module = symbols.Module(new_info['moduleName'], import_list, module_imports, {}, symbols.module_location(filename))
+
+                    new_module = symbols.Module(new_info['moduleName'], import_list, module_imports, {}, symbols.module_location(filename), last_inspection_time=time.time())
                     for d in new_info['declarations']:
                         location = symbols.Location(filename, d['line'], d['column'])
                         if d['what'] == 'function':
@@ -1116,6 +1121,9 @@ class InspectorAgent(threading.Thread):
 
             else:
                 log('ModuleInspector returns error: {0}'.format(new_info['error']))
+
+        else:
+            log('ModuleInspector exited with code {0}. Stderr: {1}'.format(exit_code, stderr))
 
 
 def list_files_in_dir_recursively(base_dir):
