@@ -80,7 +80,15 @@ def run_ghcmods(cmds, msg, alter_messages_cb=None):
                         res = cmp(l[1].column, r[1].column)
             return res
 
-        msgs.sort(compare)
+        def sort_key(a):
+            return (
+                a[1].filename != file_shown_in_view,
+                a[1].filename,
+                a[1].line,
+                a[1].column
+            )
+
+        msgs.sort(key=sort_key)
 
     run_ghcmods_thread(view, file_shown_in_view, 'Ghc-Mod: ' + msg + ' ' + file_name, ghc_mod_args, show_current_file_first_and_alter)
 
