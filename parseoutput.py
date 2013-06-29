@@ -3,6 +3,7 @@ import re
 import sublime
 import sublime_plugin
 import time
+import sys
 from threading import Thread
 from collections import defaultdict
 
@@ -54,6 +55,9 @@ class OutputMessage(object):
             self.line,
             self.column,
             self.message)
+
+    def __str__(self):
+        return self.__unicode__()
 
     def __repr__(self):
         return '<OutputMessage {0}:{1}:{2}: {3}>'.format(
@@ -132,8 +136,10 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
 
 def format_output_messages(messages):
     """Formats list of messages"""
-    return u'\n'.join(unicode(x) for x in messages)
-
+    if sys.version[0] == '2':
+        return u'\n'.join(unicode(x) for x in messages)
+    else:
+        return '\n'.join(str(x) for x in messages)
 
 def show_output_result_text(view, msg, text, exit_code, base_dir):
     """Shows text (formatted messages) in output with build result"""
