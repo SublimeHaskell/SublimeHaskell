@@ -81,12 +81,12 @@ def run_ghcmods(cmds, msg, alter_messages_cb=None):
             return res
 
         def sort_key(a):
-            return [
+            return (
                 a[1].filename != file_shown_in_view,
                 a[1].filename,
                 a[1].line,
                 a[1].column
-            ]
+            )
 
         msgs.sort(key=sort_key)
 
