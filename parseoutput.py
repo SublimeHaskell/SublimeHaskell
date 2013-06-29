@@ -3,9 +3,11 @@ import re
 import sublime
 import sublime_plugin
 import time
-import sys
+from sys import version
 from threading import Thread
 from collections import defaultdict
+
+PyV3 = version[0] == "3"
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import log, are_paths_equal, call_and_wait, get_setting_async, show_status_message_process, show_status_message
@@ -136,10 +138,10 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
 
 def format_output_messages(messages):
     """Formats list of messages"""
-    if sys.version[0] == '2':
-        return u'\n'.join(unicode(x) for x in messages)
-    else:
+    if PyV3:
         return '\n'.join(str(x) for x in messages)
+    else:
+        return u'\n'.join(unicode(x) for x in messages)
 
 def show_output_result_text(view, msg, text, exit_code, base_dir):
     """Shows text (formatted messages) in output with build result"""
