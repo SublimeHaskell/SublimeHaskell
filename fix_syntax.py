@@ -24,4 +24,4 @@ class DetectFileTypeCommand(sublime_plugin.EventListener):
 
 def set_our_syntax(view, filename):
     view.settings().set('syntax', 'Packages/SublimeHaskell/Haskell-SublimeHaskell.tmLanguage')
-    print "Switched syntax to SublimeHaskell's fixed Haskell syntax: " + filename
+    print("Switched syntax to SublimeHaskell's fixed Haskell syntax: " + filename)
