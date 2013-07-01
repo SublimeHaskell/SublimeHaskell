@@ -40,6 +40,7 @@ def preload_settings():
     get_setting('enable_ghc_mod')
     get_setting('enable_hdevtools')
     get_setting('enable_hdocs')
+    get_setting('enable_hsdev')
     get_setting('snippet_replace')
     get_setting('ghc_opts')
 
@@ -97,7 +98,7 @@ def encode_bytes(s):
     return s.encode('utf-8')
 
 def call_and_wait(command, split_lines = False, **popen_kwargs):
-    return call_and_wait_with_input(command, None, split_lines, **popen_kwargs)
+    return call_and_wait_with_input(command, '', split_lines, **popen_kwargs)
 
 def call_and_wait_tool(command, tool_name, on_result = None, filename = None, on_line = None, **popen_kwargs):
     tool_enabled = 'enable_{0}'.format(tool_name)
@@ -112,7 +113,7 @@ def call_and_wait_tool(command, tool_name, on_result = None, filename = None, on
 
     try:
         if on_line:
-            for l in call_and_wait(command, cwd = source_dir, **popen_kwargs):
+            for l in call_and_wait(command, split_lines = True, cwd = source_dir, **popen_kwargs):
                 on_line(mk_result(crlf2lf(l)))
             return None
         else:
@@ -164,7 +165,7 @@ def call_and_wait_with_input(command, input_string, split_lines = False, **popen
     if split_lines:
         process.stdin.write(encode_bytes(input_string))
         process.stdin.close()
-        return process.stdout.xreadlines()
+        return process.stdout
     else:
         stdout, stderr = process.communicate(encode_bytes(input_string))
         exit_code = process.wait()

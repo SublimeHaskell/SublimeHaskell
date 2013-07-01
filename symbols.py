@@ -45,10 +45,11 @@ class Import(object):
     """
     Haskell import of module
     """
-    def __init__(self, module_name, is_qualified = False, import_as = None):
+    def __init__(self, module_name, is_qualified = False, import_as = None, location = None):
         self.module = module_name
         self.is_qualified = is_qualified
         self.import_as = import_as
+        self.location = location
 
     def dump(self):
         return self.__dict__
@@ -191,7 +192,7 @@ class Class(TypeBase):
     """
     Haskell class declaration
     """
-    def __init__(self, name, context, args, docs = None, location = None, module = None):
+    def __init__(self, name, context, args, definition = None, docs = None, location = None, module = None):
         super(Class, self).__init__(name, 'class', context, args, None, docs, location, module)
 
 def update_with(l, r, default_value, f):
