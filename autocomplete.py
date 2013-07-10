@@ -392,7 +392,7 @@ class SublimeHaskellReinspectAll(sublime_plugin.WindowCommand):
 class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
     """
     Show information about selected symbol
-    
+
     """
     def run(self, edit, filename = None, module_name = None, decl = None):
         if decl and filename:
@@ -1288,13 +1288,14 @@ def plugin_loaded():
     CABAL_INSPECTOR_OBJ_DIR = os.path.join(package_path, 'obj/CabalInspector')
     OUTPUT_PATH = os.path.join(package_path, 'module_info.cache')
 
-    global std_inspector
-    std_inspector = StandardInspectorAgent()
-    std_inspector.start()
+    if get_setting('inspect_modules'):
+        global std_inspector
+        std_inspector = StandardInspectorAgent()
+        std_inspector.start()
 
-    global inspector
-    inspector = InspectorAgent()
-    inspector.start()
+        global inspector
+        inspector = InspectorAgent()
+        inspector.start()
 
     # TODO: How to stop_hdevtools() in Sublime Text 2?
     start_hdevtools()

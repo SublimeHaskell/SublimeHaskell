@@ -83,5 +83,11 @@
 
 	// Enable hdocs, disabled by default since 'hdocs' is not on hackage yet
 	// It can be manually installed from http://github.com/mvoidex/hdocs
-	"enable_hdocs": false
+	"enable_hdocs": false,
+
+	// Enable inpecting modules with SublimeHaskell's ModuleInspector.
+	// Needed for autocompletion.
+	// This can take a lot of time in really big Haskell projects.
+	// Changing this requires a Sublime restart.
+	"inspect_modules": true
 }
