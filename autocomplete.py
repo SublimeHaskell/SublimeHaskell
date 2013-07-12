@@ -989,6 +989,7 @@ class InspectorAgent(threading.Thread):
         "Report that a file should be reinspected."
         if filename is None:
             return
+
         with self.dirty_files_lock:
             self.dirty_files.append(filename)
         self.reinspect_event.set()
