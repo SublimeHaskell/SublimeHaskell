@@ -338,7 +338,7 @@ class SublimeHaskellReinspectAll(sublime_plugin.WindowCommand):
 class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
     """
     Show information about selected symbol
-    
+
     """
     def run(self, edit, filename = None, module_name = None, decl = None):
         if decl and (filename or module_name):
@@ -914,13 +914,14 @@ def plugin_loaded():
     OUTPUT_PATH = os.path.join(package_path, 'module_info.cache')
     HSDEV_CACHE_PATH = os.path.join(package_path, 'hsdev')
 
-    global std_inspector
-    std_inspector = StandardInspectorAgent()
-    std_inspector.start()
+    if get_setting('inspect_modules'):
+        global std_inspector
+        std_inspector = StandardInspectorAgent()
+        std_inspector.start()
 
-    global inspector
-    inspector = InspectorAgent()
-    inspector.start()
+        global inspector
+        inspector = InspectorAgent()
+        inspector.start()
 
     # TODO: How to stop_hdevtools() in Sublime Text 2?
     start_hdevtools()
