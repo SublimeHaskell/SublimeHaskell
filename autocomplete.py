@@ -144,6 +144,10 @@ class AutoCompletion(object):
         "Get all the completions that apply to the current file."
 
         current_file_name = view.file_name()
+
+        if not current_file_name:
+            return []
+
         self.current_filename = current_file_name
         line_contents = get_line_contents(view, locations[0])
         (qualified_module, symbol_name, is_import_list) = get_qualified_symbol(line_contents)
