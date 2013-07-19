@@ -148,6 +148,10 @@ class AutoCompletion(object):
         "Get all the completions that apply to the current file."
 
         current_file_name = view.file_name()
+
+        if not current_file_name:
+            return []
+
         self.current_filename = current_file_name
 
         # Contents of the line under the first cursor
