@@ -655,7 +655,7 @@ def status_message_process(msg, isok = True, timeout = 300, priority = 0):
     return with_status_message(msg, isok, lambda m, ok = None: show_status_message_process(m, ok, timeout, priority))
 
 def sublime_haskell_package_path():
-    return os.path.join(sublime.packages_path(), 'SublimeHaskell')
+    return os.path.dirname(os.path.realpath(__file__))
 
 
 def plugin_loaded():
