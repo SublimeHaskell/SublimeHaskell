@@ -13,9 +13,6 @@ import time
 # This dirty hack is used in wait_for_window function
 MAX_WAIT_FOR_WINDOW = 10
 
-# The path to where this package is installed:
-PACKAGE_PATH = None
-
 # Panel for SublimeHaskell errors
 SUBLIME_ERROR_PANEL_NAME = 'haskell_sublime_load'
 
@@ -655,14 +652,24 @@ def status_message_process(msg, isok = True, timeout = 300, priority = 0):
     return with_status_message(msg, isok, lambda m, ok = None: show_status_message_process(m, ok, timeout, priority))
 
 def sublime_haskell_package_path():
+    """Get the path to where this package is installed"""
     return os.path.dirname(os.path.realpath(__file__))
 
+def sublime_haskell_cache_path():
+    """Get the path where compiled tools and caches are stored"""
+    return os.path.join(sublime_haskell_package_path(), os.path.expandvars(get_setting('cache_path', '.')))
 
 def plugin_loaded():
-    global PACKAGE_PATH
     global CABAL_INSPECTOR_EXE_PATH
-    PACKAGE_PATH = sublime_haskell_package_path()
-    CABAL_INSPECTOR_EXE_PATH = os.path.join(PACKAGE_PATH, 'CabalInspector')
+
+    package_path = sublime_haskell_package_path()
+    cache_path = sublime_haskell_cache_path()
+
+    log("store compiled tools and caches to {0}".format(cache_path))
+    if not os.path.exists(cache_path):
+        os.makedirs(cache_path)
+
+    CABAL_INSPECTOR_EXE_PATH = os.path.join(cache_path, 'CabalInspector')
     preload_settings()
     
 if int(sublime.version()) < 3000:

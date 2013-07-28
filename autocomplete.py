@@ -36,8 +36,6 @@ CABAL_INSPECTOR_SOURCE_PATH = None
 CABAL_INSPECTOR_EXE_PATH = None
 CABAL_INSPECTOR_OBJ_DIR = None
 
-OUTPUT_PATH = None
-
 # ModuleInspector output
 MODULE_INSPECTOR_RE = re.compile(r'ModuleInfo:(?P<result>.+)')
 
@@ -889,7 +887,6 @@ class InspectorAgent(threading.Thread):
 
     def run(self):
         # Compile the CabalInspector:
-        # TODO: Where to compile it?
         with status_message(InspectorAgent.CABALMSG) as s:
 
             exit_code, out, err = call_and_wait(['ghc',
@@ -1276,17 +1273,16 @@ def plugin_loaded():
     global CABAL_INSPECTOR_SOURCE_PATH
     global CABAL_INSPECTOR_EXE_PATH
     global CABAL_INSPECTOR_OBJ_DIR
-    global OUTPUT_PATH
 
     package_path = sublime_haskell_package_path()
+    cache_path = sublime_haskell_cache_path()
 
     MODULE_INSPECTOR_SOURCE_PATH = os.path.join(package_path, 'ModuleInspector.hs')
-    MODULE_INSPECTOR_EXE_PATH = os.path.join(package_path, 'ModuleInspector')
-    MODULE_INSPECTOR_OBJ_DIR = os.path.join(package_path, 'obj/ModuleInspector')
+    MODULE_INSPECTOR_EXE_PATH = os.path.join(cache_path, 'ModuleInspector')
+    MODULE_INSPECTOR_OBJ_DIR = os.path.join(cache_path, 'obj/ModuleInspector')
     CABAL_INSPECTOR_SOURCE_PATH = os.path.join(package_path, 'CabalInspector.hs')
-    CABAL_INSPECTOR_EXE_PATH = os.path.join(package_path, 'CabalInspector')
-    CABAL_INSPECTOR_OBJ_DIR = os.path.join(package_path, 'obj/CabalInspector')
-    OUTPUT_PATH = os.path.join(package_path, 'module_info.cache')
+    CABAL_INSPECTOR_EXE_PATH = os.path.join(cache_path, 'CabalInspector')
+    CABAL_INSPECTOR_OBJ_DIR = os.path.join(cache_path, 'obj/CabalInspector')
 
     if get_setting('inspect_modules'):
         global std_inspector
