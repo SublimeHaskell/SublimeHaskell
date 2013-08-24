@@ -149,7 +149,7 @@ def show_output_result_text(view, msg, text, exit_code, base_dir):
     success = exit_code == 0
 
     success_message = 'SUCCEEDED' if success else 'FAILED'
-    output = u'{0}\n\nBuild {1}'.format(text, success_message)
+    output = u'Build {0}\n\n{1}'.format(success_message, text.strip())
 
     show_status_message_process(msg, success)
     # Show panel if there is any text to show (without the part that we add)
