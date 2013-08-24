@@ -44,7 +44,7 @@ To show inferred types use `Show type` (`ctrl-k ctrl-h ctrl-t`) command.
 
 To insert inferred type use `Insert type` (`ctrl-k ctrl-h ctrl-i`).
 
-You can jump between the errors and warnings with `Go to next error` (`alt-d, alt-e`) and `Go to previous error` (`shift-alt-d shift-alt-e`).
+You can jump between the errors and warnings with `F4` and `Shift-F4`.
 To show hidden error output, use command `Show error panel` (`ctrl-alt-e`)
 
 hdevtools as a Build System
