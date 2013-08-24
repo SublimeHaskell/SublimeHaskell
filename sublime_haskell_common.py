@@ -614,7 +614,16 @@ def show_status_message_process(msg, isok = None, timeout = 300, priority = 0):
         StatusMessage.messages[msg].start()
 
 def is_haskell_source(view = None):
-    return is_enabled_haskell_command(view, False)
+    window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
+
+    if not window or not view:
+        return False
+
+    syntax_file_for_view = view.settings().get('syntax').lower()
+    if not syntax_file_for_view.endswith("Haskell.tmLanguage".lower()):
+        return False
+
+    return True
 
 class with_status_message(object):
     def __init__(self, msg, isok, show_message):
