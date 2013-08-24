@@ -35,6 +35,8 @@ MODULE_INSPECTOR_OBJ_DIR = None
 CABAL_INSPECTOR_SOURCE_PATH = None
 CABAL_INSPECTOR_EXE_PATH = None
 CABAL_INSPECTOR_OBJ_DIR = None
+INSPECTOR_ENABLED = False
+INSPECTOR_RUNNING = False
 
 # ModuleInspector output
 MODULE_INSPECTOR_RE = re.compile(r'ModuleInfo:(?P<result>.+)')
@@ -381,9 +383,13 @@ class SublimeHaskellGoToAnyDeclaration(sublime_plugin.WindowCommand):
 
 class SublimeHaskellReinspectAll(sublime_plugin.WindowCommand):
     def run(self):
-        autocompletion.clear_inspected()
-        inspector.mark_all_files(self.window)
+        global INSPECTOR_ENABLED
 
+        if INSPECTOR_ENABLED:
+            autocompletion.clear_inspected()
+            inspector.mark_all_files(self.window)
+        else:
+            show_status_message("inspector_enabled setting is false", isok=False)
 
 
 
@@ -1144,6 +1150,18 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         get_settings().add_on_change('enable_ghc_mod', lambda: self.on_setting_changed())
 
     def on_setting_changed(self):
+        global INSPECTOR_ENABLED
+
+        INSPECTOR_ENABLED = get_setting('inspect_modules')
+
+        # Start the inspector if needed
+        # TODO Also stop it if needed!
+        if INSPECTOR_ENABLED and not INSPECTOR_RUNNING:
+            start_inspector()
+        elif (not INSPECTOR_ENABLED) and INSPECTOR_RUNNING:
+            # TODO Implement stopping it
+            log('The ModuleInspector cannot be stopped as of now. You have to restart Sublime for that.')
+
         same = True
         for k, v in self.local_settings.items():
             r = get_setting(k)
@@ -1157,7 +1175,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             if view:
                 self.set_cabal_status(view)
 
-        if not same:
+        if INSPECTOR_ENABLED and not same:
             # TODO: Changed completion settings! Update autocompletion data properly
             # For now at least try to load cabal modules info
             std_inspector.load_cabal_info()
@@ -1224,25 +1242,34 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
                 view.set_status('sublime_haskell_cabal', '{0}: {1}'.format(cabal, project_name))
 
     def on_new(self, view):
+        global INSPECTOR_ENABLED
+
         self.set_cabal_status(view)
         if is_haskell_source(view):
             filename = view.file_name()
-            inspector.mark_file_dirty(filename)
-            inspector.mark_file_active(filename)
+            if INSPECTOR_ENABLED:
+                inspector.mark_file_dirty(filename)
+                inspector.mark_file_active(filename)
 
     def on_load(self, view):
+        global INSPECTOR_ENABLED
+
         self.set_cabal_status(view)
         if is_haskell_source(view):
             filename = view.file_name()
-            inspector.mark_file_dirty(filename)
-            inspector.mark_file_active(filename)
+            if INSPECTOR_ENABLED:
+                inspector.mark_file_dirty(filename)
+                inspector.mark_file_active(filename)
 
     def on_activated(self, view):
         self.set_cabal_status(view)
 
     def on_post_save(self, view):
+        global INSPECTOR_ENABLED
+
         if is_haskell_source(view):
-            inspector.mark_file_dirty(view.file_name())
+            if INSPECTOR_ENABLED:
+                inspector.mark_file_dirty(view.file_name())
 
     def on_query_context(self, view, key, operator, operand, match_all):
         if key == 'auto_completion_popup':
@@ -1265,6 +1292,24 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             return False
 
 
+def start_inspector():
+    global INSPECTOR_RUNNING
+
+    if INSPECTOR_RUNNING:
+        raise Exception('SublimeHaskell: ModuleInspector is already running!')
+
+    log('starting ModuleInspector')
+
+    global std_inspector
+    std_inspector = StandardInspectorAgent()
+    std_inspector.start()
+
+    global inspector
+    inspector = InspectorAgent()
+    inspector.start()
+
+    INSPECTOR_RUNNING = True
+
 
 def plugin_loaded():
     global MODULE_INSPECTOR_SOURCE_PATH
@@ -1273,6 +1318,8 @@ def plugin_loaded():
     global CABAL_INSPECTOR_SOURCE_PATH
     global CABAL_INSPECTOR_EXE_PATH
     global CABAL_INSPECTOR_OBJ_DIR
+    global INSPECTOR_ENABLED
+    global INSPECTOR_RUNNING
 
     package_path = sublime_haskell_package_path()
     cache_path = sublime_haskell_cache_path()
@@ -1283,15 +1330,10 @@ def plugin_loaded():
     CABAL_INSPECTOR_SOURCE_PATH = os.path.join(package_path, 'CabalInspector.hs')
     CABAL_INSPECTOR_EXE_PATH = os.path.join(cache_path, 'CabalInspector')
     CABAL_INSPECTOR_OBJ_DIR = os.path.join(cache_path, 'obj/CabalInspector')
+    INSPECTOR_ENABLED = get_setting('inspect_modules')
 
-    if get_setting('inspect_modules'):
-        global std_inspector
-        std_inspector = StandardInspectorAgent()
-        std_inspector.start()
-
-        global inspector
-        inspector = InspectorAgent()
-        inspector.start()
+    if INSPECTOR_ENABLED:
+        start_inspector()
 
     # TODO: How to stop_hdevtools() in Sublime Text 2?
     start_hdevtools()
