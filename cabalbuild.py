@@ -46,8 +46,6 @@ projects_being_built = set()
 
 # Base command
 class SublimeHaskellBaseCommand(sublime_plugin.WindowCommand):
-    def is_enabled(self):
-        return len(autocompletion.projects.object) > 0
 
     def build(self, command, use_cabal_dev=None, filter_project = None):
         select_project(
