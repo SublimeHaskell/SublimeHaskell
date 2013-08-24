@@ -5,12 +5,12 @@ import sublime_plugin
 from threading import Thread
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import log, is_enabled_haskell_command, get_haskell_command_window_view_file_project, call_ghcmod_and_wait, get_setting_async
+    from sublime_haskell_common import log, is_haskell_source, get_haskell_command_window_view_file_project, call_ghcmod_and_wait, get_setting_async
     from parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages
     from ghci import parse_info
     import symbols
 else:
-    from SublimeHaskell.sublime_haskell_common import log, is_enabled_haskell_command, get_haskell_command_window_view_file_project, call_ghcmod_and_wait, get_setting_async
+    from SublimeHaskell.sublime_haskell_common import log, is_haskell_source, get_haskell_command_window_view_file_project, call_ghcmod_and_wait, get_setting_async
     from SublimeHaskell.parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages
     from SublimeHaskell.ghci import parse_info
     import SublimeHaskell.symbols as symbols
@@ -27,7 +27,7 @@ class SublimeHaskellGhcModCheck(sublime_plugin.WindowCommand):
         run_ghcmod(['check'], 'Checking')
 
     def is_enabled(self):
-        return is_enabled_haskell_command(None, False)
+        return is_haskell_source(None)
 
 
 class SublimeHaskellGhcModLint(sublime_plugin.WindowCommand):
@@ -35,7 +35,7 @@ class SublimeHaskellGhcModLint(sublime_plugin.WindowCommand):
         run_ghcmod(['lint', '-h', '-u'], 'Linting', lint_as_hints)
 
     def is_enabled(self):
-        return is_enabled_haskell_command(None, False)
+        return is_haskell_source(None)
 
 
 class SublimeHaskellGhcModCheckAndLint(sublime_plugin.WindowCommand):
@@ -43,7 +43,7 @@ class SublimeHaskellGhcModCheckAndLint(sublime_plugin.WindowCommand):
         run_ghcmods([['check'], ['lint', '-h', '-u']], 'Checking and Linting', lint_as_hints)
 
     def is_enabled(self):
-        return is_enabled_haskell_command(None, False)
+        return is_haskell_source(None)
 
 
 def run_ghcmods(cmds, msg, alter_messages_cb=None):

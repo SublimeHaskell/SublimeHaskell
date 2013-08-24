@@ -24,7 +24,7 @@ Installation
 
 Usage
 -----
-In short: Press `Shift-Ctrl-P` and type `haskell` to explore all commends.
+In short: Press `Shift-Ctrl-P` and type `haskell` to explore all commands.
 
 When editing Haskell source files that are part of a Cabal project, automatic error highlighting and enhanced auto-completion are available.
 
