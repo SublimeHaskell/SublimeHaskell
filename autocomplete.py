@@ -406,7 +406,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
                     if decl in m.declarations:
                         self.show_symbol_info(m.declarations[decl])
                     else:
-                        show_status_message('Symbol {0} not found in {1}'.format(decl, filename))
+                        show_status_message('Symbol "{0}" not found in {1}'.format(decl, filename))
                 else:
                     show_status_message('No info about module in {0}'.format(filename))
             return
@@ -418,7 +418,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
                     if decl in m.declarations:
                         self.show_symbol_info(m.declarations[decl])
                     else:
-                        show_status_message('Symbol {0} not found in {1}'.format(decl, filename))
+                        show_status_message('Symbol "{0}" not found in {1}'.format(decl, filename))
                 else:
                     show_status_message('No info about module {0}'.format(module_name))
             return
@@ -502,11 +502,11 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
                         ['No, thanks']], self.on_import_selected)
                     return
 
-                show_status_message('Symbol {0} not found'.format(ident), False)
+                show_status_message('Symbol "{0}" not found'.format(ident), False)
                 return
 
         if not candidates:
-            show_status_message('Symbol {0} not found'.format(ident), False)
+            show_status_message('Symbol "{0}" not found'.format(ident), False)
             return
 
         if len(candidates) == 1:
@@ -571,7 +571,7 @@ class SublimeHaskellBrowseModule(sublime_plugin.WindowCommand):
         if module_name:
             with autocompletion.database.modules as modules:
                 if module_name not in modules:
-                    show_status_message('Module {0} not found'.format(module_name), False)
+                    show_status_message('Module "{0}" not found'.format(module_name), False)
                     return
 
                 current_file_name = filename if filename else self.window.active_view().file_name()
@@ -639,7 +639,7 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
 
         with autocompletion.database.symbols as decl_symbols:
             if ident not in decl_symbols:
-                show_status_message('Declaration for {0} not found'.format(ident), False)
+                show_status_message('Declaration for "{0}" not found'.format(ident), False)
                 return
 
             decls = decl_symbols[ident]
@@ -678,7 +678,7 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
                     module_candidates.extend(modules_list)
 
         if not candidates and not module_candidates:
-            show_status_message('Declaration for {0} not found'.format(ident), False)
+            show_status_message('Declaration for "{0}" not found'.format(ident), False)
             return
 
         if len(candidates) + len(module_candidates) == 1:
