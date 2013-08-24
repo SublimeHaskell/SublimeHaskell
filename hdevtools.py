@@ -14,6 +14,21 @@ else:
     from SublimeHaskell.ghci import parse_info
     import SublimeHaskell.symbols as symbols
 
+
+def show_hdevtools_error_and_disable():
+    # Looks like we can't always get an active window here,
+    # we use sublime.error_message() instead of
+    # output_error(sublime.active_window().
+    sublime.set_timeout(lambda: sublime.error_message(
+        "SublimeHaskell: hdevtools was not found!\n"
+        + "It's used for 'symbol info' and type inference\n"
+        + "Install it with 'cabal install hdevtools',\n"
+        + "or adjust the 'add_to_PATH' setting for a custom location.\n"
+        + "'enable_hdevtools' automatically set to False in the User settings."), 0)
+
+    set_setting_async('enable_hdevtools', False)
+
+
 def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
     """
     Calls hdevtools with the given arguments.
@@ -39,13 +54,7 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
 
     except OSError as e:
         if e.errno == errno.ENOENT:
-            sublime.set_timeout(lambda: output_error(sublime.active_window(),
-                "SublimeHaskell: hdevtools was not found!\n"
-                + "It's used for 'symbol info' and type inference\n"
-                + "Try adjusting the 'add_to_PATH' setting.\n"
-                + "'enable_hdevtools' automatically set to False."), 0)
-
-        set_setting_async('enable_hdevtools', False)
+            show_hdevtools_error_and_disable()
 
         return None
 
@@ -76,11 +85,7 @@ def admin(cmds, wait = False, **popen_kwargs):
 
     except OSError as e:
         if e.errno == errno.ENOENT:
-            output_error(sublime.active_window(),
-                "SublimeHaskell: hdevtools was not found!\n"
-                + "It's used for 'symbol info' and type inference\n"
-                + "Try adjusting the 'add_to_PATH' setting.\n"
-                + "'enable_hdevtools' automatically set to False.")
+            show_hdevtools_error_and_disable()
 
         set_setting_async('enable_hdevtools', False)
 
