@@ -67,3 +67,12 @@ It is also useful to add this to your key bindings to redisplay the error panel 
 ```json
   { "keys": ["ctrl+alt+b"], "command": "show_panel", "args": {"panel": "output.exec"} }
 ```
+
+If the ModuleInspector takes too much time
+------------------------------------------
+
+The `ModuleInspector` is a program that looks at your Haskell environment to provide auto completion.
+
+Depending on your environment, this may takes very long.
+
+You can disable it with the `"inspect_modules": false` setting.
