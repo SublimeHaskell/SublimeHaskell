@@ -570,7 +570,7 @@ class StatusMessage(threading.Thread):
 
         if self.is_highest_priority():
             sublime_status_message(u'{0}{1}'.format(self.msg, '.' * dots))
-    
+
         if self.timeout <= 0:
             self.cancel()
 
@@ -680,7 +680,7 @@ def plugin_loaded():
 
     CABAL_INSPECTOR_EXE_PATH = os.path.join(cache_path, 'CabalInspector')
     preload_settings()
-    
+
 if int(sublime.version()) < 3000:
     plugin_loaded()
 

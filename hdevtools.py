@@ -130,7 +130,7 @@ def start_hdevtools():
     thread.start()
 
 def stop_hdevtools():
-    admin(["--stop-server"])    
+    admin(["--stop-server"])
 
 def hdevtools_enabled():
     return get_setting_async('enable_hdevtools') == True
