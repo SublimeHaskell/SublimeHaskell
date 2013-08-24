@@ -152,7 +152,8 @@ def show_output_result_text(view, msg, text, exit_code, base_dir):
     output = u'{0}\n\nBuild {1}'.format(text, success_message)
 
     show_status_message_process(msg, success)
-    if not success:
+    # Show panel if there is any text to show (without the part that we add)
+    if text:
         if get_setting_async('show_output_window'):
             sublime.set_timeout(lambda: write_output(view, output, base_dir), 0)
 
