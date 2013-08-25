@@ -13,9 +13,6 @@ import time
 # This dirty hack is used in wait_for_window function
 MAX_WAIT_FOR_WINDOW = 10
 
-# The path to where this package is installed:
-PACKAGE_PATH = None
-
 # Panel for SublimeHaskell errors
 SUBLIME_ERROR_PANEL_NAME = 'haskell_sublime_load'
 
@@ -458,7 +455,7 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
         # Otherwise ghc-mod will fail with 'cannot satisfy package...'
         # Seems, that user directory works well
         # Current source directory is set with -i argument in get_ghc_opts_args
-        exit_code, out, err = call_and_wait(command, cwd=get_source_dir(None))
+        exit_code, out, err = call_and_wait(command, cwd=get_source_dir(filename))
 
         if exit_code != 0:
             raise Exception("ghc-mod exited with status %d and stderr: %s" % (exit_code, err))
@@ -602,7 +599,7 @@ class StatusMessage(threading.Thread):
 
         if self.is_highest_priority():
             sublime_status_message(u'{0}{1}'.format(self.msg, '.' * dots))
-    
+
         if self.timeout <= 0:
             self.cancel()
 
@@ -646,7 +643,16 @@ def show_status_message_process(msg, isok = None, timeout = 300, priority = 0):
         StatusMessage.messages[msg].start()
 
 def is_haskell_source(view = None):
-    return is_enabled_haskell_command(view, False)
+    window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
+
+    if not window or not view:
+        return False
+
+    syntax_file_for_view = view.settings().get('syntax').lower()
+    if not syntax_file_for_view.endswith("Haskell.tmLanguage".lower()):
+        return False
+
+    return True
 
 class with_status_message(object):
     def __init__(self, msg, isok, show_message):
@@ -684,16 +690,26 @@ def status_message_process(msg, isok = True, timeout = 300, priority = 0):
     return with_status_message(msg, isok, lambda m, ok = None: show_status_message_process(m, ok, timeout, priority))
 
 def sublime_haskell_package_path():
+    """Get the path to where this package is installed"""
     return os.path.dirname(os.path.realpath(__file__))
 
+def sublime_haskell_cache_path():
+    """Get the path where compiled tools and caches are stored"""
+    return os.path.join(sublime_haskell_package_path(), os.path.expandvars(get_setting('cache_path', '.')))
 
 def plugin_loaded():
-    global PACKAGE_PATH
     global CABAL_INSPECTOR_EXE_PATH
-    PACKAGE_PATH = sublime_haskell_package_path()
-    CABAL_INSPECTOR_EXE_PATH = os.path.join(PACKAGE_PATH, 'CabalInspector')
+
+    package_path = sublime_haskell_package_path()
+    cache_path = sublime_haskell_cache_path()
+
+    log("store compiled tools and caches to {0}".format(cache_path))
+    if not os.path.exists(cache_path):
+        os.makedirs(cache_path)
+
+    CABAL_INSPECTOR_EXE_PATH = os.path.join(cache_path, 'CabalInspector')
     preload_settings()
-    
+
 if int(sublime.version()) < 3000:
     plugin_loaded()
 

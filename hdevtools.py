@@ -14,6 +14,21 @@ else:
     from SublimeHaskell.ghci import parse_info
     import SublimeHaskell.symbols as symbols
 
+
+def show_hdevtools_error_and_disable():
+    # Looks like we can't always get an active window here,
+    # we use sublime.error_message() instead of
+    # output_error(sublime.active_window().
+    sublime.set_timeout(lambda: sublime.error_message(
+        "SublimeHaskell: hdevtools was not found!\n"
+        + "It's used for 'symbol info' and type inference\n"
+        + "Install it with 'cabal install hdevtools',\n"
+        + "or adjust the 'add_to_PATH' setting for a custom location.\n"
+        + "'enable_hdevtools' automatically set to False in the User settings."), 0)
+
+    set_setting_async('enable_hdevtools', False)
+
+
 def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
     """
     Calls hdevtools with the given arguments.
@@ -25,7 +40,23 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
     if hdevtools_socket:
         arg_list.append('--socket={0}'.format(hdevtools_socket))
 
-    return call_and_wait_tool(['hdevtools'] + arg_list + ghc_opts_args, 'hdevtools', None, filename)
+    try:
+        exit_code, out, err = call_and_wait(['hdevtools'] + arg_list + ghc_opts_args, cwd = source_dir)
+
+        if exit_code != 0:
+            raise Exception("hdevtools exited with status %d and stderr: %s" % (exit_code, err))
+
+        return crlf2lf(out)
+
+    except OSError as e:
+        if e.errno == errno.ENOENT:
+            show_hdevtools_error_and_disable()
+
+        return None
+
+    except Exception as e:
+        log('calling to hdevtools fails with {0}'.format(e))
+        return None
 
 def admin(cmds, wait = False, **popen_kwargs):
     if not hdevtools_enabled():
@@ -50,11 +81,7 @@ def admin(cmds, wait = False, **popen_kwargs):
 
     except OSError as e:
         if e.errno == errno.ENOENT:
-            output_error_async(sublime.active_window(),
-                "SublimeHaskell: hdevtools was not found!\n"
-                + "It's used for 'symbol info' and type inference\n"
-                + "Try adjusting the 'add_to_PATH' setting.\n"
-                + "'enable_hdevtools' automatically set to False.")
+            show_hdevtools_error_and_disable()
 
         set_setting_async('enable_hdevtools', False)
 
@@ -99,7 +126,7 @@ def start_hdevtools():
     thread.start()
 
 def stop_hdevtools():
-    admin(["--stop-server"])    
+    admin(["--stop-server"])
 
 def hdevtools_enabled():
     return get_setting_async('enable_hdevtools') == True

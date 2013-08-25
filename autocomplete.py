@@ -37,8 +37,8 @@ MODULE_INSPECTOR_OBJ_DIR = None
 CABAL_INSPECTOR_SOURCE_PATH = None
 CABAL_INSPECTOR_EXE_PATH = None
 CABAL_INSPECTOR_OBJ_DIR = None
-
-OUTPUT_PATH = None
+INSPECTOR_ENABLED = False
+INSPECTOR_RUNNING = False
 
 HSDEV_CACHE_PATH = None
 
@@ -335,8 +335,17 @@ class SublimeHaskellGoToAnyDeclaration(sublime_plugin.WindowCommand):
 
 class SublimeHaskellReinspectAll(sublime_plugin.WindowCommand):
     def run(self):
+<<<<<<< HEAD
         inspector.mark_all_files(self.window)
+=======
+        global INSPECTOR_ENABLED
+>>>>>>> bf9fd3217fc8e5d4985e4e719850a75bf42863f3
 
+        if INSPECTOR_ENABLED:
+            autocompletion.clear_inspected()
+            inspector.mark_all_files(self.window)
+        else:
+            show_status_message("inspector_enabled setting is false", isok=False)
 
 
 class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
@@ -345,12 +354,37 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
 
     """
     def run(self, edit, filename = None, module_name = None, decl = None):
+<<<<<<< HEAD
         if decl and (filename or module_name):
             i = hsdev.find(decl, file = filename, module = module_name)
             if i:
                 self.show_symbol_info(i[0])
             else:
                 show_status_message('Symbol {0} not found'.format(decl))
+=======
+        if decl and filename:
+            with autocompletion.database.files as files:
+                if filename in files:
+                    m = files[filename]
+                    if decl in m.declarations:
+                        self.show_symbol_info(m.declarations[decl])
+                    else:
+                        show_status_message('Symbol "{0}" not found in {1}'.format(decl, filename))
+                else:
+                    show_status_message('No info about module in {0}'.format(filename))
+            return
+
+        if decl and module_name:
+            with autocompletion.database.get_cabal_modules() as cabal_modules:
+                if module_name in cabal_modules:
+                    m = cabal_modules[module_name]
+                    if decl in m.declarations:
+                        self.show_symbol_info(m.declarations[decl])
+                    else:
+                        show_status_message('Symbol "{0}" not found in {1}'.format(decl, filename))
+                else:
+                    show_status_message('No info about module {0}'.format(module_name))
+>>>>>>> bf9fd3217fc8e5d4985e4e719850a75bf42863f3
             return
 
         (module_word, ident, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
@@ -358,10 +392,92 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
 
         current_file_name = self.view.file_name()
 
+<<<<<<< HEAD
         candidates = hsdev.info(full_name, file = current_file_name)
 
         if not candidates:
             show_status_message('Symbol {0} not found'.format(full_name))
+=======
+        candidates = []
+
+        imported_symbol_not_found = False
+
+        with autocompletion.database.symbols as decl_symbols:
+            if ident in decl_symbols:
+
+                decls = decl_symbols[ident] if not module_word else [d for d in decl_symbols[ident] if d.full_name() == full_name]
+
+                modules_dict = symbols.declarations_modules(decls, lambda ms: symbols.get_visible_module(ms, current_file_name)).values()
+
+                with autocompletion.database.files as files:
+                    if current_file_name in files:
+                        cur_info = files[current_file_name]
+
+                        if not module_word or module_word == cur_info.name:
+                            # this module declaration
+                            candidates.extend([m.declarations[ident] for m in modules_dict if symbols.is_this_module(cur_info, m) and ident in m.declarations])
+                        if not candidates:
+                            # declarations from imported modules
+                            candidates.extend([m.declarations[ident] for m in modules_dict if symbols.is_imported_module(cur_info, m, module_word) and ident in m.declarations])
+                        if not candidates:
+                            imported_symbol_not_found = True
+                            # show all possible candidates
+                            candidates.extend([m.declarations[ident] for m in modules_dict if ident in m.declarations])
+
+                    # No info about imports for this file, just add all declarations
+                    else:
+                        candidates.extend([m.declarations[ident] for m in modules_dict if ident in m.declarations])
+
+            else:
+                imported_symbol_not_found = True
+
+        if imported_symbol_not_found or not candidates:
+            browse_for_module = False
+            browse_module_candidate = None
+            with autocompletion.database.modules as modules:
+                if full_name in modules:
+                    # Browse symbols in module
+                    browse_for_module = True
+                    browse_module_candidate = symbols.get_preferred_module(modules[full_name], current_file_name)
+
+            if browse_for_module:
+                if browse_module_candidate:
+                    self.view.window().run_command('sublime_haskell_browse_module', {
+                        'module_name': browse_module_candidate.name,
+                        'filename': current_file_name })
+                    return
+                else:
+                    show_status_message("No info about module {0}".format(full_name))
+                    return
+            elif not candidates:
+                # Sometimes ghc-mod returns no info about module, but module exists
+                # So there are no info about valid symbol
+                # But if user sure, that symbol exists, he can force to call for ghci to get info
+                import_list = []
+                with autocompletion.database.files as files:
+                    if current_file_name in files:
+                        import_list.extend(files[current_file_name].imports.keys())
+
+                if module_word:
+                    # Full qualified name, just call to ghci_info
+                    info = ghci_info(module_word, ident)
+                    if info:
+                        self.show_symbol_info(info)
+                        return
+                elif import_list:
+                    # Allow user to select module
+                    self.candidates = [(m, ident) for m in import_list]
+                    self.view.window().show_quick_panel([
+                        ['Select imported module', 'from where {0} may be imported'.format(ident)],
+                        ['No, thanks']], self.on_import_selected)
+                    return
+
+                show_status_message('Symbol "{0}" not found'.format(ident), False)
+                return
+
+        if not candidates:
+            show_status_message('Symbol "{0}" not found'.format(ident), False)
+>>>>>>> bf9fd3217fc8e5d4985e4e719850a75bf42863f3
             return
 
         if len(candidates) == 1:
@@ -643,7 +759,38 @@ class InspectorAgent(threading.Thread):
         self.reinspect_event = threading.Event()
 
     def run(self):
+<<<<<<< HEAD
         hsdev.load_cache(wait = True, path = HSDEV_CACHE_PATH)
+=======
+        # Compile the CabalInspector:
+        with status_message(InspectorAgent.CABALMSG) as s:
+
+            exit_code, out, err = call_and_wait(['ghc',
+                '--make', CABAL_INSPECTOR_SOURCE_PATH,
+                '-o', CABAL_INSPECTOR_EXE_PATH,
+                '-outputdir', CABAL_INSPECTOR_OBJ_DIR])
+
+            if exit_code != 0:
+                s.fail()
+                error_msg = u"SublimeHaskell: Failed to compile CabalInspector\n{0}".format(err)
+                wait_for_window(lambda w: self.show_errors(w, error_msg))
+                # Continue anyway
+
+        # Compile the ModuleInspector:
+        with status_message(InspectorAgent.MODULEMSG) as s:
+
+            exit_code, out, err = call_and_wait(['ghc',
+                '--make', MODULE_INSPECTOR_SOURCE_PATH,
+                '-package', 'ghc',
+                '-o', MODULE_INSPECTOR_EXE_PATH,
+                '-outputdir', MODULE_INSPECTOR_OBJ_DIR])
+
+            if exit_code != 0:
+                s.fail()
+                error_msg = u"SublimeHaskell: Failed to compile ModuleInspector\n{0}".format(err)
+                wait_for_window(lambda w: self.show_errors(w, error_msg))
+                return
+>>>>>>> bf9fd3217fc8e5d4985e4e719850a75bf42863f3
 
         wait_for_window(lambda w: self.mark_all_files(w))
         self.mark_active_files()
@@ -775,6 +922,18 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         get_settings().add_on_change('enable_ghc_mod', lambda: self.on_setting_changed())
 
     def on_setting_changed(self):
+        global INSPECTOR_ENABLED
+
+        INSPECTOR_ENABLED = get_setting('inspect_modules')
+
+        # Start the inspector if needed
+        # TODO Also stop it if needed!
+        if INSPECTOR_ENABLED and not INSPECTOR_RUNNING:
+            start_inspector()
+        elif (not INSPECTOR_ENABLED) and INSPECTOR_RUNNING:
+            # TODO Implement stopping it
+            log('The ModuleInspector cannot be stopped as of now. You have to restart Sublime for that.')
+
         same = True
         for k, v in self.local_settings.items():
             r = get_setting(k)
@@ -788,7 +947,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             if view:
                 self.set_cabal_status(view)
 
-        if not same:
+        if INSPECTOR_ENABLED and not same:
             # TODO: Changed completion settings! Update autocompletion data properly
             # For now at least try to load cabal modules info
             std_inspector.load_cabal_info()
@@ -855,25 +1014,34 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
                 view.set_status('sublime_haskell_cabal', '{0}: {1}'.format(cabal, project_name))
 
     def on_new(self, view):
+        global INSPECTOR_ENABLED
+
         self.set_cabal_status(view)
         if is_haskell_source(view):
             filename = view.file_name()
-            inspector.mark_file_dirty(filename)
-            inspector.mark_file_active(filename)
+            if INSPECTOR_ENABLED:
+                inspector.mark_file_dirty(filename)
+                inspector.mark_file_active(filename)
 
     def on_load(self, view):
+        global INSPECTOR_ENABLED
+
         self.set_cabal_status(view)
         if is_haskell_source(view):
             filename = view.file_name()
-            inspector.mark_file_dirty(filename)
-            inspector.mark_file_active(filename)
+            if INSPECTOR_ENABLED:
+                inspector.mark_file_dirty(filename)
+                inspector.mark_file_active(filename)
 
     def on_activated(self, view):
         self.set_cabal_status(view)
 
     def on_post_save(self, view):
+        global INSPECTOR_ENABLED
+
         if is_haskell_source(view):
-            inspector.mark_file_dirty(view.file_name())
+            if INSPECTOR_ENABLED:
+                inspector.mark_file_dirty(view.file_name())
 
     def on_query_context(self, view, key, operator, operand, match_all):
         if key == 'auto_completion_popup':
@@ -896,6 +1064,24 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             return False
 
 
+def start_inspector():
+    global INSPECTOR_RUNNING
+
+    if INSPECTOR_RUNNING:
+        raise Exception('SublimeHaskell: ModuleInspector is already running!')
+
+    log('starting ModuleInspector')
+
+    global std_inspector
+    std_inspector = StandardInspectorAgent()
+    std_inspector.start()
+
+    global inspector
+    inspector = InspectorAgent()
+    inspector.start()
+
+    INSPECTOR_RUNNING = True
+
 
 def plugin_loaded():
     global MODULE_INSPECTOR_SOURCE_PATH
@@ -906,26 +1092,22 @@ def plugin_loaded():
     global CABAL_INSPECTOR_OBJ_DIR
     global OUTPUT_PATH
     global HSDEV_CACHE_PATH
+    global INSPECTOR_ENABLED
+    global INSPECTOR_RUNNING
 
     package_path = sublime_haskell_package_path()
+    cache_path = sublime_haskell_cache_path()
 
     MODULE_INSPECTOR_SOURCE_PATH = os.path.join(package_path, 'ModuleInspector.hs')
-    MODULE_INSPECTOR_EXE_PATH = os.path.join(package_path, 'ModuleInspector')
-    MODULE_INSPECTOR_OBJ_DIR = os.path.join(package_path, 'obj/ModuleInspector')
+    MODULE_INSPECTOR_EXE_PATH = os.path.join(cache_path, 'ModuleInspector')
+    MODULE_INSPECTOR_OBJ_DIR = os.path.join(cache_path, 'obj/ModuleInspector')
     CABAL_INSPECTOR_SOURCE_PATH = os.path.join(package_path, 'CabalInspector.hs')
-    CABAL_INSPECTOR_EXE_PATH = os.path.join(package_path, 'CabalInspector')
-    CABAL_INSPECTOR_OBJ_DIR = os.path.join(package_path, 'obj/CabalInspector')
-    OUTPUT_PATH = os.path.join(package_path, 'module_info.cache')
-    HSDEV_CACHE_PATH = os.path.join(package_path, 'hsdev')
+    CABAL_INSPECTOR_EXE_PATH = os.path.join(cache_path, 'CabalInspector')
+    CABAL_INSPECTOR_OBJ_DIR = os.path.join(cache_path, 'obj/CabalInspector')
+    INSPECTOR_ENABLED = get_setting('inspect_modules')
 
-    if get_setting('inspect_modules'):
-        global std_inspector
-        std_inspector = StandardInspectorAgent()
-        std_inspector.start()
-
-        global inspector
-        inspector = InspectorAgent()
-        inspector.start()
+    if INSPECTOR_ENABLED:
+        start_inspector()
 
     # TODO: How to stop_hdevtools() in Sublime Text 2?
     start_hdevtools()

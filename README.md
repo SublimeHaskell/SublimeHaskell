@@ -7,7 +7,7 @@ Requirements
 Necessary:
 * ghc and a recent Haskell Platform (>= 2012 should do fine)
 * cabal
-* Cabal packages: base, bytestring, aeson, haskell-src-exts, haddock (`cabal install aeson haskell-src-exts haddock`)
+* Cabal packages: base, bytestring, aeson, haskell-src-exts (== 1.14.*), haddock (`cabal install aeson haskell-src-exts haddock`)
 
 Optional, but useful:
 * [ghc-mod](http://hackage.haskell.org/package/ghc-mod) (for import and LANGUAGE completions and type inference, `cabal install ghc-mod`)
@@ -24,7 +24,7 @@ Installation
 
 Usage
 -----
-In short: Press `Shift-Ctrl-P` and type `haskell` to explore all commends.
+In short: Press `Shift-Ctrl-P` and type `haskell` to explore all commands.
 
 When editing Haskell source files that are part of a Cabal project, automatic error highlighting and enhanced auto-completion are available.
 
@@ -44,7 +44,7 @@ To show inferred types use `Show type` (`ctrl-k ctrl-h ctrl-t`) command.
 
 To insert inferred type use `Insert type` (`ctrl-k ctrl-h ctrl-i`).
 
-You can jump between the errors and warnings with `Go to next error` (`alt-d, alt-e`) and `Go to previous error` (`shift-alt-d shift-alt-e`).
+You can jump between the errors and warnings with `F4` and `Shift-F4`.
 To show hidden error output, use command `Show error panel` (`ctrl-alt-e`)
 
 hdevtools as a Build System
@@ -67,3 +67,12 @@ It is also useful to add this to your key bindings to redisplay the error panel 
 ```json
   { "keys": ["ctrl+alt+b"], "command": "show_panel", "args": {"panel": "output.exec"} }
 ```
+
+If the ModuleInspector takes too much time
+------------------------------------------
+
+The `ModuleInspector` is a program that looks at your Haskell environment to provide auto completion.
+
+Depending on your environment, this may takes very long.
+
+You can disable it with the `"inspect_modules": false` setting.

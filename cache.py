@@ -131,8 +131,9 @@ def plugin_loaded():
     global PROJECTS_CACHE_PATH
 
     package_path = sublime_haskell_package_path()
+    cache_path = sublime_haskell_cache_path()
 
-    CACHE_PATH = os.path.join(package_path, 'cache')
+    CACHE_PATH = os.path.join(cache_path, 'cache')
     CABAL_CACHE_PATH = os.path.join(CACHE_PATH, 'cabal')
     PROJECTS_CACHE_PATH = os.path.join(CACHE_PATH, 'projects')
 
