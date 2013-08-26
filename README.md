@@ -47,8 +47,28 @@ To insert inferred type use `Insert type` (`ctrl-k ctrl-h ctrl-i`).
 You can jump between the errors and warnings with `F4` and `Shift-F4`.
 To show hidden error output, use command `Show error panel` (`ctrl-alt-e`)
 
-hdevtools as a Build System
----------------------------
+Build Systems
+-------------
+
+You don't have to use SublimeHaskell's built-in build functionality.
+
+If you prefer, you can disable them in the settings, and use plain Sublime Build Systems:
+
+### cabal
+
+Save this to your `~/.config/sublime-text-2/Packages/User/cabal-custom.sublime-build` to make a custom `cabal` build system:
+
+```json
+{
+  "cmd": ["cabal build --ghc-options='-O0 -hidir o0 -odir o0'"],  // append lib:myPackage or myexecutable here to only build certain cabal targets
+  "shell": true,
+  "file_regex": "^(\\S*?):(\\d+):(\\d+):$"  // this matches the output of ghc
+}
+```
+
+For more options, [look here](http://docs.sublimetext.info/en/latest/reference/build_systems.html).
+
+### hdevtools
 
 Save this to your `~/.config/sublime-text-2/Packages/User/hdevtools.sublime-build` to make `hdevtools` a build system:
 
@@ -59,6 +79,8 @@ Save this to your `~/.config/sublime-text-2/Packages/User/hdevtools.sublime-buil
   "selector": "source.haskell"
 }
 ```
+
+### Using build system results
 
 You can then build with `Ctrl-B` and jump between the errors with (Shift-)`F4`.
 
