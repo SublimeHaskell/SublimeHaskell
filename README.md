@@ -14,7 +14,7 @@ Optional, but useful:
 * [stylish-haskell](https://github.com/jaspervdj/stylish-haskell) (for code prettification, `cabal install stylish-haskell`)
 * [cabal-dev](http://hackage.haskell.org/package/cabal-dev) if you want to use it
 * [haskell-docs](http://hackage.haskell.org/package/haskell-docs) (for documentation in 'Symbol info' command, `cabal install haskell-docs`)
-* [hdevtools](https://github.com/bitc/hdevtools) (for type inference, `cabal install hdevtools`)
+* [hdevtools](https://github.com/bitc/hdevtools) (or [fork for windows](https://github.com/mvoidex/hdevtools)) (for type inference, `cabal install hdevtools`)
 
 Installation
 ------------
