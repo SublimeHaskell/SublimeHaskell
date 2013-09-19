@@ -15,21 +15,22 @@ import autocomplete
 def call_hsdev_and_wait(arg_list, filename = None, cabal = None, callback = None, **popen_kwargs):
     cmd = ['hsdev', '--json'] + arg_list
 
-    result = {}
+    result = None
 
     def on_line(l):
-        if l and 'status' in l:
-            callback(l)
-        else:
-            result.update(l)
+        if l:
+            if 'status' in l:
+                callback(l)
+            else:
+                result = l
 
     def parse_response(s):
         return {} if s.isspace() else json.loads(s)
 
     log(' '.join(cmd))
     ret = call_and_wait_tool(cmd, 'hsdev', parse_response, filename, on_line if callback else None, **popen_kwargs)
-    if ret:
-        result.update(ret)
+    if ret is not None:
+        result = ret
 
     return result
 
@@ -41,12 +42,10 @@ def hsdev(arg_list, on_response = None):
     if r is None:
         log('hsdev returns nothing')
         return None
-    if r and 'result' in r:
-        if r['result'] == 'error':
-            log('hsdev returns error: {0} with details: {1}'.format(r['error'], r['details']))
-        return r
-    log('hsdev returns unknown response: {0}'.format(r))
-    return None
+    if r and 'error' in r:
+        log('hsdev returns error: {0} with details: {1}'.format(r['error'], r['details']))
+        return None
+    return r
 
 def if_some(x, lst):
     return lst if x is not None else []
@@ -54,7 +53,7 @@ def if_some(x, lst):
 def cabal_path(cabal):
     if not cabal:
         return []
-    args = ['-c']
+    args = ['--sandbox']
     if cabal != 'cabal':
         args.append(cabal)
     return args
@@ -94,29 +93,22 @@ def start(port = None):
 def stop(port = None):
     return hsdev(['server', 'stop'] + if_some(port, ['--port', str(port)])) is not None
 
-def scan(cabal = None, project = None, file = None, path = None, module = None, projects = False, wait = False, on_status = None):
+def scan(cabal = None, projects = [], files = [], paths = [], modules = [], wait = False, on_status=None):
     opts = ['scan']
-    if module:
-        opts.extend(['module', module])
+    if modules:
+        opts.extend(['module'] + modules)
         if cabal:
-            opts.extend(['-c', cabal])
+            opts.extend(['--sandbox', cabal])
     elif cabal:
         opts.extend(['cabal'] + cabal_path(cabal))
-    elif project:
-        opts.extend(['project', '-p', project])
-    elif file:
-        opts.extend(['file', file])
-    elif path:
-        opts.extend(['path', path])
-        if projects:
-            opts.extends(['--projects'])
     else:
-        opts.extend(['cabal'])
+        args = [['--project', p] for p in projects] + [['-f', f] for f in files] + [['-p', p] for p in paths]
+        opts.extend(list(reduce(lambda x, y: x + y, args)))
 
     if wait or on_status:
         opts.extend(['-w', '-s'])
 
-    opts.extend(get_ghc_opts_args(filename = file, cabal = cabal))
+    opts.extend(get_ghc_opts_args(cabal = cabal))
 
     def onResponse(s):
         if on_status:
@@ -124,17 +116,15 @@ def scan(cabal = None, project = None, file = None, path = None, module = None, 
 
     return hsdev(opts, on_response = onResponse if wait else None)
 
-def rescan(project = None, file = None, directory = None, wait = False, on_status = None):
+def rescan(projects = [], files = [], paths = [], wait = False, on_status = None):
     opts = ['rescan']
-    if project:
-        opts.extend(['-p', project])
-    elif file:
-        opts.extend(['-f', file])
-    elif directory:
-        opts.extend(['-d', directory])
-    else:
+    args = [['--project', p] for p in projects] + [['-f', f] for f in files] + [['-p', p] for p in paths]
+
+    if not args:
         log('hsdev.rescan: must specify at least one param')
         return None
+
+    opts.extend(list(reduce(lambda x, y: x + y, args)))
 
     if wait or on_status:
         opts.extend(['-w', '-s'])
@@ -147,107 +137,186 @@ def rescan(project = None, file = None, directory = None, wait = False, on_statu
 
     return hsdev(opts, on_response = onResponse if wait else None)
 
-def clean(cabal = None, project = None, file = None, module = None):
-    return hsdev(['clean'] + cabal_path(cabal) + if_some(project, ['-p', project]) + if_some(file, ['-f', file]) + if_some(module, ['-m', module]))
+def remove(cabal = None, project = None, file = None, module = None):
+    return hsdev(
+        ['remove'] +
+        cabal_path(cabal) +
+        if_some(project, ['--project', project]) +
+        if_some(file, ['-f', file]) +
+        if_some(module, ['-m', module]))
 
-def find(name, cabal = None, project = None, file = None, module = None, source = False, standalone = False):
-    return parse_decls(hsdev(['find', name] + cabal_path(cabal) + if_some(project, ['-p', project]) + if_some(file, ['-f', file]) + if_some(module, ['-m', module]) + (['--src'] if source else []) + (['--stand'] if standalone else [])))
+def list_modules(cabal = None, project = None, source = False, standalone = False):
+    return parse_modules(
+        hsdev(
+            ['list', 'modules'] +
+            cabal_path(cabal) +
+            if_some(project, ['--project', project]) +
+            (['--src'] if source else []) +
+            (['--stand'] if standalone else [])))
 
-def list(cabal = None, project = None, source = False, standalone = False):
-    return hsdev(['list'] + cabal_path(cabal) + if_some(project, ['-p', project]) + (['--src'] if source else []) + (['--stand'] if standalone else [])).get('modules', "").splitlines()
+def list_projects():
+    return hsdev(['list', 'projects'])
 
-def browse(module = None, cabal = None, project = None, file = None):
-    return parse_modules(hsdev(['browse'] + if_some(module, ['-m', module]) + cabal_path(cabal) + if_some(project, ['-p', project]) + if_some(file, ['-f', file])))[0]
+def symbol(name, cabal = None, project = None, file = None, module = None, source = False, standalone = False):
+    return parse_decls(
+        hsdev(
+            ['symbol', name] +
+            cabal_path(cabal) +
+            if_some(project, ['-p', project]) +
+            if_some(file, ['-f', file]) +
+            if_some(module, ['-m', module]) +
+            (['--src'] if source else []) +
+            (['--stand'] if standalone else [])))
 
-def goto(name, file = None):
-    return parse_decls(hsdev(['goto', name] + if_some(file, ['-f', file])))
+def module(name = None, project = None, file = None, cabal = None):
+    return parse_module(
+        hsdev(
+            ['module'] +
+            if_some(name, ['-m', name]) +
+            cabal_path(cabal) +
+            if_some(project, ['-p', project]) +
+            if_some(file, ['-f', file])))
 
-def info(name, file = None):
-    return parse_decls(hsdev(['info', name] + if_some(file, ['-f', file])))
+def project(projects):
+    return hsdev(['project'] + projects)
 
-def lookup(name, file):
-    return parse_decls(hsdev(['lookup', file, name]))
+def whois(name, file, cabal = None):
+    return parse_module_declaration(
+        hsdev(
+            ['whois', name, '-f', file] + cabal_path(cabal)))
 
-def complete(input, file = None, module_name = None, cabal = None):
+def complete(input, file, cabal = None):
+    return parse_decls(
+        hsdev(
+            ['complete', input, '-f', file] + cabal_path(cabal)))
+
+def dump(cabal = None, projects = [], files = [], path = None, file = None):
+    opts = ['dump']
+    if cabal:
+        opts.extend(['cabal'] + cabal_path(cabal))
+    elif projects:
+        opts.extend(['project'] + projects)
+    elif files:
+        opts.extend(['standalone'] + files)
+    
+    if path:
+        opts.extend(['-p', path])
     if file:
-        return parse_decls(hsdev(['complete', 'file', file, input]))
-    return parse_decls(hsdev(
-        ['complete', 'module', module_name, input] +
-        cabal_path(cabal)))
+        opts.extend(['-f', file])
 
-def projects():
-    return hsdev(['project']).get('projects', "").splitlines()
+    r = hsdev(opts)
+    if r:
+        return parse_database(r)
+    else:
+        return r
 
-def project(p):
-    return hsdev(['project', p])
-
-def save_cache(path = None):
-    p = ['--path', path] if path else []
-    return hsdev(['cache', 'dump'] + p)
-
-def load_cache(path = None, wait = False):
-    return hsdev(['cache', 'load'] + if_some(path, ['--path', path]) + if_some(wait, ['-w']))
+def load(path = None, file = None, data = None):
+    return hsdev(
+        ['load'] +
+        if_some(path, ['-p', path]) +
+        if_some(file, ['-f', file]) +
+        if_some(data, ['--data', data]))
 
 def exit():
     return hsdev(['exit'])
 
-def parse_decls(s):
+def parse_database(s):
     if not s:
         return None
-    if s and 'declarations' in s:
-        return [parse_declaration(decl) for decl in s['declarations']]
+    if s and 'projects' in s and 'modules' in s:
+        return (s['projects'], [parse_module(m) for m in s['modules']])
     return None
+
+def parse_decls(s):
+    if s is None:
+        return None
+    return [parse_module_declaration(decl) for decl in s]
 
 def parse_modules(s):
-    if not s:
+    if s is None:
         return None
-    if s and 'modules' in s:
-        return [parse_module(m) for m in s['modules']]
-    return None
+    return [parse_module_id(m) for m in s]
 
-def parse_location(d):
-    if not d:
-        return None
-    return symbols.Location(d['file'], d['line'], d['column'], d.get('project'))
+def get_value(dc, ks, defval = None):
+    if dc is None:
+        return defval
+    if type(ks) == list:
+        cur = dc
+        for k in ks:
+            cur = cur.get(k)
+            if cur is None:
+                return defval
+        return cur
+    else:
+        return dc.get(ks, defval)
+
+def parse_location(d, p = None):
+    return symbols.Location(
+        get_value(d, 'file'),
+        get_value(p, 'line', 0),
+        get_value(p, 'column', 0),
+        get_value(d, 'project'))
 
 def parse_cabal(d):
-    if not d:
-        return None
-    if d == '<cabal>':
+    c = get_value(d, 'cabal')
+    if c == '<cabal>':
         return 'cabal'
     else:
-        return d
+        return c
 
 def parse_import(d):
     if not d:
         return None
-    return symbols.Import(d['module'], d['qualified'], d.get('as'), parse_location(d.get('location')))
+    return symbols.Import(d['name'], d['qualified'], d.get('as'), parse_location(None, d.get('pos')))
 
-def parse_module_head(d):
+def parse_module_id(d):
     return symbols.Module(
         d['name'],
         [], {}, {},
         parse_location(d.get('location')),
-        parse_cabal(d.get('cabal')))
+        parse_cabal(d.get('location')))
 
-def parse_declaration(d, parse_module_info = True):
+def parse_declaration(decl):
     try:
-        m = None
-        if 'module' in d and parse_module_info:
-            m = parse_module_head(d['module'])
+        what = decl['decl']['what']
+        loc = parse_location(None, decl.get('pos'))
+        docs = decl.get('docs')
+        name = decl['name']
 
-        if d['what'] == 'function':
-            return symbols.Function(d['name'], d.get('type'), d.get('docs'), parse_location(d.get('location')), m)
-        elif d['what'] == 'type':
-            return symbols.Type(d['name'], d.get('ctx'), d.get('args'), d.get('definition'), d.get('docs'), parse_location(d.get('location')), m)
-        elif d['what'] == 'newtype':
-            return symbols.Newtype(d['name'], d.get('ctx'), d.get('args'), d.get('definition'), d.get('docs'), parse_location(d.get('location')), m)
-        elif d['what'] == 'data':
-            return symbols.Data(d['name'], d.get('ctx'), d.get('args'), d.get('definition'), d.get('docs'), parse_location(d.get('location')), m)
-        elif d['what'] == 'class':
-            return symbols.Class(d['name'], d.get('ctx'), d.get('args'), d.get('definition'), d.get('docs'), parse_location(d.get('location')), m)
+        if what == 'function':
+            return symbols.Function(name, decl['decl'].get('type'), docs, loc)
+        elif what == 'type':
+            return symbols.Type(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc)
+        elif what == 'newtype':
+            return symbols.Newtype(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc)
+        elif what == 'data':
+            return symbols.Data(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc)
+        elif what == 'class':
+            return symbols.Class(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc)
         else:
             return None
+    except Exception as e:
+        log('Error pasring declaration: {0}'.format(e))
+        return None
+
+def parse_module_declaration(d, parse_module_info = True):
+    try:
+        m = None
+        if 'module-id' in d and parse_module_info:
+            m = parse_module_id(d['module-id'])
+
+        loc = parse_location(d['module-id'].get('location'))
+        decl = parse_declaration(d['declaration'])
+
+        if not decl:
+            return None
+
+        if decl.location:
+            decl.location.set_file(loc)
+
+        decl.module = m
+
+        return decl
     except:
         return None
 
@@ -255,10 +324,10 @@ def parse_module(d):
     return symbols.Module(
         d['name'],
         d.get('exports'),
-        dict((i['module'], parse_import(i)) for i in d['imports']) if 'imports' in d else {},
-        dict((decl['name'],parse_declaration(decl, False)) for decl in d['decls']) if 'decls' in d else {},
+        dict((i['name'], parse_import(i)) for i in d['imports']) if 'imports' in d else {},
+        dict((decl['name'],parse_declaration(decl)) for decl in d['declarations']) if 'declarations' in d else {},
         parse_location(d.get('location')),
-        parse_cabal(d.get('cabal')))
+        parse_cabal(d.get('location')))
 
 def test():
     p = HsDev()

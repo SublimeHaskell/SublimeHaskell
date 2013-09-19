@@ -14,7 +14,7 @@ class Location(object):
     Location in file at line
     """
     def __init__(self, filename, line, column, project = None):
-        if not project:
+        if not project and filename:
             project = get_cabal_project_dir_of_file(filename)
         self.project = project
         self.filename = filename
@@ -23,7 +23,12 @@ class Location(object):
 
     def position(self):
         """ Returns filename:line:column """
-        return ':'.join([self.filename, str(self.line), str(self.column)])
+        return ':'.join([self.filename if self.filename else '<no file>', str(self.line), str(self.column)])
+
+    def set_file(self, other):
+        if other is not None:
+            self.filename = other.filename
+            self.project = other.project
 
 class Symbol(object):
     """
@@ -55,7 +60,7 @@ class Import(object):
         return self.__dict__
 
 def module_location(filename):
-    return Location(filename, 1, 1)
+    return Location(filename, 0, 0)
 
 class Module(Symbol):
     """
@@ -67,8 +72,14 @@ class Module(Symbol):
         self.exports = exports
         # Dictionary from module name to Import object
         self.imports = imports.copy()
+        for i in self.imports.values():
+            if i.location:
+                i.location.set_file(self.location)
         # Dictionary from name to Symbol
         self.declarations = declarations.copy()
+        for d in self.declarations.values():
+            if d.location:
+                d.location.set_file(self.location)
 
         for decl in self.declarations.values():
             decl.module = self
@@ -82,6 +93,8 @@ class Module(Symbol):
     def add_declaration(self, new_declaration):
         if not new_declaration.module:
             new_declaration.module = self
+        if new_declaration.location:
+            new_declaration.location.set_file(self.location)
         if new_declaration.module != self:
             raise RuntimeError("Adding declaration to other module")
         self.declarations[new_declaration.name] = new_declaration
