@@ -30,6 +30,9 @@ class Location(object):
             self.filename = other.filename
             self.project = other.project
 
+    def is_null(self):
+        return self.project is None and self.filename is None and self.line == 0 and self.column == 0
+
 class Symbol(object):
     """
     Haskell symbol: module, function, data, class etc.

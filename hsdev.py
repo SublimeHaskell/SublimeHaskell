@@ -251,11 +251,12 @@ def get_value(dc, ks, defval = None):
         return dc.get(ks, defval)
 
 def parse_location(d, p = None):
-    return symbols.Location(
+    loc = symbols.Location(
         get_value(d, 'file'),
         get_value(p, 'line', 0),
         get_value(p, 'column', 0),
         get_value(d, 'project'))
+    return None if loc.is_null() else loc
 
 def parse_cabal(d):
     c = get_value(d, 'cabal')

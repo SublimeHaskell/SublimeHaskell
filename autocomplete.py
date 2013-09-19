@@ -473,6 +473,9 @@ class SublimeHaskellBrowseModule(sublime_plugin.WindowCommand):
                 'filename': candidate.module.location.filename,
                 'decl': candidate.name })
         else:
+            log('data is {0}'.format({
+                'module_name': candidate.module.name,
+                'decl': candidate.name }))
             self.window.active_view().run_command('sublime_haskell_symbol_info', {
                 'module_name': candidate.module.name,
                 'decl': candidate.name })

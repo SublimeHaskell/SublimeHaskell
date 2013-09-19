@@ -337,11 +337,16 @@ def get_setting_async(key, default=None):
     if key not in sublime_haskell_settings:
         # Load it in main thread, but for now all we can do is result default
         return default
-    return sublime_haskell_settings[key]
+    s = sublime_haskell_settings[key]
+    if s is None:
+        return default
+    return s
 
 
 def set_setting(key, value):
     """Set setting and update dictionary"""
+    if value is None:
+        return
     sublime_haskell_settings[key] = value
     get_settings().set(key, value)
     save_settings()
