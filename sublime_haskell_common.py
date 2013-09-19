@@ -149,7 +149,7 @@ def call_and_wait_with_input(command, input_string, split_lines = False, **popen
     # For the subprocess, extend the env PATH to include the 'add_to_PATH' setting.
     extended_env = dict(os.environ)
     PATH = os.getenv('PATH') or ""
-    extended_env['PATH'] = ':'.join(get_setting_async('add_to_PATH', []) + [PATH])
+    extended_env['PATH'] = os.pathsep.join(get_setting_async('add_to_PATH', []) + [PATH])
 
     process = subprocess.Popen(
         command,
