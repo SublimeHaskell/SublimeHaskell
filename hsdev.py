@@ -13,7 +13,7 @@ from sublime_haskell_common import *
 import autocomplete
 
 def call_hsdev_and_wait(arg_list, filename = None, cabal = None, callback = None, **popen_kwargs):
-    cmd = ['hsdev', '--json'] + arg_list
+    cmd = ['hsdev'] + arg_list
 
     result = None
 

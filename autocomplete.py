@@ -369,7 +369,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
             self.show_symbol_info(candidate)
             return
 
-        show_status_message('Symbol {0} not imported in file {1}'.format(full_name, current_file_name), isok)
+        show_status_message('Symbol {0} not imported in file {1}'.format(full_name, current_file_name), isok = False)
 
         candidates = hsdev.symbol(full_name)
 
@@ -489,7 +489,13 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
         current_file_name = self.view.file_name()
         current_project = get_cabal_project_dir_of_file(current_file_name)
 
-        candidates = hsdev.whois(full_name, current_file_name)
+        candidate = hsdev.whois(full_name, current_file_name)
+
+        if candidate and candidate.location and candidate.location.filename:
+            self.view.window().open_file(candidate.location.position(), sublime.ENCODED_POSITION)
+            return
+
+        candidates = hsdev.symbol(full_name, source = True)
 
         if not candidates:
             show_status_message('Declaration {0} not found'.format(ident), False)
