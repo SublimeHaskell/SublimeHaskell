@@ -3,7 +3,6 @@ import sublime
 import sublime_plugin
 import copy
 from threading import Thread
-from functools import cmp_to_key
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
@@ -281,13 +280,7 @@ class SublimeHaskellRun(SublimeHaskellBaseCommand):
         cabal_project_dir, cabal_project_name = get_cabal_project_dir_and_name_of_view(self.window.active_view())
 
         # Show current project first
-        def compare(l, r):
-            res = cmp(not l[0].startswith(cabal_project_name), not r[0].startswith(cabal_project_name))
-            if res == 0:
-                res = cmp(l[0], r[0])
-            return res
-
-        ps.sort(key=cmp_to_key(compare))
+        ps.sort(key = lambda s: (not s[0].startswith(cabal_project_name), s[0]))
 
         self.executables = list(map(lambda m: m[1], ps))
         self.window.show_quick_panel(list(map(lambda m: m[0], ps)), self.on_done)
