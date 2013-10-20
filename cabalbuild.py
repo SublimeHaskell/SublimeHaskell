@@ -1,4 +1,5 @@
 import os
+import os.path
 import sublime
 import sublime_plugin
 import copy
@@ -8,10 +9,12 @@ if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     from parseoutput import run_chain_build_thread
     from autocomplete import autocompletion
+    import hsdev
 else:
     from SublimeHaskell.sublime_haskell_common import *
     from SublimeHaskell.parseoutput import run_chain_build_thread
     from SublimeHaskell.autocomplete import autocompletion
+    import SublimeHaskell.hsdev as hsdev
 
 OUTPUT_PANEL_NAME = "haskell_run_output"
 
@@ -53,16 +56,30 @@ class SublimeHaskellBaseCommand(sublime_plugin.WindowCommand):
             lambda n, d: run_build(self.window.active_view(), n, d, cabal_config[command], use_cabal_dev),
             filter_project = filter_project)
 
+# Retrieve projects as dictionary that refers to this app instance
+def get_projects():
+    def norm(p):
+        return os.path.normcase(os.path.normpath(p))
+
+    folders = [norm(f) for f in sublime.active_window().folders()]
+
+    def in_folders(src):
+        for f in folders:
+            if norm(src).startswith(f):
+                return True
+        return False
+
+    return dict((info['name'], info) for info in hsdev.list_projects() if in_folders(info['cabal']))
 
 # Select project from list
 # on_selected accepts name of project and directory of project
 # filter_project accepts name of project and project-info as it appears in AutoCompletion object
 #   and returns whether this project must appear in selection list
 def select_project(window, on_selected, filter_project = None):
-    ps = [(name, info) for (name, info) in autocompletion.projects.object.items() if not filter_project or filter_project(name, info)]
+    ps = [(name, info) for (name, info) in get_projects().items() if not filter_project or filter_project(name, info)]
 
     def run_selected(psel):
-        on_selected(psel[0], psel[1]['dir'])
+        on_selected(psel[0], psel[1]['path'])
 
     if len(ps) == 0:
         return
@@ -84,7 +101,7 @@ def select_project(window, on_selected, filter_project = None):
         if idx != -1:
             run_selected(ps[idx])
 
-    window.show_quick_panel(list(map(lambda m: [m[0], m[1]['dir']], ps)), on_done)
+    window.show_quick_panel(list(map(lambda m: [m[0], m[1]['path']], ps)), on_done)
 
 
 def run_build(view, project_name, project_dir, config, use_cabal_dev=None):
@@ -250,9 +267,10 @@ class SublimeHaskellBuildAuto(SublimeHaskellBaseCommand):
             if run_tests:
                 has_tests = False
 
-                with autocompletion.projects as projects:
-                    if current_project_name in projects:
-                        has_tests = len(projects[current_project_name]['tests']) > 0
+                projects = get_projects()
+
+                if current_project_name in projects:
+                    has_tests = len(projects[current_project_name]['description']['tests']) > 0
 
                 if has_tests:
                     config['steps'].extend(cabal_config['test']['steps'])
@@ -264,12 +282,12 @@ class SublimeHaskellRun(SublimeHaskellBaseCommand):
     def run(self):
         self.executables = []
         ps = []
-        with autocompletion.projects as projects:
-            for p, info in projects.items():
-                for e in info['executables']:
-                    ps.append((p + ": " + e['name'], {
-                        'dir': info['dir'],
-                        'name': e['name']
+        projects = get_projects()
+        for p, info in projects.items():
+            for e in info['description']['executables']:
+                ps.append((p + ": " + e['name'], {
+                    'dir': info['path'],
+                    'name': info['name']
                     }))
 
         # Nothing to run
