@@ -162,7 +162,7 @@ def symbol(name, cabal = None, project = None, file = None, module = None, sourc
         hsdev(
             ['symbol', name] +
             cabal_path(cabal) +
-            if_some(project, ['-p', project]) +
+            if_some(project, ['--project', project]) +
             if_some(file, ['-f', file]) +
             if_some(module, ['-m', module]) +
             (['--src'] if source else []) +
@@ -174,7 +174,7 @@ def module(name = None, project = None, file = None, cabal = None):
             ['module'] +
             if_some(name, ['-m', name]) +
             cabal_path(cabal) +
-            if_some(project, ['-p', project]) +
+            if_some(project, ['--project', project]) +
             if_some(file, ['-f', file])))
 
 def project(projects):

@@ -153,7 +153,18 @@ class AutoCompletion(object):
         (qualified_module, symbol_name, is_import_list) = get_qualified_symbol(line_contents)
         qualified_prefix = '{0}.{1}'.format(qualified_module, symbol_name) if qualified_module else symbol_name
 
-        suggestions = hsdev.complete(qualified_prefix, current_file_name) or []
+        suggestions = []
+        if is_import_list:
+            current_project = hsdev.module(file = current_file_name).location.project
+            if current_project:
+                project_modules = [m.name for m in hsdev.list_modules(project = current_project)]
+                if qualified_module in project_modules:
+                    suggestions = hsdev.module(name = qualified_module, project = current_project).declarations.values()
+            if not suggestions:
+                suggestions = hsdev.module(name = qualified_module, cabal = 'cabal').declarations.values()
+        else:
+            suggestions = hsdev.complete(qualified_prefix, current_file_name) or []
+
         return list(set([s.suggest() for s in suggestions]))
 
     def completions_for_module(self, module, filename = None):
