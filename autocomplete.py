@@ -237,18 +237,7 @@ class AutoCompletion(object):
         return list(set((module_next_name(m) + '\t(module)', module_next_name(m)) for m in module_list if m.startswith(qualified_prefix)))
 
     def get_current_module_completions(self):
-        completions = []
-
-        cabal = current_cabal()
-
-        completions.extend([m.name for m in hsdev.list_modules(cabal = cabal)])
-
-        if self.current_filename:
-            (project_path, _) = get_cabal_project_dir_and_name_of_file(self.current_filename)
-            if project_path:
-                completions.extend([m.name for m in hsdev.list_modules(project = project_path)])
-
-        return set(completions)
+        return set([m.name for m in hsdev.scope_modules(file = self.current_filename, cabal = current_cabal())])
 
 
 autocompletion = AutoCompletion()
@@ -362,35 +351,28 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
     """
     def run(self, edit, filename = None, module_name = None, decl = None):
         if decl and (filename or module_name):
-            i = hsdev.symbol(decl, file = filename, module = module_name)
-            if i:
-                self.show_symbol_info(i[0])
-            else:
-                show_status_message('Symbol {0} not found'.format(decl))
+            self.full_name = decl
+            self.candidates = hsdev.symbol(decl, file = self.current_file_name, module = self.module_name)
+        else:
+            (module_word, ident, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+            self.full_name = '{0}.{1}'.format(module_word, ident) if module_word else ident
+
+            self.current_file_name = self.view.file_name()
+
+            candidates = hsdev.whois(self.full_name, self.current_file_name)
+
+            if not candidates:
+                candidates = hsdev.lookup(self.full_name, self.current_file_name)
+
+        if not self.candidates:
+            show_status_message('Symbol {0} not found'.format(self.full_name))
             return
 
-        (module_word, ident, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
-        full_name = '{0}.{1}'.format(module_word, ident) if module_word else ident
-
-        current_file_name = self.view.file_name()
-
-        candidate = hsdev.whois(full_name, current_file_name)
-
-        if candidate:
-            self.show_symbol_info(candidate)
+        if len(self.candidates) == 1:
+            self.show_symbol_info(self.candidates[0])
             return
 
-        show_status_message('Symbol {0} not imported in file {1}'.format(full_name, current_file_name), isok = False)
-
-        candidates = hsdev.symbol(full_name)
-
-        if not candidates:
-            show_status_message('Symbol {0} not found'.format(full_name))
-            return
-
-        self.candidates = candidates
-        self.view.window().show_quick_panel([[c.qualified_name()] for c in candidates], self.on_done)
-
+        self.view.window().show_quick_panel([[c.qualified_name()] for c in self.candidates], self.on_done)
 
             # if browse_for_module:
             #     if browse_module_candidate:
@@ -437,6 +419,70 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
     def is_enabled(self):
         return is_enabled_haskell_command(self.view, False)
 
+
+class SublimeHaskellInsertImportForSymbol(sublime_plugin.TextCommand):
+    """
+    Insert import for symbol
+    """
+    def run(self, edit, filename = None, decl = None):
+        self.full_name = decl
+        self.current_file_name = filename
+        self.edit = edit
+
+        if not self.current_file_name:
+            self.current_file_name = self.view.file_name()
+
+        if not self.full_name:
+            (module_word, ident, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+            self.full_name = '{0}.{1}'.format(module_word, ident) if module_word else ident
+
+        if hsdev.whois(self.full_name, file = self.current_file_name):
+            show_status_message('Symbol {0} already in scope'.format(self.full_name))
+            return
+
+        self.candidates = hsdev.lookup(self.full_name, file = self.current_file_name)
+
+        if not self.candidates:
+            show_status_message('Symbol {0} not found'.format(self.full_name))
+            return
+
+        if len(self.candidates) == 1:
+            self.add_import(self.candidates[0])
+            return
+
+        self.view.window().show_quick_panel([[c.qualified_name()] for c in self.candidates], self.on_done)
+
+    def add_import(self, decl):
+        cur_module = hsdev.module(file = self.current_file_name)
+        imports = sorted(cur_module.imports.values(), key = lambda i: i.location.line)
+        after = [i for i in imports if i.module > decl.module.name]
+
+        insert_line = 0
+        insert_gap = False
+
+        if len(after) > 0:
+            # Insert before after[0]
+            insert_line = after[0].location.line - 1
+        elif len(imports) > 0:
+            # Insert after all imports
+            insert_line = imports[-1].location.line
+        elif len(cur_module.declarations) > 0:
+            # Insert before first declaration
+            insert_line = min([d.location.line for d in cur_module.declarations.values()]) - 1
+            insert_gap = True
+        else:
+            # Insert at the end of file
+            insert_line = self.view.rowcol(self.view.size())[0]
+
+        insert_text = 'import {0}\n'.format(decl.module.name) + ('\n' if insert_gap else '')
+
+        pt = self.view.text_point(insert_line, 0)
+        self.view.insert(self.edit, pt, insert_text)
+
+    def on_done(self, idx):
+        if idx == -1:
+            return
+        self.add_import(self.candidates[idx])
 
 
 class SublimeHaskellBrowseModule(sublime_plugin.WindowCommand):

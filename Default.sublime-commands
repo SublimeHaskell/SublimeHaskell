@@ -90,8 +90,8 @@
         "command": "sublime_haskell_browse_declarations"
     },
     {
-        "caption": "SublimeHaskell: Insert import",
-        "command": "sublime_haskell_insert_import"
+        "caption": "SublimeHaskell: Insert import for symbol",
+        "command": "sublime_haskell_insert_import_for_symbol"
     },
     {
         "caption": "SublimeHaskell: Switch Cabal/Cabal-Dev",

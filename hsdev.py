@@ -180,10 +180,25 @@ def module(name = None, project = None, file = None, cabal = None):
 def project(projects):
     return hsdev(['project'] + projects)
 
+def lookup(name, file, cabal = None):
+    return parse_decls(
+        hsdev(
+            ['lookup', name, '-f', file] + cabal_path(cabal)))
+
 def whois(name, file, cabal = None):
-    return parse_module_declaration(
+    return parse_decls(
         hsdev(
             ['whois', name, '-f', file] + cabal_path(cabal)))
+
+def scope_modules(file, cabal = None):
+    return parse_modules(
+        hsdev(
+            ['scope', 'modules', '-f', file] + cabal_path(cabal)))
+
+def scope(file, cabal = None, global_scope = False):
+    return parse_decls(
+        hsdev(
+            ['scope', '-f', file] + cabal_path(cabal) + (['--global'] if global_scope else [])))
 
 def complete(input, file, cabal = None):
     return parse_decls(
@@ -336,55 +351,3 @@ def test():
     p.load_cache(path = "e:")
     l = p.list()
     log(l)
-
-class SublimeHaskellInsertImport(sublime_plugin.TextCommand):
-    """
-    Insert 'import <module>' for symbol selected
-    """
-    def run(self, edit):
-        (module_word, ident, _) = autocomplete.get_qualified_symbol_at_region(self.view, self.view.sel()[0])
-        full_name = '{0}.{1}'.format(module_word, ident) if module_word else ident
-
-        self.current_file_name = self.view.file_name()
-        self.edit = edit
-
-        is_visible = info(full_name, file = self.current_file_name) is not None
-        if is_visible:
-            show_status_message('Symbol {0} already imported'.format(full_name))
-            return
-
-        self.candidates = lookup(full_name, self.current_file_name)
-
-        self.view.window().show_quick_panel([[decl.module.name, decl.brief()] for decl in self.candidates], self.on_import_selected)
-
-    def on_import_selected(self, idx):
-        if idx == -1:
-            return
-
-        candidate = self.candidates[idx]
-
-        cur_module = browse(file = self.current_file_name)
-        imports = sorted(cur_module.imports.values(), key = lambda i: i.location.line)
-        after = [i for i in imports if i.module > candidate.module.name]
-
-        insert_line = 0
-        insert_gap = False
-
-        if len(after) > 0:
-            # Insert before after[0]
-            insert_line = after[0].location.line - 1
-        elif len(imports) > 0:
-            # Insert as last import
-            insert_line = imports[-1].location.line
-        elif len(cur_module.declarations) > 0:
-            # Insert before first declaration
-            insert_line = min([decl.location.line for decl in cur_module.declarations.values()]) - 1
-            insert_gap = True
-        else:
-            # Insert at the end of file
-            insert_line = self.view.rowcol(self.view.size())[0]
-
-        insert_text = 'import {0}\n'.format(candidate.module.name) + ('\n' if insert_gap else '')
-
-        pt = self.view.text_point(insert_line, 0)
-        self.view.insert(self.edit, pt, insert_text)
