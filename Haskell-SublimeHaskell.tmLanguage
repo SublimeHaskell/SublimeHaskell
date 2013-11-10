@@ -405,7 +405,7 @@
 		</dict>
 		<dict>
 			<key>match</key>
-			<string>\b[A-Z]\w*\b</string>
+			<string>\b[A-Z][A-Za-z_'0-9]*</string>
 			<key>name</key>
 			<string>constant.other.haskell</string>
 		</dict>
