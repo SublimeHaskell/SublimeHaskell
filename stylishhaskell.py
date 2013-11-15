@@ -30,7 +30,7 @@ class SublimeHaskellStylish(sublime_plugin.TextCommand):
 
         except OSError as e:
             if e.errno == errno.ENOENT:
-                sublime.error_message("SublimeHaskell: stylisg-haskell was not found!")
+                sublime.error_message("SublimeHaskell: stylish-haskell was not found!")
 
     def is_enabled(self):
         return is_enabled_haskell_command(self.view, False)

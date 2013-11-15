@@ -291,16 +291,10 @@ class SublimeHaskellRun(SublimeHaskellBaseCommand):
         cabal_project_dir, cabal_project_name = get_cabal_project_dir_and_name_of_view(self.window.active_view())
 
         # Show current project first
-        def compare(l, r):
-            res = cmp(not l[0].startswith(cabal_project_name), not r[0].startswith(cabal_project_name))
-            if res == 0:
-                res = cmp(l[0], r[0])
-            return res
+        ps.sort(key = lambda s: (not s[0].startswith(cabal_project_name), s[0]))
 
-        ps.sort(compare)
-
-        self.executables = map(lambda m: m[1], ps)
-        self.window.show_quick_panel(map(lambda m: m[0], ps), self.on_done)
+        self.executables = list(map(lambda m: m[1], ps))
+        self.window.show_quick_panel(list(map(lambda m: m[0], ps)), self.on_done)
 
     def on_done(self, idx):
         if idx == -1:
