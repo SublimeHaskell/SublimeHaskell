@@ -775,9 +775,8 @@ class InspectorAgent(threading.Thread):
 
     def mark_file_dirty(self, filename):
         "Report that a file should be reinspected."
-        if not filename:
-            return
-
+	if filename is None:
+	    return
         with self.dirty_files_lock:
             self.dirty_files.append(filename)
         self.reinspect_event.set()
