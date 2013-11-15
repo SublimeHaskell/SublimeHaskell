@@ -659,21 +659,11 @@ class StandardInspectorAgent(threading.Thread):
                 cache_end_time = time.clock()
                 log('loading standard modules cache for {0} within {1} seconds'.format(cabal, cache_end_time - cache_begin_time))
 
-                modules = None
-                with autocompletion.module_completions as module_completions:
-                    if cabal in module_completions:
-                        return
-                    module_completions[cabal] = set([m.name for m in hsdev.list_modules(cabal = cabal)])
-                    modules = module_completions[cabal].copy()
-
                 begin_time = time.clock()
                 log('loading standard modules info for {0}'.format(cabal))
 
-                self.loaded_modules = 0
-
                 def module_scanned(msg):
-                    self.loaded_modules += 1
-                    s.percentage_message(self.loaded_modules, 100)
+                    s.percentage_message(msg['progress']['current'], msg['progress']['total'])
 
                 hsdev.scan(cabal = cabal, wait = True, on_status = module_scanned)
 
@@ -800,14 +790,9 @@ class InspectorAgent(threading.Thread):
         try:
 
             with status_message_process('Reinspecting ({0}/{1}) {2}'.format(index, count, project_name), priority = 1) as s:
-                total_files = len(hsdev.list_modules(project = cabal_dir))
-
-                self.files_loaded = 0
 
                 def file_scanned(msg):
-                    self.files_loaded += 1
-                    log('file scanned: {0}'.format(msg['status']))
-                    s.percentage_message(self.files_loaded, 100)
+                    s.percentage_message(msg['progress']['current'], msg['progress']['total'])
 
                 hsdev.scan(projects = [cabal_dir], wait = True, on_status = file_scanned)
 

@@ -87,6 +87,17 @@ def hsinspect(module = None, file = None, cabal = None, ghc_opts = []):
 def print_status(s):
     print(s['status'])
 
+class StatusToMessage(object):
+    def __init__(messager):
+        self.messager = messager
+
+    def on_status(self, s):
+        (task_name, info) = s['task'].values()[0]
+        cur = s['progress']['current']
+        total = s['progress']['total']
+        s.change_message('{0} {1}: {2}'.format(task_name, info, s['status']))
+        s.percentage_message(cur, total)
+
 def start(port = None):
     return hsdev(['server', 'start'] + if_some(port, ['--port', str(port)])) is not None
 
