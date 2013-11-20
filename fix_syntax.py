@@ -2,7 +2,7 @@
 # is slightly broken.
 #
 # This sets the syntax of all Haskell files to our
-# SublimeHaskell/Haskell-SublimeHaskell.tmLanguage instead.
+# SublimeHaskell/Syntaxes/Haskell-SublimeHaskell.tmLanguage instead.
 #
 # Forked from https://gist.github.com/2940866.
 import sublime_plugin
