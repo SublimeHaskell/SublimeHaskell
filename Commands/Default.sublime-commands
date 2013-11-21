@@ -3,7 +3,7 @@
         "caption": "Preferences: SublimeHaskell Settings – Default",
         "command": "open_file", "args":
         {
-            "file": "${packages}/SublimeHaskell/SublimeHaskell.sublime-settings"
+            "file": "${packages}/SublimeHaskell/Settings/SublimeHaskell.sublime-settings"
         }
     },
     {

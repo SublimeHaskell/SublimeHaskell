@@ -1,0 +1,9 @@
+<snippet>
+	<content><![CDATA[
+data ${1:Record} = $1
+	{ ${2:field} :: ${3:Type}$0
+	} deriving (${4:Eq, Show})
+]]></content>
+	<tabTrigger>record</tabTrigger>
+	<scope>source.haskell</scope>
+</snippet>
