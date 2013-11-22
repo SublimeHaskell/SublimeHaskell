@@ -1,6 +1,0 @@
-<snippet>
-    <content><![CDATA[{-# INLINE ${0:function} #-}]]></content>
-    <tabTrigger>inline</tabTrigger>
-    <scope>source.haskell</scope>
-    <description>Inline Pragma</description>
-</snippet>

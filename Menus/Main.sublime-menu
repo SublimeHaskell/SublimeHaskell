@@ -18,7 +18,7 @@
                             {
                                 "command": "open_file", "args":
                                 {
-                                    "file": "${packages}/SublimeHaskell/SublimeHaskell.sublime-settings"
+                                    "file": "${packages}/SublimeHaskell/Settings/SublimeHaskell.sublime-settings"
                                 },
                                 "caption": "Settings – Default"
                             },
@@ -33,7 +33,7 @@
                             {
                                 "command": "open_file", "args":
                                 {
-                                    "file": "${packages}/SublimeHaskell/Default.sublime-keymap"
+                                    "file": "${packages}/SublimeHaskell/Keymaps/Default.sublime-keymap"
                                 },
                                 "caption": "Key Bindings – Default"
                             },
