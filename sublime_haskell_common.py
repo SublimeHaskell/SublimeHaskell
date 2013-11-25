@@ -45,7 +45,7 @@ def preload_settings():
 
 # SublimeHaskell settings dictionary
 # used to retrieve it async from any thread
-sublime_haskell_settings = {}
+sublime_haskell_settings = LockedObject({})
 
 
 def is_enabled_haskell_command(view = None, must_be_project=True, must_be_main=False, must_be_file = False):
@@ -300,15 +300,16 @@ def get_setting(key, default=None):
     # Get setting
     result = get_settings().get(key, default)
     # Key was not retrieved, save its value and add callback to auto-update
-    if key not in sublime_haskell_settings:
-        sublime_haskell_settings[key] = result
-        get_settings().add_on_change(key, lambda: update_setting(key))
+    with sublime_haskell_settings as settings:
+        if key not in settings:
+            get_settings().add_on_change(key, lambda: update_setting(key))
+        settings[key] = result
     return result
 
 
 def update_setting(key):
     "Updates setting as it was changed"
-    sublime_haskell_settings[key] = get_setting(key)
+    get_setting(key)
 
 
 def get_setting_async(key, default=None):
@@ -318,15 +319,17 @@ def get_setting_async(key, default=None):
     """
     # Reload it in main thread for future calls of get_setting_async
     sublime.set_timeout(lambda: update_setting(key), 0)
-    if key not in sublime_haskell_settings:
-        # Load it in main thread, but for now all we can do is result default
-        return default
-    return sublime_haskell_settings[key]
+    with sublime_haskell_settings as settings:
+        if key not in settings:
+            # Load it in main thread, but for now all we can do is result default
+            return default
+        return settings[key]
 
 
 def set_setting(key, value):
     """Set setting and update dictionary"""
-    sublime_haskell_settings[key] = value
+    with sublime_haskell_settings as settings:
+        settings[key] = value
     get_settings().set(key, value)
     save_settings()
 
