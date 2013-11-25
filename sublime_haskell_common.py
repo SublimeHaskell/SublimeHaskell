@@ -8,6 +8,9 @@ import sublime_plugin
 import subprocess
 import threading
 import time
+from sys import version
+
+PyV3 = version[0] == "3"
 
 # Maximum seconds to wait for window to appear
 # This dirty hack is used in wait_for_window function
@@ -93,6 +96,17 @@ def encode_bytes(s):
         return None
     return s.encode('utf-8')
 
+# Get extended environment from settings for Popen
+def get_extended_env():
+    ext_env = dict(os.environ)
+    PATH = os.getenv('PATH') or ""
+    add_to_PATH = get_setting_async('add_to_PATH', [])
+    if not PyV3:
+        # convert unicode strings to strings (for Python < 3) as env can contain only strings
+        add_to_PATH = map(str, add_to_PATH)
+    ext_env['PATH'] = os.pathsep.join(add_to_PATH + [PATH])
+    return ext_env
+
 def call_and_wait(command, **popen_kwargs):
     return call_and_wait_with_input(command, None, **popen_kwargs)
 
@@ -103,9 +117,7 @@ def call_no_wait(command, **popen_kwargs):
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         popen_kwargs['startupinfo'] = startupinfo
 
-    extended_env = dict(os.environ)
-    PATH = os.getenv('PATH') or ""
-    extended_env['PATH'] = os.pathsep.join(get_setting_async('add_to_PATH', []) + [PATH])
+    extended_env = get_extended_env()
 
     process = subprocess.Popen(
         command,
@@ -126,9 +138,7 @@ def call_and_wait_with_input(command, input_string, **popen_kwargs):
         popen_kwargs['startupinfo'] = startupinfo
 
     # For the subprocess, extend the env PATH to include the 'add_to_PATH' setting.
-    extended_env = dict(os.environ)
-    PATH = os.getenv('PATH') or ""
-    extended_env['PATH'] = os.pathsep.join(get_setting_async('add_to_PATH', []) + [PATH])
+    extended_env = get_extended_env()
 
     process = subprocess.Popen(
         command,
