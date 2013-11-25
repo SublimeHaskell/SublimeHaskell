@@ -22,6 +22,26 @@ SUBLIME_ERROR_PANEL_NAME = 'haskell_sublime_load'
 # Used to detect hs-source-dirs for project
 CABAL_INSPECTOR_EXE_PATH = None
 
+# Object with lock attacjed
+class LockedObject(object):
+    """
+    Object with lock
+    x = LockedObject(some_value)
+    with x as v:
+        v...
+    """
+
+    def __init__(self, obj, lock = None):
+        self.object_lock = lock if lock else threading.Lock()
+        self.object = obj
+
+    def __enter__(self):
+        self.object_lock.__enter__()
+        return self.object
+
+    def __exit__(self, type, value, traceback):
+        self.object_lock.__exit__()
+
 # Setting can't be get from not main threads
 # So we using a trick:
 # Once setting loaded from main thread, it also stored in sublime_haskell_settings dictionary
@@ -696,22 +716,3 @@ def plugin_loaded():
 
 if int(sublime.version()) < 3000:
     plugin_loaded()
-
-class LockedObject(object):
-    """
-    Object with lock
-    x = LockedObject(some_value)
-    with x as v:
-        v...
-    """
-
-    def __init__(self, obj, lock = None):
-        self.object_lock = lock if lock else threading.Lock()
-        self.object = obj
-
-    def __enter__(self):
-        self.object_lock.__enter__()
-        return self.object
-
-    def __exit__(self, type, value, traceback):
-        self.object_lock.__exit__()
