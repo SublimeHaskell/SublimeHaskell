@@ -221,7 +221,7 @@ class AutoCompletion(object):
             # TODO handle multiple selections
             match_language = LANGUAGE_RE.match(line_contents)
             if match_language:
-                return [(unicode(c),) * 2 for c in self.language_completions]
+                return [(to_unicode(c),) * 2 for c in self.language_completions]
 
         # Autocompletion for import statements
         if get_setting('auto_complete_imports'):
@@ -1193,13 +1193,13 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             # TODO handle multiple selections
             match_language = LANGUAGE_RE.match(line_contents)
             if match_language:
-                return [(unicode(c),) * 2 for c in autocompletion.language_completions]
+                return [(to_unicode(c),) * 2 for c in autocompletion.language_completions]
 
         # Autocompletion for import statements
         if get_setting('auto_complete_imports'):
             match_import = IMPORT_RE.match(line_contents)
             if match_import:
-                import_completions = [(unicode(c),) * 2 for c in autocompletion.get_current_module_completions()]
+                import_completions = [(to_unicode(c),) * 2 for c in autocompletion.get_current_module_completions()]
 
                 # Right after "import "? Propose "qualified" as well!
                 qualified_match = IMPORT_QUALIFIED_POSSIBLE_RE.match(line_contents)
