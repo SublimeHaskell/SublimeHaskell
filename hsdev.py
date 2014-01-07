@@ -1,4 +1,5 @@
 import os
+import os.path
 import sys
 import sublime
 import sublime_plugin
@@ -10,7 +11,6 @@ import time
 
 import symbols
 from sublime_haskell_common import *
-import autocomplete
 
 def call_hsdev_and_wait(arg_list, filename = None, cabal = None, callback = None, **popen_kwargs):
     cmd = ['hsdev'] + arg_list
@@ -98,8 +98,11 @@ class StatusToMessage(object):
         s.change_message('{0} {1}: {2}'.format(task_name, info, s['status']))
         s.percentage_message(cur, total)
 
-def start(port = None):
-    return hsdev(['server', 'start'] + if_some(port, ['--port', str(port)])) is not None
+def start(port = None, cache = None, log = None):
+    return hsdev(['server', 'start'] + if_some(port, ['--port', str(port)]) + if_some(cache, ['--cache', cache]) + if_some(log, ['--log', log])) is not None
+
+def link(port = None, parent = None):
+    return hsdev(['link'] + if_some(port, ['--port', str(port)]) + if_some(parent, ['--parent', parent])) is not None
 
 def stop(port = None):
     return hsdev(['server', 'stop'] + if_some(port, ['--port', str(port)])) is not None
@@ -156,6 +159,9 @@ def remove(cabal = None, project = None, file = None, module = None):
         if_some(file, ['-f', file]) +
         if_some(module, ['-m', module]))
 
+def remove_all():
+    return hsdev(['remove', '-a'])
+
 def list_modules(cabal = None, project = None, source = False, standalone = False):
     return parse_modules(
         hsdev(
@@ -168,10 +174,10 @@ def list_modules(cabal = None, project = None, source = False, standalone = Fals
 def list_projects():
     return hsdev(['list', 'projects'])
 
-def symbol(name, cabal = None, project = None, file = None, module = None, source = False, standalone = False):
+def symbol(name = None, cabal = None, project = None, file = None, module = None, source = False, standalone = False):
     return parse_decls(
         hsdev(
-            ['symbol', name] +
+            (['symbol', name] if name else ['symbol']) +
             cabal_path(cabal) +
             if_some(project, ['--project', project]) +
             if_some(file, ['-f', file]) +
@@ -362,3 +368,22 @@ def test():
     p.load_cache(path = "e:")
     l = p.list()
     log(l)
+
+class HsDevHolder(threading.Thread):
+    def __init__(self, port = None, cache = None):
+        super(HsDevHolder, self).__init__()
+        self.daemon = True
+        self.port = port
+        self.cache = cache
+
+    def run(self):
+        while True:
+            start(port = self.port, cache = self.cache, log = os.path.join(self.cache, 'hsdev.log'))
+            link(port = self.port, parent = os.path.basename(sys.executable))
+
+hsdev_holder = None
+
+def create_server(port = None, cache = None):
+    global hsdev_holder
+    hsdev_holder = HsDevHolder(port, cache)
+    hsdev_holder.start()

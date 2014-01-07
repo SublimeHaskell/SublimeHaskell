@@ -1,10 +1,12 @@
 import json
 import os
+import os.path
 import re
 import sublime
 import sublime_plugin
 import threading
 import time
+import sys
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
@@ -275,35 +277,51 @@ class SublimeHaskellComplete(sublime_plugin.TextCommand):
 
 
 
-class SublimeHaskellBrowseDeclarations(sublime_plugin.WindowCommand):
-    """
-    Show all available declarations from current cabal and opened projects
-    """
-    def run(self):
-        self.decls = []
+class SublimeHaskellBrowseDeclarations(sublime_plugin.TextCommand):
+    def run(self, edit):
         self.declarations = []
-
-        decls = hsdev.symbol('', cabal = current_cabal())
-        decls.extend(hsdev.symbol('', source = True))
+        decls = hsdev.scope(self.view.file_name(), global_scope = True)
 
         for decl in decls:
-            self.decls.append(decl)
-            self.declarations.append(decl.module.name + ': ' + decl.brief())
+            self.declarations.append([decl.brief(), decl.module.name])
 
         self.window.show_quick_panel(self.declarations, self.on_done)
 
     def on_done(self, idx):
         if idx == -1:
             return
-        view = self.window.active_view()
-        if not view:
+        
+
+
+class SublimeHaskellBrowseDeclarations(sublime_plugin.TextCommand):
+    """
+    Show all available declarations from current cabal and opened projects
+    """
+    def run(self, edit):
+        self.decls = []
+        self.declarations = []
+
+        self.decls = hsdev.scope(self.view.file_name(), global_scope = True)
+
+        for decl in self.decls:
+            self.declarations.append([decl.module.name + ': ' + decl.brief()])
+
+        self.view.window().show_quick_panel(self.declarations, self.on_done)
+
+    def on_done(self, idx):
+        if idx == -1:
             return
 
         decl = self.decls[idx]
 
-        view.run_command('sublime_haskell_symbol_info', {
-            'filename': decl.location.filename,
-            'decl': decl.name })
+        if decl.location.filename is not None:
+            self.view.run_command('sublime_haskell_symbol_info', {
+                'filename': decl.location.filename,
+                'decl': decl.name })
+        else:
+            self.view.run_command('sublime_haskell_symbol_info', {
+                'module_name': decl.module.name,
+                'decl': decl.name })
 
     def is_enabled(self):
         return is_enabled_haskell_command(None, False)
@@ -315,7 +333,7 @@ class SublimeHaskellGoToAnyDeclaration(sublime_plugin.WindowCommand):
         self.files = []
         self.declarations = []
 
-        decls = hsdev.symbol('', source = True)
+        decls = hsdev.symbol(source = True)
 
         for decl in decls:
             self.files.append([decl.location.filename, str(decl.location.line), str(decl.location.column)])
@@ -339,7 +357,8 @@ class SublimeHaskellReinspectAll(sublime_plugin.WindowCommand):
 
         if INSPECTOR_ENABLED:
             autocompletion.clear_inspected()
-            inspector.mark_all_files(self.window)
+            hsdev.remove_all()
+            hsdev_inspector.start_inspect()
         else:
             show_status_message("inspector_enabled setting is false", isok=False)
 
@@ -352,7 +371,8 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
     def run(self, edit, filename = None, module_name = None, decl = None):
         if decl and (filename or module_name):
             self.full_name = decl
-            self.candidates = hsdev.symbol(decl, file = self.current_file_name, module = self.module_name)
+            self.current_file_name = filename
+            self.candidates = hsdev.symbol(decl, file = self.current_file_name, module = module_name)
         else:
             (module_word, ident, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
             self.full_name = '{0}.{1}'.format(module_word, ident) if module_word else ident
@@ -373,13 +393,6 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
             return
 
         self.view.window().show_quick_panel([[c.qualified_name()] for c in self.candidates], self.on_done)
-
-            # if browse_for_module:
-            #     if browse_module_candidate:
-            #         self.view.window().run_command('sublime_haskell_browse_module', {
-            #             'module_name': browse_module_candidate.name,
-            #             'filename': current_file_name })
-            #         return
 
     def on_done(self, idx):
         if idx == -1:
@@ -581,6 +594,139 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
 
 
 
+
+hsdev_inspector = None
+
+class HsDevAgent(threading.Thread):
+    def __init__(self):
+        super(HsDevAgent, self).__init__()
+        self.daemon = True
+        self.cabal_to_load = LockedObject([])
+        self.dirty_files = LockedObject([])
+
+        self.reinspect_event = threading.Event()
+
+    def run(self):
+        self.start_inspect()
+
+        while True:
+            load_cabal = []
+            with self.cabal_to_load as cabal_to_load:
+                load_cabal = cabal_to_load[:]
+                cabal_to_load[:] = []
+
+            for c in load_cabal:
+                try:
+                    self.reinspect_cabal(c)
+                except:
+                    continue
+
+            files_to_reinspect = []
+            with self.dirty_files as dirty_files:
+                files_to_reinspect = dirty_files[:]
+                dirty_files[:] = []
+
+            if len(files_to_reinspect) > 0:
+                loaded_projects = [n['path'] for n in hsdev.list_projects()]
+                projects = []
+                files = []
+                for f in files_to_reinspect:
+                    d = get_cabal_project_dir_of_file(f)
+                    if d is not None and d not in loaded_projects:
+                        projects.append(d)
+                    else:
+                        files.append(f)
+
+                projects = list(set(projects))
+                files = list(set(files))
+
+                for i, p in enumerate(projects):
+                    try:
+                        self.reinspect_project(p, i + 1, len(projects))
+                    except:
+                        continue
+
+                for f in files:
+                    try:
+                        self.reinspect_file(f)
+                    except:
+                        continue
+
+            self.reinspect_event.wait(AGENT_SLEEP_TIMEOUT)
+            self.reinspect_event.clear()
+
+    def start_inspect(self):
+        self.mark_cabal()
+        wait_for_window(lambda w: self.mark_all_files(w))
+        self.reinspect_event.set()
+
+    def mark_all_files(self, window):
+        folder_files = []
+        for folder in window.folders():
+            folder_files.extend(list_files_in_dir_recursively(folder))
+        with self.dirty_files as dirty_files:
+            dirty_files.extend([f for f in folder_files if f.endswith('.hs')])
+        self.reinspect_event.set()
+
+    def mark_file_dirty(self, filename):
+        if filename is None:
+            return
+        with self.dirty_files as dirty_files:
+            dirty_files.append(filename)
+        self.reinspect_event.set()
+
+    def mark_cabal(self, cabal_name = None):
+        if not cabal_name:
+            cabal_name = current_cabal()
+
+        with self.cabal_to_load as cabal_to_load:
+            cabal_to_load.append(cabal_name)
+        self.reinspect_event.set()
+
+    def reinspect_cabal(self, cabal = None):
+        if not cabal:
+            cabal = current_cabal()
+
+        try:
+            with status_message_process('Loading standard modules info for {0}'.format(cabal)) as s:
+                begin_time = time.clock()
+                log('loading standard modules info for {0}'.format(cabal))
+
+                def cabal_status(msg):
+                    if 'status' in msg:
+                        s.change_message('Loading standard modules info for {0}: {1}'.format(cabal, msg['task']))
+
+                hsdev.scan(cabal = cabal, wait = True, on_status = cabal_status)
+
+                end_time = time.clock()
+                log('loading standard modules info for {0} within {1} seconds'.format(cabal, end_time - begin_time))
+
+        except Exception as e:
+            log('loading standard modules info for {0} failed with {1}'.format(cabal, e))
+
+    def reinspect_project(self, cabal_dir, index, count):
+        begin_time = time.clock()
+        log('reinspecting project ({0})'.format(cabal_dir))
+        (project_name, cabal_file) = get_cabal_in_dir(cabal_dir)
+
+        try:
+            with status_message_process('Reinspecting ({0}/{1}) {2}'.format(index, count, project_name), priority = 1) as s:
+                def file_scanned(msg):
+                    if 'progress' in msg:
+                        s.percentage_message(msg['progress']['current'], msg['progress']['total'])
+
+                hsdev.scan(projects = [cabal_dir], wait = True, on_status = file_scanned)
+
+                end_time = time.clock()
+                log('total inspection time: {0} seconds'.format(end_time - begin_time))
+
+        except Exception as e:
+            log('Inspecting project {0} failed: {1}'.format(cabal_dir, e))
+
+    def reinspect_file(self, filename):
+        show_status_message('Reinspecting {0}'.format(filename))
+        hsdev.scan(files = [filename])
+
 class StandardInspectorAgent(threading.Thread):
     def __init__(self):
         super(StandardInspectorAgent, self).__init__()
@@ -654,18 +800,10 @@ class StandardInspectorAgent(threading.Thread):
 
         try:
             with status_message_process('Loading standard modules info for {0}'.format(cabal)) as s:
-                cache_begin_time = time.clock()
-                hsdev.load(path = HSDEV_CACHE_PATH)
-                cache_end_time = time.clock()
-                log('loading standard modules cache for {0} within {1} seconds'.format(cabal, cache_end_time - cache_begin_time))
-
                 begin_time = time.clock()
                 log('loading standard modules info for {0}'.format(cabal))
 
-                def module_scanned(msg):
-                    s.percentage_message(msg['progress']['current'], msg['progress']['total'])
-
-                hsdev.scan(cabal = cabal, wait = True, on_status = module_scanned)
+                hsdev.scan(cabal = cabal, wait = True)
 
                 end_time = time.clock()
                 log('loading standard modules info for {0} within {1} seconds'.format(cabal, end_time - begin_time))
@@ -708,9 +846,8 @@ class InspectorAgent(threading.Thread):
         self.reinspect_event = threading.Event()
 
     def run(self):
-        hsdev.load(path = HSDEV_CACHE_PATH)
-
         wait_for_window(lambda w: self.mark_all_files(w))
+
         self.mark_active_files()
 
         # Periodically wake up and see if there is anything to inspect.
@@ -864,7 +1001,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         if INSPECTOR_ENABLED and not same:
             # TODO: Changed completion settings! Update autocompletion data properly
             # For now at least try to load cabal modules info
-            std_inspector.load_cabal_info()
+            # std_inspector.load_cabal_info()
             pass
 
     def get_special_completions(self, view, prefix, locations):
@@ -933,9 +1070,8 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         self.set_cabal_status(view)
         if is_haskell_source(view):
             filename = view.file_name()
-            if INSPECTOR_ENABLED:
-                inspector.mark_file_dirty(filename)
-                inspector.mark_file_active(filename)
+            if filename and INSPECTOR_ENABLED:
+                hsdev_inspector.mark_file_dirty(filename)
 
     def on_load(self, view):
         global INSPECTOR_ENABLED
@@ -943,9 +1079,8 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         self.set_cabal_status(view)
         if is_haskell_source(view):
             filename = view.file_name()
-            if INSPECTOR_ENABLED:
-                inspector.mark_file_dirty(filename)
-                inspector.mark_file_active(filename)
+            if filename and INSPECTOR_ENABLED:
+                hsdev_inspector.mark_file_dirty(filename)
 
     def on_activated(self, view):
         self.set_cabal_status(view)
@@ -954,8 +1089,9 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         global INSPECTOR_ENABLED
 
         if is_haskell_source(view):
-            if INSPECTOR_ENABLED:
-                inspector.mark_file_dirty(view.file_name())
+            filename = view.file_name()
+            if filename and INSPECTOR_ENABLED:
+                hsdev_inspector.mark_file_dirty(filename)
 
     def on_query_context(self, view, key, operator, operand, match_all):
         if key == 'auto_completion_popup':
@@ -986,13 +1122,17 @@ def start_inspector():
 
     log('starting ModuleInspector')
 
-    global std_inspector
-    std_inspector = StandardInspectorAgent()
-    std_inspector.start()
+    # global std_inspector
+    # std_inspector = StandardInspectorAgent()
+    # std_inspector.start()
 
-    global inspector
-    inspector = InspectorAgent()
-    inspector.start()
+    # global inspector
+    # inspector = InspectorAgent()
+    # inspector.start()
+
+    global hsdev_inspector
+    hsdev_inspector = HsDevAgent()
+    hsdev_inspector.start()
 
     INSPECTOR_RUNNING = True
 
@@ -1018,6 +1158,7 @@ def plugin_loaded():
     CABAL_INSPECTOR_SOURCE_PATH = os.path.join(package_path, 'CabalInspector.hs')
     CABAL_INSPECTOR_EXE_PATH = os.path.join(cache_path, 'CabalInspector')
     CABAL_INSPECTOR_OBJ_DIR = os.path.join(cache_path, 'obj/CabalInspector')
+    HSDEV_CACHE_PATH = os.path.join(cache_path, 'hsdev')
     INSPECTOR_ENABLED = get_setting('inspect_modules')
 
     if INSPECTOR_ENABLED:
