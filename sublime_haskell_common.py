@@ -8,6 +8,9 @@ import sublime_plugin
 import subprocess
 import threading
 import time
+from sys import version
+
+PyV3 = version[0] == "3"
 
 # Maximum seconds to wait for window to appear
 # This dirty hack is used in wait_for_window function
@@ -18,6 +21,30 @@ SUBLIME_ERROR_PANEL_NAME = 'haskell_sublime_load'
 
 # Used to detect hs-source-dirs for project
 CABAL_INSPECTOR_EXE_PATH = None
+
+# unicode function
+def to_unicode(s):
+    return s if PyV3 else unicode(s)
+
+# Object with lock attacjed
+class LockedObject(object):
+    """
+    Object with lock
+    x = LockedObject(some_value)
+    with x as v:
+        v...
+    """
+
+    def __init__(self, obj, lock = None):
+        self.object_lock = lock if lock else threading.Lock()
+        self.object = obj
+
+    def __enter__(self):
+        self.object_lock.__enter__()
+        return self.object
+
+    def __exit__(self, type, value, traceback):
+        self.object_lock.__exit__()
 
 # Setting can't be get from not main threads
 # So we using a trick:
@@ -43,7 +70,7 @@ def preload_settings():
 
 # SublimeHaskell settings dictionary
 # used to retrieve it async from any thread
-sublime_haskell_settings = {}
+sublime_haskell_settings = LockedObject({})
 
 
 def is_enabled_haskell_command(view = None, must_be_project=True, must_be_main=False, must_be_file = False):
@@ -97,11 +124,23 @@ def encode_bytes(s):
 def call_and_wait(command, split_lines = False, **popen_kwargs):
     return call_and_wait_with_input(command, '', split_lines, **popen_kwargs)
 
+# Get extended environment from settings for Popen
+def get_extended_env():
+    ext_env = dict(os.environ)
+    PATH = os.getenv('PATH') or ""
+    add_to_PATH = get_setting_async('add_to_PATH', [])
+    if not PyV3:
+        # convert unicode strings to strings (for Python < 3) as env can contain only strings
+        add_to_PATH = map(str, add_to_PATH)
+    ext_env['PATH'] = os.pathsep.join(add_to_PATH + [PATH])
+    return ext_env
+
 def call_and_wait_tool(command, tool_name, on_result = None, filename = None, on_line = None, **popen_kwargs):
     tool_enabled = 'enable_{0}'.format(tool_name)
 
     if get_setting_async(tool_enabled) != True:
         return None
+    extended_env = get_extended_env()
 
     source_dir = get_source_dir(filename)
 
@@ -147,9 +186,7 @@ def call_and_wait_with_input(command, input_string, split_lines = False, **popen
         popen_kwargs['startupinfo'] = startupinfo
 
     # For the subprocess, extend the env PATH to include the 'add_to_PATH' setting.
-    extended_env = dict(os.environ)
-    PATH = os.getenv('PATH') or ""
-    extended_env['PATH'] = os.pathsep.join(get_setting_async('add_to_PATH', []) + [PATH])
+    extended_env = get_extended_env()
 
     process = subprocess.Popen(
         command,
@@ -316,15 +353,16 @@ def get_setting(key, default=None):
     # Get setting
     result = get_settings().get(key, default)
     # Key was not retrieved, save its value and add callback to auto-update
-    if key not in sublime_haskell_settings:
-        sublime_haskell_settings[key] = result
-        get_settings().add_on_change(key, lambda: update_setting(key))
+    with sublime_haskell_settings as settings:
+        if key not in settings:
+            get_settings().add_on_change(key, lambda: update_setting(key))
+        settings[key] = result
     return result
 
 
 def update_setting(key):
     "Updates setting as it was changed"
-    sublime_haskell_settings[key] = get_setting(key)
+    get_setting(key)
 
 
 def get_setting_async(key, default=None):
@@ -334,20 +372,17 @@ def get_setting_async(key, default=None):
     """
     # Reload it in main thread for future calls of get_setting_async
     sublime.set_timeout(lambda: update_setting(key), 0)
-    if key not in sublime_haskell_settings:
-        # Load it in main thread, but for now all we can do is result default
-        return default
-    s = sublime_haskell_settings[key]
-    if s is None:
-        return default
-    return s
+    with sublime_haskell_settings as settings:
+        if key not in settings:
+            # Load it in main thread, but for now all we can do is result default
+            return default
+        return settings[key]
 
 
 def set_setting(key, value):
     """Set setting and update dictionary"""
-    if value is None:
-        return
-    sublime_haskell_settings[key] = value
+    with sublime_haskell_settings as settings:
+        settings[key] = value
     get_settings().set(key, value)
     save_settings()
 
