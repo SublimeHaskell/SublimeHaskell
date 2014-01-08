@@ -69,13 +69,13 @@ class Module(Symbol):
     """
     Haskell module symbol
     """
-    def __init__(self, module_name, exports = [], imports = {}, declarations = {}, location = None, cabal = None, last_inspection_time = 0):
+    def __init__(self, module_name, exports = [], imports = [], declarations = {}, location = None, cabal = None, last_inspection_time = 0):
         super(Module, self).__init__('module', module_name, None, location)
         # List of strings
         self.exports = exports
         # Dictionary from module name to Import object
-        self.imports = imports.copy()
-        for i in self.imports.values():
+        self.imports = [i for i in imports]
+        for i in self.imports:
             if i.location:
                 i.location.set_file(self.location)
         # Dictionary from name to Symbol
@@ -107,7 +107,7 @@ class Module(Symbol):
         Unalias module import if any
         Returns list of unaliased modules
         """
-        return [i.module for i in self.imports.items() if i.import_as == module_alias]
+        return [i.module for i in self.imports if i.import_as == module_alias]
 
 class Declaration(Symbol):
     def __init__(self, name, decl_type = 'declaration', docs = None, location = None, module = None):
@@ -469,13 +469,15 @@ def is_imported_module(in_module, m, qualified_name = None):
     If 'qualified_name' specified, 'm' must be 'qualified_name' or imported as 'qualified_name'
     """
     if qualified_name:
-        if m.name in in_module.imports:
-            cur_import = in_module.imports[m.name]
-            return cur_import.module == qualified_name or cur_import.import_as == qualified_name
+        for i in in_module.imports:
+            if m.name == i:
+                cur_import = i
+                return cur_import.module == qualified_name or cur_import.import_as == qualified_name
         return False
     else:
-        if m.name in in_module.imports:
-            return (not in_module.imports[m.name].is_qualified)
+        for i in in_module.imports:
+            if m.name == i:
+                return (not i.is_qualified)
         # Return True also on Prelude
         return m.name == 'Prelude'
 

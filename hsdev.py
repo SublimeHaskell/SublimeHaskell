@@ -1,6 +1,7 @@
 import os
 import os.path
 import sys
+import socket
 import sublime
 import sublime_plugin
 import subprocess
@@ -25,7 +26,10 @@ def call_hsdev_and_wait(arg_list, filename = None, cabal = None, callback = None
                 result = l
 
     def parse_response(s):
-        return {} if s.isspace() else json.loads(s)
+        try:
+            return {} if s.isspace() else json.loads(s)
+        except Exception as e:
+            return {'response' : s}
 
     log(' '.join(cmd))
     ret = call_and_wait_tool(cmd, 'hsdev', parse_response, filename, on_line if callback else None, **popen_kwargs)
@@ -40,7 +44,6 @@ def hsdev(arg_list, on_response = None):
 
     r = call_hsdev_and_wait(arg_list, callback = on_response)
     if r is None:
-        log('hsdev returns nothing')
         return None
     if r and 'error' in r:
         log('hsdev returns error: {0} with details: {1}'.format(r['error'], r['details']))
@@ -174,7 +177,7 @@ def list_modules(cabal = None, project = None, source = False, standalone = Fals
 def list_projects():
     return hsdev(['list', 'projects'])
 
-def symbol(name = None, cabal = None, project = None, file = None, module = None, source = False, standalone = False):
+def symbol(name = None, cabal = None, project = None, file = None, module = None, source = False, standalone = False, prefix = None):
     return parse_decls(
         hsdev(
             (['symbol', name] if name else ['symbol']) +
@@ -183,7 +186,8 @@ def symbol(name = None, cabal = None, project = None, file = None, module = None
             if_some(file, ['-f', file]) +
             if_some(module, ['-m', module]) +
             (['--src'] if source else []) +
-            (['--stand'] if standalone else [])))
+            (['--stand'] if standalone else []) +
+            if_some(prefix, ['--prefix', prefix])))
 
 def module(name = None, project = None, file = None, cabal = None):
     return parse_module(
@@ -212,10 +216,10 @@ def scope_modules(file, cabal = None):
         hsdev(
             ['scope', 'modules', '-f', file] + cabal_path(cabal)))
 
-def scope(file, cabal = None, global_scope = False):
+def scope(file, cabal = None, global_scope = False, prefix = None):
     return parse_decls(
         hsdev(
-            ['scope', '-f', file] + cabal_path(cabal) + (['--global'] if global_scope else [])))
+            ['scope', '-f', file] + cabal_path(cabal) + (['--global'] if global_scope else []) + if_some(prefix, ['--prefix', prefix])))
 
 def complete(input, file, cabal = None):
     return parse_decls(
@@ -357,7 +361,7 @@ def parse_module(d):
     return symbols.Module(
         d['name'],
         d.get('exports'),
-        dict((i['name'], parse_import(i)) for i in d['imports']) if 'imports' in d else {},
+        [parse_import(i) for i in d['imports']] if 'imports' in d else [],
         dict((decl['name'],parse_declaration(decl)) for decl in d['declarations']) if 'declarations' in d else {},
         parse_location(d.get('location')),
         parse_cabal(d.get('location')))
@@ -369,21 +373,42 @@ def test():
     l = p.list()
     log(l)
 
-class HsDevHolder(threading.Thread):
-    def __init__(self, port = None, cache = None):
+class HsDevHolder(object):
+    def __init__(self, port = 4567, cache = None):
         super(HsDevHolder, self).__init__()
-        self.daemon = True
         self.port = port
         self.cache = cache
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.started_event = threading.Event()
 
-    def run(self):
-        while True:
-            start(port = self.port, cache = self.cache, log = os.path.join(self.cache, 'hsdev.log'))
-            link(port = self.port, parent = os.path.basename(sys.executable))
+    def run_hsdev(self, tries = 10):
+        self.start_hsdev()
+        self.link_hsdev(tries = tries)
+
+    def start_hsdev(self):
+        start(port = self.port, cache = self.cache)
+
+    def link_hsdev(self, tries = 10):
+        for n in xrange(0, tries):
+            try:
+                log('connecting to hsdev server...')
+                self.socket.connect(('127.0.0.1', self.port))
+                log('connected to hsdev server')
+                self.socket.sendall(b'["link"]\n')
+                self.started_event.set()
+                log('hsdev server started')
+                return
+            except:
+                log('failed to connect to hsdev server, wait for a while')
+                time.sleep(0.1)
+
+    # Wait until linked
+    def wait_hsdev(self, timeout = 60):
+        return self.started_event.wait(timeout)
 
 hsdev_holder = None
 
-def create_server(port = None, cache = None):
+def start_server(port = None, cache = None):
     global hsdev_holder
     hsdev_holder = HsDevHolder(port, cache)
-    hsdev_holder.start()
+    hsdev_holder.run_hsdev()
