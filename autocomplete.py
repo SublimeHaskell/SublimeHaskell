@@ -605,16 +605,22 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
 
         candidates = hsdev.symbol(full_name, source = True)
 
-        if not candidates:
+        module_candidates = [m for m in hsdev.list_modules(source = True) if m.name == full_name]
+
+        if not candidates and not module_candidates:
             show_status_message('Declaration {0} not found'.format(ident), False)
             return
 
-        if len(candidates) == 1:
-            self.view.window().open_file(candidates[0].location.position(), sublime.ENCODED_POSITION)
-            return
+        if len(candidates) + len(module_candidates) == 1:
+            if len(candidates) == 1:
+                self.view.window().open_file(candidates[0].location.position(), sublime.ENCODED_POSITION)
+                return
+            if len(module_candidates) == 1:
+                self.view.window().open_file(module_candidates[0].location.position(), sublime.ENCODED_POSITION)
+                return
 
         # many candidates
-        self.select_candidates = [([c.name, c.location.position()], True) for c in candidates] + [([m.name, m.location.filename], False) for m in module_candidates]
+        self.select_candidates = [([c.brief(), c.location.position()], True) for c in candidates] + [([m.name, m.location.filename], False) for m in module_candidates]
         self.view.window().show_quick_panel([c[0] for c in self.select_candidates], self.on_done)
 
     def on_done(self, idx):
