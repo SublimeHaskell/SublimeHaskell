@@ -78,16 +78,20 @@
         "command": "sublime_haskell_stylish"
     },
     {
-        "caption": "SublimeHaskell: Go to Any Declaration",
+        "caption": "SublimeHaskell: Go to any declaration",
         "command": "sublime_haskell_go_to_any_declaration"
     },
     {
-        "caption": "SublimeHaskell: Go to Declaration",
+        "caption": "SublimeHaskell: Go to declaration",
         "command": "sublime_haskell_go_to_declaration"
     },
     {
-        "caption": "SublimeHaskell: Browse Declarations",
+        "caption": "SublimeHaskell: Browse declarations",
         "command": "sublime_haskell_browse_declarations"
+    },
+    {
+        "caption": "SublimeHaskell: Find declarations",
+        "command": "sublime_haskell_find_declarations"
     },
     {
         "caption": "SublimeHaskell: Insert import for symbol",

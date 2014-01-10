@@ -49,6 +49,9 @@ class Symbol(object):
     def full_name(self):
         return self.module.name + '.' + self.name
 
+    def by_source(self):
+        return self.location is not None and self.location.filename is not None
+
 class Import(object):
     """
     Haskell import of module

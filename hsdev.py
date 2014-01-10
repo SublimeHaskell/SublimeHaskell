@@ -177,7 +177,7 @@ def list_modules(cabal = None, project = None, source = False, standalone = Fals
 def list_projects():
     return hsdev(['list', 'projects'])
 
-def symbol(name = None, cabal = None, project = None, file = None, module = None, source = False, standalone = False, prefix = None):
+def symbol(name = None, cabal = None, project = None, file = None, module = None, source = False, standalone = False, prefix = None, find = None):
     return parse_decls(
         hsdev(
             (['symbol', name] if name else ['symbol']) +
@@ -187,7 +187,8 @@ def symbol(name = None, cabal = None, project = None, file = None, module = None
             if_some(module, ['-m', module]) +
             (['--src'] if source else []) +
             (['--stand'] if standalone else []) +
-            if_some(prefix, ['--prefix', prefix])))
+            if_some(prefix, ['--prefix', prefix]) +
+            if_some(find, ['--find', find])))
 
 def module(name = None, project = None, file = None, cabal = None):
     return parse_module(
@@ -216,10 +217,14 @@ def scope_modules(file, cabal = None):
         hsdev(
             ['scope', 'modules', '-f', file] + cabal_path(cabal)))
 
-def scope(file, cabal = None, global_scope = False, prefix = None):
+def scope(file, cabal = None, global_scope = False, prefix = None, find = None):
     return parse_decls(
         hsdev(
-            ['scope', '-f', file] + cabal_path(cabal) + (['--global'] if global_scope else []) + if_some(prefix, ['--prefix', prefix])))
+            ['scope', '-f', file] +
+            cabal_path(cabal) +
+            (['--global'] if global_scope else []) +
+            if_some(prefix, ['--prefix', prefix]) +
+            if_some(find, ['--find', find])))
 
 def complete(input, file, cabal = None):
     return parse_decls(

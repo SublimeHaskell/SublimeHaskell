@@ -307,6 +307,9 @@ class SublimeHaskellBrowseDeclarations(sublime_plugin.TextCommand):
 
         self.decls = hsdev.scope(self.view.file_name(), global_scope = True)
 
+        if not self.decls:
+            show_status_message("Can't get scope for {0}".format(self.view.file_name()), False)
+
         for decl in self.decls:
             self.declarations.append([decl.module.name + ': ' + decl.brief()])
 
@@ -318,14 +321,37 @@ class SublimeHaskellBrowseDeclarations(sublime_plugin.TextCommand):
 
         decl = self.decls[idx]
 
-        if decl.location.filename is not None:
-            self.view.run_command('sublime_haskell_symbol_info', {
-                'filename': decl.location.filename,
-                'decl': decl.name })
-        else:
-            self.view.run_command('sublime_haskell_symbol_info', {
-                'module_name': decl.module.name,
-                'decl': decl.name })
+        show_declaration_info(self.view, decl)
+
+    def is_enabled(self):
+        return is_enabled_haskell_command(None, False)
+
+
+
+class SublimeHaskellFindDeclarations(sublime_plugin.WindowCommand):
+    def run(self):
+        self.window.show_input_panel("Search string", "", self.on_done, self.on_change, self.on_cancel)
+
+    def on_done(self, input):
+        self.decls = hsdev.symbol(find = input)
+        if not self.decls:
+            show_status_message("Nothing found for: {0}".format(input))
+
+        self.window.show_quick_panel([[decl.module.name + ': ' + decl.brief()] for decl in self.decls], self.on_select)
+
+    def on_change(self, input):
+        pass
+
+    def on_cancel(self):
+        pass
+
+    def on_select(self, idx):
+        if idx == -1:
+            return
+
+        decl = self.decls[idx]
+
+        show_declaration_info(self.window.active_view(), decl)
 
     def is_enabled(self):
         return is_enabled_haskell_command(None, False)
@@ -438,6 +464,18 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
 
     def is_enabled(self):
         return is_enabled_haskell_command(self.view, False)
+
+# Show symbol info for declaration via calling command
+def show_declaration_info(view, decl):
+    if decl.by_source():
+        view.run_command('sublime_haskell_symbol_info', {
+            'filename': decl.location.filename,
+            'decl': decl.name })
+    else:
+        view.run_command('sublime_haskell_symbol_info', {
+            'module_name': decl.module.name,
+            'decl': decl.name })
+
 
 
 class SublimeHaskellInsertImportForSymbol(sublime_plugin.TextCommand):
@@ -576,17 +614,7 @@ class SublimeHaskellBrowseModule(sublime_plugin.WindowCommand):
 
         candidate = self.candidates[idx]
 
-        if candidate.module.location:
-            self.window.active_view().run_command('sublime_haskell_symbol_info', {
-                'filename': candidate.module.location.filename,
-                'decl': candidate.name })
-        else:
-            log('data is {0}'.format({
-                'module_name': candidate.module.name,
-                'decl': candidate.name }))
-            self.window.active_view().run_command('sublime_haskell_symbol_info', {
-                'module_name': candidate.module.name,
-                'decl': candidate.name })
+        show_declaration_info(self.window.active_view(), candidate)
 
 class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
     def run(self, edit):
