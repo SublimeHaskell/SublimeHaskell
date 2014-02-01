@@ -10,9 +10,9 @@ from collections import defaultdict
 PyV3 = version[0] == "3"
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import log, are_paths_equal, call_and_wait, get_setting_async, show_status_message_process, show_status_message
+    from sublime_haskell_common import log, are_paths_equal, call_and_wait, get_setting_async, show_status_message_process, show_status_message, SublimeHaskellTextCommand
 else:
-    from SublimeHaskell.sublime_haskell_common import log, are_paths_equal, call_and_wait, get_setting_async, show_status_message_process, show_status_message
+    from SublimeHaskell.sublime_haskell_common import log, are_paths_equal, call_and_wait, get_setting_async, show_status_message_process, show_status_message, SublimeHaskellTextCommand
 
 ERROR_PANEL_NAME = 'haskell_error_checker'
 
@@ -226,7 +226,7 @@ message_levels = {
 # These next and previous commands were shamelessly copied
 # from the great SublimeClang plugin.
 
-class SublimeHaskellNextError(sublime_plugin.TextCommand):
+class SublimeHaskellNextError(SublimeHaskellTextCommand):
     def run(self, edit):
         log("SublimeHaskellNextError")
         v = self.view
@@ -248,7 +248,7 @@ class SublimeHaskellNextError(sublime_plugin.TextCommand):
             sublime.status_message("No more errors or warnings!")
 
 
-class SublimeHaskellPreviousError(sublime_plugin.TextCommand):
+class SublimeHaskellPreviousError(SublimeHaskellTextCommand):
     def run(self, edit):
         v = self.view
         fn = v.file_name().encode("utf-8")

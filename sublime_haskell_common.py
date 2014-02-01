@@ -788,3 +788,11 @@ def create_process(command, **kwargs):
         **kwargs)
 
     return process
+
+class SublimeHaskellWindowCommand(sublime_plugin.WindowCommand):
+    def is_enabled(self):
+        return is_enabled_haskell_command(None, False)
+
+class SublimeHaskellTextCommand(sublime_plugin.TextCommand):
+    def is_enabled(self):
+        return is_enabled_haskell_command(self.view, False)

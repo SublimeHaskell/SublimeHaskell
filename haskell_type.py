@@ -3,12 +3,12 @@ import sublime_plugin
 import re
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message
+    from sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand
     from autocomplete import autocompletion
     from hdevtools import hdevtools_type, hdevtools_enabled
     from ghcmod import ghcmod_type, ghcmod_enabled
 else:
-    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message
+    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand
     from SublimeHaskell.autocomplete import autocompletion
     from SublimeHaskell.hdevtools import hdevtools_type, hdevtools_enabled
     from SublimeHaskell.ghcmod import ghcmod_type, ghcmod_enabled
@@ -122,7 +122,7 @@ def haskell_type(filename, module_name, line, column, cabal = None):
         result = ghcmod_type(filename, module_name, line, column, cabal = cabal)
     return parse_type_output(result) if result else None
 
-class SublimeHaskellShowType(sublime_plugin.TextCommand):
+class SublimeHaskellShowType(SublimeHaskellTextCommand):
     def run(self, edit, filename = None, line = None, column = None):
         result = self.get_types(filename, int(line) if line else None, int(column) if column else None)
         self.show_types(result)

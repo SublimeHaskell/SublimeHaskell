@@ -263,7 +263,7 @@ def can_complete_qualified_symbol(info):
     else:
         return list(filter(lambda m: m.startswith(module_name), autocompletion.get_current_module_completions())) != []
 
-class SublimeHaskellComplete(sublime_plugin.TextCommand):
+class SublimeHaskellComplete(SublimeHaskellTextCommand):
     """ Shows autocompletion popup """
     def run(self, edit, characters):
         for region in self.view.sel():
@@ -276,12 +276,9 @@ class SublimeHaskellComplete(sublime_plugin.TextCommand):
     def do_complete(self):
         self.view.run_command("auto_complete")
 
-    def is_enabled(self):
-        return is_enabled_haskell_command(self.view, False)
 
 
-
-class SublimeHaskellBrowseDeclarations(sublime_plugin.TextCommand):
+class SublimeHaskellBrowseDeclarations(SublimeHaskellTextCommand):
     def run(self, edit):
         self.declarations = []
         decls = hsdev.scope(self.view.file_name(), global_scope = True)
@@ -297,7 +294,7 @@ class SublimeHaskellBrowseDeclarations(sublime_plugin.TextCommand):
         
 
 
-class SublimeHaskellBrowseDeclarations(sublime_plugin.TextCommand):
+class SublimeHaskellBrowseDeclarations(SublimeHaskellTextCommand):
     """
     Show all available declarations from current cabal and opened projects
     """
@@ -323,12 +320,9 @@ class SublimeHaskellBrowseDeclarations(sublime_plugin.TextCommand):
 
         show_declaration_info(self.view, decl)
 
-    def is_enabled(self):
-        return is_enabled_haskell_command(None, False)
 
 
-
-class SublimeHaskellFindDeclarations(sublime_plugin.WindowCommand):
+class SublimeHaskellFindDeclarations(SublimeHaskellWindowCommand):
     def run(self):
         self.window.show_input_panel("Search string", "", self.on_done, self.on_change, self.on_cancel)
 
@@ -353,12 +347,10 @@ class SublimeHaskellFindDeclarations(sublime_plugin.WindowCommand):
 
         show_declaration_info(self.window.active_view(), decl)
 
-    def is_enabled(self):
-        return is_enabled_haskell_command(None, False)
 
 
 
-class SublimeHaskellGoToAnyDeclaration(sublime_plugin.WindowCommand):
+class SublimeHaskellGoToAnyDeclaration(SublimeHaskellWindowCommand):
     def run(self):
         self.files = []
         self.declarations = []
@@ -376,12 +368,10 @@ class SublimeHaskellGoToAnyDeclaration(sublime_plugin.WindowCommand):
             return
         self.window.open_file(':'.join(self.files[idx]), sublime.ENCODED_POSITION)
 
-    def is_enabled(self):
-        return is_enabled_haskell_command(None, False)
 
 
 
-class SublimeHaskellReinspectAll(sublime_plugin.WindowCommand):
+class SublimeHaskellReinspectAll(SublimeHaskellWindowCommand):
     def run(self):
         global INSPECTOR_ENABLED
 
@@ -393,7 +383,7 @@ class SublimeHaskellReinspectAll(sublime_plugin.WindowCommand):
             show_status_message("inspector_enabled setting is false", isok=False)
 
 
-class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
+class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
     """
     Show information about selected symbol
 
@@ -468,13 +458,8 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
         self.view.window().run_command('show_panel', {
             'panel': 'output.' + 'sublime_haskell_symbol_info' })
 
-    def is_enabled(self):
-        return is_enabled_haskell_command(self.view, False)
-
 # Show symbol info for declaration via calling command
 def show_declaration_info(view, decl):
-    log('decl is {0}'.format(decl.brief()))
-
     info = {}
     info['decl'] = decl.name
     info['module_name'] = decl.module.name
@@ -486,11 +471,9 @@ def show_declaration_info(view, decl):
         info['package_name'] = decl.location.package.name
         info['cabal'] = decl.location.cabal
 
-    log('info is {0}'.format(info))
-
     sublime.set_timeout(lambda: view.run_command('sublime_haskell_symbol_info', info), 0)
 
-class SublimeHaskellInsertImportForSymbol(sublime_plugin.TextCommand):
+class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
     """
     Insert import for symbol
     """
@@ -554,11 +537,8 @@ class SublimeHaskellInsertImportForSymbol(sublime_plugin.TextCommand):
             return
         self.add_import(self.candidates[idx])
 
-    def is_enabled(self):
-        return is_enabled_haskell_command(self.view, False)
 
-
-class SublimeHaskellClearImports(sublime_plugin.TextCommand):
+class SublimeHaskellClearImports(SublimeHaskellTextCommand):
     def run(self, edit, filename = None):
         self.current_file_name = filename
         self.edit = edit
@@ -583,10 +563,7 @@ class SublimeHaskellClearImports(sublime_plugin.TextCommand):
             pt = self.view.text_point(i.location.line - 1, 0)
             self.view.replace(edit, self.view.line(pt), ni)
 
-    def is_enabled(self):
-        return is_enabled_haskell_command(self.view, False)
-
-class SublimeHaskellBrowseModule(sublime_plugin.WindowCommand):
+class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
     """
     Browse module symbols
     """
@@ -643,7 +620,7 @@ class SublimeHaskellBrowseModule(sublime_plugin.WindowCommand):
 
         show_declaration_info(self.window.active_view(), candidate)
 
-class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
+class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
     def run(self, edit):
         (module_word, ident, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
 
@@ -687,9 +664,6 @@ class SublimeHaskellGoToDeclaration(sublime_plugin.TextCommand):
             self.view.window().open_file(selected[0][1], sublime.ENCODED_POSITION)
         else:
             self.view.window().open_file(selected[0][1])
-
-    def is_enabled(self):
-        return is_enabled_haskell_command(self.view, False)
 
 
 

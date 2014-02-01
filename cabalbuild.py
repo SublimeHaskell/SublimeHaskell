@@ -48,13 +48,16 @@ projects_being_built = set()
 
 
 # Base command
-class SublimeHaskellBaseCommand(sublime_plugin.WindowCommand):
+class SublimeHaskellBaseCommand(SublimeHaskellWindowCommand):
 
     def build(self, command, use_cabal_dev=None, filter_project = None):
         select_project(
             self.window,
             lambda n, d: run_build(self.window.active_view(), n, d, cabal_config[command], use_cabal_dev),
             filter_project = filter_project)
+
+    def is_enabled(self):
+        return is_enabled_haskell_command(None, False)
 
 # Retrieve projects as dictionary that refers to this app instance
 def get_projects():
@@ -145,7 +148,7 @@ def run_build(view, project_name, project_dir, config, use_cabal_dev=None):
         on_done=done_callback)
 
 
-class SublimeHaskellSwitchCabalDev(sublime_plugin.WindowCommand):
+class SublimeHaskellSwitchCabalDev(SublimeHaskellWindowCommand):
     def run(self):
         use_cabal_dev = get_setting('use_cabal_dev')
         sandbox = get_setting('cabal_dev_sandbox')

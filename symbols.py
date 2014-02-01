@@ -43,21 +43,21 @@ class Package(object):
         self.name = name
         self.version = version
 
-    def parse(package_id):
-        if package_id is None:
-            return None
-        m = re.match('([\w\-]+)\-([\d\.]+)', package_id)
-        if m:
-            (name, version) = m.groups()
-            return Package(name, version)
-        m = re.match('([\w\-]+)', package_id)
-        if m:
-            (name, ) = m.groups()
-            return Package(name)
-        return None
-
     def package_id(self):
         return '{0}-{1}'.format(self.name, self.version) if self.version is not None else self.name
+
+def parse_package(package_id):
+    if package_id is None:
+        return None
+    m = re.match('([\w\-]+)\-([\d\.]+)', package_id)
+    if m:
+        (name, version) = m.groups()
+        return Package(name, version)
+    m = re.match('([\w\-]+)', package_id)
+    if m:
+        (name, ) = m.groups()
+        return Package(name)
+    return None
 
 class InstalledLocation(object):
     """

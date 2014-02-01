@@ -307,7 +307,7 @@ def parse_location(d, p = None):
     if not loc.is_null():
         return loc
     loc = symbols.InstalledLocation(
-        symbols.Package.parse(get_value(d, 'package')),
+        symbols.parse_package(get_value(d, 'package')),
         get_value(d, 'cabal'))
     if not loc.is_null():
         return loc

@@ -6,12 +6,12 @@ import threading
 from threading import Thread
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import log, is_haskell_source, get_haskell_command_window_view_file_project, call_ghcmod_and_wait, get_setting_async, create_process
+    from sublime_haskell_common import log, is_haskell_source, get_haskell_command_window_view_file_project, call_ghcmod_and_wait, get_setting_async, create_process, SublimeHaskellWindowCommand
     from parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages
     from ghci import parse_info
     import symbols
 else:
-    from SublimeHaskell.sublime_haskell_common import log, is_haskell_source, get_haskell_command_window_view_file_project, call_ghcmod_and_wait, get_setting_async, create_process
+    from SublimeHaskell.sublime_haskell_common import log, is_haskell_source, get_haskell_command_window_view_file_project, call_ghcmod_and_wait, get_setting_async, create_process, SublimeHaskellWindowCommand
     from SublimeHaskell.parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages
     from SublimeHaskell.ghci import parse_info
     import SublimeHaskell.symbols as symbols
@@ -24,7 +24,7 @@ def lint_as_hints(msgs):
             m[1].level = 'hint'
 
 
-class SublimeHaskellGhcModCheck(sublime_plugin.WindowCommand):
+class SublimeHaskellGhcModCheck(SublimeHaskellWindowCommand):
     def run(self):
         run_ghcmod(['check'], 'Checking')
 
@@ -32,7 +32,7 @@ class SublimeHaskellGhcModCheck(sublime_plugin.WindowCommand):
         return is_haskell_source(None)
 
 
-class SublimeHaskellGhcModLint(sublime_plugin.WindowCommand):
+class SublimeHaskellGhcModLint(SublimeHaskellWindowCommand):
     def run(self):
         run_ghcmod(['lint', '-h', '-u'], 'Linting', lint_as_hints)
 
@@ -40,7 +40,7 @@ class SublimeHaskellGhcModLint(sublime_plugin.WindowCommand):
         return is_haskell_source(None)
 
 
-class SublimeHaskellGhcModCheckAndLint(sublime_plugin.WindowCommand):
+class SublimeHaskellGhcModCheckAndLint(SublimeHaskellWindowCommand):
     def run(self):
         run_ghcmods([['check'], ['lint', '-h', '-u']], 'Checking and Linting', lint_as_hints)
 
