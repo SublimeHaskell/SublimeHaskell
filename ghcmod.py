@@ -4,7 +4,6 @@ import sublime
 import sublime_plugin
 import threading
 from threading import Thread
-import Queue
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import log, is_haskell_source, get_haskell_command_window_view_file_project, call_ghcmod_and_wait, get_setting_async, create_process

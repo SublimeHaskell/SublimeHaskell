@@ -398,11 +398,17 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
     Show information about selected symbol
 
     """
-    def run(self, edit, filename = None, module_name = None, decl = None):
+    def run(self, edit, filename = None, module_name = None, package_name = None, project_name = None, cabal = None, decl = None):
         if decl and (filename or module_name):
             self.full_name = decl
             self.current_file_name = filename
-            self.candidates = hsdev.symbol(decl, file = self.current_file_name, module = module_name)
+            self.candidates = hsdev.symbol(
+                decl,
+                project = project_name,
+                file = self.current_file_name,
+                module = module_name,
+                package = package_name,
+                cabal = cabal)
         else:
             (module_word, ident, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
             self.full_name = '{0}.{1}'.format(module_word, ident) if module_word else ident
@@ -425,7 +431,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
             self.show_symbol_info(self.candidates[0])
             return
 
-        self.view.window().show_quick_panel([[c.qualified_name()] for c in self.candidates], self.on_done)
+        self.view.window().show_quick_panel([[c.qualified_name(), c.location_string()] for c in self.candidates], self.on_done)
 
     def on_done(self, idx):
         if idx == -1:
@@ -467,16 +473,22 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
 
 # Show symbol info for declaration via calling command
 def show_declaration_info(view, decl):
+    log('decl is {0}'.format(decl.brief()))
+
+    info = {}
+    info['decl'] = decl.name
+    info['module_name'] = decl.module.name
     if decl.by_source():
-        view.run_command('sublime_haskell_symbol_info', {
-            'filename': decl.location.filename,
-            'decl': decl.name })
-    else:
-        view.run_command('sublime_haskell_symbol_info', {
-            'module_name': decl.module.name,
-            'decl': decl.name })
+        info['filename'] = decl.location.filename
+        if decl.location.project:
+            info['project_name'] = decl.location.project
+    if decl.by_cabal() and decl.location.package.name:
+        info['package_name'] = decl.location.package.name
+        info['cabal'] = decl.location.cabal
 
+    log('info is {0}'.format(info))
 
+    sublime.set_timeout(lambda: view.run_command('sublime_haskell_symbol_info', info), 0)
 
 class SublimeHaskellInsertImportForSymbol(sublime_plugin.TextCommand):
     """
@@ -578,9 +590,14 @@ class SublimeHaskellBrowseModule(sublime_plugin.WindowCommand):
     """
     Browse module symbols
     """
-    def run(self, module_name = None, filename = None):
+    def run(self, module_name = None, package_name = None, project_name = None, filename = None, cabal = None):
         if module_name or filename:
-            m = hsdev.module(name = module_name, file = filename)
+            m = hsdev.module(
+                name = module_name,
+                package = package_name,
+                project = project_name,
+                file = filename,
+                cabal = cabal)
             if not m:
                 show_status_message('Module {0} not found'.format(module_name or filename))
                 return
@@ -593,20 +610,30 @@ class SublimeHaskellBrowseModule(sublime_plugin.WindowCommand):
 
         self.candidates = []
 
-        self.candidates.extend([[m.name] for m in hsdev.list_modules(cabal = current_cabal())])
-        self.candidates.extend([[m.name] for m in hsdev.list_modules(source = True)])
+        self.candidates.extend([(m, [m.name, m.location_string()]) for m in hsdev.list_modules(cabal = current_cabal())])
+        self.candidates.extend([(m, [m.name, m.location_string()]) for m in hsdev.list_modules(source = True)])
 
-        self.candidates.sort(key = lambda c: c[0])
+        self.candidates.sort(key = lambda c: c[1][0])
 
-        self.window.show_quick_panel(self.candidates, self.on_done)
+        self.window.show_quick_panel([c[1] for c in self.candidates], self.on_done)
 
     def on_done(self, idx):
         if idx == -1:
             return
 
-        module_name = self.candidates[idx][0]
-        self.window.run_command('sublime_haskell_browse_module', {
-            'module_name': module_name })
+        m = self.candidates[idx][0]
+
+        info = {}
+        info['module_name'] = m.name
+        if m.by_source():
+            info['filename'] = m.location.filename
+            if m.location.project:
+                info['project_name'] = m.location.project
+        if m.by_cabal() and m.location.package.name:
+            info['package_name'] = m.location.package.name
+            info['cabal'] = m.location.cabal
+
+        sublime.set_timeout(lambda: self.window.run_command('sublime_haskell_browse_module', info), 0)
 
     def on_symbol_selected(self, idx):
         if idx == -1:

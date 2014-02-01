@@ -7,11 +7,15 @@ import sublime_plugin
 import subprocess
 import threading
 import json
-import Queue
 import time
+from functools import reduce
 
-import symbols
-from sublime_haskell_common import *
+if int(sublime.version()) < 3000:
+    import symbols
+    from sublime_haskell_common import *
+else:
+    import SublimeHaskell.symbols as symbols
+    from SublimeHaskell.sublime_haskell_common import *
 
 def call_hsdev_and_wait(arg_list, filename = None, cabal = None, callback = None, **popen_kwargs):
     cmd = ['hsdev'] + arg_list
@@ -177,27 +181,30 @@ def list_modules(cabal = None, project = None, source = False, standalone = Fals
 def list_projects():
     return hsdev(['list', 'projects'])
 
-def symbol(name = None, cabal = None, project = None, file = None, module = None, source = False, standalone = False, prefix = None, find = None):
+def symbol(name = None, project = None, file = None, module = None, package = None, cabal = None, source = False, standalone = False, prefix = None, find = None):
     return parse_decls(
         hsdev(
             (['symbol', name] if name else ['symbol']) +
-            cabal_path(cabal) +
             if_some(project, ['--project', project]) +
             if_some(file, ['-f', file]) +
             if_some(module, ['-m', module]) +
+            if_some(package, ['--package', package]) +
+            cabal_path(cabal) +
             (['--src'] if source else []) +
             (['--stand'] if standalone else []) +
             if_some(prefix, ['--prefix', prefix]) +
             if_some(find, ['--find', find])))
 
-def module(name = None, project = None, file = None, cabal = None):
+def module(name = None, package = None, project = None, file = None, cabal = None, source = False):
     return parse_module(
         hsdev(
             ['module'] +
             if_some(name, ['-m', name]) +
-            cabal_path(cabal) +
+            if_some(package, ['--package', package]) +
             if_some(project, ['--project', project]) +
-            if_some(file, ['-f', file])))
+            cabal_path(cabal) +
+            if_some(file, ['-f', file]) +
+            (['--src'] if source else [])))
 
 def project(projects):
     return hsdev(['project'] + projects)
@@ -297,7 +304,14 @@ def parse_location(d, p = None):
         get_value(p, 'line', 0),
         get_value(p, 'column', 0),
         get_value(d, 'project'))
-    return None if loc.is_null() else loc
+    if not loc.is_null():
+        return loc
+    loc = symbols.InstalledLocation(
+        symbols.Package.parse(get_value(d, 'package')),
+        get_value(d, 'cabal'))
+    if not loc.is_null():
+        return loc
+    return None
 
 def parse_cabal(d):
     c = get_value(d, 'cabal')
@@ -312,6 +326,8 @@ def parse_import(d):
     return symbols.Import(d['name'], d['qualified'], d.get('as'), parse_location(None, d.get('pos')))
 
 def parse_module_id(d):
+    if d is None:
+        return None
     return symbols.Module(
         d['name'],
         [], {}, {},
@@ -363,6 +379,8 @@ def parse_module_declaration(d, parse_module_info = True):
         return None
 
 def parse_module(d):
+    if d is None:
+        return None
     return symbols.Module(
         d['name'],
         d.get('exports'),
@@ -394,7 +412,7 @@ class HsDevHolder(object):
         start(port = self.port, cache = self.cache)
 
     def link_hsdev(self, tries = 10):
-        for n in xrange(0, tries):
+        for n in range(0, tries):
             try:
                 log('connecting to hsdev server...')
                 self.socket.connect(('127.0.0.1', self.port))

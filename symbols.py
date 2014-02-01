@@ -30,8 +30,50 @@ class Location(object):
             self.filename = other.filename
             self.project = other.project
 
+    def to_string(self):
+        if self.line == 0 and self.column == 0:
+            return self.filename
+        return self.position()
+
     def is_null(self):
         return self.project is None and self.filename is None and self.line == 0 and self.column == 0
+
+class Package(object):
+    def __init__(self, name, version = None):
+        self.name = name
+        self.version = version
+
+    def parse(package_id):
+        if package_id is None:
+            return None
+        m = re.match('([\w\-]+)\-([\d\.]+)', package_id)
+        if m:
+            (name, version) = m.groups()
+            return Package(name, version)
+        m = re.match('([\w\-]+)', package_id)
+        if m:
+            (name, ) = m.groups()
+            return Package(name)
+        return None
+
+    def package_id(self):
+        return '{0}-{1}'.format(self.name, self.version) if self.version is not None else self.name
+
+class InstalledLocation(object):
+    """
+    Module location in cabal
+    """
+    def __init__(self, package, cabal = None):
+        if not cabal:
+            cabal = 'cabal'
+        self.package = package
+        self.cabal = cabal
+
+    def to_string(self):
+        return '{0} in {1}'.format(self.package.package_id(), self.cabal)
+
+    def is_null(self):
+        return self.package is None
 
 class Symbol(object):
     """
@@ -50,7 +92,15 @@ class Symbol(object):
         return self.module.name + '.' + self.name
 
     def by_source(self):
-        return self.location is not None and self.location.filename is not None
+        return type(self.location) == Location
+
+    def by_cabal(self):
+        return type(self.location) == InstalledLocation
+
+    def location_string(self):
+        if not self.location:
+            return None
+        return self.location.to_string()
 
 class Import(object):
     """
@@ -84,8 +134,13 @@ class Module(Symbol):
         # Dictionary from name to Symbol
         self.declarations = declarations.copy()
         for d in self.declarations.values():
-            if d.location:
-                d.location.set_file(self.location)
+            if self.by_cabal():
+                d.location = self.location
+            else:
+                if d.location:
+                    d.location.set_file(self.location)
+                else:
+                    d.location = self.location
 
         for decl in self.declarations.values():
             decl.module = self
