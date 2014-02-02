@@ -8,12 +8,12 @@ from threading import Thread
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     from parseoutput import run_chain_build_thread
-    from autocomplete import autocompletion, list_files_in_dir_recursively
+    from autocomplete import autocompletion, list_files_in_dir_recursively, hsdev_inspector
     import hsdev
 else:
     from SublimeHaskell.sublime_haskell_common import *
     from SublimeHaskell.parseoutput import run_chain_build_thread
-    from SublimeHaskell.autocomplete import autocompletion, list_files_in_dir_recursively
+    from SublimeHaskell.autocomplete import autocompletion, list_files_in_dir_recursively, hsdev_inspector
     import SublimeHaskell.hsdev as hsdev
 
 OUTPUT_PANEL_NAME = "haskell_run_output"
@@ -158,22 +158,15 @@ class SublimeHaskellSwitchCabalDev(SublimeHaskellWindowCommand):
         sandboxes = list(set(sandboxes))
         set_setting('cabal_dev_sandbox_list', sandboxes)
 
-        # No candboxes
+        # No sandboxes
         if len(sandboxes) == 0:
             sublime_status_message('There is nothing to switch to')
-            set_setting('use_cabal_dev', False)
-            save_settings()
+            self.switch_cabal('cabal')
             return
 
         # One sandbox, just switch
         if len(sandboxes) == 1:
-            set_setting('use_cabal_dev', not use_cabal_dev)
-            if use_cabal_dev:
-                now_using = 'Cabal'
-            else:
-                now_using = 'Cabal-Dev'
-            sublime_status_message('Switched to ' + now_using)
-            save_settings()
+            self.switch_cabal('cabal' if use_cabal_dev else sandbox)
             return
 
         # Many sandboxes, show list
@@ -192,14 +185,31 @@ class SublimeHaskellSwitchCabalDev(SublimeHaskellWindowCommand):
     def on_done(self, idx):
         if idx == -1:
             return
+
         selected = self.sorted_sands[idx]
         if selected == "<Cabal>":
+            self.switch_cabal('cabal')
+        else:
+            self.switch_cabal(selected)
+
+    def switch_cabal(self, new_cabal):
+        old_cabal = current_cabal()
+
+        if new_cabal == old_cabal:
+            return
+
+        if new_cabal == 'cabal':
             set_setting('use_cabal_dev', False)
         else:
             set_setting('use_cabal_dev', True)
-            set_setting('cabal_dev_sandbox', selected)
+            set_setting('cabal_dev_sandbox', new_cabal)
 
         save_settings()
+
+        sublime_status_message('Switched to ' + new_cabal)
+
+        hsdev.remove(cabal = old_cabal)
+        hsdev_inspector.mark_cabal(new_cabal)
 
 
 # Default build system (cabal or cabal-dev)

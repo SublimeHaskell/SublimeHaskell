@@ -732,6 +732,9 @@ class HsDevAgent(threading.Thread):
             self.reinspect_event.wait(AGENT_SLEEP_TIMEOUT)
             self.reinspect_event.clear()
 
+    def force_inspect(self):
+        self.reinspect_event.set()
+
     def start_inspect(self):
         self.mark_cabal()
         wait_for_window(lambda w: self.mark_all_files(w))

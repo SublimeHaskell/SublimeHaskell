@@ -60,10 +60,7 @@ def if_some(x, lst):
 def cabal_path(cabal):
     if not cabal:
         return []
-    args = ['--sandbox']
-    if cabal != 'cabal':
-        args.append(cabal)
-    return args
+    return ["--sandbox"] if cabal == 'cabal' else ["--sandbox={0}".format(cabal)]
 
 def hsinspect(module = None, file = None, cabal = None, ghc_opts = []):
     cmd = ['hsinspect']
