@@ -88,6 +88,16 @@ class Symbol(object):
 
         self.tags = {}
 
+    def update_location(self, module_loc):
+        """
+        JSON contains only line + column
+        This function used to merge module location, which contains all other info with line + column
+        """
+        if self.location and self.by_source():
+            self.location.set_file(module_loc)
+        else:
+            self.location = module_loc
+
     def full_name(self):
         return self.module.name + '.' + self.name
 
@@ -134,13 +144,7 @@ class Module(Symbol):
         # Dictionary from name to Symbol
         self.declarations = declarations.copy()
         for d in self.declarations.values():
-            if self.by_cabal():
-                d.location = self.location
-            else:
-                if d.location:
-                    d.location.set_file(self.location)
-                else:
-                    d.location = self.location
+            d.update_location(self.location)
 
         for decl in self.declarations.values():
             decl.module = self
@@ -154,8 +158,7 @@ class Module(Symbol):
     def add_declaration(self, new_declaration):
         if not new_declaration.module:
             new_declaration.module = self
-        if new_declaration.location:
-            new_declaration.location.set_file(self.location)
+        new_declaration.update_location(self.location)
         if new_declaration.module != self:
             raise RuntimeError("Adding declaration to other module")
         self.declarations[new_declaration.name] = new_declaration

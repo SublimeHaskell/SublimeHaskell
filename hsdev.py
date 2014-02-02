@@ -369,8 +369,7 @@ def parse_module_declaration(d, parse_module_info = True):
         if not decl:
             return None
 
-        if decl.location:
-            decl.location.set_file(loc)
+        decl.update_location(loc)
 
         decl.module = m
 
