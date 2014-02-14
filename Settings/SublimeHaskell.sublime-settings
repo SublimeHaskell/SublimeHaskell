@@ -74,6 +74,12 @@
 	// Additional ghc options for use in ghc-mod and ModuleInspector, for example "-package ghc"
 	"ghc_opts": [],
 
+	// Enable hsdev
+	// git clone https://github.com/mvoidex/hsdev
+	// cd hsdev
+	// cabal install
+	"enable_hsdev": true,
+
 	// Enables hdevtools (it must be installed, cabal install hdevtools)
 	// See the add_to_PATH settings to specify a custom location.
 	"enable_hdevtools": true,
