@@ -71,7 +71,8 @@ def preload_settings():
 # SublimeHaskell settings dictionary
 # used to retrieve it async from any thread
 sublime_haskell_settings = LockedObject({})
-
+# Callbacks on change settings
+sublime_settings_changes = LockedObject({})
 
 def is_enabled_haskell_command(view = None, must_be_project=True, must_be_main=False, must_be_file = False):
     """Returns True if command for .hs can be invoked"""
@@ -135,10 +136,10 @@ def get_extended_env():
     ext_env['PATH'] = os.pathsep.join(add_to_PATH + [PATH])
     return ext_env
 
-def call_and_wait_tool(command, tool_name, on_result = None, filename = None, on_line = None, **popen_kwargs):
+def call_and_wait_tool(command, tool_name, on_result = None, filename = None, on_line = None, check_enabled = True, **popen_kwargs):
     tool_enabled = 'enable_{0}'.format(tool_name)
 
-    if get_setting_async(tool_enabled) != True:
+    if check_enabled and get_setting_async(tool_enabled) != True:
         return None
     extended_env = get_extended_env()
 
@@ -343,10 +344,8 @@ def attach_cabal_sandbox(cmd, cabal = None):
 def get_settings():
     return sublime.load_settings("SublimeHaskell.sublime-settings")
 
-
 def save_settings():
     sublime.save_settings("SublimeHaskell.sublime-settings")
-
 
 def get_setting(key, default=None):
     "This should be used only from main thread"
@@ -355,14 +354,20 @@ def get_setting(key, default=None):
     # Key was not retrieved, save its value and add callback to auto-update
     with sublime_haskell_settings as settings:
         if key not in settings:
-            get_settings().add_on_change(key, lambda: update_setting(key))
+            get_settings().add_on_change(key, lambda: on_changed_setting(key))
         settings[key] = result
     return result
 
-
 def update_setting(key):
-    "Updates setting as it was changed"
     get_setting(key)
+
+def on_changed_setting(key):
+    "Updates setting as it was changed"
+    val = get_setting(key)
+    with sublime_settings_changes as changes:
+        if key in changes:
+            for fn in changes[key]:
+                fn(key, val)
 
 
 def get_setting_async(key, default=None):
@@ -388,6 +393,14 @@ def set_setting(key, value):
 
 def set_setting_async(key, value):
     sublime.set_timeout(lambda: set_setting(key, value), 0)
+
+
+def subscribe_setting(key, fn):
+    with sublime_settings_changes as changes:
+        if key not in changes:
+            changes[key] = []
+        changes[key].append(fn)
+
 
 def ghci_package_db(cabal = None):
     if cabal == 'cabal':
