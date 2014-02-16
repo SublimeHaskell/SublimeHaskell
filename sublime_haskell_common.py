@@ -151,7 +151,7 @@ def call_and_wait_tool(command, tool_name, on_result = None, filename = None, on
     try:
         if on_line:
             for l in call_and_wait(command, split_lines = True, cwd = source_dir, **popen_kwargs):
-                on_line(mk_result(crlf2lf(l)))
+                on_line(mk_result(crlf2lf(decode_bytes(l))))
             return None
         else:
             exit_code, out, err = call_and_wait(command, cwd = source_dir, **popen_kwargs)

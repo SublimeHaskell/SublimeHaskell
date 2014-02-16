@@ -375,6 +375,12 @@ class SublimeHaskellGoToAnyDeclaration(SublimeHaskellWindowCommand):
 
 
 
+class SublimeHaskellReinspectCabalCommand(SublimeHaskellWindowCommand):
+    def run(self, old_cabal = None, new_cabal = None):
+        if old_cabal is not None:
+            call_hsdev(hsdev.remove, cabal = old_cabal)
+        if new_cabal is not None:
+            hsdev_inspector.mark_cabal(new_cabal)
 
 class SublimeHaskellReinspectAll(SublimeHaskellWindowCommand):
     def run(self):
@@ -1016,6 +1022,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         else:
             return False
 
+hsdev_inspector = None
 
 def start_inspector():
     global INSPECTOR_RUNNING

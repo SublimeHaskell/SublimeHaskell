@@ -8,12 +8,12 @@ from threading import Thread
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     from parseoutput import run_chain_build_thread
-    from autocomplete import autocompletion, list_files_in_dir_recursively, hsdev_inspector
+    from autocomplete import autocompletion, list_files_in_dir_recursively, call_hsdev
     import hsdev
 else:
     from SublimeHaskell.sublime_haskell_common import *
     from SublimeHaskell.parseoutput import run_chain_build_thread
-    from SublimeHaskell.autocomplete import autocompletion, list_files_in_dir_recursively, hsdev_inspector
+    from SublimeHaskell.autocomplete import autocompletion, list_files_in_dir_recursively, call_hsdev
     import SublimeHaskell.hsdev as hsdev
 
 OUTPUT_PANEL_NAME = "haskell_run_output"
@@ -148,7 +148,7 @@ def run_build(view, project_name, project_dir, config, use_cabal_dev=None):
         on_done=done_callback)
 
 
-class SublimeHaskellSwitchCabalDev(SublimeHaskellWindowCommand):
+class SublimeHaskellSwitchCabalDevCommand(SublimeHaskellWindowCommand):
     def run(self):
         use_cabal_dev = get_setting('use_cabal_dev')
         sandbox = get_setting('cabal_dev_sandbox')
@@ -208,42 +208,43 @@ class SublimeHaskellSwitchCabalDev(SublimeHaskellWindowCommand):
 
         sublime_status_message('Switched to ' + new_cabal)
 
-        hsdev.remove(cabal = old_cabal)
-        hsdev_inspector.mark_cabal(new_cabal)
+        self.window.run_command('sublime_haskell_reinspect_cabal', {
+            'old_cabal': old_cabal,
+            'new_cabal': new_cabal })
 
 
 # Default build system (cabal or cabal-dev)
 
-class SublimeHaskellClean(SublimeHaskellBaseCommand):
+class SublimeHaskellCleanCommand(SublimeHaskellBaseCommand):
     def run(self):
         self.build('clean')
 
 
-class SublimeHaskellConfigure(SublimeHaskellBaseCommand):
+class SublimeHaskellConfigureCommand(SublimeHaskellBaseCommand):
     def run(self):
         self.build('configure')
 
 
-class SublimeHaskellBuild(SublimeHaskellBaseCommand):
+class SublimeHaskellBuildCommand(SublimeHaskellBaseCommand):
     def run(self):
         self.build('build_then_warnings')
 
 
-class SublimeHaskellTypecheck(SublimeHaskellBaseCommand):
+class SublimeHaskellTypecheckCommand(SublimeHaskellBaseCommand):
     def run(self):
         self.build('typecheck_then_warnings')
 
 
-class SublimeHaskellRebuild(SublimeHaskellBaseCommand):
+class SublimeHaskellRebuildCommand(SublimeHaskellBaseCommand):
     def run(self):
         self.build('rebuild')
 
 
-class SublimeHaskellInstall(SublimeHaskellBaseCommand):
+class SublimeHaskellInstallCommand(SublimeHaskellBaseCommand):
     def run(self):
         self.build('install')
 
-class SublimeHaskellTest(SublimeHaskellBaseCommand):
+class SublimeHaskellTestCommand(SublimeHaskellBaseCommand):
     def run(self):
         def has_tests(name, info):
             return len(info['tests']) > 0
@@ -251,7 +252,7 @@ class SublimeHaskellTest(SublimeHaskellBaseCommand):
         self.build('test', filter_project = has_tests)
 
 # Auto build current project
-class SublimeHaskellBuildAuto(SublimeHaskellBaseCommand):
+class SublimeHaskellBuildAutoCommand(SublimeHaskellBaseCommand):
     def run(self):
         current_project_dir, current_project_name = get_cabal_project_dir_and_name_of_view(self.window.active_view())
         if current_project_name and current_project_dir:
@@ -284,7 +285,7 @@ class SublimeHaskellBuildAuto(SublimeHaskellBaseCommand):
             run_build(self.window.active_view(), current_project_name, current_project_dir, config, None)
 
 
-class SublimeHaskellRun(SublimeHaskellBaseCommand):
+class SublimeHaskellRunCommand(SublimeHaskellBaseCommand):
     def run(self):
         self.executables = []
         ps = []
