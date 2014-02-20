@@ -91,6 +91,9 @@
 	// Changing this requires a Sublime restart.
 	"inspect_modules": true,
 
+	// Show symbol info at the status bar instead of in its own panel.
+	"enable_symbol_info_at_status_bar": false,
+
 	// Relative or absolute path to a folder where local caches are stored.
 	// The same folder is used to store the CabalInspector/ModuleInspector tools.
 	// This setting is useful for preventing auto-generated or inherently local
