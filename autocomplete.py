@@ -399,7 +399,7 @@ class SublimeHaskellToggleSymbolInfoStatusBarCommand(sublime_plugin.TextCommand)
 
 
 
-class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand, output_area):
+class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
     """
     Show information about selected symbol
 
