@@ -393,7 +393,13 @@ class SublimeHaskellReinspectAll(sublime_plugin.WindowCommand):
 
 
 
-class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
+class SublimeHaskellToggleSymbolInfoStatusBarCommand(sublime_plugin.TextCommand):
+    """Toggles showing symbol type info at status bar instead of panel."""
+    toggle_setting_async('enable_symbol_info_at_status_bar')
+
+
+
+class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand, output_area):
     """
     Show information about selected symbol
 
@@ -537,20 +543,23 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
             show_status_message("Can't get info for {0}.{1}".format(module_name, ident_name), False)
 
     def show_symbol_info(self, decl):
-        output_view = self.view.window().get_output_panel('sublime_haskell_symbol_info')
-        output_view.set_read_only(False)
-
         util.refine_decl(decl)
 
-        # TODO: Move to separate command for Sublime Text 3
-        output_view.run_command('sublime_haskell_output_text', {
-            'text': decl.detailed() })
+        if get_setting_async('enable_symbol_info_at_status_bar'):
+            show_status_message(decl.detailed().split('\n')[0])
+        else:
+            output_view = self.view.window().get_output_panel('sublime_haskell_symbol_info')
+            output_view.set_read_only(False)
 
-        output_view.sel().clear()
-        output_view.set_read_only(True)
+            # TODO: Move to separate command for Sublime Text 3
+            output_view.run_command('sublime_haskell_output_text', {
+                'text': decl.detailed()})
 
-        self.view.window().run_command('show_panel', {
-            'panel': 'output.' + 'sublime_haskell_symbol_info' })
+            output_view.sel().clear()
+            output_view.set_read_only(True)
+
+            self.view.window().run_command('show_panel', {
+                'panel': 'output.' + 'sublime_haskell_symbol_info' })
 
     def browse_module(self, module):
         with autocompletion.database.modules as modules:
