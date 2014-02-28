@@ -94,6 +94,14 @@
         "command": "sublime_haskell_find_declarations"
     },
     {
+        "caption": "SublimeHaskell: Hayoo",
+        "command": "sublime_haskell_hayoo"
+    },
+    {
+        "caption": "SublimeHaskell: Search declarations everywhere",
+        "command": "sublime_haskell_search"
+    },
+    {
         "caption": "SublimeHaskell: Insert import for symbol",
         "command": "sublime_haskell_insert_import_for_symbol"
     },

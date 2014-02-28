@@ -30,6 +30,9 @@ class Location(object):
             self.filename = other.filename
             self.project = other.project
 
+    def __str__(self):
+        return self.to_string()
+
     def to_string(self):
         if self.line == 0 and self.column == 0:
             return self.filename
@@ -69,11 +72,30 @@ class InstalledLocation(object):
         self.package = package
         self.cabal = cabal
 
+    def __str__(self):
+        return self.to_string()
+
     def to_string(self):
         return '{0} in {1}'.format(self.package.package_id(), self.cabal)
 
     def is_null(self):
         return self.package is None
+
+class OtherLocation(object):
+    """
+    Other module location
+    """
+    def __init__(self, source):
+        self.source = source
+
+    def __str__(self):
+        return self.to_string()
+
+    def to_string(self):
+        return (self.source or "")
+
+    def is_null(self):
+        return self.source is None
 
 class Symbol(object):
     """
@@ -106,6 +128,9 @@ class Symbol(object):
 
     def by_cabal(self):
         return type(self.location) == InstalledLocation
+
+    def by_hayoo(self):
+        return type(self.location) == OtherLocation
 
     def location_string(self):
         if not self.location:

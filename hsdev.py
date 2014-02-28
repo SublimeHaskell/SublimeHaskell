@@ -244,6 +244,9 @@ def complete(input, file, cabal = None, port = None):
         hsdev(
             ['complete', input, '-f', file] + cabal_path(cabal), port = port))
 
+def hayoo(query, port = None):
+    return parse_decls(hsdev(['hayoo', query], port = port))
+
 def dump(cabal = None, projects = [], files = [], path = None, file = None, port = None):
     opts = ['dump']
     if cabal:
@@ -315,6 +318,10 @@ def parse_location(d, p = None):
     loc = symbols.InstalledLocation(
         symbols.parse_package(get_value(d, 'package')),
         get_value(d, 'cabal'))
+    if not loc.is_null():
+        return loc
+    loc = symbols.OtherLocation(
+        get_value(d, 'source'))
     if not loc.is_null():
         return loc
     return None

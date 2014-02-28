@@ -336,7 +336,7 @@ class SublimeHaskellFindDeclarations(SublimeHaskellWindowCommand):
         if not self.decls:
             show_status_message("Nothing found for: {0}".format(input))
 
-        self.window.show_quick_panel([[decl.module.name + ': ' + decl.brief()] for decl in self.decls], self.on_select)
+        self.window.show_quick_panel([[decl.module.name + ': ' + decl.brief(), str(decl.location)] for decl in self.decls], self.on_select)
 
     def on_change(self, input):
         pass
@@ -352,6 +352,63 @@ class SublimeHaskellFindDeclarations(SublimeHaskellWindowCommand):
 
         show_declaration_info(self.window.active_view(), decl)
 
+
+
+class SublimeHaskellHayoo(SublimeHaskellWindowCommand):
+    def run(self):
+        self.window.show_input_panel("Search string", "", self.on_done, self.on_change, self.on_cancel)
+
+    def on_done(self, input):
+        self.decls = call_hsdev(hsdev.hayoo, query = input)
+        if not self.decls:
+            show_status_message("Nothing found for: {0}".format(input))
+            return
+
+        self.window.show_quick_panel([[decl.module.name + ': ' + decl.brief(), str(decl.location)] for decl in self.decls], self.on_select)
+
+    def on_change(self, input):
+        pass
+
+    def on_cancel(self):
+        pass
+
+    def on_select(self, idx):
+        if idx == -1:
+            return
+
+        decl = self.decls[idx]
+        
+        show_declaration_info(self.window.active_view(), decl)
+
+
+
+class SublimeHaskellSearch(SublimeHaskellWindowCommand):
+    def run(self):
+        self.window.show_input_panel("Search string", "", self.on_done, self.on_change, self.on_cancel)
+
+    def on_done(self, input):
+        self.decls = []
+        self.decls.extend(call_hsdev(hsdev.symbol, find = input) or [])
+        self.decls.extend(call_hsdev(hsdev.hayoo, query = input) or [])
+        if not self.decls:
+            show_status_message("Nothing found for: {0}".format(input))
+            return
+
+        self.window.show_quick_panel([[decl.module.name + ': ' + decl.brief(), str(decl.location)] for decl in self.decls], self.on_select)
+
+    def on_change(self, input):
+        pass
+
+    def on_cancel(self):
+        pass
+
+    def on_select(self, idx):
+        if idx == -1:
+            return
+
+        decl = self.decls[idx]
+
+        show_declaration_info(self.window.active_view(), decl)
 
 
 
@@ -456,21 +513,14 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
             show_status_message("Can't get info for {0}.{1}".format(module_name, ident_name), False)
 
     def show_symbol_info(self, decl):
-        output_view = self.view.window().get_output_panel('sublime_haskell_symbol_info')
-        output_view.set_read_only(False)
-
-        # TODO: Move to separate command for Sublime Text 3
-        output_view.run_command('sublime_haskell_output_text', {
-            'text': decl.detailed() })
-
-        output_view.sel().clear()
-        output_view.set_read_only(True)
-
-        self.view.window().run_command('show_panel', {
-            'panel': 'output.' + 'sublime_haskell_symbol_info' })
+        show_declaration_info_panel(self.view, decl)
 
 # Show symbol info for declaration via calling command
 def show_declaration_info(view, decl):
+    if decl.by_hayoo():
+        show_declaration_info_panel(view, decl)
+        return
+
     info = {}
     info['decl'] = decl.name
     info['module_name'] = decl.module.name
@@ -483,6 +533,20 @@ def show_declaration_info(view, decl):
         info['cabal'] = decl.location.cabal
 
     sublime.set_timeout(lambda: view.run_command('sublime_haskell_symbol_info', info), 0)
+
+def show_declaration_info_panel(view, decl):
+    output_view = view.window().get_output_panel('sublime_haskell_symbol_info')
+    output_view.set_read_only(False)
+
+    # TODO: Move to separate command for Sublime Text 3
+    output_view.run_command('sublime_haskell_output_text', {
+        'text': decl.detailed() })
+
+    output_view.sel().clear()
+    output_view.set_read_only(True)
+
+    view.window().run_command('show_panel', {
+        'panel': 'output.' + 'sublime_haskell_symbol_info' })
 
 class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
     """
