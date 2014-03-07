@@ -17,6 +17,7 @@ if int(sublime.version()) < 3000:
     from ghci import ghci_info
     from haskell_docs import haskell_docs
     from hdevtools import start_hdevtools, stop_hdevtools
+    from parseoutput import write_panel
     import hsdev
 else:
     from SublimeHaskell.sublime_haskell_common import *
@@ -27,6 +28,7 @@ else:
     from SublimeHaskell.ghci import ghci_info
     from SublimeHaskell.haskell_docs import haskell_docs
     from SublimeHaskell.hdevtools import start_hdevtools, stop_hdevtools
+    from SublimeHaskell.parseoutput import write_panel
     import SublimeHaskell.hsdev as hsdev
 
 
@@ -62,9 +64,10 @@ IMPORT_QUALIFIED_POSSIBLE_RE = re.compile(r'.*import\s+(?P<qualifiedprefix>\S*)$
 NO_SPECIAL_CHARS_RE = re.compile(r'^(\w|[\-\.])*$')
 
 # Get symbol qualified prefix and its name
-SYMBOL_RE = re.compile(r'((?P<module>\w+(\.\w+)*)\.)?(?P<identifier>\w*)$')
+SYMBOL_RE = re.compile(r'((?P<module>[A-Z]\w*(\.[A-Z]\w*)*)\.)?((?P<identifier>[a-z]\w*)|(?P<operator>[!#$%&*+\./<=>?@\\\^|\-~:]+))$')
+# SYMBOL_RE = re.compile(r'((?P<module>\w+(\.\w+)*)\.)?(?P<identifier>((\w*)|([]*)))$')
 # Get symbol module scope and its name within import statement
-IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>\w+(\.\w+)*)(\s+as\s+(?P<as>\w+))?\s*\(.*?(?P<identifier>\w*)$')
+IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z]\w*(\.[A-Z]\w*)*)(\s+as\s+(?P<as>[A-Z]\w*))?\s*\(.*?((?P<identifier>[a-z]\w*)|(?P<operator>[!#$%&*+\./<=>?@\\\^|\-~:]+))$')
 
 def get_line_contents(view, location):
     """
@@ -91,14 +94,14 @@ def get_qualified_name(s):
 def get_qualified_symbol(line):
     """
     Get module context of symbol and symbol itself
-    Returns (module, name, is_import_list), where module (or one of) can be None
+    Returns (module, name, is_import_list, is_operator), where module (or one of) can be None
     """
     res = IMPORT_SYMBOL_RE.search(line)
     if res:
-        return (res.group('module'), res.group('identifier'), True)
+        return (res.group('module'), res.group('identifier') or res.group('operator'), True, bool(res.group('operator')))
     res = SYMBOL_RE.search(line)
     # res always match
-    return (res.group('module'), res.group('identifier'), False)
+    return (res.group('module'), res.group('identifier') or res.group('operator'), False, bool(res.group('operator')))
 
 def get_qualified_symbol_at_region(view, region):
     """
@@ -125,9 +128,6 @@ class AutoCompletion(object):
         #     name - name of executable
         self.projects = LockedObject({})
 
-        # Storage of information
-        self.database = symbols.Database()
-
         # keywords
         # TODO: keywords can't appear anywhere, we can suggest in right places
         self.keyword_completions = map(
@@ -153,7 +153,7 @@ class AutoCompletion(object):
 
         self.current_filename = current_file_name
         line_contents = get_line_contents(view, locations[0])
-        (qualified_module, symbol_name, is_import_list) = get_qualified_symbol(line_contents)
+        (qualified_module, symbol_name, is_import_list, is_operator) = get_qualified_symbol(line_contents)
         qualified_prefix = '{0}.{1}'.format(qualified_module, symbol_name) if qualified_module else symbol_name
 
         suggestions = []
@@ -259,7 +259,7 @@ def can_complete_qualified_symbol(info):
     """
     Helper function, returns whether sublime_haskell_complete can run for (module, symbol, is_import_list)
     """
-    (module_name, symbol_name, is_import_list) = info
+    (module_name, symbol_name, is_import_list, is_operator) = info
     if not module_name:
         return False
 
@@ -335,6 +335,7 @@ class SublimeHaskellFindDeclarations(SublimeHaskellWindowCommand):
         self.decls = call_hsdev(hsdev.symbol, find = input)
         if not self.decls:
             show_status_message("Nothing found for: {0}".format(input))
+            return
 
         self.window.show_quick_panel([[decl.module.name + ': ' + decl.brief(), str(decl.location)] for decl in self.decls], self.on_select)
 
@@ -468,7 +469,12 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
                 package = package_name,
                 cabal = cabal)
         else:
-            (module_word, ident, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+            (module_word, ident, _, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+
+            if not module_word and not ident:
+                show_status_message('No symbol selected', False)
+                return
+
             self.full_name = '{0}.{1}'.format(module_word, ident) if module_word else ident
 
             self.current_file_name = self.view.file_name()
@@ -535,33 +541,26 @@ def show_declaration_info(view, decl):
     sublime.set_timeout(lambda: view.run_command('sublime_haskell_symbol_info', info), 0)
 
 def show_declaration_info_panel(view, decl):
-    output_view = view.window().get_output_panel('sublime_haskell_symbol_info')
-    output_view.set_read_only(False)
-
-    # TODO: Move to separate command for Sublime Text 3
-    output_view.run_command('sublime_haskell_output_text', {
-        'text': decl.detailed() })
-
-    output_view.sel().clear()
-    output_view.set_read_only(True)
-
-    view.window().run_command('show_panel', {
-        'panel': 'output.' + 'sublime_haskell_symbol_info' })
+    write_panel(view.window(), decl.detailed(), 'sublime_haskell_symbol_info')
 
 class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
     """
     Insert import for symbol
     """
-    def run(self, edit, filename = None, decl = None):
+    def run(self, edit, filename = None, decl = None, module_name = None):
         self.full_name = decl
         self.current_file_name = filename
         self.edit = edit
+
+        if module_name is not None:
+            self.add_import(module_name)
+            return
 
         if not self.current_file_name:
             self.current_file_name = self.view.file_name()
 
         if not self.full_name:
-            (module_word, ident, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+            (module_word, ident, _, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
             self.full_name = '{0}.{1}'.format(module_word, ident) if module_word else ident
 
         if call_hsdev(hsdev.whois, self.full_name, file = self.current_file_name):
@@ -575,15 +574,15 @@ class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
             return
 
         if len(self.candidates) == 1:
-            self.add_import(self.candidates[0])
+            self.add_import(self.candidates[0].module.name)
             return
 
         self.view.window().show_quick_panel([[c.qualified_name()] for c in self.candidates], self.on_done)
 
-    def add_import(self, decl):
+    def add_import(self, module_name):
         cur_module = call_hsdev(hsdev.module, file = self.current_file_name)
         imports = sorted(cur_module.imports, key = lambda i: i.location.line)
-        after = [i for i in imports if i.module > decl.module.name]
+        after = [i for i in imports if i.module > module_name]
 
         insert_line = 0
         insert_gap = False
@@ -602,15 +601,19 @@ class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
             # Insert at the end of file
             insert_line = self.view.rowcol(self.view.size())[0]
 
-        insert_text = 'import {0}\n'.format(decl.module.name) + ('\n' if insert_gap else '')
+        insert_text = 'import {0}\n'.format(module_name) + ('\n' if insert_gap else '')
 
         pt = self.view.text_point(insert_line, 0)
         self.view.insert(self.edit, pt, insert_text)
 
+        show_status_message('Import {0} added'.format(module_name), True)
+
     def on_done(self, idx):
         if idx == -1:
             return
-        self.add_import(self.candidates[idx])
+        self.view.run_command('sublime_haskell_insert_import_for_symbol', {
+            'filename': self.current_file_name,
+            'module_name': self.candidates[idx].module.name })
 
 
 class SublimeHaskellClearImports(SublimeHaskellTextCommand):
@@ -697,7 +700,7 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
 
 class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
     def run(self, edit):
-        (module_word, ident, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+        (module_word, ident, _, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
 
         full_name = '.'.join([module_word, ident]) if module_word else ident
 

@@ -129,5 +129,9 @@
         "caption": "SublimeHaskell: Show error panel",
         "command": "show_panel",
         "args": { "panel": "output.haskell_error_checker" }
+    },
+    {
+        "caption": "Cabal: List",
+        "command": "sublime_haskell_cabal_list"
     }
 ]

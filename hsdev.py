@@ -247,6 +247,12 @@ def complete(input, file, cabal = None, port = None):
 def hayoo(query, port = None):
     return parse_decls(hsdev(['hayoo', query], port = port))
 
+def cabal_list(query = None, port = None):
+    r = hsdev(['cabal', 'list'] + ([query] if query else []), port = port)
+    if r is None:
+        return None
+    return [parse_cabal_package(s) for s in r]
+
 def dump(cabal = None, projects = [], files = [], path = None, file = None, port = None):
     opts = ['dump']
     if cabal:
@@ -400,6 +406,17 @@ def parse_module(d):
         dict((decl['name'],parse_declaration(decl)) for decl in d['declarations']) if 'declarations' in d else {},
         parse_location(d.get('location')),
         parse_cabal(d.get('location')))
+
+def parse_cabal_package(d):
+    if d is None:
+        return None
+    return symbols.CabalPackage(
+        d['name'],
+        d.get('synopsis'),
+        d.get('default-version'),
+        d.get('installed-versions'),
+        d.get('homepage'),
+        d.get('license'))
 
 def test():
     p = HsDev()

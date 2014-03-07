@@ -293,6 +293,19 @@ def mark_messages_in_view(messages, view):
             sublime.DRAW_OUTLINED)
 
 
+def write_panel(window, text, panel_name = "sublime_haskell_panel"):
+    output_view = window.get_output_panel(panel_name)
+    output_view.set_read_only(False)
+
+    output_view.run_command('sublime_haskell_output_text', { 'text': text })
+
+    output_view.sel().clear()
+    output_view.sel().add(sublime.Region(0))
+    output_view.set_read_only(True)
+
+    window.run_command('show_panel', { 'panel': 'output.' + panel_name })
+
+
 def write_output(view, text, cabal_project_dir):
     "Write text to Sublime's output panel."
     output_view = view.window().get_output_panel(ERROR_PANEL_NAME)

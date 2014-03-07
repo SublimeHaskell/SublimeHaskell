@@ -204,7 +204,7 @@ def call_and_wait_with_input(command, input_string, split_lines = False, **popen
     else:
         stdout, stderr = process.communicate(encode_bytes(input_string))
         exit_code = process.wait()
-        return (exit_code, decode_bytes(stdout), decode_bytes(stderr))
+        return (exit_code, crlf2lf(decode_bytes(stdout)), crlf2lf(decode_bytes(stderr)))
 
 def log(message):
     print(u'Sublime Haskell: {0}'.format(message))
