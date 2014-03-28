@@ -55,6 +55,8 @@ AGENT_SLEEP_TIMEOUT = 60.0
 # Checks if we are in a LANGUAGE pragma.
 LANGUAGE_RE = re.compile(r'.*{-#\s+LANGUAGE.*')
 
+WORD_RE = re.compile(r'^(?P<word>[\w\d\']*)(?P<tail>.*)')
+
 # Checks if we are in an import statement.
 IMPORT_RE = re.compile(r'.*import(\s+qualified)?\s+')
 IMPORT_RE_PREFIX = re.compile(r'^\s*import(\s+qualified)?\s+(.*)$')
@@ -64,10 +66,10 @@ IMPORT_QUALIFIED_POSSIBLE_RE = re.compile(r'.*import\s+(?P<qualifiedprefix>\S*)$
 NO_SPECIAL_CHARS_RE = re.compile(r'^(\w|[\-\.])*$')
 
 # Get symbol qualified prefix and its name
-SYMBOL_RE = re.compile(r'((?P<module>[A-Z]\w*(\.[A-Z]\w*)*)\.)?((?P<identifier>[a-z]\w*)|(?P<operator>[!#$%&*+\./<=>?@\\\^|\-~:]+))$')
+SYMBOL_RE = re.compile(r'((?P<module>[A-Z][\w\d]*(\.[A-Z][\w\d\']*)*)\.)?((?P<identifier>[a-z][\w\d\']*)|(?P<operator>[!#$%&*+\./<=>?@\\\^|\-~:]+))$')
 # SYMBOL_RE = re.compile(r'((?P<module>\w+(\.\w+)*)\.)?(?P<identifier>((\w*)|([]*)))$')
 # Get symbol module scope and its name within import statement
-IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z]\w*(\.[A-Z]\w*)*)(\s+as\s+(?P<as>[A-Z]\w*))?\s*\(.*?((?P<identifier>[a-z]\w*)|(?P<operator>[!#$%&*+\./<=>?@\\\^|\-~:]+))$')
+IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']*(\.[A-Z][\w\d\']*)*)(\s+as\s+(?P<as>[A-Z][\w\d\']*))?\s*\(.*?((?P<identifier>[a-z][\w\d\']*)|(?P<operator>[!#$%&*+\./<=>?@\\\^|\-~:]+))$')
 
 def get_line_contents(view, location):
     """
@@ -75,11 +77,27 @@ def get_line_contents(view, location):
     """
     return view.substr(sublime.Region(view.line(location).a, location))
 
+def logged(v, fmt = '{0}'):
+    log(fmt.format(v))
+    return v
+
+def get_line_contents_at_region(view, region):
+    """
+    Returns (before, at, after)
+    """
+    line_region = view.line(region)
+
+    before = view.substr(sublime.Region(line_region.a, region.a))
+    at = view.substr(region)
+    after = view.substr(sublime.Region(region.b, line_region.b))
+    return logged((before, at, after), fmt = 'get_line_contents_at_region: {0}')
+
 def get_line_contents_before_region(view, region):
     """
     Returns contents of line before the given region (including it).
     """
-    return view.substr(sublime.Region(view.line(region).a, region.b))
+    (before, at, _) = get_line_contents_at_region(view, region)
+    return before + at
 
 def get_qualified_name(s):
     """
@@ -108,9 +126,11 @@ def get_qualified_symbol_at_region(view, region):
     Get module context of symbol and symbol itself for line before (and with) word on region
     Returns (module, name), where module (or one of) can be None
     """
-    word_region = view.word(region)
-    preline = get_line_contents_before_region(view, word_region)
-    return get_qualified_symbol(preline)
+    (before, at, after) = get_line_contents_at_region(view, region)
+    res = WORD_RE.match(after)
+    if res:
+        at = at + res.group('word')
+    return get_qualified_symbol(before + at)
 
 # Autocompletion data
 class AutoCompletion(object):
@@ -120,14 +140,6 @@ class AutoCompletion(object):
         # cabal name => set of modules, where cabal name is 'cabal' for cabal or sandbox path for cabal-devs
         self.module_completions = LockedObject({})
 
-        # Currently used projects
-        # name => project where project is:
-        #   dir - project dir
-        #   cabal - cabal file
-        #   executables - list of executables where executable is
-        #     name - name of executable
-        self.projects = LockedObject({})
-
         # keywords
         # TODO: keywords can't appear anywhere, we can suggest in right places
         self.keyword_completions = map(
@@ -135,12 +147,6 @@ class AutoCompletion(object):
             ['case', 'data', 'instance', 'type', 'where', 'deriving', 'import', 'module'])
 
         self.current_filename = None
-
-    def clear_inspected(self):
-        # self.info = {}
-        # self.std_info = {}
-        self.projects.object = {}
-        self.database = symbols.Database()
 
     @hsdev.use_hsdev
     def get_completions(self, view, prefix, locations):
@@ -187,11 +193,7 @@ class AutoCompletion(object):
         """
         Returns completions for module
         """
-        with self.database.modules as modules:
-            if module_name not in modules:
-                return []
-            # TODO: Show all possible completions?
-            return self.completions_for_module(module_name, filename)
+        return self.completions_for_module(module_name, filename)
 
     @hsdev.use_hsdev
     def get_import_completions(self, view, prefix, locations):
@@ -445,7 +447,6 @@ class SublimeHaskellReinspectAll(SublimeHaskellWindowCommand):
         global INSPECTOR_ENABLED
 
         if INSPECTOR_ENABLED:
-            autocompletion.clear_inspected()
             call_hsdev(hsdev.remove_all)
             hsdev_inspector.start_inspect()
         else:

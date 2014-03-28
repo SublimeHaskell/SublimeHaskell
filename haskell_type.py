@@ -4,14 +4,16 @@ import re
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand
-    from autocomplete import autocompletion
+    from autocomplete import autocompletion, call_hsdev, get_qualified_symbol_at_region
     from hdevtools import hdevtools_type, hdevtools_enabled
     from ghcmod import ghcmod_type, ghcmod_enabled
+    import hsdev
 else:
     from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand
-    from SublimeHaskell.autocomplete import autocompletion
+    from SublimeHaskell.autocomplete import autocompletion, call_hsdev, get_qualified_symbol_at_region
     from SublimeHaskell.hdevtools import hdevtools_type, hdevtools_enabled
     from SublimeHaskell.ghcmod import ghcmod_type, ghcmod_enabled
+    import SublimeHaskell.hsdev as hsdev
     from functools import reduce
 
 # Used to find out the module name.
@@ -139,9 +141,9 @@ class SublimeHaskellShowType(SublimeHaskellTextCommand):
         column = sublime_column_to_type_column(self.view, r, c)
 
         module_name = None
-        with autocompletion.database.files as files:
-            if filename in files:
-                module_name = files[filename].name
+        m = call_hsdev(hsdev.module, file = filename)
+        if m:
+            module_name = m.name
 
         return haskell_type(filename, module_name, line, column)
 
@@ -188,7 +190,7 @@ class SublimeHaskellInsertType(SublimeHaskellShowType):
         result = self.get_best_type(self.get_types())
         if result:
             r = result.region(self.view)
-            name = self.view.substr(self.view.word(r.begin()))
+            (_, name, _, _) = get_qualified_symbol_at_region(self.view, self.view.word(r.begin()))
             line_begin = self.view.line(r).begin()
             prefix = self.view.substr(sublime.Region(line_begin, r.begin()))
             indent = re.search('(?P<indent>\s*)', prefix).group('indent')

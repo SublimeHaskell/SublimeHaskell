@@ -349,7 +349,7 @@ def parse_module_id(d):
         return None
     return symbols.Module(
         d['name'],
-        [], {}, {},
+        [], [], {},
         parse_location(d.get('location')),
         parse_cabal(d.get('location')))
 
