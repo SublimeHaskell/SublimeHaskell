@@ -90,7 +90,7 @@ def position_by_point(view, point):
 class RegionType(object):
     def __init__(self, typename, start, end = None):
         self.typename = typename
-        self.start = start\
+        self.start = start
         self.end = end if end else start
 
     def region(self, view):
@@ -194,15 +194,12 @@ class SublimeHaskellShowType(SublimeHaskellTextCommand):
         self.view.window().show_quick_panel([t.typename for t in self.types], self.on_done, 0, -1, self.on_changed)
 
     def on_done(self, idx):
+        self.view.erase_regions('typed')
+
         if idx == -1:
             return
 
         t = self.types[idx]
-        self.view.sel().clear()
-        self.view.sel().add(t.region(self.view))
-
-        self.view.erase_regions('typed')
-
         output_text(self.output_view, t.show(self.view), clear = True)
 
     def on_changed(self, idx):
