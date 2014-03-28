@@ -184,6 +184,9 @@ def list_modules(cabal = None, project = None, source = False, standalone = Fals
             (['--src'] if source else []) +
             (['--stand'] if standalone else []), port = port))
 
+def list_packages(port = None):
+    return hsdev(['list', 'packages'], port = port)
+
 def list_projects(port = None):
     return hsdev(['list', 'projects'], port = port)
 
@@ -252,6 +255,9 @@ def cabal_list(query = None, port = None):
     if r is None:
         return None
     return [parse_cabal_package(s) for s in r]
+
+def ghcmod_type(file, line, column = 1, cabal = None, port = None):
+    return hsdev(['ghc-mod', 'type', '--file', file, str(line), str(column)] + cabal_path(cabal), port = port)
 
 def dump(cabal = None, projects = [], files = [], path = None, file = None, port = None):
     opts = ['dump']

@@ -3,13 +3,13 @@ import sublime_plugin
 import re
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand
+    from sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand, output_panel, output_text
     from autocomplete import autocompletion, call_hsdev, get_qualified_symbol_at_region
     from hdevtools import hdevtools_type, hdevtools_enabled
     from ghcmod import ghcmod_type, ghcmod_enabled
     import hsdev
 else:
-    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand
+    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand, output_panel, output_text
     from SublimeHaskell.autocomplete import autocompletion, call_hsdev, get_qualified_symbol_at_region
     from SublimeHaskell.hdevtools import hdevtools_type, hdevtools_enabled
     from SublimeHaskell.ghcmod import ghcmod_type, ghcmod_enabled
@@ -69,6 +69,19 @@ class FilePosition(object):
         # But '\t' is one character
         return view.text_point(self.line - 1, type_column_to_sublime_column(view, self.line, self.column))
 
+    def to_str(self):
+        return '{0}:{1}'.format(self.line, self.column)
+
+    def from_point(view, p):
+        (l, c) = view.rowcol(p)
+        return FilePosition(int(l + 1), int(c + 1))
+
+    def from_str(s):
+        if not s:
+            return None
+        [l, c] = s.split(':')
+        return FilePosition(int(l), int(c))
+
 def position_by_point(view, point):
     tabs = tabs_offset(view, point)
     (r, c) = view.rowcol(point)
@@ -87,7 +100,9 @@ class RegionType(object):
         return view.substr(self.region(view))
 
     def show(self, view):
-        return '{0} :: {1}'.format(self.substr(view), self.typename)
+        expr = self.substr(view)
+        fmt = '{0} :: {1}' if len(expr.splitlines()) == 1 else '{0}\n:: {1}'
+        return fmt.format(self.substr(view), self.typename)
 
     def precise_in_region(self, view, other):
         this_region = self.region(view)
@@ -118,6 +133,17 @@ def parse_type_output(s):
 def haskell_type(filename, module_name, line, column, cabal = None):
     result = None
 
+    if hsdev.hsdev_enabled():
+        def to_file_pos(r):
+            return FilePosition(r['line'], r['column'])
+        def to_region_type(r):
+            return RegionType(
+                r['type'],
+                to_file_pos(r['region']['from']),
+                to_file_pos(r['region']['to']))
+        ts = call_hsdev(hsdev.ghcmod_type, filename, line, column, cabal = cabal)
+        if ts:
+            return [to_region_type(r) for r in ts]
     if hdevtools_enabled():
         result = hdevtools_type(filename, line, column, cabal = cabal)
     if not result and module_name and ghcmod_enabled():
@@ -163,22 +189,29 @@ class SublimeHaskellShowType(SublimeHaskellTextCommand):
             show_status_message("Can't infer type", False)
             return
 
-        best_result = self.get_best_type(types)
+        self.types = types
+        self.output_view = output_panel(self.view.window(), '', panel_name = 'sublime_haskell_show_type')
+        self.view.window().show_quick_panel([t.typename for t in self.types], self.on_done, 0, -1, self.on_changed)
 
-        type_text = [best_result.show(self.view), '']
-        type_text.extend([r.show(self.view) for r in types if r.start.line == r.end.line])
+    def on_done(self, idx):
+        if idx == -1:
+            return
 
-        output_view = self.view.window().get_output_panel('sublime_haskell_hdevtools_type')
-        output_view.set_read_only(False)
+        t = self.types[idx]
+        self.view.sel().clear()
+        self.view.sel().add(t.region(self.view))
 
-        output_view.run_command('sublime_haskell_output_text', {
-            'text': '\n'.join(type_text) })
+        self.view.erase_regions('typed')
 
-        output_view.sel().clear()
-        output_view.set_read_only(True)
+        output_text(self.output_view, t.show(self.view), clear = True)
 
-        self.view.window().run_command('show_panel', {
-            'panel': 'output.sublime_haskell_hdevtools_type' })
+    def on_changed(self, idx):
+        if idx == -1:
+            return
+
+        t = self.types[idx]
+        output_text(self.output_view, t.show(self.view), clear = True)
+        self.view.add_regions('typed', [t.region(self.view)], 'string', 'dot', sublime.DRAW_OUTLINED)
 
     def is_enabled(self):
         return is_enabled_haskell_command(self.view, False)

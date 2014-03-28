@@ -547,24 +547,33 @@ class SublimeHaskellOutputText(sublime_plugin.TextCommand):
     Helper command to output text to any view
     TODO: Is there any default command for this purpose?
     """
-    def run(self, edit, text = None):
+    def run(self, edit, text = None, clear = False):
         if not text:
             return
+        self.view.set_read_only(False)
+        if clear:
+            self.view.erase(edit, sublime.Region(0, self.view.size()))
         self.view.insert(edit, self.view.size(), text)
+        self.view.set_read_only(True)
+
+def output_text(view, text = None, clear = False):
+    view.run_command('sublime_haskell_output_text', { 'text': (text or ''), 'clear': str(clear) })
+
+def output_panel(window, text = None, panel_name = None):
+    if not text:
+        text = ''
+    if not panel_name:
+        panel_name = 'sublime_haskell_output_panel'
+    output_view = window.get_output_panel(panel_name)
+    output_text(output_view, text, clear = True)
+    output_view.sel().clear()
+    window.run_command('show_panel', { 'panel': ('output.' + panel_name) })
+    return output_view
 
 
 
 def output_error(window, text):
-    "Write text to Sublime's output panel with important information about SublimeHaskell error during load"
-    output_view = window.get_output_panel(SUBLIME_ERROR_PANEL_NAME)
-    output_view.set_read_only(False)
-
-    output_view.run_command('sublime_haskell_output_text', {
-        'text': text})
-
-    output_view.set_read_only(True)
-
-    window.run_command('show_panel', {'panel': 'output.' + SUBLIME_ERROR_PANEL_NAME})
+    output_panel(window, text, panel_name = SUBLIME_ERROR_PANEL_NAME)
 
 def output_error_async(window, text):
     sublime.set_timeout(lambda: output_error(window, text), 0)
