@@ -424,7 +424,7 @@ class SublimeHaskellGoToAnyDeclaration(SublimeHaskellWindowCommand):
 
         for decl in decls:
             self.files.append([decl.location.filename, str(decl.location.line), str(decl.location.column)])
-            self.declarations.append([decl.brief(), '{0}:{1}:{2}'.format(decl.module.name, decl.location.line, decl.location.column)])
+            self.declarations.append([decl.brief(), decl.location.position()])
 
         self.window.show_quick_panel(self.declarations, self.on_done)
 
