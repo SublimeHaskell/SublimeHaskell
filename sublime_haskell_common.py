@@ -559,11 +559,7 @@ class SublimeHaskellOutputText(sublime_plugin.TextCommand):
 def output_text(view, text = None, clear = False):
     view.run_command('sublime_haskell_output_text', { 'text': (text or ''), 'clear': str(clear) })
 
-def output_panel(window, text = None, panel_name = None):
-    if not text:
-        text = ''
-    if not panel_name:
-        panel_name = 'sublime_haskell_output_panel'
+def output_panel(window, text = '', panel_name = 'sublime_haskell_output_panel'):
     output_view = window.get_output_panel(panel_name)
     output_text(output_view, text, clear = True)
     output_view.sel().clear()

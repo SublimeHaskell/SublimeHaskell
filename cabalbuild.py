@@ -345,24 +345,6 @@ def write_output(window, text, base_dir):
     output_view = output_panel(window, text, panel_name = OUTPUT_PANEL_NAME)
     output_view.settings().set("result_base_dir", base_dir)
 
-    # window.run_command('sublime_haskell_output_panel', {
-    #     'text': text,
-    #     'panel_name': OUTPUT_PANEL_NAME })
-
-    # output_view = window.get_output_panel(OUTPUT_PANEL_NAME)
-    # output_view.set_read_only(False)
-    # # Configure Sublime's error message parsing:
-    # output_view.settings().set("result_base_dir", base_dir)
-    # # Write to the output buffer:
-    # output_view.run_command('sublime_haskell_output_text', {
-    #     'text': text })
-    # # Set the selection to the beginning of the view so that "next result" works:
-    # output_view.sel().clear()
-    # output_view.sel().add(sublime.Region(0))
-    # output_view.set_read_only(True)
-    # # Show the results panel:
-    # window.run_command('show_panel', {'panel': 'output.' + OUTPUT_PANEL_NAME})
-
 
 def hide_output(window):
     window.run_command('hide_panel', {'panel': 'output.' + OUTPUT_PANEL_NAME})

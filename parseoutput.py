@@ -10,9 +10,9 @@ from collections import defaultdict
 PyV3 = version[0] == "3"
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import log, are_paths_equal, call_and_wait, get_setting_async, show_status_message_process, show_status_message, SublimeHaskellTextCommand
+    from sublime_haskell_common import log, are_paths_equal, call_and_wait, get_setting_async, show_status_message_process, show_status_message, SublimeHaskellTextCommand, output_panel
 else:
-    from SublimeHaskell.sublime_haskell_common import log, are_paths_equal, call_and_wait, get_setting_async, show_status_message_process, show_status_message, SublimeHaskellTextCommand
+    from SublimeHaskell.sublime_haskell_common import log, are_paths_equal, call_and_wait, get_setting_async, show_status_message_process, show_status_message, SublimeHaskellTextCommand, output_panel
 
 ERROR_PANEL_NAME = 'haskell_error_checker'
 
@@ -294,34 +294,13 @@ def mark_messages_in_view(messages, view):
 
 
 def write_panel(window, text, panel_name = "sublime_haskell_panel"):
-    output_view = window.get_output_panel(panel_name)
-    output_view.set_read_only(False)
-
-    output_view.run_command('sublime_haskell_output_text', { 'text': text })
-
-    output_view.sel().clear()
-    output_view.sel().add(sublime.Region(0))
-    output_view.set_read_only(True)
-
-    window.run_command('show_panel', { 'panel': 'output.' + panel_name })
-
+    output_panel(window, text, panel_name = panel_name)
 
 def write_output(view, text, cabal_project_dir):
     "Write text to Sublime's output panel."
-    output_view = view.window().get_output_panel(ERROR_PANEL_NAME)
-    output_view.set_read_only(False)
-    # Configure Sublime's error message parsing:
+    output_view = output_panel(view.window(), text, panel_name = ERROR_PANEL_NAME)
     output_view.settings().set("result_file_regex", result_file_regex)
     output_view.settings().set("result_base_dir", cabal_project_dir)
-    # Write to the output buffer:
-    output_view.run_command('sublime_haskell_output_text', {
-        'text': text })
-    # Set the selection to the beginning of the view so that "next result" works:
-    output_view.sel().clear()
-    output_view.sel().add(sublime.Region(0))
-    output_view.set_read_only(True)
-    # Show the results panel:
-    view.window().run_command('show_panel', {'panel': 'output.' + ERROR_PANEL_NAME})
 
 
 def hide_output(view):

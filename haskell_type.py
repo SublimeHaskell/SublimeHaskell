@@ -90,7 +90,7 @@ def position_by_point(view, point):
 class RegionType(object):
     def __init__(self, typename, start, end = None):
         self.typename = typename
-        self.start = start
+        self.start = start\
         self.end = end if end else start
 
     def region(self, view):
