@@ -205,7 +205,7 @@ def mark_messages_in_views(errors):
             mark_messages_in_view(errors_in_view, v)
     end_time = time.clock()
     log('total time to mark {0} diagnostics: {1} seconds'.format(
-        len(errors), end_time - begin_time))
+        len(errors), end_time - begin_time), log_debug)
 
 message_levels = {
     'hint': {
@@ -228,7 +228,6 @@ message_levels = {
 
 class SublimeHaskellNextError(SublimeHaskellTextCommand):
     def run(self, edit):
-        log("SublimeHaskellNextError")
         v = self.view
         fn = v.file_name().encode("utf-8")
         line, column = v.rowcol(v.sel()[0].a)

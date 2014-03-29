@@ -67,6 +67,7 @@ def preload_settings():
     get_setting('enable_hsdev')
     get_setting('snippet_replace')
     get_setting('ghc_opts')
+    get_setting('log')
 
 # SublimeHaskell settings dictionary
 # used to retrieve it async from any thread
@@ -167,12 +168,12 @@ def call_and_wait_tool(command, tool_name, on_result = None, filename = None, on
             output_error_async(sublime.active_window(), "SublimeHaskell: {0} was not found!\n'{1}' is set to False".format(tool_name, tool_enabled))
             set_setting_async(tool_enabled, False)
         else:
-            log('{0} fails with {1}'.format(tool_name, e))
+            log('{0} fails with {1}'.format(tool_name, e), log_error)
 
         return None
 
     except Exception as e:
-        log('{0} fails with {1}'.format(tool_name, e))
+        log('{0} fails with {1}'.format(tool_name, e), log_error)
 
     return None
 
@@ -206,8 +207,16 @@ def call_and_wait_with_input(command, input_string, split_lines = False, **popen
         exit_code = process.wait()
         return (exit_code, crlf2lf(decode_bytes(stdout)), crlf2lf(decode_bytes(stderr)))
 
-def log(message):
-    print(u'Sublime Haskell: {0}'.format(message))
+log_error = 1
+log_warning = 2
+log_info = 3
+log_debug = 4
+log_trace = 5
+
+def log(message, level = log_info):
+    log_level = get_setting_async('log', log_info)
+    if log_level >= level:
+        print(u'Sublime Haskell: {0}'.format(message))
 
 
 def get_cabal_project_dir_and_name_of_view(view):
@@ -605,7 +614,7 @@ def with_status_message(msg, action):
         return True
     except SublimeHaskellError as e:
         show_status_message(msg, False)
-        log(e.reason)
+        log(e.reason, log_error)
         return False
 
 def crlf2lf(s):
@@ -756,16 +765,12 @@ def sublime_haskell_cache_path():
     return os.path.join(sublime_haskell_package_path(), os.path.expandvars(get_setting('cache_path', '.')))
 
 def plugin_loaded():
-    global CABAL_INSPECTOR_EXE_PATH
-
     package_path = sublime_haskell_package_path()
     cache_path = sublime_haskell_cache_path()
 
-    log("store compiled tools and caches to {0}".format(cache_path))
     if not os.path.exists(cache_path):
         os.makedirs(cache_path)
 
-    CABAL_INSPECTOR_EXE_PATH = os.path.join(cache_path, 'CabalInspector')
     preload_settings()
 
 if int(sublime.version()) < 3000:

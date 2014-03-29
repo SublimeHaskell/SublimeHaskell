@@ -107,7 +107,7 @@ def run_build(view, project_name, project_dir, config, use_cabal_dev=None):
     # We compare the project_name for simplicity (projects with same
     # names are of course possible, but unlikely, so we let them wait)
     if project_name in projects_being_built:
-        log("Not building '%s' because it is already being built" % project_name)
+        log("Not building '%s' because it is already being built" % project_name, log_warning)
         sublime_status_message('Already building %s' % project_name)
         return
     # Set project as building
@@ -133,7 +133,7 @@ def run_build(view, project_name, project_dir, config, use_cabal_dev=None):
     # Assemble command lines to run (possibly multiple steps)
     commands = [extra_args([tool_name] + step) for step in tool_steps]
 
-    log('running build commands: {0}'.format(commands))
+    log('running build commands: {0}'.format(commands), log_trace)
 
     def done_callback():
         # Set project as done being built so that it can be built again

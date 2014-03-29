@@ -44,7 +44,7 @@ def call_hsdev_and_wait(arg_list, filename = None, cabal = None, callback = None
         except Exception as e:
             return {'error' : 'invalid response', 'details' : s}
 
-    log(' '.join(cmd))
+    log(' '.join(cmd), log_trace)
     ret = call_and_wait_tool(cmd, 'hsdev', parse_response, filename, on_line if callback else None, check_enabled = False, **popen_kwargs)
     if ret is not None:
         result = ret
@@ -56,7 +56,7 @@ def hsdev(arg_list, port = None, on_response = None):
     if r is None:
         return None
     if r and 'error' in r:
-        log('hsdev returns error: {0} with details: {1}'.format(r['error'], r['details']))
+        log('hsdev returns error: {0} with details: {1}'.format(r['error'], r['details']), log_error)
         return None
     return r
 
@@ -80,7 +80,7 @@ def hsinspect(module = None, file = None, cabal = None, ghc_opts = []):
     elif cabal:
         cmd.extend(['cabal', cabal])
     else:
-        log('hsinspect must specify module, file or cabal')
+        log('hsinspect must specify module, file or cabal', log_debug)
         return None
 
     for opt in ghc_opts:
@@ -89,7 +89,7 @@ def hsinspect(module = None, file = None, cabal = None, ghc_opts = []):
     r = call_and_wait_tool(cmd, 'hsinspect', lambda s: json.loads(s), file, None)
     if r:
         if 'error' in r:
-            log('hsinspect returns error: {0}'.format(r['error']))
+            log('hsinspect returns error: {0}'.format(r['error']), log_error)
         else:
             return on_result(r)
     return None
@@ -148,7 +148,7 @@ def rescan(projects = [], files = [], paths = [], wait = False, on_status = None
     args = [['--project', p] for p in projects] + [['-f', f] for f in files] + [['-p', p] for p in paths]
 
     if not args:
-        log('hsdev.rescan: must specify at least one param')
+        log('hsdev.rescan: must specify at least one param', log_debug)
         return None
 
     opts.extend(list(reduce(lambda x, y: x + y, args)))
@@ -175,12 +175,13 @@ def remove(cabal = None, project = None, file = None, module = None, port = None
 def remove_all(port = None):
     return hsdev(['remove', '-a'], port = port)
 
-def list_modules(cabal = None, project = None, source = False, standalone = False, port = None):
+def list_modules(cabal = None, project = None, package = None, source = False, standalone = False, port = None):
     return parse_modules(
         hsdev(
             ['list', 'modules'] +
             cabal_path(cabal) +
             if_some(project, ['--project', project]) +
+            if_some(package, ['--package', package]) +
             (['--src'] if source else []) +
             (['--stand'] if standalone else []), port = port))
 
@@ -379,7 +380,7 @@ def parse_declaration(decl):
         else:
             return None
     except Exception as e:
-        log('Error pasring declaration: {0}'.format(e))
+        log('Error pasring declaration: {0}'.format(e), log_error)
         return None
 
 def parse_module_declaration(d, parse_module_info = True):
@@ -424,13 +425,6 @@ def parse_cabal_package(d):
         d.get('homepage'),
         d.get('license'))
 
-def test():
-    p = HsDev()
-    # time.sleep(10)
-    p.load_cache(path = "e:")
-    l = p.list()
-    log(l)
-
 class HsDevHolder(object):
     def __init__(self, port = 4567, cache = None):
         super(HsDevHolder, self).__init__()
@@ -456,15 +450,15 @@ class HsDevHolder(object):
     def link_hsdev(self, tries = 10):
         for n in range(0, tries):
             try:
-                log('connecting to hsdev server...')
+                log('connecting to hsdev server...', log_info)
                 self.socket.connect(('127.0.0.1', self.port))
-                log('connected to hsdev server')
+                log('connected to hsdev server', log_info)
                 self.socket.sendall(b'["link"]\n')
                 self.started_event.set()
-                log('hsdev server started')
+                log('hsdev server started', log_info)
                 return True
             except:
-                log('failed to connect to hsdev server, wait for a while')
+                log('failed to connect to hsdev server, wait for a while', log_warning)
                 time.sleep(0.1)
         return False
 

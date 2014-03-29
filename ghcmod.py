@@ -128,7 +128,7 @@ def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb
 
         if not success:
             all_cmds_outputs.append(out)
-            log(u"ghc-mod %s didn't exit with success on '%s'" % (u' '.join(cmd), filename))
+            log(u"ghc-mod %s didn't exit with success on '%s'" % (u' '.join(cmd), filename), log_error)
 
         all_cmds_successful &= success
 

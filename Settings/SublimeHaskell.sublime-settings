@@ -105,5 +105,8 @@
 	// Examples:
 	// 		"cache_path": "../../Local/SublimeHaskell"
 	// 		"cache_path": "%TEMP%\\SublimeHaskell"
-	"cache_path": "."
+	"cache_path": ".",
+
+	// Log level, 0 — no log, 1 — errors, 2 — warnings, 3 — info messages, 4 — debug, 5 — trace
+	"log": 3
 }

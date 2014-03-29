@@ -10,7 +10,7 @@ else:
 def call_hdocs_and_wait(args, filename = None, cabal = None):
     ghc_opts_args = get_ghc_opts_args(filename, cabal = cabal)
     command = ['hdocs'] + args + ghc_opts_args
-    log(command)
+    log(command, log_trace)
 
     return call_and_wait_tool(command, 'hdocs', lambda o: json.loads(o), filename)
 

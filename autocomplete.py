@@ -35,19 +35,10 @@ else:
 # If true, files that have not changed will not be re-inspected.
 CHECK_MTIME = True
 
-MODULE_INSPECTOR_SOURCE_PATH = None
-MODULE_INSPECTOR_EXE_PATH = None
-MODULE_INSPECTOR_OBJ_DIR = None
-CABAL_INSPECTOR_SOURCE_PATH = None
-CABAL_INSPECTOR_EXE_PATH = None
-CABAL_INSPECTOR_OBJ_DIR = None
 INSPECTOR_ENABLED = False
 INSPECTOR_RUNNING = False
 
 HSDEV_CACHE_PATH = None
-
-# ModuleInspector output
-MODULE_INSPECTOR_RE = re.compile(r'ModuleInfo:(?P<result>.+)')
 
 # The agent sleeps this long between inspections.
 AGENT_SLEEP_TIMEOUT = 60.0
@@ -55,7 +46,7 @@ AGENT_SLEEP_TIMEOUT = 60.0
 # Checks if we are in a LANGUAGE pragma.
 LANGUAGE_RE = re.compile(r'.*{-#\s+LANGUAGE.*')
 
-WORD_RE = re.compile(r'^(?P<word>[\w\d\']*)(?P<tail>.*)')
+WORD_RE = re.compile(r'^(?P<word>[\w\d\'\.]*)(?P<tail>.*)')
 
 # Checks if we are in an import statement.
 IMPORT_RE = re.compile(r'.*import(\s+qualified)?\s+')
@@ -66,7 +57,9 @@ IMPORT_QUALIFIED_POSSIBLE_RE = re.compile(r'.*import\s+(?P<qualifiedprefix>\S*)$
 NO_SPECIAL_CHARS_RE = re.compile(r'^(\w|[\-\.])*$')
 
 # Get symbol qualified prefix and its name
-SYMBOL_RE = re.compile(r'((?P<module>[A-Z][\w\d]*(\.[A-Z][\w\d\']*)*)\.)?((?P<identifier>[a-z][\w\d\']*)|(?P<operator>[!#$%&*+\./<=>?@\\\^|\-~:]+))$')
+SYMBOL_RE = re.compile(r'((?P<module>[A-Z][\w\d]*(\.[A-Z][\w\d\']*)*)\.)?((?P<identifier>(\w[\w\d\']*)?)|(?P<operator>[!#$%&*+\./<=>?@\\\^|\-~:]+))$')
+# Get import name
+IMPORT_MODULE_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']*(\.[A-Z][\w\d\']*)*)\b')
 # SYMBOL_RE = re.compile(r'((?P<module>\w+(\.\w+)*)\.)?(?P<identifier>((\w*)|([]*)))$')
 # Get symbol module scope and its name within import statement
 IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']*(\.[A-Z][\w\d\']*)*)(\s+as\s+(?P<as>[A-Z][\w\d\']*))?\s*\(.*?((?P<identifier>[a-z][\w\d\']*)|(?P<operator>[!#$%&*+\./<=>?@\\\^|\-~:]+))$')
@@ -78,7 +71,7 @@ def get_line_contents(view, location):
     return view.substr(sublime.Region(view.line(location).a, location))
 
 def logged(v, fmt = '{0}'):
-    log(fmt.format(v))
+    log(fmt.format(v), log_trace)
     return v
 
 def get_line_contents_at_region(view, region):
@@ -90,7 +83,7 @@ def get_line_contents_at_region(view, region):
     before = view.substr(sublime.Region(line_region.a, region.a))
     at = view.substr(region)
     after = view.substr(sublime.Region(region.b, line_region.b))
-    return logged((before, at, after), fmt = 'get_line_contents_at_region: {0}')
+    return (before, at, after)
 
 def get_line_contents_before_region(view, region):
     """
@@ -117,6 +110,9 @@ def get_qualified_symbol(line):
     res = IMPORT_SYMBOL_RE.search(line)
     if res:
         return (res.group('module'), res.group('identifier') or res.group('operator'), True, bool(res.group('operator')))
+    res = IMPORT_MODULE_RE.search(line)
+    if res:
+        return (res.group('module'), None, False, False)
     res = SYMBOL_RE.search(line)
     # res always match
     return (res.group('module'), res.group('identifier') or res.group('operator'), False, bool(res.group('operator')))
@@ -470,15 +466,21 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
                 package = package_name,
                 cabal = cabal)
         else:
+            self.current_file_name = self.view.file_name()
+
             (module_word, ident, _, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+
+            if ident is None: # module
+                self.view.window().run_command('sublime_haskell_browse_module', {
+                    'module_name': module_word,
+                    'scope': self.current_file_name })
+                return
 
             if not module_word and not ident:
                 show_status_message('No symbol selected', False)
                 return
 
             self.full_name = '{0}.{1}'.format(module_word, ident) if module_word else ident
-
-            self.current_file_name = self.view.file_name()
 
             self.candidates = call_hsdev(hsdev.whois, self.full_name, self.current_file_name)
 
@@ -627,7 +629,7 @@ class SublimeHaskellClearImports(SublimeHaskellTextCommand):
 
         (exit_code, cleared, err) = call_and_wait(['hsclearimports', self.current_file_name, '--max-import-list', '16'])
         if exit_code != 0:
-            log('hsclearimports error: {0}'.format(err))
+            log('hsclearimports error: {0}'.format(err), log_error)
             return
 
         cur_module = call_hsdev(hsdev.module, file = self.current_file_name)
@@ -635,7 +637,7 @@ class SublimeHaskellClearImports(SublimeHaskellTextCommand):
         new_imports = cleared.splitlines()
 
         if len(imports) != len(new_imports):
-            log('different number of imports: {0} and {1}'.format(len(imports), len(new_imports)))
+            log('different number of imports: {0} and {1}'.format(len(imports), len(new_imports)), log_error)
             return
 
         for i, ni in zip(imports, new_imports):
@@ -646,28 +648,58 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
     """
     Browse module symbols
     """
-    def run(self, module_name = None, package_name = None, project_name = None, filename = None, cabal = None):
-        if module_name or filename:
-            m = call_hsdev(hsdev.module, 
-                name = module_name,
+    def run(self, module_name = None, package_name = None, project_name = None, filename = None, cabal = None, scope = None):
+        self.candidates = []
+
+        m = None
+        if filename:
+            m = call_hsdev(
+                hsdev.module,
+                file = filename,
                 package = package_name,
                 project = project_name,
-                file = filename,
                 cabal = cabal)
             if not m:
-                show_status_message('Module {0} not found'.format(module_name or filename))
+                show_status_message('Module {0} not found'.format(filename))
                 return
 
+        if module_name:
+            ms = []
+            if scope:
+                ms = [m for m in call_hsdev(
+                    hsdev.scope_modules,
+                    file = scope,
+                    cabal = cabal) if m.name == module_name]
+            else:
+                ms = [m for m in call_hsdev(
+                    hsdev.list_modules,
+                    package = package_name,
+                    project = project_name,
+                    cabal = cabal) if m.name == module_name]
+
+            if len(ms) == 0:
+                show_status_message('Module {0} not found'.format(module_name))
+                return
+            if len(ms) == 1:
+                m = call_hsdev(
+                    hsdev.module,
+                    name = module_name,
+                    package = package_name,
+                    project = project_name,
+                    cabal = cabal)
+            else:
+                self.candidates.extend([(m, [m.name, m.location_string()]) for m in ms])
+
+        if m:
             decls = list(m.declarations.values())
             self.candidates = sorted(decls, key = lambda d: d.brief())
 
-            self.window.show_quick_panel([[decl.brief(), decl.docs.splitlines()[0]] if decl.docs else [decl.brief()] for decl in self.candidates], self.on_symbol_selected)
+            self.window.show_quick_panel([[decl.brief(), decl.docs.splitlines()[0] if decl.docs else ''] for decl in self.candidates], self.on_symbol_selected)
             return
 
-        self.candidates = []
-
-        self.candidates.extend([(m, [m.name, m.location_string()]) for m in call_hsdev(hsdev.list_modules, cabal = current_cabal())])
-        self.candidates.extend([(m, [m.name, m.location_string()]) for m in call_hsdev(hsdev.list_modules, source = True)])
+        if not self.candidates:
+            self.candidates.extend([(m, [m.name, m.location_string()]) for m in call_hsdev(hsdev.list_modules, cabal = current_cabal())])
+            self.candidates.extend([(m, [m.name, m.location_string()]) for m in call_hsdev(hsdev.list_modules, source = True)])
 
         self.candidates.sort(key = lambda c: c[1][0])
 
@@ -790,12 +822,12 @@ class HsDevAgent(threading.Thread):
             if self.hsdev_enabled_changed:
                 self.hsdev_enabled_changed = False
                 if self.hsdev_enabled:
-                    log("starting hsdev")
+                    log("starting hsdev", log_info)
                     self.start_hsdev()
                     self.call(hsdev.remove_all)
                     self.start_inspect()
                 else:
-                    log("stopping hsdev")
+                    log("stopping hsdev", log_info)
                     self.stop_hsdev()
 
             load_cabal = []
@@ -882,7 +914,7 @@ class HsDevAgent(threading.Thread):
         try:
             with status_message_process('Loading standard modules info for {0}'.format(cabal)) as s:
                 begin_time = time.clock()
-                log('loading standard modules info for {0}'.format(cabal))
+                log('loading standard modules info for {0}'.format(cabal), log_info)
 
                 def cabal_status(msg):
                     if 'status' in msg:
@@ -891,15 +923,15 @@ class HsDevAgent(threading.Thread):
                 call_hsdev(hsdev.scan, cabal = cabal, wait = True, on_status = cabal_status)
 
                 end_time = time.clock()
-                log('loading standard modules info for {0} within {1} seconds'.format(cabal, end_time - begin_time))
+                log('loading standard modules info for {0} within {1} seconds'.format(cabal, end_time - begin_time), log_debug)
 
         except Exception as e:
-            log('loading standard modules info for {0} failed with {1}'.format(cabal, e))
+            log('loading standard modules info for {0} failed with {1}'.format(cabal, e), log_error)
 
     @hsdev.use_hsdev
     def reinspect_project(self, cabal_dir, index, count):
         begin_time = time.clock()
-        log('reinspecting project ({0})'.format(cabal_dir))
+        log('reinspecting project ({0})'.format(cabal_dir), log_info)
         (project_name, cabal_file) = get_cabal_in_dir(cabal_dir)
 
         try:
@@ -911,10 +943,10 @@ class HsDevAgent(threading.Thread):
                 call_hsdev(hsdev.scan, projects = [cabal_dir], wait = True, on_status = file_scanned)
 
                 end_time = time.clock()
-                log('total inspection time: {0} seconds'.format(end_time - begin_time))
+                log('total inspection time: {0} seconds'.format(end_time - begin_time), log_debug)
 
         except Exception as e:
-            log('Inspecting project {0} failed: {1}'.format(cabal_dir, e))
+            log('Inspecting project {0} failed: {1}'.format(cabal_dir, e), log_error)
 
     @hsdev.use_hsdev
     def reinspect_file(self, filename):
@@ -960,7 +992,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             start_inspector()
         elif (not INSPECTOR_ENABLED) and INSPECTOR_RUNNING:
             # TODO Implement stopping it
-            log('The ModuleInspector cannot be stopped as of now. You have to restart Sublime for that.')
+            log('The inspector cannot be stopped as of now. You have to restart Sublime for that.', log_error)
 
         same = True
         for k, v in self.local_settings.items():
@@ -1023,7 +1055,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             completions = autocompletion.get_completions(view, prefix, locations)
 
         end_time = time.clock()
-        log('time to get completions: {0} seconds'.format(end_time - begin_time))
+        log('time to get completions: {0} seconds'.format(end_time - begin_time), log_debug)
         # Don't put completions with special characters (?, !, ==, etc.)
         # into completion because that wipes all default Sublime completions:
         # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
@@ -1098,7 +1130,7 @@ def start_inspector():
     if INSPECTOR_RUNNING:
         raise Exception('SublimeHaskell: ModuleInspector is already running!')
 
-    log('starting ModuleInspector')
+    log('starting inspector', log_trace)
 
     global hsdev_inspector
     hsdev_inspector = HsDevAgent()
@@ -1107,12 +1139,6 @@ def start_inspector():
     INSPECTOR_RUNNING = True
 
 def plugin_loaded():
-    global MODULE_INSPECTOR_SOURCE_PATH
-    global MODULE_INSPECTOR_EXE_PATH
-    global MODULE_INSPECTOR_OBJ_DIR
-    global CABAL_INSPECTOR_SOURCE_PATH
-    global CABAL_INSPECTOR_EXE_PATH
-    global CABAL_INSPECTOR_OBJ_DIR
     global OUTPUT_PATH
     global HSDEV_CACHE_PATH
     global INSPECTOR_ENABLED
@@ -1121,12 +1147,6 @@ def plugin_loaded():
     package_path = sublime_haskell_package_path()
     cache_path = sublime_haskell_cache_path()
 
-    MODULE_INSPECTOR_SOURCE_PATH = os.path.join(package_path, 'ModuleInspector.hs')
-    MODULE_INSPECTOR_EXE_PATH = os.path.join(cache_path, 'ModuleInspector')
-    MODULE_INSPECTOR_OBJ_DIR = os.path.join(cache_path, 'obj/ModuleInspector')
-    CABAL_INSPECTOR_SOURCE_PATH = os.path.join(package_path, 'CabalInspector.hs')
-    CABAL_INSPECTOR_EXE_PATH = os.path.join(cache_path, 'CabalInspector')
-    CABAL_INSPECTOR_OBJ_DIR = os.path.join(cache_path, 'obj/CabalInspector')
     HSDEV_CACHE_PATH = os.path.join(cache_path, 'hsdev')
     INSPECTOR_ENABLED = get_setting('inspect_modules')
 

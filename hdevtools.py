@@ -55,7 +55,7 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
         return None
 
     except Exception as e:
-        log('calling to hdevtools fails with {0}'.format(e))
+        log('calling to hdevtools fails with {0}'.format(e), log_error)
         return None
 
 def admin(cmds, wait = False, **popen_kwargs):
