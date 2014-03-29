@@ -216,8 +216,8 @@ def module(name = None, package = None, project = None, file = None, cabal = Non
             if_some(file, ['-f', file]) +
             (['--src'] if source else []), port = port))
 
-def project(projects, port = None):
-    return hsdev(['project'] + projects, port = port)
+def project(project, port = None):
+    return hsdev(['project', '--project', project], port = port)
 
 def lookup(name, file, cabal = None, port = None):
     return parse_decls(
