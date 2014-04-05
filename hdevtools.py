@@ -36,6 +36,7 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
     """
     ghc_opts_args = get_ghc_opts_args(filename, cabal = cabal)
     hdevtools_socket = get_setting_async('hdevtools_socket')
+    source_dir = get_source_dir(filename)
 
     if hdevtools_socket:
         arg_list.append('--socket={0}'.format(hdevtools_socket))

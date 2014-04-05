@@ -22,6 +22,10 @@
         "command": "sublime_haskell_insert_type"
     },
     {
+        "caption": "SublimeHaskell: Expand selection to Expression",
+        "command": "sublime_haskell_expand_selection_expression"
+    },
+    {
         "caption": "SublimeHaskell: Show symbol info",
         "command": "sublime_haskell_symbol_info"
     },

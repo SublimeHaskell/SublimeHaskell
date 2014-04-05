@@ -1,9 +1,10 @@
 [
-    { "keys": ["ctrl+shift+r"], "context": [ {"key" : "is_haskell_source" } ], "command": "sublime_haskell_go_to_declaration" },
-    { "keys": ["ctrl+m", "ctrl+i"], "context": [ {"key": "is_haskell_source" } ], "command": "sublime_haskell_insert_import" },
-    { "keys": ["ctrl+k", "ctrl+h", "ctrl+t"], "context": [ {"key" : "is_haskell_source" } ], "command": "sublime_haskell_show_type" },
-    { "keys": ["ctrl+k", "ctrl+h", "ctrl+i"], "context": [ {"key" : "is_haskell_source" } ], "command": "sublime_haskell_insert_type" },
-    { "keys": ["ctrl+k", "ctrl+i"], "context": [ {"key" : "is_haskell_source" } ], "command": "sublime_haskell_symbol_info" },
+    { "keys": ["ctrl+shift+r"], "context": [ { "key" : "is_haskell_source" } ], "command": "sublime_haskell_go_to_declaration" },
+    { "keys": ["ctrl+shift+y"], "context": [ { "key": "is_haskell_source" } ], "command": "sublime_haskell_expand_selection_expression" },
+    { "keys": ["ctrl+m", "ctrl+i"], "context": [ { "key": "is_haskell_source" } ], "command": "sublime_haskell_insert_import" },
+    { "keys": ["ctrl+k", "ctrl+h", "ctrl+t"], "context": [ { "key" : "is_haskell_source" } ], "command": "sublime_haskell_show_type" },
+    { "keys": ["ctrl+k", "ctrl+h", "ctrl+i"], "context": [ { "key" : "is_haskell_source" } ], "command": "sublime_haskell_insert_type" },
+    { "keys": ["ctrl+k", "ctrl+i"], "context": [ { "key" : "is_haskell_source" } ], "command": "sublime_haskell_symbol_info" },
     {
         "command": "sublime_haskell_complete",
         "args": {"characters": "."},

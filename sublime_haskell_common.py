@@ -441,20 +441,21 @@ def get_source_dir(filename):
         return os.path.dirname(filename)
 
     _project_name, cabal_file = get_cabal_in_dir(cabal_dir)
-    exit_code, out, err = call_and_wait([CABAL_INSPECTOR_EXE_PATH, cabal_file])
+    exit_code, out, err = call_and_wait(['hsinspect', 'cabal', cabal_file])
 
     if exit_code == 0:
         info = json.loads(out)
 
         dirs = ["."]
 
-        if 'error' not in info:
+        if 'error' not in info and 'description' in info:
             # collect all hs-source-dirs
-            if info['library']:
-                dirs.extend(info['library']['info']['source-dirs'])
-            for i in info['executables']:
+            descr = info['description']
+            if descr['library']:
+                dirs.extend(descr['library']['info']['source-dirs'])
+            for i in descr['executables']:
                 dirs.extend(i['info']['source-dirs'])
-            for t in info['tests']:
+            for t in descr['tests']:
                 dirs.extend(t['info']['source-dirs'])
 
         paths = [os.path.abspath(os.path.join(cabal_dir, d)) for d in dirs]

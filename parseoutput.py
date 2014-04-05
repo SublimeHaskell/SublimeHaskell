@@ -10,9 +10,9 @@ from collections import defaultdict
 PyV3 = version[0] == "3"
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import log, are_paths_equal, call_and_wait, get_setting_async, show_status_message_process, show_status_message, SublimeHaskellTextCommand, output_panel
+    from sublime_haskell_common import *
 else:
-    from SublimeHaskell.sublime_haskell_common import log, are_paths_equal, call_and_wait, get_setting_async, show_status_message_process, show_status_message, SublimeHaskellTextCommand, output_panel
+    from SublimeHaskell.sublime_haskell_common import *
 
 ERROR_PANEL_NAME = 'haskell_error_checker'
 

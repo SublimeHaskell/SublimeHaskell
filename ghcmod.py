@@ -6,12 +6,12 @@ import threading
 from threading import Thread
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import log, is_haskell_source, get_haskell_command_window_view_file_project, call_ghcmod_and_wait, get_setting_async, create_process, SublimeHaskellWindowCommand
+    from sublime_haskell_common import *
     from parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages
     from ghci import parse_info
     import symbols
 else:
-    from SublimeHaskell.sublime_haskell_common import log, is_haskell_source, get_haskell_command_window_view_file_project, call_ghcmod_and_wait, get_setting_async, create_process, SublimeHaskellWindowCommand
+    from SublimeHaskell.sublime_haskell_common import *
     from SublimeHaskell.parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages
     from SublimeHaskell.ghci import parse_info
     import SublimeHaskell.symbols as symbols

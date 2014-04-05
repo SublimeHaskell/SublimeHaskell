@@ -3,13 +3,13 @@ import sublime_plugin
 import re
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand, output_panel, output_text
+    from sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, log, log_trace
     from autocomplete import autocompletion, call_hsdev, get_qualified_symbol_at_region
     from hdevtools import hdevtools_type, hdevtools_enabled
     from ghcmod import ghcmod_type, ghcmod_enabled
     import hsdev
 else:
-    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand, output_panel, output_text
+    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, log, log_trace
     from SublimeHaskell.autocomplete import autocompletion, call_hsdev, get_qualified_symbol_at_region
     from SublimeHaskell.hdevtools import hdevtools_type, hdevtools_enabled
     from SublimeHaskell.ghcmod import ghcmod_type, ghcmod_enabled
@@ -113,6 +113,29 @@ class RegionType(object):
             return (1, -other_region.intersection(this_region).size())
         return (2, 0)
 
+class TypedRegion(object):
+    def __init__(self, view, region, typename):
+        self.view = view
+        self.expr = view.substr(region)
+        self.region = region
+        self.typename = typename
+
+    def show(self, view):
+        fmt = '{0} :: {1}' if len(self.expr.splitlines()) == 1 else '{0}\n\t:: {1}'
+        return fmt.format(self.expr, self.typename)
+
+    def __eq__(self, r):
+        return self.region == r.region
+
+    def contains(self, r):
+        return self.contains_region(r.region)
+
+    def contains_region(self, r):
+        return self.region.contains(r)
+
+    def fromRegionType(r, view):
+        return TypedRegion(view, r.region(view), r.typename)
+
 def region_by_region(view, region, typename):
     return RegionType(typename, position_by_point(view, region.a), position_by_point(view, region.b))
 
@@ -144,11 +167,29 @@ def haskell_type(filename, module_name, line, column, cabal = None):
         ts = call_hsdev(hsdev.ghcmod_type, filename, line, column, cabal = cabal)
         if ts:
             return [to_region_type(r) for r in ts]
+        return None
     if hdevtools_enabled():
         result = hdevtools_type(filename, line, column, cabal = cabal)
     if not result and module_name and ghcmod_enabled():
         result = ghcmod_type(filename, module_name, line, column, cabal = cabal)
     return parse_type_output(result) if result else None
+
+def haskell_type_view(view, selection = None):
+    filename = view.file_name()
+
+    if selection is None:
+        selection = view.sel()[0]
+
+    (r, c) = view.rowcol(selection.b)
+    line = r + 1
+    column = sublime_column_to_type_column(view, r, c)
+
+    module_name = None
+    m = call_hsdev(hsdev.module, file = filename)
+    if m:
+        module_name = m.name
+
+    return haskell_type(filename, module_name, line, column)
 
 class SublimeHaskellShowType(SublimeHaskellTextCommand):
     def run(self, edit, filename = None, line = None, column = None):
@@ -162,9 +203,7 @@ class SublimeHaskellShowType(SublimeHaskellTextCommand):
         if (not line) or (not column):
             (r, c) = self.view.rowcol(self.view.sel()[0].b)
             line = r + 1
-            column = c + 1
-
-        column = sublime_column_to_type_column(self.view, r, c)
+            column = sublime_column_to_type_column(self.view, r, c)
 
         module_name = None
         m = call_hsdev(hsdev.module, file = filename)
@@ -226,3 +265,70 @@ class SublimeHaskellInsertType(SublimeHaskellShowType):
             indent = re.search('(?P<indent>\s*)', prefix).group('indent')
             signature = '{0}{1} :: {2}\n'.format(indent, name, result.typename)
             self.view.insert(edit, line_begin, signature)
+
+class ExpandSelectionInfo(object):
+    def __init__(self, view, selection = None):
+        self.view = view
+        self.selection = selection if selection is not None else view.sel()[0]
+        types = haskell_type_view(view, self.selection)
+        self.regions = [TypedRegion.fromRegionType(t, view) for t in types] if types else None
+        self.expanded_index = None
+
+    def is_valid(self):
+        return self.regions is not None
+
+    def is_actual(self, view = None, selection = None):
+        if not view:
+            view = self.view
+        if selection is None:
+            selection = self.selection
+        return self.view == view and self.selection == selection
+
+    def is_top(self):
+        if self.expanded_index is None:
+            return False
+        return self.expanded_index + 1 == len(self.regions)
+
+    def typed_region(self):
+        return self.regions[self.expanded_index] if self.expanded_index is not None else None
+
+    def expand(self):
+        if not self.is_valid():
+            return None
+        if self.is_top():
+            return self.typed_region()
+
+        if self.expanded_index is None:
+            for i, r in enumerate(self.regions):
+                if r.contains_region(self.selection) and r.region != self.selection:
+                    self.expanded_index = i
+                    break
+        else:
+            self.expanded_index = self.expanded_index + 1
+
+        self.selection = self.typed_region().region
+        return self.typed_region()
+
+# Expand selection to expression
+class SublimeHaskellExpandSelectionExpression(SublimeHaskellShowType):
+    # last expand regions with type
+    Infos = None
+
+    def run(self, edit):
+        selections = list(self.view.sel())
+
+        if not self.is_infos_valid(selections):
+            self.Infos = [ExpandSelectionInfo(self.view, s) for s in selections]
+
+        if not self.is_infos_valid(selections):
+            show_status_message('Unable to retrieve expand selection info', False)
+            return
+
+        tr = [i.expand() for i in self.Infos]
+        self.view.sel().clear()
+        self.view.sel().add_all([t.region for t in tr])
+
+        output_panel(self.view.window(), '\n'.join([t.typename for t in tr]), panel_name = 'sublime_haskell_expand_selection_expression')
+
+    def is_infos_valid(self, selections):
+        return self.Infos and all([i.is_valid() for i in self.Infos]) and len(selections) == len(self.Infos) and all([i.is_actual(self.view, s) for i, s in zip(self.Infos, selections)])
