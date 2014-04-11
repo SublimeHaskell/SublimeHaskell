@@ -521,7 +521,7 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
         exit_code, out, err = call_and_wait(command, cwd=get_source_dir(filename))
 
         if exit_code != 0:
-            raise Exception("ghc-mod exited with status %d and stderr: %s" % (exit_code, err))
+            raise Exception("%s exited with status %d and stderr: %s" % (' '.join(command), exit_code, err))
 
         return crlf2lf(out)
 
