@@ -439,7 +439,7 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
         (self.line, self.column) = self.view.rowcol(self.view.sel()[0].a)
 
         if project:
-            current_project = call_hsdev(hsdev.module, file = self.current_filename, locals = True).location.project
+            current_project = call_hsdev(hsdev.module, file = self.current_filename).location.project
             if not current_project:
                 show_status_message('File {0} is not in project'.format(self.current_filename), False)
                 return
@@ -447,8 +447,8 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
             decls = self.qualified_decls(self.sorted_decls(call_hsdev(hsdev.symbol, project = current_project)))
             self.declarations = [[decl.brief(), decl.location.position()] for decl in decls]
         else:
-            decls = self.sorted_decls(call_hsdev(hsdev.symbol, file = self.current_filename))
-            self.declarations = [[decl.brief()] for decl in decls]
+            decls = self.sorted_decls(call_hsdev(hsdev.symbol, file = self.current_filename, locals = True))
+            self.declarations = [[(decl.location.column * ' ') + decl.brief()] for decl in decls]
         self.files = [[decl.location.filename, str(decl.location.line), str(decl.location.column)] for decl in decls]
 
         self.window.show_quick_panel(self.declarations, self.on_done, 0, self.closest_idx(decls), self.on_highlighted)
