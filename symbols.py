@@ -199,6 +199,9 @@ class Declaration(Symbol):
     def __init__(self, name, decl_type = 'declaration', docs = None, location = None, module = None):
         super(Declaration, self).__init__(decl_type, name, docs, location, module)
 
+    def make_qualified(self):
+        self.name = self.qualified_name()
+
     def suggest(self):
         """ Returns suggestion for this declaration """
         return (self.name, self.name)

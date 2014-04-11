@@ -191,13 +191,14 @@ def list_packages(port = None):
 def list_projects(port = None):
     return hsdev(['list', 'projects'], port = port)
 
-def symbol(name = None, project = None, file = None, module = None, package = None, cabal = None, source = False, standalone = False, prefix = None, find = None, port = None):
+def symbol(name = None, project = None, file = None, module = None, locals = False, package = None, cabal = None, source = False, standalone = False, prefix = None, find = None, port = None):
     return parse_decls(
         hsdev(
             (['symbol', name] if name else ['symbol']) +
             if_some(project, ['--project', project]) +
             if_some(file, ['-f', file]) +
             if_some(module, ['-m', module]) +
+            (['--locals'] if locals else []) +
             if_some(package, ['--package', package]) +
             cabal_path(cabal) +
             (['--src'] if source else []) +
@@ -205,10 +206,11 @@ def symbol(name = None, project = None, file = None, module = None, package = No
             if_some(prefix, ['--prefix', prefix]) +
             if_some(find, ['--find', find]), port = port))
 
-def module(name = None, package = None, project = None, file = None, cabal = None, source = False, port = None):
+def module(name = None, locals = False, package = None, project = None, file = None, cabal = None, source = False, port = None):
     return parse_module(
         hsdev(
             ['module'] +
+            (['--locals'] if locals else []) +
             if_some(name, ['-m', name]) +
             if_some(package, ['--package', package]) +
             if_some(project, ['--project', project]) +

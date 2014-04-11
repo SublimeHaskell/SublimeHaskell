@@ -64,6 +64,22 @@ IMPORT_MODULE_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']
 # Get symbol module scope and its name within import statement
 IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']*(\.[A-Z][\w\d\']*)*)(\s+as\s+(?P<as>[A-Z][\w\d\']*))?\s*\(.*?((?P<identifier>[a-z][\w\d\']*)|(?P<operator>[!#$%&*+\./<=>?@\\\^|\-~:]+))$')
 
+def is_scanned_source(view = None):
+    window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
+    if file_shown_in_view is None:
+        return False
+    m = call_hsdev(hsdev.module, file = file_shown_in_view)
+    return m is not None
+
+def is_in_project(view = None):
+    window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
+    if file_shown_in_view is None:
+        return False
+    m = call_hsdev(hsdev.module, file = file_shown_in_view)
+    if m is None:
+        return False
+    return m.location.project is not None
+
 def get_line_contents(view, location):
     """
     Returns contents of line at the given location.
@@ -408,6 +424,59 @@ class SublimeHaskellSearch(SublimeHaskellWindowCommand):
         decl = self.decls[idx]
 
         show_declaration_info(self.window.active_view(), decl)
+
+
+
+# General goto command
+class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
+    def run(self, project = False):
+        self.files = []
+        self.declarations = []
+        decls = []
+
+        self.view = self.window.active_view()
+        self.current_filename = self.view.file_name()
+        (self.line, self.column) = self.view.rowcol(self.view.sel()[0].a)
+
+        if project:
+            current_project = call_hsdev(hsdev.module, file = self.current_filename, locals = True).location.project
+            if not current_project:
+                show_status_message('File {0} is not in project'.format(self.current_filename), False)
+                return
+
+            decls = self.qualified_decls(self.sorted_decls(call_hsdev(hsdev.symbol, project = current_project)))
+            self.declarations = [[decl.brief(), decl.location.position()] for decl in decls]
+        else:
+            decls = self.sorted_decls(call_hsdev(hsdev.symbol, file = self.current_filename))
+            self.declarations = [[decl.brief()] for decl in decls]
+        self.files = [[decl.location.filename, str(decl.location.line), str(decl.location.column)] for decl in decls]
+
+        self.window.show_quick_panel(self.declarations, self.on_done, 0, self.closest_idx(decls), self.on_highlighted)
+
+    def qualified_decls(self, decls):
+        for decl in decls:
+            decl.make_qualified()
+        return decls
+
+    def sorted_decls(self, decls):
+        return list(sorted(decls, key = lambda d: (d.location.filename, d.location.line)))
+
+    def closest_idx(self, decls):
+        return min(
+            filter(
+                lambda d: d[1].location.filename == self.current_filename,
+                enumerate(decls)),
+            key = lambda d: abs(d[1].location.line - self.line))[0]
+
+    def on_done(self, idx):
+        if idx == -1:
+            return
+        self.window.open_file(':'.join(self.files[idx]), sublime.ENCODED_POSITION)
+
+    def on_highlighted(self, idx):
+        if idx == -1:
+            return
+        self.window.open_file(':'.join(self.files[idx]), sublime.ENCODED_POSITION | sublime.TRANSIENT)
 
 
 
@@ -1105,8 +1174,12 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
     def on_query_context(self, view, key, operator, operand, match_all):
         if key == 'auto_completion_popup':
             return get_setting('auto_completion_popup')
-        elif key == 'is_haskell_source':
+        elif key == 'haskell_source':
             return is_haskell_source(view)
+        elif key == 'scanned_source':
+            return is_scanned_source(view)
+        elif key == 'in_project':
+            return is_in_project(view)
         elif key == "is_module_completion" or key == "is_import_completion":
             chars = {
                 "is_module_completion": '.',
