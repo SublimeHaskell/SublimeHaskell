@@ -809,7 +809,7 @@ class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
         current_file_name = self.view.file_name()
         current_project = get_cabal_project_dir_of_file(current_file_name)
 
-        candidate = call_hsdev(hsdev.whois, full_name, current_file_name)
+        candidate = list(filter(lambda d: d.by_source(), call_hsdev(hsdev.whois, full_name, current_file_name)))
 
         if candidate and candidate[0].location and candidate[0].location.filename:
             self.view.window().open_file(candidate[0].location.position(), sublime.ENCODED_POSITION)
@@ -833,7 +833,7 @@ class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
 
         # many candidates
         self.select_candidates = [([c.brief(), c.location.position()], True) for c in candidates] + [([m.name, m.location.filename], False) for m in module_candidates]
-        self.view.window().show_quick_panel([c[0] for c in self.select_candidates], self.on_done)
+        self.view.window().show_quick_panel([c[0] for c in self.select_candidates], self.on_done, 0, 0, self.on_highlighted)
 
     def on_done(self, idx):
         if idx == -1:
@@ -845,6 +845,15 @@ class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
         else:
             self.view.window().open_file(selected[0][1])
 
+    def on_highlighted(self, idx):
+        if idx == -1:
+            return
+
+        selected = self.select_candidates[idx]
+        if selected[1]:
+            self.view.window().open_file(selected[0][1], sublime.ENCODED_POSITION | sublime.TRANSIENT)
+        else:
+            self.view.window().open_file(selected[0][1], sublime.TRANSIENT)
 
 
 
