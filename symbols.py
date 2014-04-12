@@ -21,9 +21,11 @@ class Location(object):
         self.line = line
         self.column = column
 
-    def position(self):
+    def position(self, column = True):
         """ Returns filename:line:column """
-        return ':'.join([self.filename if self.filename else '<no file>', str(self.line), str(self.column)])
+        if column:
+            return ':'.join([self.filename if self.filename else '<no file>', str(self.line), str(self.column)])
+        return ':'.join([self.filename if self.filename else '<no file>', str(self.line)])
 
     def set_file(self, other):
         if other is not None:

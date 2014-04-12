@@ -449,7 +449,7 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
         else:
             decls = self.sorted_decls(call_hsdev(hsdev.symbol, file = self.current_filename, locals = True))
             self.declarations = [[(decl.location.column * ' ') + decl.brief()] for decl in decls]
-        self.files = [[decl.location.filename, str(decl.location.line), str(decl.location.column)] for decl in decls]
+        self.files = [decl.location for decl in decls]
 
         self.window.show_quick_panel(self.declarations, self.on_done, 0, self.closest_idx(decls), self.on_highlighted)
 
@@ -471,12 +471,22 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
     def on_done(self, idx):
         if idx == -1:
             return
-        self.window.open_file(':'.join(self.files[idx]), sublime.ENCODED_POSITION)
+        self.open(self.files[idx])
 
     def on_highlighted(self, idx):
         if idx == -1:
             return
-        self.window.open_file(':'.join(self.files[idx]), sublime.ENCODED_POSITION | sublime.TRANSIENT)
+        self.open(self.files[idx], True)
+
+    def open(self, location, transient = False):
+        log('location is {0}'.format(location.position()), log_trace)
+        view = self.window.open_file(location.position(column = False), sublime.ENCODED_POSITION | sublime.TRANSIENT if transient else sublime.ENCODED_POSITION)
+        if location.column != 0:
+            log('column is not 0', log_trace)
+            rgn = view.find_by_class(view.sel()[0].a, True, sublime.CLASS_WORD_START)
+            log('found region {0}'.format(rgn), log_trace)
+            view.sel().clear()
+            view.sel().add(rgn)
 
 
 
