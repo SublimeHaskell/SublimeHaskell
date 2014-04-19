@@ -169,7 +169,7 @@ identOfName name = case name of
 documentationMap :: Doc.Interface -> M.Map String String
 documentationMap iface = M.fromList $ concatMap toDoc $ Doc.ifaceExportItems iface where
     toDoc :: Doc.ExportItem Name.Name -> [(String, String)]
-    toDoc (Doc.ExportDecl decl docs _ _) = maybe [] (zip (extractNames decl) . repeat) $ extractDocs docs
+    toDoc Doc.ExportDecl{ Doc.expItemDecl = decl, Doc.expItemMbDoc = docs } = maybe [] (zip (extractNames decl) . repeat) $ extractDocs docs
     toDoc _ = []
 
     extractNames :: HsDecls.LHsDecl Name.Name -> [String]
