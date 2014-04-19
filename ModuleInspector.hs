@@ -198,7 +198,6 @@ documentationMap iface = M.fromList $ concatMap toDoc $ Doc.ifaceExportItems ifa
         printDoc (Doc.DocOrderedList lst) = concatMap printDoc lst -- And this
         printDoc (Doc.DocDefList defs) = concatMap (\(l, r) -> printDoc l ++ " = " ++ printDoc r) defs -- ?
         printDoc (Doc.DocCodeBlock code) = printDoc code
-        printDoc (Doc.DocPic pic) = pic
         printDoc (Doc.DocAName a) = a
         printDoc (Doc.DocExamples exs) = unlines $ map showExample exs where
             showExample (Doc.Example expr results) = expr ++ " => " ++ intercalate ", " results
@@ -206,6 +205,8 @@ documentationMap iface = M.fromList $ concatMap toDoc $ Doc.ifaceExportItems ifa
         -- but exist in 2.13.*
         -- printDoc (Doc.DocHyperlink link) = fromMaybe (Doc.hyperlinkUrl link) (Doc.hyperlinkLabel link)
         -- printDoc (Doc.DocProperty prop) = prop
+        -- TODO This one only works with haddock 2.13, but has a different type in 2.14
+        -- printDoc (Doc.DocPic pic) = pic
         -- Catch all unsupported ones
         printDoc _ = "[unsupported-by-extractDocs]" -- TODO
 
