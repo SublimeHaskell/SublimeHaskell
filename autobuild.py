@@ -14,17 +14,24 @@ class SublimeHaskellAutobuild(sublime_plugin.EventListener):
         auto_lint_enabled = get_setting('enable_auto_lint')
         cabal_project_dir, cabal_project_name = get_cabal_project_dir_and_name_of_view(view)
 
+        # In some cases (e.g. when the same file is open in 2 tabs with only
+        # one tab being visible), the view has no window, but its on_post_save()
+        # is still called. In that background case, we don't want to run the command.
+        window = view.window()
+        if window is None:
+            return
+
         # auto build enabled and file within a cabal project
         if auto_build_enabled and cabal_project_dir is not None:
-            view.window().run_command('sublime_haskell_build_auto')
+            window.run_command('sublime_haskell_build_auto')
         # try to ghc-mod check
         elif get_setting('enable_ghc_mod'):
             if auto_check_enabled and auto_lint_enabled:
-                view.window().run_command('sublime_haskell_ghc_mod_check_and_lint')
+                window.run_command('sublime_haskell_ghc_mod_check_and_lint')
             elif auto_check_enabled:
-                view.window().run_command('sublime_haskell_ghc_mod_check')
+                window.run_command('sublime_haskell_ghc_mod_check')
             elif auto_lint_enabled:
-                view.window().run_command('sublime_haskell_ghc_mod_lint')
+                window.run_command('sublime_haskell_ghc_mod_lint')
 
 
 def current_cabal_build():
