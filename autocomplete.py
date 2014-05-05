@@ -883,7 +883,8 @@ class HsDevAgent(threading.Thread):
         self.hsdev_enabled = False
 
     def start_hsdev(self):
-        sublime.set_timeout(lambda: self.hsdev_holder.run_hsdev(), 0)
+        # sublime.set_timeout(lambda: self.hsdev_holder.run_hsdev(), 0)
+        self.hsdev_holder.run_hsdev()
         return self.hsdev_holder.wait_hsdev()
 
     def stop_hsdev(self):

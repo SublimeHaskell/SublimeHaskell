@@ -66,7 +66,7 @@ def if_some(x, lst):
 def cabal_path(cabal):
     if not cabal:
         return []
-    return ["--sandbox"] if cabal == 'cabal' else ["--sandbox={0}".format(cabal)]
+    return ["--cabal"] if cabal == 'cabal' else ["--sandbox={0}".format(cabal)]
 
 def hsinspect(module = None, file = None, cabal = None, ghc_opts = []):
     cmd = ['hsinspect']
@@ -455,7 +455,7 @@ class HsDevHolder(object):
                 log('connecting to hsdev server...', log_info)
                 self.socket.connect(('127.0.0.1', self.port))
                 log('connected to hsdev server', log_info)
-                self.socket.sendall(b'["link"]\n')
+                self.socket.sendall(b'{"command":["link"],"opts":{"hold":null}}\n')
                 self.started_event.set()
                 log('hsdev server started', log_info)
                 return True
@@ -480,6 +480,230 @@ class HsDev(object):
         self.socket = None
         self.hsdev_socket = None
         self.hsdev_address = None
+
+    def ping(self):
+        r = self.call(['ping'], [], {})
+        return r and ('message' in r) and (r['message'] == 'pong')
+
+    def scan_cabal(self, cabal = None, sandboxes = [], wait = False, on_status = None):
+        if cabal is None:
+            cabal = not sandboxes # default: --cabal enabled if not sandboxes specified and disabled otherwise
+
+        opts = {}
+
+        if cabal:
+            opts.update({'cabal': None})
+        if sandboxes:
+            opts.update({'sandbox': sandboxes})
+        if wait or on_status:
+            opts.update({'wait': None})
+        if on_status:
+            opts.update({'status': None})
+
+        return self.call(['scan', 'cabal'], [], opts, on_status)
+
+    def scan_module(self, module, cabal = None, sandboxes = [], wait = False, on_status = None):
+        if cabal is None:
+            cabal = not sandboxes
+
+        opts = {}
+
+        if cabal:
+            opts.update({'cabal': None})
+        if sandboxes:
+            opts.update({'sandbox': sandboxes})
+        if wait or on_status:
+            opts.update({'wait': None})
+        if on_status:
+            opts.update({'status': None})
+
+        return self.call(['scan', 'module'], [module], opts, on_status)
+
+    def scan(self, projects = [], files = [], paths = [], wait = False, on_status = None):
+        opts = {}
+
+        if projects:
+            opts.update({'project': projects})
+        if files:
+            opts.update({'file': files})
+        if paths:
+            opts.update({'path': paths})
+        if wait or on_status:
+            opts.update({'wait': None})
+        if on_status:
+            opts.update({'status': None})
+
+        return self.call(['scan'], [], opts, on_status)
+
+    def rescan(self, projects = [], files = [], paths = [], wait = False, on_status = None):
+        opts = {}
+
+        if projects:
+            opts.update({'project': projects})
+        if files:
+            opts.update({'file': files})
+        if paths:
+            opts.update({'path': paths})
+        if wait or on_status:
+            opts.update({'wait': None})
+        if on_status:
+            opts.update({'status': None})
+
+        return self.call(['rescan'], [], opts, on_status)
+
+    def remove(self, cabal = False, sandboxes = [], projects = [], files = [], modules = []):
+        opts = {}
+
+        if cabal:
+            opts.update({'cabal': None})
+        if sandboxes:
+            opts.update({'sandbox': sandboxes})
+        if projects:
+            opts.update({'project': projects})
+        if files:
+            opts.update({'file': files})
+        if modules:
+            opts.update({'module': modules})
+
+        return self.call(['remove'], [], opts)
+
+    def remove_all(self):
+        return self.call(['remove'], [], {'all': None})
+
+    def list_modules(self, cabal = False, sandboxes = None, projects = None, packages = None, source = False, standalone = False):
+        opts = {}
+
+        if cabal:
+            opts.update({'cabal': None})
+        if sandboxes:
+            opts.update({'sandbox': sandboxes})
+        if projects:
+            opts.update({'project': projects})
+        if packages:
+            opts.update({'package': packages})
+        if source:
+            opts.update({'src': None})
+        if standalone:
+            opts.update({'stand': None})
+
+        return self.call(['list', 'modules'], [], opts)
+
+    def list_packages(self):
+        return self.call(['list', 'packages'], [], {})
+
+    def list_projects(self):
+        return self.call(['list', 'projects'], [], {})
+
+    def symbol(self, name = None, project = None, file = None, module = None, locals = False, package = None, cabal = False, sandbox = None, source = False, standalone = False, prefix = None, find = None):
+        opts = {}
+
+        if project:
+            opts.update({'project': project})
+        if file:
+            opts.update({'file': file})
+        if module:
+            opts.update({'module': module})
+        if locals:
+            opts.update({'locals': None})
+        if package:
+            opts.update({'package': package})
+        if cabal:
+            opts.update({'cabal': cabal})
+        if sandbox:
+            opts.update({'sandbox': sandbox})
+        if source:
+            opts.update({'src': None})
+        if standalone:
+            opts.update({'stand': None})
+
+        return self.call(['symbol'], [name] if name else [], opts)
+
+    def module(self, name = None, project = None, file = None, locals = False, package = None, cabal = False, sandbox = None, source = False):
+        opts = {}
+
+        if name:
+            opts.update({'module': name})
+        if project:
+            opts.update({'project': project})
+        if file:
+            opts.update({'file': file})
+        if locals:
+            opts.update({'locals': None})
+        if package:
+            opts.update({'package': package})
+        if cabal:
+            opts.update({'cabal': None})
+        if sandbox:
+            opts.update({'sandbox': sandbox})
+        if source:
+            opts.update({'src': None})
+
+        return self.call(['module'], [], opts)
+
+    def project(self, project):
+        return self.call(['project'], [], {'project': project})
+
+    def lookup(self, name, file, sandbox = None):
+        opts = {'file': file}
+
+        if sandbox:
+            opts.update({'sandbox': sandbox})
+
+        return self.call(['lookup'], [name], opts)
+
+    def whois(self, name, file, sandbox = None):
+        opts = {'file': file}
+
+        if sandbox:
+            opts.update({'sandbox': sandbox})
+
+        return self.call(['whois'], [name], opts)
+
+    def scope_modules(self, file, sandbox = None):
+        opts = {'file': file}
+
+        if sandbox:
+            opts.update({'sandbox': sandbox})
+
+        return self.call(['scope', 'modules'], [], opts)
+
+    def scope(self, file, sandbox = None, global_scope = False, prefix = None, find = None):
+        opts = {'file': file}
+
+        if sandbox:
+            opts.update({'sandbox': sandbox})
+        if global_scope:
+            opts.update({'global': None})
+        if prefix:
+            opts.update({'prefix': prefix})
+        if find:
+            opts.update({'find': find})
+
+        return self.call(['scope'], [], opts)
+
+    def complete(self, input, file, sandbox = None):
+        opts = {'file': file}
+
+        if sandbox:
+            opts.update({'sandbox': sandbox})
+
+        return self.call(['complete'], [input], opts)
+
+    def hayoo(self, query):
+        return self.call(['hayoo'], [query], {})
+
+    def cabal_list(self, query = None):
+        return self.call(['cabal', 'list'], [query] if query else [], {})
+
+    def ghcmod_type(self, file, line, column = 1, sandbox = None):
+        opts = {'file': file}
+
+        if sandbox:
+            opts.update({'sandbox': sandbox})
+
+        return self.call(['ghc-mod', 'type'], [str(line), str(column)], opts)
+
+    # Socket functions
 
     def accept(self):
         if self.connected.is_set():
@@ -512,10 +736,12 @@ class HsDev(object):
         if not self.is_connected():
             return None
         opts.update({'no-file': None})
-        self.hsdev_socket.sendall('{0}\n'.format(json.dumps({
+        msg = json.dumps({
             'command': command,
             'args': args,
-            'opts': opts })).encode())
+            'opts': opts })
+        log(msg, log_debug)
+        self.hsdev_socket.sendall('{0}\n'.format(msg).encode())
         return self.receive_response(on_status)
 
     def receive_response(self, on_status = None):
