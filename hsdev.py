@@ -472,3 +472,63 @@ class HsDevHolder(object):
     def call(self, fn, *args, **kwargs):
         kwargs['port'] = self.port
         return fn(*args, **kwargs)
+
+class HsDev(object):
+    def __init__(self, port = 4567):
+        self.port = port
+        self.connected = threading.Event()
+        self.socket = None
+        self.hsdev_socket = None
+        self.hsdev_address = None
+
+    def accept(self):
+        if self.connected.is_set():
+            return
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.bind(('127.0.0.1', self.port))
+        self.socket.listen(1)
+        (s, addr) = self.socket.accept()
+        self.hsdev_socket = s
+        self.hsdev_address = addr
+        self.connected.set()
+
+    def accept_async(self):
+        thread = threading.Thread(
+            target = self.accept)
+        thread.start()
+
+    def wait(self):
+        self.connected.wait()
+
+    def close(self):
+        self.socket.close()
+        if self.hsdev_socket:
+            self.hsdev_socket.close()
+
+    def is_connected(self):
+        return self.connected.is_set()
+
+    def call(self, command, args = [], opts = {}, on_status = None):
+        if not self.is_connected():
+            return None
+        opts.update({'no-file': None})
+        self.hsdev_socket.sendall('{0}\n'.format(json.dumps({
+            'command': command,
+            'args': args,
+            'opts': opts })).encode())
+        return self.receive_response(on_status)
+
+    def receive_response(self, on_status = None):
+        resp = json.loads(self.receive_response_raw())
+        if 'status' in resp:
+            if on_status:
+                on_status(resp)
+            return self.receive_response(on_status)
+        else:
+            return resp
+
+    def receive_response_raw(self):
+        part = ''
+        while not part.endswith('\n'):
+            part = part + self.hsdev_socket.recv(65536).decode()
+        return part.rstrip('\n')
