@@ -96,6 +96,6 @@ If the ModuleInspector takes too much time
 
 The `ModuleInspector` is a program that looks at your Haskell environment to provide auto completion.
 
-Depending on your environment, this may takes very long.
+Depending on your environment, this may take very long.
 
 You can disable it with the `"inspect_modules": false` setting.
