@@ -293,6 +293,22 @@ def are_paths_equal(path, other_path):
     other_path = os.path.abspath(other_path)
     return path == other_path
 
+def is_cabal(cabal):
+    if cabal == 'cabal':
+        return True
+    if cabal is None:
+        return None
+    return False
+
+def current_is_cabal():
+    return is_cabal(current_cabal())
+
+def as_sandboxes(cabal):
+    if cabal == 'cabal':
+        return None
+    if cabal is None:
+        return None
+    return [cabal]
 
 def current_cabal():
     """
@@ -311,6 +327,9 @@ def current_sandbox():
         return get_setting_async('cabal_dev_sandbox')
     else:
         return None
+
+def current_sandboxes():
+    return as_sandboxes(current_sandbox())
 
 def cabal_name_by_sandbox(sandbox):
     if not sandbox:
