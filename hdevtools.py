@@ -34,9 +34,6 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
     Calls hdevtools with the given arguments.
     Shows a sublime error message if hdevtools is not available.
     """
-    if not hdevtools_enabled():
-        return None
-
     ghc_opts_args = get_ghc_opts_args(filename, cabal = cabal)
     hdevtools_socket = get_setting_async('hdevtools_socket')
     source_dir = get_source_dir(filename)
@@ -59,7 +56,7 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
         return None
 
     except Exception as e:
-        log('calling to hdevtools fails with {0}'.format(e))
+        log('calling to hdevtools fails with {0}'.format(e), log_error)
         return None
 
 def admin(cmds, wait = False, **popen_kwargs):

@@ -403,7 +403,7 @@
 		</dict>
 		<dict>
 			<key>begin</key>
-			<string>\b([a-z_][a-zA-Z0-9_']*|\([|!%$+\-.,=&lt;/&gt;]+\))\s*(::)</string>
+			<string>\b([a-z_][a-zA-Z0-9_']*|\([|!%$+\-.,=&lt;/&gt;]+\))\s*((::)|∷)</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>1</key>

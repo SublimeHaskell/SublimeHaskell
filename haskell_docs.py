@@ -27,5 +27,5 @@ def haskell_docs(module, name):
             return '\n'.join(result)
     except OSError as e:
         if e.errno == errno.ENOENT:
-            log("haskell-docs not found, no docs available, try 'cabal install haskell-docs'")
+            log("haskell-docs not found, no docs available, try 'cabal install haskell-docs'", log_error)
     return None

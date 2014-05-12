@@ -30,7 +30,7 @@ class SublimeHaskellAutobuild(sublime_plugin.EventListener):
 def current_cabal_build():
     """Current cabal build command"""
     args = []
-    if get_setting('use_cabal_dev'):
+    if get_setting('use_cabal_sandbox'):
         args += ['cabal-dev']
     else:
         args += ['cabal']

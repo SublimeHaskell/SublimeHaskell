@@ -133,18 +133,5 @@ def plugin_loaded():
     package_path = sublime_haskell_package_path()
     cache_path = sublime_haskell_cache_path()
 
-    CACHE_PATH = os.path.join(cache_path, 'cache')
-    CABAL_CACHE_PATH = os.path.join(CACHE_PATH, 'cabal')
-    PROJECTS_CACHE_PATH = os.path.join(CACHE_PATH, 'projects')
-
-    if not os.path.exists(CACHE_PATH):
-        os.mkdir(CACHE_PATH)
-
-    if not os.path.exists(CABAL_CACHE_PATH):
-        os.mkdir(CABAL_CACHE_PATH)
-
-    if not os.path.exists(PROJECTS_CACHE_PATH):
-        os.mkdir(PROJECTS_CACHE_PATH)
-
 if int(sublime.version()) < 3000:
     plugin_loaded()

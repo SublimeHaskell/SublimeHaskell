@@ -56,14 +56,14 @@
 	// Example: /home/user/.cabal/bin
 	"add_to_PATH": [],
 
-	// Use cabal-dev
-	"use_cabal_dev": false,
+	// Use cabal sandbox
+	"use_cabal_sandbox": false,
 
 	// Sandbox for cabal-dev
-	"cabal_dev_sandbox": "",
+	"cabal_sandbox": "",
 
 	// Cabal-dev sandboxes
-	"cabal_dev_sandbox_list": [],
+	"cabal_sandbox_list": [],
 
 	// Inhibit default Sublime word completions
 	"inhibit_completions": false,
@@ -73,6 +73,12 @@
 
 	// Additional ghc options for use in ghc-mod and ModuleInspector, for example "-package ghc"
 	"ghc_opts": [],
+
+	// Enable hsdev
+	// git clone https://github.com/mvoidex/hsdev
+	// cd hsdev
+	// cabal install
+	"enable_hsdev": false,
 
 	// Enables hdevtools (it must be installed, cabal install hdevtools)
 	// See the add_to_PATH settings to specify a custom location.
@@ -99,5 +105,8 @@
 	// Examples:
 	// 		"cache_path": "../../Local/SublimeHaskell"
 	// 		"cache_path": "%TEMP%\\SublimeHaskell"
-	"cache_path": "."
+	"cache_path": ".",
+
+	// Log level, 0 — no log, 1 — errors, 2 — warnings, 3 — info messages, 4 — debug, 5 — trace
+	"log": 3
 }

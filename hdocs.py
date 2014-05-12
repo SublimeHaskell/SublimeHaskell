@@ -8,53 +8,20 @@ else:
     from SublimeHaskell.sublime_haskell_common import *
 
 def call_hdocs_and_wait(args, filename = None, cabal = None):
-    if not hdocs_enabled():
-        return None
-
     ghc_opts_args = get_ghc_opts_args(filename, cabal = cabal)
-    source_dir = get_source_dir(filename)
-    
-    try:
-        command = ['hdocs'] + args + ghc_opts_args
-        log(command)
+    command = ['hdocs'] + args + ghc_opts_args
+    log(command, log_trace)
 
-        exit_code, out, err = call_and_wait(command, cwd = source_dir)
-
-        if exit_code != 0:
-            raise Exception("hdocs exited with status %d and stderr: %s" % (exit_code, err))
-
-        return crlf2lf(out)
-
-    except OSError as e:
-        if e.errno == errno.ENOENT:
-            sublime.set_timeout(lambda: output_error(sublime.active_window(), "SublimeHaskell: hdocs was not found!\n'enable_hdocs' is set to False"), 0)
-            set_setting_async('enable_hdocs', False)
-
-        return None
-
-    except Exception as e:
-        log('hdocs fails with {0}'.format(e))
-        return None
+    return call_and_wait_tool(command, 'hdocs', lambda o: json.loads(o), filename)
 
 def module_docs(module_name, cabal = None):
-    if not hdocs_enabled():
-        return None
-
-    try:
-        contents = call_hdocs_and_wait(['docs', module_name], cabal = cabal)
-        if contents:
-            return json.loads(contents)
-        else:
-            return None
-    except Exception as e:
-        log('hdocs fails with {0}'.format(e))
-        return None
+    return call_hdocs_and_wait([module_name], cabal = cabal)
 
 def symbol_docs(module_name, symbol_name, cabal = None):
-    if not hdocs_enabled():
-        return None
-
-    return call_hdocs_and_wait(['docs', module_name, symbol_name], cabal = cabal)
+    ret = call_hdocs_and_wait([module_name, symbol_name], cabal = cabal)
+    if ret and symbol_name in ret:
+        return ret[symbol_name]
+    return None
 
 def load_module_docs(module):
     if not hdocs_enabled():

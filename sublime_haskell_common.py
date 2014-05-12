@@ -56,21 +56,24 @@ class LockedObject(object):
 def preload_settings():
     # Now we can use get_setting_async for 'add_to_PATH' safely
     get_setting('add_to_PATH')
-    get_setting('use_cabal_dev')
-    get_setting('cabal_dev_sandbox')
-    get_setting('cabal_dev_sandbox_list')
+    get_setting('use_cabal_sandbox')
+    get_setting('cabal_sandbox')
+    get_setting('cabal_sandbox_list')
     get_setting('enable_auto_build')
     get_setting('show_output_window')
     get_setting('enable_ghc_mod')
     get_setting('enable_hdevtools')
     get_setting('enable_hdocs')
+    get_setting('enable_hsdev')
     get_setting('snippet_replace')
     get_setting('ghc_opts')
+    get_setting('log')
 
 # SublimeHaskell settings dictionary
 # used to retrieve it async from any thread
 sublime_haskell_settings = LockedObject({})
-
+# Callbacks on change settings
+sublime_settings_changes = LockedObject({})
 
 def is_enabled_haskell_command(view = None, must_be_project=True, must_be_main=False, must_be_file = False):
     """Returns True if command for .hs can be invoked"""
@@ -120,6 +123,9 @@ def encode_bytes(s):
         return None
     return s.encode('utf-8')
 
+def call_and_wait(command, split_lines = False, **popen_kwargs):
+    return call_and_wait_with_input(command, '', split_lines, **popen_kwargs)
+
 # Get extended environment from settings for Popen
 def get_extended_env():
     ext_env = dict(os.environ)
@@ -131,27 +137,47 @@ def get_extended_env():
     ext_env['PATH'] = os.pathsep.join(add_to_PATH + [PATH])
     return ext_env
 
-def call_and_wait(command, **popen_kwargs):
-    return call_and_wait_with_input(command, None, **popen_kwargs)
+def call_and_wait_tool(command, tool_name, on_result = None, filename = None, on_line = None, check_enabled = True, **popen_kwargs):
+    tool_enabled = 'enable_{0}'.format(tool_name)
 
-def call_no_wait(command, **popen_kwargs):
-    """Run the specified command with no block"""
-    if subprocess.mswindows:
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        popen_kwargs['startupinfo'] = startupinfo
-
+    if check_enabled and get_setting_async(tool_enabled) != True:
+        return None
     extended_env = get_extended_env()
 
-    process = subprocess.Popen(
-        command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        stdin=subprocess.PIPE,
-        env=extended_env,
-        **popen_kwargs)
+    source_dir = get_source_dir(filename)
 
-def call_and_wait_with_input(command, input_string, **popen_kwargs):
+    def mk_result(s):
+        return on_result(s) if on_result else s
+
+    try:
+        if on_line:
+            for l in call_and_wait(command, split_lines = True, cwd = source_dir, **popen_kwargs):
+                on_line(mk_result(crlf2lf(decode_bytes(l))))
+            return None
+        else:
+            exit_code, out, err = call_and_wait(command, cwd = source_dir, **popen_kwargs)
+            out = crlf2lf(out)
+
+            if exit_code != 0:
+                raise Exception('{0} exited with status {1} and stderr: {2}'.format(tool_name, exit_code, err))
+
+            return mk_result(out)
+
+    except OSError as e:
+        if e.errno == errno.ENOENT:
+            output_error_async(sublime.active_window(), "SublimeHaskell: {0} was not found!\n'{1}' is set to False".format(tool_name, tool_enabled))
+            set_setting_async(tool_enabled, False)
+        else:
+            log('{0} fails with {1}'.format(tool_name, e), log_error)
+
+        return None
+
+    except Exception as e:
+        log('{0} fails with {1}'.format(tool_name, e), log_error)
+
+    return None
+
+def call_and_wait_with_input(command, input_string, split_lines = False, **popen_kwargs):
     """Run the specified command, block until it completes, and return
     the exit code, stdout, and stderr.
     Extends os.environment['PATH'] with the 'add_to_PATH' setting.
@@ -171,13 +197,26 @@ def call_and_wait_with_input(command, input_string, **popen_kwargs):
         stdin=subprocess.PIPE,
         env=extended_env,
         **popen_kwargs)
-    stdout, stderr = process.communicate(encode_bytes(input_string))
-    exit_code = process.wait()
-    return (exit_code, decode_bytes(stdout), decode_bytes(stderr))
 
+    if split_lines:
+        process.stdin.write(encode_bytes(input_string))
+        process.stdin.close()
+        return process.stdout
+    else:
+        stdout, stderr = process.communicate(encode_bytes(input_string))
+        exit_code = process.wait()
+        return (exit_code, crlf2lf(decode_bytes(stdout)), crlf2lf(decode_bytes(stderr)))
 
-def log(message):
-    print(u'Sublime Haskell: {0}'.format(message))
+log_error = 1
+log_warning = 2
+log_info = 3
+log_debug = 4
+log_trace = 5
+
+def log(message, level = log_info):
+    log_level = get_setting_async('log', log_info)
+    if log_level >= level:
+        print(u'Sublime Haskell: {0}'.format(message))
 
 
 def get_cabal_project_dir_and_name_of_view(view):
@@ -254,13 +293,29 @@ def are_paths_equal(path, other_path):
     other_path = os.path.abspath(other_path)
     return path == other_path
 
+def is_cabal(cabal):
+    if cabal == 'cabal':
+        return True
+    if cabal is None:
+        return None
+    return False
+
+def current_is_cabal():
+    return is_cabal(current_cabal())
+
+def as_sandboxes(cabal):
+    if cabal == 'cabal':
+        return None
+    if cabal is None:
+        return None
+    return [cabal]
 
 def current_cabal():
     """
     Returns current cabal-dev sandbox or 'cabal'
     """
-    if get_setting_async('use_cabal_dev'):
-        return get_setting_async('cabal_dev_sandbox')
+    if get_setting_async('use_cabal_sandbox'):
+        return get_setting_async('cabal_sandbox')
     else:
         return 'cabal'
 
@@ -268,10 +323,13 @@ def current_sandbox():
     """
     Returns current cabal-def sandbox or None
     """
-    if get_setting_async('use_cabal_dev'):
-        return get_setting_async('cabal_dev_sandbox')
+    if get_setting_async('use_cabal_sandbox'):
+        return get_setting_async('cabal_sandbox')
     else:
         return None
+
+def current_sandboxes():
+    return as_sandboxes(current_sandbox())
 
 def cabal_name_by_sandbox(sandbox):
     if not sandbox:
@@ -286,15 +344,15 @@ def sandbox_by_cabal_name(cabal):
 def attach_sandbox(cmd, sandbox = None):
     """Attach sandbox arguments to command"""
     if not sandbox:
-        sandbox = get_setting_async('cabal_dev_sandbox')
+        sandbox = get_setting_async('cabal_sandbox')
     if len(sandbox) > 0:
         return cmd + ['-s', sandbox]
     return cmd
 
 
 def try_attach_sandbox(cmd, sandbox = None):
-    """Attach sandbox if use_cabal_dev enabled"""
-    if not get_setting_async('use_cabal_dev'):
+    """Attach sandbox if use_cabal_sandbox enabled"""
+    if not get_setting_async('use_cabal_sandbox'):
         return cmd
     return attach_sandbox(cmd, sandbox)
 
@@ -314,10 +372,8 @@ def attach_cabal_sandbox(cmd, cabal = None):
 def get_settings():
     return sublime.load_settings("SublimeHaskell.sublime-settings")
 
-
 def save_settings():
     sublime.save_settings("SublimeHaskell.sublime-settings")
-
 
 def get_setting(key, default=None):
     "This should be used only from main thread"
@@ -326,14 +382,20 @@ def get_setting(key, default=None):
     # Key was not retrieved, save its value and add callback to auto-update
     with sublime_haskell_settings as settings:
         if key not in settings:
-            get_settings().add_on_change(key, lambda: update_setting(key))
+            get_settings().add_on_change(key, lambda: on_changed_setting(key))
         settings[key] = result
     return result
 
-
 def update_setting(key):
-    "Updates setting as it was changed"
     get_setting(key)
+
+def on_changed_setting(key):
+    "Updates setting as it was changed"
+    val = get_setting(key)
+    with sublime_settings_changes as changes:
+        if key in changes:
+            for fn in changes[key]:
+                fn(key, val)
 
 
 def get_setting_async(key, default=None):
@@ -360,11 +422,19 @@ def set_setting(key, value):
 def set_setting_async(key, value):
     sublime.set_timeout(lambda: set_setting(key, value), 0)
 
+
+def subscribe_setting(key, fn):
+    with sublime_settings_changes as changes:
+        if key not in changes:
+            changes[key] = []
+        changes[key].append(fn)
+
+
 def ghci_package_db(cabal = None):
     if cabal == 'cabal':
         return None
-    dev = True if cabal else get_setting_async('use_cabal_dev')
-    box = cabal if cabal else get_setting_async('cabal_dev_sandbox')
+    dev = True if cabal else get_setting_async('use_cabal_sandbox')
+    box = cabal if cabal else get_setting_async('cabal_sandbox')
     if dev and box:
         package_conf = (filter(lambda x: re.match('packages-(.*)\.conf', x), os.listdir(box)) + [None])[0]
         if package_conf:
@@ -390,20 +460,21 @@ def get_source_dir(filename):
         return os.path.dirname(filename)
 
     _project_name, cabal_file = get_cabal_in_dir(cabal_dir)
-    exit_code, out, err = call_and_wait([CABAL_INSPECTOR_EXE_PATH, cabal_file])
+    exit_code, out, err = call_and_wait(['hsinspect', 'cabal', cabal_file])
 
     if exit_code == 0:
         info = json.loads(out)
 
         dirs = ["."]
 
-        if 'error' not in info:
+        if 'error' not in info and 'description' in info:
             # collect all hs-source-dirs
-            if info['library']:
-                dirs.extend(info['library']['info']['source-dirs'])
-            for i in info['executables']:
+            descr = info['description']
+            if descr['library']:
+                dirs.extend(descr['library']['info']['source-dirs'])
+            for i in descr['executables']:
                 dirs.extend(i['info']['source-dirs'])
-            for t in info['tests']:
+            for t in descr['tests']:
                 dirs.extend(t['info']['source-dirs'])
 
         paths = [os.path.abspath(os.path.join(cabal_dir, d)) for d in dirs]
@@ -475,7 +546,7 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
 
     except OSError as e:
         if e.errno == errno.ENOENT:
-            output_error(sublime.active_window(),
+            output_error_async(sublime.active_window(),
                 "SublimeHaskell: ghc-mod was not found!\n"
                 + "It is used for LANGUAGE and import autocompletions and type inference.\n"
                 + "Try adjusting the 'add_to_PATH' setting.\n"
@@ -505,24 +576,32 @@ class SublimeHaskellOutputText(sublime_plugin.TextCommand):
     Helper command to output text to any view
     TODO: Is there any default command for this purpose?
     """
-    def run(self, edit, text = None):
+    def run(self, edit, text = None, clear = False):
         if not text:
             return
+        self.view.set_read_only(False)
+        if clear:
+            self.view.erase(edit, sublime.Region(0, self.view.size()))
         self.view.insert(edit, self.view.size(), text)
+        self.view.set_read_only(True)
+
+def output_text(view, text = None, clear = False):
+    view.run_command('sublime_haskell_output_text', { 'text': (text or ''), 'clear': str(clear) })
+
+def output_panel(window, text = '', panel_name = 'sublime_haskell_output_panel'):
+    output_view = window.get_output_panel(panel_name)
+    output_text(output_view, text, clear = True)
+    output_view.sel().clear()
+    window.run_command('show_panel', { 'panel': ('output.' + panel_name) })
+    return output_view
 
 
 
 def output_error(window, text):
-    "Write text to Sublime's output panel with important information about SublimeHaskell error during load"
-    output_view = window.get_output_panel(SUBLIME_ERROR_PANEL_NAME)
-    output_view.set_read_only(False)
+    output_panel(window, text, panel_name = SUBLIME_ERROR_PANEL_NAME)
 
-    output_view.run_command('sublime_haskell_output_text', {
-        'text': text})
-
-    output_view.set_read_only(True)
-
-    window.run_command('show_panel', {'panel': 'output.' + SUBLIME_ERROR_PANEL_NAME})
+def output_error_async(window, text):
+    sublime.set_timeout(lambda: output_error(window, text), 0)
 
 class SublimeHaskellError(RuntimeError):
     def __init__(self, what):
@@ -555,7 +634,7 @@ def with_status_message(msg, action):
         return True
     except SublimeHaskellError as e:
         show_status_message(msg, False)
-        log(e.reason)
+        log(e.reason, log_error)
         return False
 
 def crlf2lf(s):
@@ -706,17 +785,57 @@ def sublime_haskell_cache_path():
     return os.path.join(sublime_haskell_package_path(), os.path.expandvars(get_setting('cache_path', '.')))
 
 def plugin_loaded():
-    global CABAL_INSPECTOR_EXE_PATH
-
     package_path = sublime_haskell_package_path()
     cache_path = sublime_haskell_cache_path()
 
-    log("store compiled tools and caches to {0}".format(cache_path))
     if not os.path.exists(cache_path):
         os.makedirs(cache_path)
 
-    CABAL_INSPECTOR_EXE_PATH = os.path.join(cache_path, 'CabalInspector')
     preload_settings()
 
 if int(sublime.version()) < 3000:
     plugin_loaded()
+
+class LockedObject(object):
+    """
+    Object with lock
+    x = LockedObject(some_value)
+    with x as v:
+        v...
+    """
+
+    def __init__(self, obj, lock = None):
+        self.object_lock = lock if lock else threading.Lock()
+        self.object = obj
+
+    def __enter__(self):
+        self.object_lock.__enter__()
+        return self.object
+
+    def __exit__(self, type, value, traceback):
+        self.object_lock.__exit__()
+
+def create_process(command, **kwargs):
+    if subprocess.mswindows:
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        kwargs['startupinfo'] = startupinfo
+
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stdin=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=False,
+        universal_newlines=True,
+        **kwargs)
+
+    return process
+
+class SublimeHaskellWindowCommand(sublime_plugin.WindowCommand):
+    def is_enabled(self):
+        return is_enabled_haskell_command(None, False)
+
+class SublimeHaskellTextCommand(sublime_plugin.TextCommand):
+    def is_enabled(self):
+        return is_enabled_haskell_command(self.view, False)
