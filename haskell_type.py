@@ -4,13 +4,13 @@ import re
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, log, log_trace
-    from autocomplete import autocompletion, call_hsdev, get_qualified_symbol_at_region
+    from autocomplete import autocompletion, hsdev_inspector, get_qualified_symbol_at_region
     from hdevtools import hdevtools_type, hdevtools_enabled
     from ghcmod import ghcmod_type, ghcmod_enabled
     import hsdev
 else:
     from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, log, log_trace
-    from SublimeHaskell.autocomplete import autocompletion, call_hsdev, get_qualified_symbol_at_region
+    from SublimeHaskell.autocomplete import autocompletion, hsdev_inspector, get_qualified_symbol_at_region
     from SublimeHaskell.hdevtools import hdevtools_type, hdevtools_enabled
     from SublimeHaskell.ghcmod import ghcmod_type, ghcmod_enabled
     import SublimeHaskell.hsdev as hsdev
@@ -164,7 +164,7 @@ def haskell_type(filename, module_name, line, column, cabal = None):
                 r['type'],
                 to_file_pos(r['region']['from']),
                 to_file_pos(r['region']['to']))
-        ts = call_hsdev(hsdev.ghcmod_type, filename, line, column, cabal = cabal)
+        ts = hsdev_client().ghcmod_type(filename, line, column, sandbox = as_sandboxes(cabal))
         if ts:
             return [to_region_type(r) for r in ts]
         return None
@@ -185,7 +185,7 @@ def haskell_type_view(view, selection = None):
     column = sublime_column_to_type_column(view, r, c)
 
     module_name = None
-    m = call_hsdev(hsdev.module, file = filename)
+    m = hsdev_inspector(hsdev.module, file = filename)
     if m:
         module_name = m.name
 
@@ -206,7 +206,7 @@ class SublimeHaskellShowType(SublimeHaskellTextCommand):
             column = sublime_column_to_type_column(self.view, r, c)
 
         module_name = None
-        m = call_hsdev(hsdev.module, file = filename)
+        m = hsdev_inspector(hsdev.module, file = filename)
         if m:
             module_name = m.name
 

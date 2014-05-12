@@ -17,6 +17,40 @@ else:
     import SublimeHaskell.symbols as symbols
     from SublimeHaskell.sublime_haskell_common import *
 
+def concat_args(args):
+    def cat(x, y):
+        (px, ex) = x
+        (py, ey) = y
+        return (px or py, (ex if px else []) + (ey if py else []))
+    return reduce(cat, args, (True, []))[1]
+
+def concat_opts(opts):
+    def cat(x, y):
+        (px, ex) = x
+        (py, ey) = y
+        v = (ex if px else {}).copy()
+        v.update((ey if py else {}).copy())
+        return (px or py, v)
+    return reduce(cat, opts, (True, {}))[1]
+
+# {'x': ['1','2'], 'y': None} ⇒ ['--x', '1', '--x', '2', '--y']
+def flatten_opts(opts):
+    r = []
+
+    def to_opt(x):
+        return '--{0}'.format(x)
+
+    for k, v in opts.items():
+        if v is None:
+            r.append(to_opt(k))
+        elif type(v) is list:
+            for n in v:
+                r.extend([to_opt(k), str(n)])
+        else:
+            r.extend([to_opt(k), str(v)])
+
+    return r
+
 def hsdev_enabled():
     return get_setting_async('enable_hsdev') == True
 
@@ -481,227 +515,57 @@ class HsDev(object):
         self.hsdev_socket = None
         self.hsdev_address = None
 
-    def ping(self):
-        r = self.call(['ping'], [], {})
-        return r and ('message' in r) and (r['message'] == 'pong')
+    def __del__(self):
+        self.close()
 
-    def scan_cabal(self, cabal = None, sandboxes = [], wait = False, on_status = None):
-        if cabal is None:
-            cabal = not sandboxes # default: --cabal enabled if not sandboxes specified and disabled otherwise
+    # Util
 
-        opts = {}
+    def start_server(as_client = False, port = 4567, cache = None):
+        cmd = concat_args([
+            (True, ["hsdev", "server", "start"]),
+            (as_client, ["--as-client"]),
+            (port, ["--port", str(port)]),
+            (cache, ["--cache", cache])])
 
-        if cabal:
-            opts.update({'cabal': None})
-        if sandboxes:
-            opts.update({'sandbox': sandboxes})
-        if wait or on_status:
-            opts.update({'wait': None})
-        if on_status:
-            opts.update({'status': None})
+        def parse_response(s):
+            try:
+                return {} if s.isspace() else json.loads(s)
+            except Exception as e:
+                return {'error': 'Invalid response', 'details': s}
 
-        return self.call(['scan', 'cabal'], [], opts, on_status)
+        log('Starting hsdev server command: {0}'.format(cmd), log_trace)
+        log('Starting hsdev server', log_info)
 
-    def scan_module(self, module, cabal = None, sandboxes = [], wait = False, on_status = None):
-        if cabal is None:
-            cabal = not sandboxes
+        ret = call_and_wait_tool(cmd, 'hsdev', parse_response, None, None, check_enabled = False)
+        if ret is not None:
+            return ret
+        return None
 
-        opts = {}
+    # Static creators
 
-        if cabal:
-            opts.update({'cabal': None})
-        if sandboxes:
-            opts.update({'sandbox': sandboxes})
-        if wait or on_status:
-            opts.update({'wait': None})
-        if on_status:
-            opts.update({'status': None})
+    def server(port = 4567, cache = None):
+        h = HsDev(port = port)
+        h.accept()
+        start_server(as_client = True, port = port, cache = cache)
+        return h
 
-        return self.call(['scan', 'module'], [module], opts, on_status)
+    def server_async(port = 4567, cache = None):
+        h = HsDev(port = port)
+        h.accept_async()
+        start_server(as_client = True, port = port, cache = cache)
+        return h
 
-    def scan(self, projects = [], files = [], paths = [], wait = False, on_status = None):
-        opts = {}
+    def client(port = 4567, cache = None):
+        start_server(as_client = False, port = port, cache = cache)
+        h = HsDev(port = port)
+        h.connect()
+        return h
 
-        if projects:
-            opts.update({'project': projects})
-        if files:
-            opts.update({'file': files})
-        if paths:
-            opts.update({'path': paths})
-        if wait or on_status:
-            opts.update({'wait': None})
-        if on_status:
-            opts.update({'status': None})
-
-        return self.call(['scan'], [], opts, on_status)
-
-    def rescan(self, projects = [], files = [], paths = [], wait = False, on_status = None):
-        opts = {}
-
-        if projects:
-            opts.update({'project': projects})
-        if files:
-            opts.update({'file': files})
-        if paths:
-            opts.update({'path': paths})
-        if wait or on_status:
-            opts.update({'wait': None})
-        if on_status:
-            opts.update({'status': None})
-
-        return self.call(['rescan'], [], opts, on_status)
-
-    def remove(self, cabal = False, sandboxes = [], projects = [], files = [], modules = []):
-        opts = {}
-
-        if cabal:
-            opts.update({'cabal': None})
-        if sandboxes:
-            opts.update({'sandbox': sandboxes})
-        if projects:
-            opts.update({'project': projects})
-        if files:
-            opts.update({'file': files})
-        if modules:
-            opts.update({'module': modules})
-
-        return self.call(['remove'], [], opts)
-
-    def remove_all(self):
-        return self.call(['remove'], [], {'all': None})
-
-    def list_modules(self, cabal = False, sandboxes = None, projects = None, packages = None, source = False, standalone = False):
-        opts = {}
-
-        if cabal:
-            opts.update({'cabal': None})
-        if sandboxes:
-            opts.update({'sandbox': sandboxes})
-        if projects:
-            opts.update({'project': projects})
-        if packages:
-            opts.update({'package': packages})
-        if source:
-            opts.update({'src': None})
-        if standalone:
-            opts.update({'stand': None})
-
-        return self.call(['list', 'modules'], [], opts)
-
-    def list_packages(self):
-        return self.call(['list', 'packages'], [], {})
-
-    def list_projects(self):
-        return self.call(['list', 'projects'], [], {})
-
-    def symbol(self, name = None, project = None, file = None, module = None, locals = False, package = None, cabal = False, sandbox = None, source = False, standalone = False, prefix = None, find = None):
-        opts = {}
-
-        if project:
-            opts.update({'project': project})
-        if file:
-            opts.update({'file': file})
-        if module:
-            opts.update({'module': module})
-        if locals:
-            opts.update({'locals': None})
-        if package:
-            opts.update({'package': package})
-        if cabal:
-            opts.update({'cabal': cabal})
-        if sandbox:
-            opts.update({'sandbox': sandbox})
-        if source:
-            opts.update({'src': None})
-        if standalone:
-            opts.update({'stand': None})
-
-        return self.call(['symbol'], [name] if name else [], opts)
-
-    def module(self, name = None, project = None, file = None, locals = False, package = None, cabal = False, sandbox = None, source = False):
-        opts = {}
-
-        if name:
-            opts.update({'module': name})
-        if project:
-            opts.update({'project': project})
-        if file:
-            opts.update({'file': file})
-        if locals:
-            opts.update({'locals': None})
-        if package:
-            opts.update({'package': package})
-        if cabal:
-            opts.update({'cabal': None})
-        if sandbox:
-            opts.update({'sandbox': sandbox})
-        if source:
-            opts.update({'src': None})
-
-        return self.call(['module'], [], opts)
-
-    def project(self, project):
-        return self.call(['project'], [], {'project': project})
-
-    def lookup(self, name, file, sandbox = None):
-        opts = {'file': file}
-
-        if sandbox:
-            opts.update({'sandbox': sandbox})
-
-        return self.call(['lookup'], [name], opts)
-
-    def whois(self, name, file, sandbox = None):
-        opts = {'file': file}
-
-        if sandbox:
-            opts.update({'sandbox': sandbox})
-
-        return self.call(['whois'], [name], opts)
-
-    def scope_modules(self, file, sandbox = None):
-        opts = {'file': file}
-
-        if sandbox:
-            opts.update({'sandbox': sandbox})
-
-        return self.call(['scope', 'modules'], [], opts)
-
-    def scope(self, file, sandbox = None, global_scope = False, prefix = None, find = None):
-        opts = {'file': file}
-
-        if sandbox:
-            opts.update({'sandbox': sandbox})
-        if global_scope:
-            opts.update({'global': None})
-        if prefix:
-            opts.update({'prefix': prefix})
-        if find:
-            opts.update({'find': find})
-
-        return self.call(['scope'], [], opts)
-
-    def complete(self, input, file, sandbox = None):
-        opts = {'file': file}
-
-        if sandbox:
-            opts.update({'sandbox': sandbox})
-
-        return self.call(['complete'], [input], opts)
-
-    def hayoo(self, query):
-        return self.call(['hayoo'], [query], {})
-
-    def cabal_list(self, query = None):
-        return self.call(['cabal', 'list'], [query] if query else [], {})
-
-    def ghcmod_type(self, file, line, column = 1, sandbox = None):
-        opts = {'file': file}
-
-        if sandbox:
-            opts.update({'sandbox': sandbox})
-
-        return self.call(['ghc-mod', 'type'], [str(line), str(column)], opts)
+    def client_async(port = 4567, cache = None):
+        start_server(as_client = False, port = port, cache = cache)
+        h = HsDev(port = port)
+        h.connect_async()
+        return h
 
     # Socket functions
 
@@ -717,32 +581,76 @@ class HsDev(object):
         self.connected.set()
 
     def accept_async(self):
-        thread = threading.Thread(
-            target = self.accept)
+        thread = threading.Thread(target = self.accept)
         thread.start()
 
-    def wait(self):
-        self.connected.wait()
+    def connect(self, tries = 10):
+        if self.connected.is_set():
+            return
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        for n in range(0, tries):
+            try:
+                log('connecting to hsdev server...', log_info)
+                self.socket.connect(('127.0.0.1', self.port))
+                self.hsdev_socket = self.socket
+                self.hsdev_address = '127.0.0.1'
+                self.connected.set()
+                log('connected to hsdev server', log_info)
+                return True
+            except Exception as e:
+                log('failed to connect to hsdev server', log_warning)
+                time.sleep(0.1)
+
+        return False
+
+    def connect_async(self, tries = 10):
+        thread = threading.Thread(target = self.connect)
+        thread.start()
+  
+    def wait(self, timeout = None):
+        return self.connected.wait(timeout)
 
     def close(self):
-        self.socket.close()
+        if not self.is_connected():
+            return
         if self.hsdev_socket:
             self.hsdev_socket.close()
+            self.hsdev_socket = None
+        self.socket.close()
+        self.connected.clear()
 
     def is_connected(self):
         return self.connected.is_set()
 
     def call(self, command, args = [], opts = {}, on_status = None):
         if not self.is_connected():
+            log('HsDev.call: not connected', log_error)
             return None
-        opts.update({'no-file': None})
-        msg = json.dumps({
-            'command': command,
-            'args': args,
-            'opts': opts })
-        log(msg, log_debug)
-        self.hsdev_socket.sendall('{0}\n'.format(msg).encode())
-        return self.receive_response(on_status)
+
+        try:
+            # log
+            call_cmd = 'hsdev {0}'.format(' '.join(command + args + flatten_opts(opts)))
+
+            opts.update({'no-file': None})
+            msg = json.dumps({
+                'command': command,
+                'args': args,
+                'opts': opts })
+
+            self.hsdev_socket.sendall('{0}\n'.format(msg).encode())
+            r = self.receive_response(on_status)
+            if 'error' in r:
+                if 'details' in r:
+                    log('{0} returns error: {1}, details: {2}'.format(call_cmd, r['error'], r['details']), log_error)
+                else:
+                    log('{0} returns error: {1}'.format(call_cmd, r['error']), log_error)
+                return None
+            log(call_cmd, log_trace)
+            return r
+        except Exception as e:
+            log('{0} fails with exception: {1}'.format(call_cmd, e), log_error)
+            return None
 
     def receive_response(self, on_status = None):
         resp = json.loads(self.receive_response_raw())
@@ -758,3 +666,178 @@ class HsDev(object):
         while not part.endswith('\n'):
             part = part + self.hsdev_socket.recv(65536).decode()
         return part.rstrip('\n')
+
+    # Commands
+
+    def link(self, hold = False):
+        return self.call(['link'], [], concat_opts([(hold, {'hold': None})]))
+
+    def ping(self):
+        r = self.call(['ping'], [], {})
+        return r and ('message' in r) and (r['message'] == 'pong')
+
+    def scan_cabal(self, cabal = None, sandboxes = [], wait = False, on_status = None):
+        if cabal is None:
+            cabal = not sandboxes # default: --cabal enabled if not sandboxes specified and disabled otherwise
+
+        opts = concat_opts([
+            (cabal, {'cabal': None}),
+            (sandboxes, {'sandbox': sandboxes}),
+            (wait or on_status, {'wait': None}),
+            (on_status, {'status': None})])
+
+        return self.call(['scan', 'cabal'], [], opts, on_status)
+
+    def scan_module(self, module, cabal = None, sandboxes = [], wait = False, on_status = None):
+        if cabal is None:
+            cabal = not sandboxes
+
+        opts = concat_opts([
+            (cabal, {'cabal': None}),
+            (sandboxes, {'sandbox': sandboxes}),
+            (wait or on_status, {'wait': None}),
+            (on_status, {'status': None})])
+
+        return self.call(['scan', 'module'], [module], opts, on_status)
+
+    def scan(self, projects = [], files = [], paths = [], wait = False, on_status = None):
+        opts = concat_opts([
+            (projects, {'project': projects}),
+            (files, {'file': files}),
+            (paths, {'path': paths}),
+            (wait or on_status, {'wait': None}),
+            (on_status, {'status': None})])
+
+        return self.call(['scan'], [], opts, on_status)
+
+    def rescan(self, projects = [], files = [], paths = [], wait = False, on_status = None):
+        opts = concat_opts([
+            (projects, {'project': projects}),
+            (files, {'file': files}),
+            (paths, {'path': paths}),
+            (wait or on_status, {'wait': None}),
+            (on_status, {'status': None})])
+
+        return self.call(['rescan'], [], opts, on_status)
+
+    def remove(self, cabal = False, sandboxes = [], projects = [], files = [], modules = []):
+        opts = concat_opts([
+            (cabal, {'cabal': None}),
+            (sandboxes, {'sandbox': sandboxes}),
+            (projects, {'project': projects}),
+            (files, {'file': files}),
+            (modules, {'module': modules})])
+
+        return self.call(['remove'], [], opts)
+
+    def remove_all(self):
+        return self.call(['remove'], [], {'all': None})
+
+    def list_modules(self, cabal = False, sandboxes = None, projects = None, packages = None, source = False, standalone = False):
+        opts = concat_opts([
+            (cabal, {'cabal': None}),
+            (sandboxes, {'sandbox': sandboxes}),
+            (projects, {'project': projects}),
+            (packages, {'package': packages}),
+            (source, {'src': None}),
+            (standalone, {'stand': None})])
+
+        return parse_modules(self.call(['list', 'modules'], [], opts))
+
+    def list_packages(self):
+        return self.call(['list', 'packages'], [], {})
+
+    def list_projects(self):
+        return self.call(['list', 'projects'], [], {})
+
+    def symbol(self, name = None, project = None, file = None, module = None, locals = False, package = None, cabal = False, sandbox = None, source = False, standalone = False, prefix = None, find = None):
+        opts = concat_opts([
+            (project, {'project': project}),
+            (file, {'file': file}),
+            (module, {'module': module}),
+            (locals, {'locals': None}),
+            (package, {'package': package}),
+            (cabal, {'cabal': None}),
+            (sandbox, {'sandbox': sandbox}),
+            (source, {'src': None}),
+            (standalone, {'stand': None})])
+
+        return parse_decls(self.call(['symbol'], [name] if name else [], opts))
+
+    def module(self, name = None, project = None, file = None, locals = False, package = None, cabal = False, sandbox = None, source = False):
+        opts = concat_opts([
+            (name, {'module': name}),
+            (project, {'project': project}),
+            (file, {'file': file}),
+            (locals, {'locals': None}),
+            (package, {'package': package}),
+            (cabal, {'cabal': None}),
+            (sandbox, {'sandbox': sandbox}),
+            (source, {'src': None})])
+
+        return parse_module(self.call(['module'], [], opts))
+
+    def project(self, project):
+        return self.call(['project'], [], {'project': project})
+
+    def lookup(self, name, file, sandbox = None):
+        opts = {'file': file}
+
+        if sandbox:
+            opts.update({'sandbox': sandbox})
+
+        return parse_decls(self.call(['lookup'], [name], opts))
+
+    def whois(self, name, file, sandbox = None):
+        opts = {'file': file}
+
+        if sandbox:
+            opts.update({'sandbox': sandbox})
+
+        return parse_decls(self.call(['whois'], [name], opts))
+
+    def scope_modules(self, file, sandbox = None):
+        opts = {'file': file}
+
+        if sandbox:
+            opts.update({'sandbox': sandbox})
+
+        return parse_modules(self.call(['scope', 'modules'], [], opts))
+
+    def scope(self, file, sandbox = None, global_scope = False, prefix = None, find = None):
+        opts = concat_opts([
+            (True, {'file': file}),
+            (sandbox, {'sandbox': sandbox}),
+            (global_scope, {'global': None}),
+            (prefix, {'prefix': prefix}),
+            (find, {'find': find})])
+
+        return parse_decls(self.call(['scope'], [], opts))
+
+    def complete(self, input, file, sandbox = None):
+        opts = {'file': file}
+
+        if sandbox:
+            opts.update({'sandbox': sandbox})
+
+        return parse_decls(self.call(['complete'], [input], opts))
+
+    def hayoo(self, query):
+        return parse_decls(self.call(['hayoo'], [query], {}))
+
+    def cabal_list(self, query = None):
+        r = self.call(['cabal', 'list'], [query] if query else [], {})
+        if r is None:
+            return None
+        return [parse_cabal_package(s) for s in r]
+
+    def ghcmod_type(self, file, line, column = 1, sandbox = None):
+        opts = concat_opts([
+            (True, {'file': file}),
+            (sandbox, {'sandbox': sandbox})])
+
+        return self.call(['ghc-mod', 'type'], [str(line), str(column)], opts)
+
+    def exit(self):
+        self.call(['exit'], [], {})
+        self.close()

@@ -8,12 +8,12 @@ from threading import Thread
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     from parseoutput import run_chain_build_thread
-    from autocomplete import autocompletion, list_files_in_dir_recursively, call_hsdev
+    from autocomplete import autocompletion, list_files_in_dir_recursively, hsdev_inspector
     import hsdev
 else:
     from SublimeHaskell.sublime_haskell_common import *
     from SublimeHaskell.parseoutput import run_chain_build_thread
-    from SublimeHaskell.autocomplete import autocompletion, list_files_in_dir_recursively, call_hsdev
+    from SublimeHaskell.autocomplete import autocompletion, list_files_in_dir_recursively, hsdev_inspector
     import SublimeHaskell.hsdev as hsdev
 
 OUTPUT_PANEL_NAME = "haskell_run_output"
