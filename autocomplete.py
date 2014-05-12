@@ -901,12 +901,14 @@ class HsDevAgent(threading.Thread):
         self.hsdev.close()
 
     def on_hsdev_enabled(self, key, value):
-        self.hsdev_enabled_changed = True
-        self.hsdev_enabled = value
-        self.force_inspect()
+        if key == 'enable_hsdev' and self.hsdev_enabled != value:
+            self.hsdev_enabled_changed = True
+            self.hsdev_enabled = value
+            self.force_inspect()
 
     def run(self):
         if hsdev.hsdev_enabled():
+            self.hsdev_enabled = True
             self.start_hsdev()
 
         subscribe_setting('enable_hsdev', self.on_hsdev_enabled)
@@ -1063,8 +1065,8 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
     def __init__(self):
         self.local_settings = {
             'enable_ghc_mod': None,
-            'use_cabal_dev': None,
-            'cabal_dev_sandbox': None,
+            'use_cabal_sandbox': None,
+            'cabal_sandbox': None,
         }
 
         for s in self.local_settings.keys():
@@ -1161,7 +1163,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         filename = view.file_name()
         if filename:
             (cabal_dir, project_name) = get_cabal_project_dir_and_name_of_file(filename)
-            cabal = 'cabal-dev' if get_setting_async('use_cabal_dev') else 'cabal'
+            cabal = 'cabal sandbox' if get_setting_async('use_cabal_sandbox') else 'cabal'
             if project_name:
                 view.set_status('sublime_haskell_cabal', '{0}: {1}'.format(cabal, project_name))
 
@@ -1228,6 +1230,9 @@ def start_inspector():
 
     hsdev_inspector = HsDevAgent()
     hsdev_inspector.start()
+
+    global INSPECTOR_RUNNING
+    INSPECTOR_RUNNING = True
 
 def plugin_loaded():
     global OUTPUT_PATH

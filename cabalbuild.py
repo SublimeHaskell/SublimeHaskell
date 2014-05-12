@@ -50,10 +50,10 @@ projects_being_built = set()
 # Base command
 class SublimeHaskellBaseCommand(SublimeHaskellWindowCommand):
 
-    def build(self, command, use_cabal_dev=None, filter_project = None):
+    def build(self, command, use_cabal_sandbox=None, filter_project = None):
         select_project(
             self.window,
-            lambda n, d: run_build(self.window.active_view(), n, d, cabal_config[command], use_cabal_dev),
+            lambda n, d: run_build(self.window.active_view(), n, d, cabal_config[command], use_cabal_sandbox),
             filter_project = filter_project)
 
     def is_enabled(self):
@@ -100,7 +100,7 @@ def select_project(window, on_selected, filter_project = None):
     window.show_quick_panel(list(map(lambda m: [m[0], m[1]['path']], ps)), on_done)
 
 
-def run_build(view, project_name, project_dir, config, use_cabal_dev=None):
+def run_build(view, project_name, project_dir, config, use_cabal_sandbox=None):
     global projects_being_built
 
     # Don't build if a build is already running for this project
@@ -114,10 +114,10 @@ def run_build(view, project_name, project_dir, config, use_cabal_dev=None):
     projects_being_built.add(project_name)
 
     # Run cabal or cabal-dev
-    if use_cabal_dev is None:
-        use_cabal_dev = get_setting_async('use_cabal_dev')
+    if use_cabal_sandbox is None:
+        use_cabal_sandbox = get_setting_async('use_cabal_sandbox')
 
-    tool = cabal_tool[use_cabal_dev]
+    tool = cabal_tool[use_cabal_sandbox]
 
     # Title of tool: Cabal, Cabal-Dev
     tool_title = tool['message']
@@ -148,15 +148,15 @@ def run_build(view, project_name, project_dir, config, use_cabal_dev=None):
         on_done=done_callback)
 
 
-class SublimeHaskellSwitchCabalDevCommand(SublimeHaskellWindowCommand):
+class SublimeHaskellSwitchCabalSandboxCommand(SublimeHaskellWindowCommand):
     def run(self):
-        use_cabal_dev = get_setting('use_cabal_dev')
-        sandbox = get_setting('cabal_dev_sandbox')
-        sandboxes = get_setting('cabal_dev_sandbox_list')
+        use_cabal_sandbox = get_setting('use_cabal_sandbox')
+        sandbox = get_setting('cabal_sandbox')
+        sandboxes = get_setting('cabal_sandbox_list')
 
         sandboxes.append(sandbox)
         sandboxes = list(set(sandboxes))
-        set_setting('cabal_dev_sandbox_list', sandboxes)
+        set_setting('cabal_sandbox_list', sandboxes)
 
         # No sandboxes
         if len(sandboxes) == 0:
@@ -166,14 +166,14 @@ class SublimeHaskellSwitchCabalDevCommand(SublimeHaskellWindowCommand):
 
         # One sandbox, just switch
         if len(sandboxes) == 1:
-            self.switch_cabal('cabal' if use_cabal_dev else sandbox)
+            self.switch_cabal('cabal' if use_cabal_sandbox else sandbox)
             return
 
         # Many sandboxes, show list
         self.sorted_sands = sandboxes
         # Move previously used sandbox (or cabal) on top
         self.sorted_sands.remove(sandbox)
-        if use_cabal_dev:
+        if use_cabal_sandbox:
             self.sorted_sands.insert(0, sandbox)
             self.sorted_sands.insert(0, "<Cabal>")
         else:
@@ -199,10 +199,10 @@ class SublimeHaskellSwitchCabalDevCommand(SublimeHaskellWindowCommand):
             return
 
         if new_cabal == 'cabal':
-            set_setting('use_cabal_dev', False)
+            set_setting('use_cabal_sandbox', False)
         else:
-            set_setting('use_cabal_dev', True)
-            set_setting('cabal_dev_sandbox', new_cabal)
+            set_setting('use_cabal_sandbox', True)
+            set_setting('cabal_sandbox', new_cabal)
 
         save_settings()
 

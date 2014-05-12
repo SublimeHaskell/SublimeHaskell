@@ -56,9 +56,9 @@ class LockedObject(object):
 def preload_settings():
     # Now we can use get_setting_async for 'add_to_PATH' safely
     get_setting('add_to_PATH')
-    get_setting('use_cabal_dev')
-    get_setting('cabal_dev_sandbox')
-    get_setting('cabal_dev_sandbox_list')
+    get_setting('use_cabal_sandbox')
+    get_setting('cabal_sandbox')
+    get_setting('cabal_sandbox_list')
     get_setting('enable_auto_build')
     get_setting('show_output_window')
     get_setting('enable_ghc_mod')
@@ -314,8 +314,8 @@ def current_cabal():
     """
     Returns current cabal-dev sandbox or 'cabal'
     """
-    if get_setting_async('use_cabal_dev'):
-        return get_setting_async('cabal_dev_sandbox')
+    if get_setting_async('use_cabal_sandbox'):
+        return get_setting_async('cabal_sandbox')
     else:
         return 'cabal'
 
@@ -323,8 +323,8 @@ def current_sandbox():
     """
     Returns current cabal-def sandbox or None
     """
-    if get_setting_async('use_cabal_dev'):
-        return get_setting_async('cabal_dev_sandbox')
+    if get_setting_async('use_cabal_sandbox'):
+        return get_setting_async('cabal_sandbox')
     else:
         return None
 
@@ -344,15 +344,15 @@ def sandbox_by_cabal_name(cabal):
 def attach_sandbox(cmd, sandbox = None):
     """Attach sandbox arguments to command"""
     if not sandbox:
-        sandbox = get_setting_async('cabal_dev_sandbox')
+        sandbox = get_setting_async('cabal_sandbox')
     if len(sandbox) > 0:
         return cmd + ['-s', sandbox]
     return cmd
 
 
 def try_attach_sandbox(cmd, sandbox = None):
-    """Attach sandbox if use_cabal_dev enabled"""
-    if not get_setting_async('use_cabal_dev'):
+    """Attach sandbox if use_cabal_sandbox enabled"""
+    if not get_setting_async('use_cabal_sandbox'):
         return cmd
     return attach_sandbox(cmd, sandbox)
 
@@ -433,8 +433,8 @@ def subscribe_setting(key, fn):
 def ghci_package_db(cabal = None):
     if cabal == 'cabal':
         return None
-    dev = True if cabal else get_setting_async('use_cabal_dev')
-    box = cabal if cabal else get_setting_async('cabal_dev_sandbox')
+    dev = True if cabal else get_setting_async('use_cabal_sandbox')
+    box = cabal if cabal else get_setting_async('cabal_sandbox')
     if dev and box:
         package_conf = (filter(lambda x: re.match('packages-(.*)\.conf', x), os.listdir(box)) + [None])[0]
         if package_conf:

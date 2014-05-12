@@ -56,14 +56,14 @@
 	// Example: /home/user/.cabal/bin
 	"add_to_PATH": [],
 
-	// Use cabal-dev
-	"use_cabal_dev": false,
+	// Use cabal sandbox
+	"use_cabal_sandbox": false,
 
 	// Sandbox for cabal-dev
-	"cabal_dev_sandbox": "",
+	"cabal_sandbox": "",
 
 	// Cabal-dev sandboxes
-	"cabal_dev_sandbox_list": [],
+	"cabal_sandbox_list": [],
 
 	// Inhibit default Sublime word completions
 	"inhibit_completions": false,
