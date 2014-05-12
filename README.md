@@ -7,10 +7,10 @@ Requirements
 Necessary:
 * ghc and a recent Haskell Platform (>= 2012 should do fine)
 * cabal
-* Cabal packages: base, bytestring, aeson, haskell-src-exts (== 1.14.*), haddock (`cabal install aeson haskell-src-exts haddock`)
-* If you are using GHC 7.6, you might have trouble with too new versions of haddock; in that case, try `cabal install haddock --constraint=haddock==2.13.2.1`
+* Cabal packages: base, bytestring, aeson, haskell-src-exts (>= 1.14.0), haddock (`cabal install aeson haskell-src-exts haddock`)
 
 Optional, but useful:
+* [hsdev](http://hackage.haskell.org/package/hsdev) (for completion, inspection etc, `cabal install hsdev`) disabled by default because it's in beta, enable it with setting `enable_hsdev` setting to `true`
 * [ghc-mod](http://hackage.haskell.org/package/ghc-mod) (for import and LANGUAGE completions and type inference, `cabal install ghc-mod`)
 * [stylish-haskell](https://github.com/jaspervdj/stylish-haskell) (for code prettification, `cabal install stylish-haskell`)
 * [cabal-dev](http://hackage.haskell.org/package/cabal-dev) if you want to use it
@@ -37,7 +37,7 @@ To use cabal-dev instead of cabal, set use_cabal_dev to true (or use command "Sw
 
 Stylish-haskell can be used to stylish file or selected text.
 
-Use `Ctrl-Shift-R` to go to declaration and `Ctrl-K-I` to show symbol info with documentation. These command are also available through context menu with right-click.
+Use `F12` to go to declaration and `Ctrl-K-I` to show symbol info with documentation. These command are also available through context menu with right-click.
 
 Command 'SublimeHaskell: Browse module' is similar to ghci's browse command
 
