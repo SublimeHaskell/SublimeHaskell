@@ -1,5 +1,6 @@
 [
 	{ "caption": "-", "id": "sublime_haskell" },
 	{ "command": "sublime_haskell_go_to_declaration", "caption": "Go to Declaration" },
-	{ "command": "sublime_haskell_symbol_info", "caption": "Show symbol info" }
+	{ "command": "sublime_haskell_symbol_info", "caption": "Show symbol info" },
+	{ "command": "sublime_haskell_insert_import", "caption": "Insert import for symbol" }
 ]

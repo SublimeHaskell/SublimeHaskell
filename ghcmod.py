@@ -2,18 +2,20 @@ import os
 import re
 import sublime
 import sublime_plugin
+import threading
 from threading import Thread
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import log, is_haskell_source, get_haskell_command_window_view_file_project, call_ghcmod_and_wait, get_setting_async
+    from sublime_haskell_common import *
     from parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages
     from ghci import parse_info
     import symbols
 else:
-    from SublimeHaskell.sublime_haskell_common import log, is_haskell_source, get_haskell_command_window_view_file_project, call_ghcmod_and_wait, get_setting_async
+    from SublimeHaskell.sublime_haskell_common import *
     from SublimeHaskell.parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages
     from SublimeHaskell.ghci import parse_info
     import SublimeHaskell.symbols as symbols
+
 
 
 def lint_as_hints(msgs):
@@ -22,7 +24,7 @@ def lint_as_hints(msgs):
             m[1].level = 'hint'
 
 
-class SublimeHaskellGhcModCheck(sublime_plugin.WindowCommand):
+class SublimeHaskellGhcModCheck(SublimeHaskellWindowCommand):
     def run(self):
         run_ghcmod(['check'], 'Checking')
 
@@ -30,7 +32,7 @@ class SublimeHaskellGhcModCheck(sublime_plugin.WindowCommand):
         return is_haskell_source(None)
 
 
-class SublimeHaskellGhcModLint(sublime_plugin.WindowCommand):
+class SublimeHaskellGhcModLint(SublimeHaskellWindowCommand):
     def run(self):
         run_ghcmod(['lint', '-h', '-u'], 'Linting', lint_as_hints)
 
@@ -38,7 +40,7 @@ class SublimeHaskellGhcModLint(sublime_plugin.WindowCommand):
         return is_haskell_source(None)
 
 
-class SublimeHaskellGhcModCheckAndLint(sublime_plugin.WindowCommand):
+class SublimeHaskellGhcModCheckAndLint(SublimeHaskellWindowCommand):
     def run(self):
         run_ghcmods([['check'], ['lint', '-h', '-u']], 'Checking and Linting', lint_as_hints)
 
@@ -104,7 +106,6 @@ def run_ghcmods_thread(view, filename, msg, cmds_with_args, alter_messages_cb):
         args=(view, filename, msg, cmds_with_args, alter_messages_cb))
     thread.start()
 
-
 def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb):
     sublime.set_timeout(lambda: hide_output(view), 0)
 
@@ -127,7 +128,7 @@ def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb
 
         if not success:
             all_cmds_outputs.append(out)
-            log(u"ghc-mod %s didn't exit with success on '%s'" % (u' '.join(cmd), filename))
+            log(u"ghc-mod %s didn't exit with success on '%s'" % (u' '.join(cmd), filename), log_error)
 
         all_cmds_successful &= success
 

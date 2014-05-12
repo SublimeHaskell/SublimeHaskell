@@ -22,6 +22,10 @@
         "command": "sublime_haskell_insert_type"
     },
     {
+        "caption": "SublimeHaskell: Expand selection to Expression",
+        "command": "sublime_haskell_expand_selection_expression"
+    },
+    {
         "caption": "SublimeHaskell: Show symbol info",
         "command": "sublime_haskell_symbol_info"
     },
@@ -78,20 +82,40 @@
         "command": "sublime_haskell_stylish"
     },
     {
-        "caption": "SublimeHaskell: Go to Any Declaration",
+        "caption": "SublimeHaskell: Go to any declaration",
         "command": "sublime_haskell_go_to_any_declaration"
     },
     {
-        "caption": "SublimeHaskell: Go to Declaration",
+        "caption": "SublimeHaskell: Go to declaration",
         "command": "sublime_haskell_go_to_declaration"
     },
     {
-        "caption": "SublimeHaskell: Browse Declarations",
+        "caption": "SublimeHaskell: Browse declarations",
         "command": "sublime_haskell_browse_declarations"
     },
     {
-        "caption": "SublimeHaskell: Switch Cabal/Cabal-Dev",
-        "command": "sublime_haskell_switch_cabal_dev"
+        "caption": "SublimeHaskell: Find declarations",
+        "command": "sublime_haskell_find_declarations"
+    },
+    {
+        "caption": "SublimeHaskell: Hayoo",
+        "command": "sublime_haskell_hayoo"
+    },
+    {
+        "caption": "SublimeHaskell: Search declarations everywhere",
+        "command": "sublime_haskell_search"
+    },
+    {
+        "caption": "SublimeHaskell: Insert import for symbol",
+        "command": "sublime_haskell_insert_import_for_symbol"
+    },
+    {
+        "caption": "SublimeHaskell: Clear imports",
+        "command": "sublime_haskell_clear_imports"
+    },
+    {
+        "caption": "SublimeHaskell: Switch Cabal sandbox",
+        "command": "sublime_haskell_switch_cabal_sandbox"
     },
     {
         "caption": "SublimeHaskell: Reinspect all",
@@ -109,5 +133,9 @@
         "caption": "SublimeHaskell: Show error panel",
         "command": "show_panel",
         "args": { "panel": "output.haskell_error_checker" }
+    },
+    {
+        "caption": "Cabal: List",
+        "command": "sublime_haskell_cabal_list"
     }
 ]

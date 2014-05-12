@@ -1,4 +1,5 @@
 import os
+import os.path
 import sublime
 import sublime_plugin
 import copy
@@ -7,11 +8,13 @@ from threading import Thread
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     from parseoutput import run_chain_build_thread
-    from autocomplete import autocompletion
+    from autocomplete import autocompletion, list_files_in_dir_recursively, hsdev_inspector
+    import hsdev
 else:
     from SublimeHaskell.sublime_haskell_common import *
     from SublimeHaskell.parseoutput import run_chain_build_thread
-    from SublimeHaskell.autocomplete import autocompletion
+    from SublimeHaskell.autocomplete import autocompletion, list_files_in_dir_recursively, hsdev_inspector
+    import SublimeHaskell.hsdev as hsdev
 
 OUTPUT_PANEL_NAME = "haskell_run_output"
 
@@ -45,24 +48,34 @@ projects_being_built = set()
 
 
 # Base command
-class SublimeHaskellBaseCommand(sublime_plugin.WindowCommand):
+class SublimeHaskellBaseCommand(SublimeHaskellWindowCommand):
 
-    def build(self, command, use_cabal_dev=None, filter_project = None):
+    def build(self, command, use_cabal_sandbox=None, filter_project = None):
         select_project(
             self.window,
-            lambda n, d: run_build(self.window.active_view(), n, d, cabal_config[command], use_cabal_dev),
+            lambda n, d: run_build(self.window.active_view(), n, d, cabal_config[command], use_cabal_sandbox),
             filter_project = filter_project)
 
+    def is_enabled(self):
+        return is_enabled_haskell_command(None, False)
+
+# Retrieve projects as dictionary that refers to this app instance
+def get_projects():
+    folder_files = [src for f in sublime.active_window().folders() for src in list_files_in_dir_recursively(f) if os.path.splitext(src)[1] == ".hs"]
+    view_files = [v.file_name() for v in sublime.active_window().views() if is_haskell_source(v)]
+    active_projects = set([get_cabal_project_dir_of_file(src) for src in (folder_files + view_files)])
+
+    return dict((info['name'], info) for info in hsdev.list_projects() if info['path'] in active_projects)
 
 # Select project from list
 # on_selected accepts name of project and directory of project
 # filter_project accepts name of project and project-info as it appears in AutoCompletion object
 #   and returns whether this project must appear in selection list
 def select_project(window, on_selected, filter_project = None):
-    ps = [(name, info) for (name, info) in autocompletion.projects.object.items() if not filter_project or filter_project(name, info)]
+    ps = [(name, info) for (name, info) in get_projects().items() if not filter_project or filter_project(name, info)]
 
     def run_selected(psel):
-        on_selected(psel[0], psel[1]['dir'])
+        on_selected(psel[0], psel[1]['path'])
 
     if len(ps) == 0:
         return
@@ -84,27 +97,27 @@ def select_project(window, on_selected, filter_project = None):
         if idx != -1:
             run_selected(ps[idx])
 
-    window.show_quick_panel(list(map(lambda m: [m[0], m[1]['dir']], ps)), on_done)
+    window.show_quick_panel(list(map(lambda m: [m[0], m[1]['path']], ps)), on_done)
 
 
-def run_build(view, project_name, project_dir, config, use_cabal_dev=None):
+def run_build(view, project_name, project_dir, config, use_cabal_sandbox=None):
     global projects_being_built
 
     # Don't build if a build is already running for this project
     # We compare the project_name for simplicity (projects with same
     # names are of course possible, but unlikely, so we let them wait)
     if project_name in projects_being_built:
-        log("Not building '%s' because it is already being built" % project_name)
+        log("Not building '%s' because it is already being built" % project_name, log_warning)
         sublime_status_message('Already building %s' % project_name)
         return
     # Set project as building
     projects_being_built.add(project_name)
 
     # Run cabal or cabal-dev
-    if use_cabal_dev is None:
-        use_cabal_dev = get_setting_async('use_cabal_dev')
+    if use_cabal_sandbox is None:
+        use_cabal_sandbox = get_setting_async('use_cabal_sandbox')
 
-    tool = cabal_tool[use_cabal_dev]
+    tool = cabal_tool[use_cabal_sandbox]
 
     # Title of tool: Cabal, Cabal-Dev
     tool_title = tool['message']
@@ -120,7 +133,7 @@ def run_build(view, project_name, project_dir, config, use_cabal_dev=None):
     # Assemble command lines to run (possibly multiple steps)
     commands = [extra_args([tool_name] + step) for step in tool_steps]
 
-    log('running build commands: {0}'.format(commands))
+    log('running build commands: {0}'.format(commands), log_trace)
 
     def done_callback():
         # Set project as done being built so that it can be built again
@@ -135,39 +148,32 @@ def run_build(view, project_name, project_dir, config, use_cabal_dev=None):
         on_done=done_callback)
 
 
-class SublimeHaskellSwitchCabalDev(sublime_plugin.WindowCommand):
+class SublimeHaskellSwitchCabalSandboxCommand(SublimeHaskellWindowCommand):
     def run(self):
-        use_cabal_dev = get_setting('use_cabal_dev')
-        sandbox = get_setting('cabal_dev_sandbox')
-        sandboxes = get_setting('cabal_dev_sandbox_list')
+        use_cabal_sandbox = get_setting('use_cabal_sandbox')
+        sandbox = get_setting('cabal_sandbox')
+        sandboxes = get_setting('cabal_sandbox_list')
 
         sandboxes.append(sandbox)
         sandboxes = list(set(sandboxes))
-        set_setting('cabal_dev_sandbox_list', sandboxes)
+        set_setting('cabal_sandbox_list', sandboxes)
 
-        # No candboxes
+        # No sandboxes
         if len(sandboxes) == 0:
             sublime_status_message('There is nothing to switch to')
-            set_setting('use_cabal_dev', False)
-            save_settings()
+            self.switch_cabal('cabal')
             return
 
         # One sandbox, just switch
         if len(sandboxes) == 1:
-            set_setting('use_cabal_dev', not use_cabal_dev)
-            if use_cabal_dev:
-                now_using = 'Cabal'
-            else:
-                now_using = 'Cabal-Dev'
-            sublime_status_message('Switched to ' + now_using)
-            save_settings()
+            self.switch_cabal('cabal' if use_cabal_sandbox else sandbox)
             return
 
         # Many sandboxes, show list
         self.sorted_sands = sandboxes
         # Move previously used sandbox (or cabal) on top
         self.sorted_sands.remove(sandbox)
-        if use_cabal_dev:
+        if use_cabal_sandbox:
             self.sorted_sands.insert(0, sandbox)
             self.sorted_sands.insert(0, "<Cabal>")
         else:
@@ -179,48 +185,66 @@ class SublimeHaskellSwitchCabalDev(sublime_plugin.WindowCommand):
     def on_done(self, idx):
         if idx == -1:
             return
+
         selected = self.sorted_sands[idx]
         if selected == "<Cabal>":
-            set_setting('use_cabal_dev', False)
+            self.switch_cabal('cabal')
         else:
-            set_setting('use_cabal_dev', True)
-            set_setting('cabal_dev_sandbox', selected)
+            self.switch_cabal(selected)
+
+    def switch_cabal(self, new_cabal):
+        old_cabal = current_cabal()
+
+        if new_cabal == old_cabal:
+            return
+
+        if new_cabal == 'cabal':
+            set_setting('use_cabal_sandbox', False)
+        else:
+            set_setting('use_cabal_sandbox', True)
+            set_setting('cabal_sandbox', new_cabal)
 
         save_settings()
+
+        sublime_status_message('Switched to ' + new_cabal)
+
+        self.window.run_command('sublime_haskell_reinspect_cabal', {
+            'old_cabal': old_cabal,
+            'new_cabal': new_cabal })
 
 
 # Default build system (cabal or cabal-dev)
 
-class SublimeHaskellClean(SublimeHaskellBaseCommand):
+class SublimeHaskellCleanCommand(SublimeHaskellBaseCommand):
     def run(self):
         self.build('clean')
 
 
-class SublimeHaskellConfigure(SublimeHaskellBaseCommand):
+class SublimeHaskellConfigureCommand(SublimeHaskellBaseCommand):
     def run(self):
         self.build('configure')
 
 
-class SublimeHaskellBuild(SublimeHaskellBaseCommand):
+class SublimeHaskellBuildCommand(SublimeHaskellBaseCommand):
     def run(self):
         self.build('build_then_warnings')
 
 
-class SublimeHaskellTypecheck(SublimeHaskellBaseCommand):
+class SublimeHaskellTypecheckCommand(SublimeHaskellBaseCommand):
     def run(self):
         self.build('typecheck_then_warnings')
 
 
-class SublimeHaskellRebuild(SublimeHaskellBaseCommand):
+class SublimeHaskellRebuildCommand(SublimeHaskellBaseCommand):
     def run(self):
         self.build('rebuild')
 
 
-class SublimeHaskellInstall(SublimeHaskellBaseCommand):
+class SublimeHaskellInstallCommand(SublimeHaskellBaseCommand):
     def run(self):
         self.build('install')
 
-class SublimeHaskellTest(SublimeHaskellBaseCommand):
+class SublimeHaskellTestCommand(SublimeHaskellBaseCommand):
     def run(self):
         def has_tests(name, info):
             return len(info['tests']) > 0
@@ -228,7 +252,7 @@ class SublimeHaskellTest(SublimeHaskellBaseCommand):
         self.build('test', filter_project = has_tests)
 
 # Auto build current project
-class SublimeHaskellBuildAuto(SublimeHaskellBaseCommand):
+class SublimeHaskellBuildAutoCommand(SublimeHaskellBaseCommand):
     def run(self):
         current_project_dir, current_project_name = get_cabal_project_dir_and_name_of_view(self.window.active_view())
         if current_project_name and current_project_dir:
@@ -250,9 +274,10 @@ class SublimeHaskellBuildAuto(SublimeHaskellBaseCommand):
             if run_tests:
                 has_tests = False
 
-                with autocompletion.projects as projects:
-                    if current_project_name in projects:
-                        has_tests = len(projects[current_project_name]['tests']) > 0
+                projects = get_projects()
+
+                if current_project_name in projects:
+                    has_tests = len(projects[current_project_name]['description']['tests']) > 0
 
                 if has_tests:
                     config['steps'].extend(cabal_config['test']['steps'])
@@ -260,16 +285,16 @@ class SublimeHaskellBuildAuto(SublimeHaskellBaseCommand):
             run_build(self.window.active_view(), current_project_name, current_project_dir, config, None)
 
 
-class SublimeHaskellRun(SublimeHaskellBaseCommand):
+class SublimeHaskellRunCommand(SublimeHaskellBaseCommand):
     def run(self):
         self.executables = []
         ps = []
-        with autocompletion.projects as projects:
-            for p, info in projects.items():
-                for e in info['executables']:
-                    ps.append((p + ": " + e['name'], {
-                        'dir': info['dir'],
-                        'name': e['name']
+        projects = get_projects()
+        for p, info in projects.items():
+            for e in info['description']['executables']:
+                ps.append((p + ": " + e['name'], {
+                    'dir': info['path'],
+                    'name': info['name']
                     }))
 
         # Nothing to run
@@ -317,19 +342,8 @@ def run_binary(name, bin_file, base_dir):
 
 def write_output(window, text, base_dir):
     "Write text to Sublime's output panel."
-    output_view = window.get_output_panel(OUTPUT_PANEL_NAME)
-    output_view.set_read_only(False)
-    # Configure Sublime's error message parsing:
+    output_view = output_panel(window, text, panel_name = OUTPUT_PANEL_NAME)
     output_view.settings().set("result_base_dir", base_dir)
-    # Write to the output buffer:
-    output_view.run_command('sublime_haskell_output_text', {
-        'text': text })
-    # Set the selection to the beginning of the view so that "next result" works:
-    output_view.sel().clear()
-    output_view.sel().add(sublime.Region(0))
-    output_view.set_read_only(True)
-    # Show the results panel:
-    window.run_command('show_panel', {'panel': 'output.' + OUTPUT_PANEL_NAME})
 
 
 def hide_output(window):

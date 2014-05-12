@@ -1,30 +1,54 @@
 [
-    { "keys": ["ctrl+shift+r"], "context": [ {"key" : "is_haskell_source" } ], "command": "sublime_haskell_go_to_declaration" },
-    { "keys": ["ctrl+k", "ctrl+h", "ctrl+t"], "context": [ {"key" : "is_haskell_source" } ], "command": "sublime_haskell_show_type" },
-    { "keys": ["ctrl+k", "ctrl+h", "ctrl+i"], "context": [ {"key" : "is_haskell_source" } ], "command": "sublime_haskell_insert_type" },
-    { "keys": ["ctrl+k", "ctrl+i"], "context": [ {"key" : "is_haskell_source" } ], "command": "sublime_haskell_symbol_info" },
+    {
+        "keys": ["ctrl+r"],
+        "context": [
+            { "key": "haskell_source" },
+            { "key": "scanned_source" } ],
+        "command": "sublime_haskell_go_to"
+    },
+    {
+        "keys": ["ctrl+shift+r"],
+        "context": [
+            { "key": "haskell_source" },
+            { "key": "scanned_source" },
+            { "key": "in_project" } ],
+        "command": "sublime_haskell_go_to",
+        "args": { "project": true }
+    },
+    {
+        "keys": ["f12"],
+        "context": [
+            { "key" : "haskell_source" },
+            { "key": "scanned_source" } ],
+        "command": "sublime_haskell_go_to_declaration"
+    },
+    { "keys": ["ctrl+shift+y"], "context": [ { "key": "haskell_source" } ], "command": "sublime_haskell_expand_selection_expression" },
+    { "keys": ["ctrl+m", "ctrl+i"], "context": [ { "key": "haskell_source" } ], "command": "sublime_haskell_insert_import" },
+    { "keys": ["ctrl+k", "ctrl+h", "ctrl+t"], "context": [ { "key" : "haskell_source" } ], "command": "sublime_haskell_show_type" },
+    { "keys": ["ctrl+k", "ctrl+h", "ctrl+i"], "context": [ { "key" : "haskell_source" } ], "command": "sublime_haskell_insert_type" },
+    { "keys": ["ctrl+k", "ctrl+i"], "context": [ { "key" : "haskell_source" } ], "command": "sublime_haskell_symbol_info" },
     {
         "command": "sublime_haskell_complete",
         "args": {"characters": "."},
         "keys": ["."],
-        "context": [ { "key": "is_haskell_source" }, { "key": "auto_completion_popup" }, { "key": "is_module_completion" } ]
+        "context": [ { "key": "haskell_source" }, { "key": "auto_completion_popup" }, { "key": "is_module_completion" } ]
     },
     {
         "command": "sublime_haskell_complete",
         "args": {"characters": "("},
         "keys": ["("],
-        "context": [ { "key": "is_haskell_source" }, { "key": "auto_completion_popup" }, { "key": "is_import_completion" } ]
+        "context": [ { "key": "haskell_source" }, { "key": "auto_completion_popup" }, { "key": "is_import_completion" } ]
     },
     // Same keybindings as SublimeClang
     {
         "command": "sublime_haskell_next_error",
         "keys": ["alt+d", "alt+e"],
-        "context": [ { "key": "is_haskell_source" } ]
+        "context": [ { "key": "haskell_source" } ]
     },
     {
         "command": "sublime_haskell_previous_error",
         "keys": ["alt+shift+d", "alt+shift+e"],
-        "context": [ { "key": "is_haskell_source" } ]
+        "context": [ { "key": "haskell_source" } ]
     },
     {
         "keys": ["ctrl+alt+e"],

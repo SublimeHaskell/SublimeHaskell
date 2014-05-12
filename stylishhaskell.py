@@ -3,12 +3,12 @@ import sublime
 import sublime_plugin
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import is_enabled_haskell_command, call_and_wait_with_input
+    from sublime_haskell_common import is_enabled_haskell_command, call_and_wait_with_input, SublimeHaskellTextCommand
 else:
-    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, call_and_wait_with_input
+    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, call_and_wait_with_input, SublimeHaskellTextCommand
 
 
-class SublimeHaskellStylish(sublime_plugin.TextCommand):
+class SublimeHaskellStylish(SublimeHaskellTextCommand):
     def run(self, edit):
         try:
             regions = []

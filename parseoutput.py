@@ -10,9 +10,9 @@ from collections import defaultdict
 PyV3 = version[0] == "3"
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import log, are_paths_equal, call_and_wait, get_setting_async, show_status_message_process, show_status_message
+    from sublime_haskell_common import *
 else:
-    from SublimeHaskell.sublime_haskell_common import log, are_paths_equal, call_and_wait, get_setting_async, show_status_message_process, show_status_message
+    from SublimeHaskell.sublime_haskell_common import *
 
 ERROR_PANEL_NAME = 'haskell_error_checker'
 
@@ -205,7 +205,7 @@ def mark_messages_in_views(errors):
             mark_messages_in_view(errors_in_view, v)
     end_time = time.clock()
     log('total time to mark {0} diagnostics: {1} seconds'.format(
-        len(errors), end_time - begin_time))
+        len(errors), end_time - begin_time), log_debug)
 
 message_levels = {
     'hint': {
@@ -226,9 +226,8 @@ message_levels = {
 # These next and previous commands were shamelessly copied
 # from the great SublimeClang plugin.
 
-class SublimeHaskellNextError(sublime_plugin.TextCommand):
+class SublimeHaskellNextError(SublimeHaskellTextCommand):
     def run(self, edit):
-        log("SublimeHaskellNextError")
         v = self.view
         fn = v.file_name().encode("utf-8")
         line, column = v.rowcol(v.sel()[0].a)
@@ -248,7 +247,7 @@ class SublimeHaskellNextError(sublime_plugin.TextCommand):
             sublime.status_message("No more errors or warnings!")
 
 
-class SublimeHaskellPreviousError(sublime_plugin.TextCommand):
+class SublimeHaskellPreviousError(SublimeHaskellTextCommand):
     def run(self, edit):
         v = self.view
         fn = v.file_name().encode("utf-8")
@@ -293,22 +292,14 @@ def mark_messages_in_view(messages, view):
             sublime.DRAW_OUTLINED)
 
 
+def write_panel(window, text, panel_name = "sublime_haskell_panel"):
+    output_panel(window, text, panel_name = panel_name)
+
 def write_output(view, text, cabal_project_dir):
     "Write text to Sublime's output panel."
-    output_view = view.window().get_output_panel(ERROR_PANEL_NAME)
-    output_view.set_read_only(False)
-    # Configure Sublime's error message parsing:
+    output_view = output_panel(view.window(), text, panel_name = ERROR_PANEL_NAME)
     output_view.settings().set("result_file_regex", result_file_regex)
     output_view.settings().set("result_base_dir", cabal_project_dir)
-    # Write to the output buffer:
-    output_view.run_command('sublime_haskell_output_text', {
-        'text': text })
-    # Set the selection to the beginning of the view so that "next result" works:
-    output_view.sel().clear()
-    output_view.sel().add(sublime.Region(0))
-    output_view.set_read_only(True)
-    # Show the results panel:
-    view.window().run_command('show_panel', {'panel': 'output.' + ERROR_PANEL_NAME})
 
 
 def hide_output(view):
