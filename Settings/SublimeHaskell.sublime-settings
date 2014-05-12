@@ -78,7 +78,7 @@
 	// git clone https://github.com/mvoidex/hsdev
 	// cd hsdev
 	// cabal install
-	"enable_hsdev": true,
+	"enable_hsdev": false,
 
 	// Enables hdevtools (it must be installed, cabal install hdevtools)
 	// See the add_to_PATH settings to specify a custom location.
