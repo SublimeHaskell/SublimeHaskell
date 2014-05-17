@@ -515,6 +515,8 @@ class HsDev(object):
         self.hsdev_socket = None
         self.hsdev_address = None
 
+        self.part = ''
+
     def __del__(self):
         self.close()
 
@@ -662,10 +664,11 @@ class HsDev(object):
             return resp
 
     def receive_response_raw(self):
-        part = ''
-        while not part.endswith('\n'):
-            part = part + self.hsdev_socket.recv(65536).decode()
-        return part.rstrip('\n')
+        while not '\n' in self.part:
+            self.part = self.part + self.hsdev_socket.recv(65536).decode()
+        (r, _, post) = self.part.partition('\n')
+        self.part = post
+        return r
 
     # Commands
 
