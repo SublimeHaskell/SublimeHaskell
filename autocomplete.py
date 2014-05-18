@@ -1202,21 +1202,6 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             if match_language:
                 return [(to_unicode(c),) * 2 for c in autocompletion.language_completions]
 
-        # Autocompletion for import statements
-        if get_setting('auto_complete_imports'):
-            match_import = IMPORT_RE.match(line_contents)
-            if match_import:
-                import_completions = [(to_unicode(c),) * 2 for c in autocompletion.get_current_module_completions()]
-
-                # Right after "import "? Propose "qualified" as well!
-                qualified_match = IMPORT_QUALIFIED_POSSIBLE_RE.match(line_contents)
-                if qualified_match:
-                    qualified_prefix = qualified_match.group('qualifiedprefix')
-                    if qualified_prefix == "" or "qualified".startswith(qualified_prefix):
-                        import_completions.insert(0, (u"qualified", "qualified "))
-
-                return import_completions
-
         return []
 
     def on_query_completions(self, view, prefix, locations):
