@@ -850,13 +850,15 @@ class StandardInspectorAgent(threading.Thread):
             if module_name in cabal_modules:
                 return
 
-        try:
-            m = util.browse_module(module_name, cabal = cabal)
-            if m:
-                autocompletion.database.add_module(m)
+        if get_setting_async('enable_ghc_mod'):
+            try:
+                m = util.browse_module(module_name, cabal = cabal)
 
-        except Exception as e:
-            log('Inspecting in-cabal module {0} failed: {1}'.format(module_name, e))
+                if m:
+                    autocompletion.database.add_module(m)
+
+            except Exception as e:
+                log('Inspecting in-cabal module {0} failed: {1}'.format(module_name, e))
 
     def _load_standard_module_docs(self, module_name, cabal = None):
         if not cabal:
