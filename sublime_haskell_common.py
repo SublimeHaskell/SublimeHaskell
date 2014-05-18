@@ -480,6 +480,8 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
                 + "It is used for LANGUAGE and import autocompletions and type inference.\n"
                 + "Try adjusting the 'add_to_PATH' setting.\n"
                 + "You can also turn this off using the 'enable_ghc_mod' setting.")
+        # Re-raise so that calling code doesn't try to work on the `None` return value
+        raise e
 
 def wait_for_window_callback(on_appear, seconds_to_wait):
     window = sublime.active_window()
