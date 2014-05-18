@@ -243,7 +243,7 @@ class AutoCompletion(object):
                 (qualified, pref) = match_import.groups()
                 import_completions = self.get_module_completions_for(pref)
 
-                # Right after "import " Propose "qualified" as well!
+                # Right after "import "? Propose "qualified" as well!
                 qualified_match = IMPORT_QUALIFIED_POSSIBLE_RE.match(line_contents)
                 if qualified_match:
                     qualified_prefix = qualified_match.group('qualifiedprefix')
