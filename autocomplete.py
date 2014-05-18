@@ -252,7 +252,7 @@ class AutoCompletion(object):
 
                 return list(set(import_completions))
 
-        return None
+        return []
 
     def get_module_completions_for(self, qualified_prefix, modules = None):
         def module_next_name(mname):
@@ -1217,7 +1217,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 
                 return import_completions
 
-        return None
+        return []
 
     def on_query_completions(self, view, prefix, locations):
         if not is_haskell_source(view):
