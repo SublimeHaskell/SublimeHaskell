@@ -103,11 +103,22 @@ def get_qualified_symbol_at_region(view, region):
     preline = get_line_contents_before_region(view, word_region)
     return get_qualified_symbol(preline)
 
+
+# Gets available LANGUAGE options and import modules from ghc-mod
+def get_ghcmod_language_pragmas():
+
+    if get_setting_async('enable_ghc_mod'):
+        return call_ghcmod_and_wait(['lang']).splitlines()
+
+    return []
+
+
 # Autocompletion data
 class AutoCompletion(object):
     """Information for completion"""
     def __init__(self):
-        self.language_completions = []
+        self.language_pragmas = get_ghcmod_language_pragmas()
+
         # cabal name => set of modules, where cabal name is 'cabal' for cabal or sandbox path for cabal-devs
         self.module_completions = LockedObject({})
 
@@ -220,13 +231,6 @@ class AutoCompletion(object):
         # Contents of the current line up to the cursor
         line_contents = get_line_contents(view, locations[0])
 
-        # Autocompletion for LANGUAGE pragmas
-        if get_setting('auto_complete_language_pragmas'):
-            # TODO handle multiple selections
-            match_language = LANGUAGE_RE.match(line_contents)
-            if match_language:
-                return [(to_unicode(c),) * 2 for c in self.language_completions]
-
         # Autocompletion for import statements
         if get_setting('auto_complete_imports'):
             match_import_list = IMPORT_SYMBOL_RE.search(line_contents)
@@ -251,6 +255,20 @@ class AutoCompletion(object):
                         import_completions.insert(0, (u"qualified", "qualified "))
 
                 return list(set(import_completions))
+
+        return []
+
+    def get_special_completions(self, view, prefix, locations):
+
+        # Contents of the current line up to the cursor
+        line_contents = get_line_contents(view, locations[0])
+
+        # Autocompletion for LANGUAGE pragmas
+        if get_setting('auto_complete_language_pragmas'):
+            # TODO handle multiple selections
+            match_language = LANGUAGE_RE.match(line_contents)
+            if match_language:
+                return [(to_unicode(c),) * 2 for c in self.language_pragmas]
 
         return []
 
@@ -728,7 +746,6 @@ class StandardInspectorAgent(threading.Thread):
         self.update_event = threading.Event()
 
     def run(self):
-        self.init_ghcmod_completions()
         self.load_module_completions()
 
         while True:
@@ -790,15 +807,6 @@ class StandardInspectorAgent(threading.Thread):
         with self.cabal_lock:
             self.cabal_to_load.append(cabal_name)
         self.update_event.set()
-
-    # Gets available LANGUAGE options and import modules from ghc-mod
-    def init_ghcmod_completions(self):
-
-        if not get_setting_async('enable_ghc_mod'):
-            return
-
-        # Init LANGUAGE completions
-        autocompletion.language_completions = call_ghcmod_and_wait(['lang']).splitlines()
 
     # Load modules info for cabal/cabal-dev specified
     def load_module_completions(self, cabal = None):
@@ -1190,20 +1198,6 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             std_inspector.load_cabal_info()
             pass
 
-    def get_special_completions(self, view, prefix, locations):
-
-        # Contents of the current line up to the cursor
-        line_contents = get_line_contents(view, locations[0])
-
-        # Autocompletion for LANGUAGE pragmas
-        if get_setting('auto_complete_language_pragmas'):
-            # TODO handle multiple selections
-            match_language = LANGUAGE_RE.match(line_contents)
-            if match_language:
-                return [(to_unicode(c),) * 2 for c in autocompletion.language_completions]
-
-        return []
-
     def on_query_completions(self, view, prefix, locations):
         if not is_haskell_source(view):
             return []
@@ -1211,7 +1205,8 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         begin_time = time.clock()
         # Only suggest symbols if the current file is part of a Cabal project.
 
-        completions = autocompletion.get_import_completions(view, prefix, locations)
+        completions = (autocompletion.get_import_completions(view, prefix, locations) +
+                       autocompletion.get_special_completions(view, prefix, locations))
 
         if not completions:
             completions = autocompletion.get_completions(view, prefix, locations)
