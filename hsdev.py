@@ -849,7 +849,8 @@ class HsDev(object):
             (cabal, {'cabal': None}),
             (sandbox, {'sandbox': sandbox}),
             (source, {'src': None}),
-            (standalone, {'stand': None})])
+            (standalone, {'stand': None}),
+            (prefix, {'prefix': prefix})])
 
         return parse_decls(self.call(['symbol'], [name] if name else [], opts))
 
