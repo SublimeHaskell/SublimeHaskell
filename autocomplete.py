@@ -892,7 +892,7 @@ class hsdev_status(object):
                 if 'progress' in msg and msg['progress']:
                     status_msg = status_msg + ' ({0}/{1})'.format(msg['progress']['current'], msg['progress']['total'])
                 if 'child' in msg and msg['child'] and 'progress' in msg['child'] and msg['child']['progress']:
-                    status_msg = status_msg + ' {0}%'.format(msg['child']['progress']['current'] * 100 / msg['child']['progress']['total'])
+                    status_msg = status_msg + ' {0}%'.format(int(msg['child']['progress']['current'] * 100 / msg['child']['progress']['total']))
                 self.status_message.change_message(status_msg)
                 return
 
