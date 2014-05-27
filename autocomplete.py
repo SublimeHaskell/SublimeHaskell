@@ -873,6 +873,45 @@ class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
 
 
 
+class hsdev_status(object):
+    def __init__(self, status_message):
+        self.status_message = status_message
+
+    def __call__(self, msg):
+        if 'params' in msg and msg['params']:
+            object_type = msg['params']['type']
+            object_name = msg['params']['name']
+
+            if object_type == 'path':
+                if 'child' in msg and msg['child']:
+                    self.__call__(msg['child'])
+                return
+
+            if object_type == 'project':
+                status_msg = 'Inspecting project {0}'.format(object_name)
+                if 'progress' in msg and msg['progress']:
+                    status_msg = status_msg + ' ({0}/{1})'.format(msg['progress']['current'], msg['progress']['total'])
+                if 'child' in msg and msg['child'] and 'progress' in msg['child'] and msg['child']['progress']:
+                    status_msg = status_msg + ' {0}%'.format(msg['child']['progress']['current'] * 100 / msg['child']['progress']['total'])
+                self.status_message.change_message(status_msg)
+                return
+
+            if object_type == 'cabal':
+                status_msg = 'Inspecting {0}'.format(object_name)
+                if 'progress' in msg and msg['progress']:
+                    status_msg = status_msg + ' ({0}/{1})'.format(msg['progress']['current'], msg['progress']['total'])
+                self.status_message.change_message(status_msg)
+                return
+
+            if object_type == 'module':
+                status_msg = 'Inspecting {0}'.format(object_name)
+                if 'progress' in msg and msg['progress']:
+                    status_msg = status_msg + ' ({0}/{1})'.format(msg['progress']['current'], msg['progress']['total'])
+                self.status_message.change_message(status_msg)
+                return
+
+
+
 hsdev_inspector = None
 
 def hsdev_client():
@@ -895,11 +934,13 @@ class HsDevAgent(threading.Thread):
 
     def start_hsdev(self):
         hsdev.HsDev.start_server(as_client = False, cache = HSDEV_CACHE_PATH)
-        if not self.hsdev.connect():
-            log("HsDevAgent.start_hsdev: unable to connect to server", log_warning)
+        self.hsdev.connect_async(autoconnect = True)
+        self.hsdev_scanner.connect_async(autoconnect = True)
+        if not self.hsdev.wait():
+            log('Unable to connect to hsdev server', log_warning)
+        if not self.hsdev_scanner.wait():
+            log('Unable to connect to hsdev server', log_warning)
         self.hsdev.link()
-        if not self.hsdev_scanner.connect():
-            log("HsDevAgent.start_hsdev: unable to connect to server", log_warning)            
 
     def stop_hsdev(self):
         self.hsdev_scanner.close()
@@ -1034,7 +1075,7 @@ class HsDevAgent(threading.Thread):
                     if 'status' in msg:
                         s.change_message('Loading standard modules info for {0}: {1}'.format(cabal, msg['task']['sandbox']))
 
-                self.hsdev_scanner.scan_cabal(cabal = is_cabal(cabal), sandboxes = as_sandboxes(cabal), wait = True, on_status = cabal_status)
+                self.hsdev_scanner.scan_cabal(cabal = is_cabal(cabal), sandboxes = as_sandboxes(cabal), wait = True, on_status = hsdev_status(s))
 
                 end_time = time.clock()
                 log('loading standard modules info for {0} within {1} seconds'.format(cabal, end_time - begin_time), log_debug)
@@ -1052,7 +1093,7 @@ class HsDevAgent(threading.Thread):
                     if 'progress' in msg:
                         s.percentage_message(msg['progress']['current'], msg['progress']['total'])
 
-                self.hsdev_scanner.scan(paths = [path], wait = True, on_status = file_scanned)
+                self.hsdev_scanner.scan(paths = [path], wait = True, on_status = hsdev_status(s))
 
                 end_time = time.clock()
                 log('total inspection time: {0} seconds'.format(end_time - begin_time), log_debug)
@@ -1073,7 +1114,7 @@ class HsDevAgent(threading.Thread):
                     if 'progress' in msg:
                         s.percentage_message(msg['progress']['current'], msg['progress']['total'])
 
-                self.hsdev_scanner.scan(projects = [cabal_dir], wait = True, on_status = file_scanned)
+                self.hsdev_scanner.scan(projects = [cabal_dir], wait = True, on_status = hsdev_status(s))
 
                 end_time = time.clock()
                 log('total inspection time: {0} seconds'.format(end_time - begin_time), log_debug)

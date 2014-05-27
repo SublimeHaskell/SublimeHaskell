@@ -507,18 +507,70 @@ class HsDevHolder(object):
         kwargs['port'] = self.port
         return fn(*args, **kwargs)
 
+def reconnect_function(fn):
+    def wrapped(self, *args, **kwargs):
+        def run_fn():
+            if 'autoconnect' in kwargs:
+                self.autoconnect = kwargs['autoconnect']
+                del kwargs['autoconnect']
+            return fn(self, *args, **kwargs)
+        self.set_reconnect_function(run_fn)
+        return run_fn()
+    return wrapped
+
+
+
+class begin_connecting(object):
+    def __init__(self, agent):
+        self.agent = agent
+
+    def __enter__(self):
+        self.agent.set_connecting()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if type:
+            self.agent.set_unconnected()
+        else:
+            if self.agent.is_connecting():
+                self.agent.set_unconnected()
+
+
+
+def connect_function(fn):
+    def wrapped(self, *args, **kwargs):
+        if self.is_unconnected():
+            with begin_connecting(self):
+                return fn(self, *args, **kwargs)
+    return wrapped
+
+
+
 class HsDev(object):
     def __init__(self, port = 4567):
         self.port = port
+        self.connecting = threading.Event()
         self.connected = threading.Event()
         self.socket = None
         self.hsdev_socket = None
         self.hsdev_address = None
 
+        self.connect_fun = None
+
         self.part = ''
 
     def __del__(self):
         self.close()
+
+    # Autoconnect
+    def set_reconnect_function(self, f):
+        if self.connect_fun is None:
+            self.connect_fun = f
+
+    def reconnect(self):
+        if self.connect_fun is not None:
+            log('Reconnecting to hsdev...', log_info)
+            self.connect_fun()
 
     # Util
 
@@ -545,50 +597,51 @@ class HsDev(object):
 
     # Static creators
 
-    def server(port = 4567, cache = None):
+    def server(port = 4567, cache = None, autoconnect = False):
         h = HsDev(port = port)
-        h.accept()
+        h.accept(autoconnect = autoconnect)
         start_server(as_client = True, port = port, cache = cache)
         return h
 
-    def server_async(port = 4567, cache = None):
+    def server_async(port = 4567, cache = None, autoconnect = False):
         h = HsDev(port = port)
-        h.accept_async()
+        h.accept_async(autoconnect = autoconnect)
         start_server(as_client = True, port = port, cache = cache)
         return h
 
-    def client(port = 4567, cache = None):
+    def client(port = 4567, cache = None, autoconnect = False):
         start_server(as_client = False, port = port, cache = cache)
         h = HsDev(port = port)
-        h.connect()
+        h.connect(autoconnect = autoconnect)
         return h
 
-    def client_async(port = 4567, cache = None):
+    def client_async(port = 4567, cache = None, autoconnect = False):
         start_server(as_client = False, port = port, cache = cache)
         h = HsDev(port = port)
-        h.connect_async()
+        h.connect_async(autoconnect = autoconnect)
         return h
 
     # Socket functions
 
+    @connect_function
+    @reconnect_function
     def accept(self):
-        if self.connected.is_set():
-            return
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind(('127.0.0.1', self.port))
         self.socket.listen(1)
         (s, addr) = self.socket.accept()
         self.hsdev_socket = s
         self.hsdev_address = addr
-        self.connected.set()
+        self.set_connected()
 
+    @reconnect_function
     def accept_async(self):
         thread = threading.Thread(target = self.accept)
         thread.start()
 
+    @connect_function
+    @reconnect_function
     def connect(self, tries = 10):
-        if self.connected.is_set():
-            return
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         for n in range(0, tries):
@@ -597,7 +650,7 @@ class HsDev(object):
                 self.socket.connect(('127.0.0.1', self.port))
                 self.hsdev_socket = self.socket
                 self.hsdev_address = '127.0.0.1'
-                self.connected.set()
+                self.set_connected()
                 log('connected to hsdev server', log_info)
                 return True
             except Exception as e:
@@ -606,15 +659,18 @@ class HsDev(object):
 
         return False
 
+    @reconnect_function
     def connect_async(self, tries = 10):
-        thread = threading.Thread(target = self.connect)
+        thread = threading.Thread(
+            target = self.connect,
+            kwargs = { 'tries' : tries })
         thread.start()
   
     def wait(self, timeout = None):
         return self.connected.wait(timeout)
 
     def close(self):
-        if not self.is_connected():
+        if self.is_unconnected():
             return
         if self.hsdev_socket:
             self.hsdev_socket.close()
@@ -622,13 +678,39 @@ class HsDev(object):
         self.socket.close()
         self.connected.clear()
 
+    def is_connecting(self):
+        return self.connecting.is_set()
+
     def is_connected(self):
         return self.connected.is_set()
 
+    def is_unconnected(self):
+        return (not self.is_connecting()) and (not self.is_connected())
+
+    def set_unconnected(self):
+        if self.connecting.is_set():
+            self.connecting.clear()
+        if self.connected.is_set():
+            self.connected.clear()
+
+    def set_connecting(self):
+        self.set_unconnected()
+        self.connecting.set()
+
+    def set_connected(self):
+        if self.is_connecting():
+            self.connected.set()
+            self.connecting.clear()
+        else:
+            log('HsDev.set_connected called while not in connecting state', log_debug)
+
     def call(self, command, args = [], opts = {}, on_status = None):
         if not self.is_connected():
-            log('HsDev.call: not connected', log_error)
-            return None
+            log('Not connected to hsdev', log_error)
+            if self.autoconnect:
+                self.reconnect()
+            if not self.is_connected():
+                return None
 
         try:
             # log
@@ -652,6 +734,10 @@ class HsDev(object):
             return r
         except Exception as e:
             log('{0} fails with exception: {1}'.format(call_cmd, e), log_error)
+            log('Connection to hsdev lost', log_error)
+            self.close()
+            if self.autoconnect:
+                self.reconnect()
             return None
 
     def receive_response(self, on_status = None):
