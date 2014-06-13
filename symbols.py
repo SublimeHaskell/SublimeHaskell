@@ -43,10 +43,7 @@ class Symbol(object):
         JSON contains only line + column
         This function used to merge module location, which contains all other info with line + column
         """
-        if self.location and self.by_source():
-            self.location.set_file(module_loc)
-        else:
-            self.location = module_loc
+        self.location = module_loc
 
     def full_name(self):
         return self.module.name + '.' + self.name
@@ -129,15 +126,16 @@ class Declaration(Symbol):
         if self.docs:
             info.extend(['', self.docs])
 
-        if self.by_source():
+        if self.location:
             info.append('')
             if self.location.project:
                 info.append('Defined in {0} at {1}'.format(self.location.project, self.location.position()))
             else:
                 info.append('Defined at {0}'.format(self.location.position()))
-        if self.by_cabal():
+                
+        if self.module and self.module.cabal:
             info.append('')
-            info.append('Installed in {0} in package {1}'.format(self.location.cabal, self.location.package.package_id()))
+            info.append('Installed in {0}'.format(self.module.cabal))
 
         return '\n'.join(info)
 
@@ -226,7 +224,7 @@ def same_module(l, r):
     and modules defined in one file, in same cabal-dev sandbox or in cabal
     """
     same_cabal = l.cabal and r.cabal and (l.cabal == r.cabal)
-    same_filename = l.by_source() and r.by_source() and (l.location.filename == r.location.filename)
+    same_filename = l.location and r.location and (l.location.filename == r.location.filename)
     nowhere = (not l.cabal) and (not l.location) and (not r.cabal) and (not r.location)
     return l.name == r.name and (same_cabal or same_filename or nowhere)
 

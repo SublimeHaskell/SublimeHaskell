@@ -521,7 +521,7 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
                     self.candidates = [(m, ident) for m in import_list]
                     self.view.window().show_quick_panel([
                         ['Select imported module', 'from where {0} may be imported'.format(ident)],
-                        ['No, thanks']], self.on_import_selected)
+                        ['No, thanks', '']], self.on_import_selected)
                     return
 
                 show_status_message('Symbol "{0}" not found'.format(ident), False)
@@ -545,7 +545,10 @@ class SublimeHaskellSymbolInfoCommand(sublime_plugin.TextCommand):
 
     def on_import_selected(self, idx):
         if idx == 0: # Yes, select imported module
-            self.view.window().show_quick_panel(['{0}.{1}'.format(i[0], i[1]) for i in self.candidates], self.on_candidate_selected)
+            sublime.set_timeout(
+                lambda: self.view.window().show_quick_panel(['{0}.{1}'.format(i[0], i[1]) for i in self.candidates], 
+                                                             self.on_candidate_selected), 10
+            )
 
     def on_candidate_selected(self, idx):
         if idx == -1:
