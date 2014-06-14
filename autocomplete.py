@@ -184,7 +184,7 @@ class AutoCompletion(object):
             if not suggestions:
                 suggestions = hsdev_client().module(name = qualified_name, cabal = current_is_cabal(), sandbox = current_sandbox()).declarations.values()
         else:
-            suggestions = hsdev_client().complete(qualified_prefix, current_file_name, cabal = current_is_cabal(), sandbox = current_sandbox()) or []
+            suggestions = hsdev_client().complete(qualified_prefix, current_file_name, sandbox = current_sandbox()) or []
             if not suggestions:
                 suggestions = hsdev_client().scope(current_file_name, sandbox = current_sandbox(), global_scope = True, prefix = qualified_prefix) or []
             if not suggestions:
