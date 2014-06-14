@@ -114,8 +114,8 @@
         "command": "sublime_haskell_clear_imports"
     },
     {
-        "caption": "SublimeHaskell: Switch Cabal/Cabal-Dev",
-        "command": "sublime_haskell_switch_cabal_dev"
+        "caption": "SublimeHaskell: Switch Cabal sandbox",
+        "command": "sublime_haskell_switch_cabal_sandbox"
     },
     {
         "caption": "SublimeHaskell: Reinspect all",

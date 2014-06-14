@@ -124,7 +124,7 @@ def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb
         # Replace NULLs to indents
         out = stdout.replace('\0', '\n  ')
 
-        success = len(out) == 0
+        success = len(out.strip()) == 0
 
         if not success:
             all_cmds_outputs.append(out)

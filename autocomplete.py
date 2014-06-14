@@ -451,6 +451,9 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
             self.declarations = [[(decl.location.column * ' ') + decl.brief()] for decl in decls]
         self.files = [decl.location for decl in decls]
 
+        if not decls:
+            return
+
         self.window.show_quick_panel(self.declarations, self.on_done, 0, self.closest_idx(decls), self.on_highlighted)
 
     def qualified_decls(self, decls):
@@ -462,11 +465,12 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
         return list(sorted(decls, key = lambda d: (d.location.filename, d.location.line)))
 
     def closest_idx(self, decls):
-        return min(
-            filter(
-                lambda d: d[1].location.filename == self.current_filename,
-                enumerate(decls)),
-            key = lambda d: abs(d[1].location.line - self.line))[0]
+        fdecls = list(filter(
+            lambda d: d[1].location.filename == self.current_filename,
+            enumerate(decls)))
+        if not fdecls:
+            return -1
+        return min(fdecls, key = lambda d: abs(d[1].location.line - self.line))[0]
 
     def on_done(self, idx):
         if idx == -1:
@@ -587,7 +591,8 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
 
     def on_import_selected(self, idx):
         if idx == 0: # Yes, select imported module
-            self.view.window().show_quick_panel(['{0}.{1}'.format(i[0], i[1]) for i in self.candidates], self.on_candidate_selected)
+            sublime.set_timeout(
+                lambda: self.view.window().show_quick_panel(['{0}.{1}'.format(i[0], i[1]) for i in self.candidates], self.on_candidate_selected), 0)
 
     def on_candidate_selected(self, idx):
         if idx == -1:
@@ -869,6 +874,45 @@ class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
 
 
 
+class hsdev_status(object):
+    def __init__(self, status_message):
+        self.status_message = status_message
+
+    def __call__(self, msg):
+        if 'params' in msg and msg['params']:
+            object_type = msg['params']['type']
+            object_name = msg['params']['name']
+
+            if object_type == 'path':
+                if 'child' in msg and msg['child']:
+                    self.__call__(msg['child'])
+                return
+
+            if object_type == 'project':
+                status_msg = 'Inspecting project {0}'.format(object_name)
+                if 'progress' in msg and msg['progress']:
+                    status_msg = status_msg + ' ({0}/{1})'.format(msg['progress']['current'], msg['progress']['total'])
+                if 'child' in msg and msg['child'] and 'progress' in msg['child'] and msg['child']['progress']:
+                    status_msg = status_msg + ' {0}%'.format(int(msg['child']['progress']['current'] * 100 / msg['child']['progress']['total']))
+                self.status_message.change_message(status_msg)
+                return
+
+            if object_type == 'cabal':
+                status_msg = 'Inspecting {0}'.format(object_name)
+                if 'progress' in msg and msg['progress']:
+                    status_msg = status_msg + ' ({0}/{1})'.format(msg['progress']['current'], msg['progress']['total'])
+                self.status_message.change_message(status_msg)
+                return
+
+            if object_type == 'module':
+                status_msg = 'Inspecting {0}'.format(object_name)
+                if 'progress' in msg and msg['progress']:
+                    status_msg = status_msg + ' ({0}/{1})'.format(msg['progress']['current'], msg['progress']['total'])
+                self.status_message.change_message(status_msg)
+                return
+
+
+
 hsdev_inspector = None
 
 def hsdev_client():
@@ -880,6 +924,7 @@ class HsDevAgent(threading.Thread):
         self.daemon = True
         self.cabal_to_load = LockedObject([])
         self.dirty_files = LockedObject([])
+        self.dirty_paths = LockedObject([])
         self.hsdev = hsdev.HsDev()
         self.hsdev_scanner = hsdev.HsDev()
 
@@ -890,23 +935,27 @@ class HsDevAgent(threading.Thread):
 
     def start_hsdev(self):
         hsdev.HsDev.start_server(as_client = False, cache = HSDEV_CACHE_PATH)
-        if not self.hsdev.connect():
-            log("HsDevAgent.start_hsdev: unable to connect to server", log_warning)
+        self.hsdev.connect_async(autoconnect = True)
+        self.hsdev_scanner.connect_async(autoconnect = True)
+        if not self.hsdev.wait():
+            log('Unable to connect to hsdev server', log_warning)
+        if not self.hsdev_scanner.wait():
+            log('Unable to connect to hsdev server', log_warning)
         self.hsdev.link()
-        if not self.hsdev_scanner.connect():
-            log("HsDevAgent.start_hsdev: unable to connect to server", log_warning)            
 
     def stop_hsdev(self):
         self.hsdev_scanner.close()
         self.hsdev.close()
 
     def on_hsdev_enabled(self, key, value):
-        self.hsdev_enabled_changed = True
-        self.hsdev_enabled = value
-        self.force_inspect()
+        if key == 'enable_hsdev' and self.hsdev_enabled != value:
+            self.hsdev_enabled_changed = True
+            self.hsdev_enabled = value
+            self.force_inspect()
 
     def run(self):
         if hsdev.hsdev_enabled():
+            self.hsdev_enabled = True
             self.start_hsdev()
 
         subscribe_setting('enable_hsdev', self.on_hsdev_enabled)
@@ -933,6 +982,17 @@ class HsDevAgent(threading.Thread):
             for c in load_cabal:
                 try:
                     self.reinspect_cabal(c)
+                except:
+                    continue
+
+            scan_paths = []
+            with self.dirty_paths as dirty_paths:
+                scan_paths = dirty_paths[:]
+                dirty_paths[:] = []
+
+            for p in scan_paths:
+                try:
+                    self.reinspect_path(p)
                 except:
                     continue
 
@@ -979,18 +1039,19 @@ class HsDevAgent(threading.Thread):
         self.reinspect_event.set()
 
     def mark_all_files(self, window):
-        folder_files = []
-        for folder in window.folders():
-            folder_files.extend(list_files_in_dir_recursively(folder))
         with self.dirty_files as dirty_files:
-            dirty_files.extend([f for f in folder_files if f.endswith('.hs')])
+            dirty_files.extend(list(filter(lambda f: f and f.endswith('.hs'), [v.file_name() for v in window.views()])))
+        with self.dirty_paths as dirty_paths:
+            dirty_paths.extend(window.folders())
         self.reinspect_event.set()
 
     def mark_file_dirty(self, filename):
         if filename is None:
             return
+
         with self.dirty_files as dirty_files:
             dirty_files.append(filename)
+
         self.reinspect_event.set()
 
     def mark_cabal(self, cabal_name = None):
@@ -1013,9 +1074,9 @@ class HsDevAgent(threading.Thread):
 
                 def cabal_status(msg):
                     if 'status' in msg:
-                        s.change_message('Loading standard modules info for {0}: {1}'.format(cabal, msg['task']))
+                        s.change_message('Loading standard modules info for {0}: {1}'.format(cabal, msg['task']['sandbox']))
 
-                self.hsdev_scanner.scan_cabal(cabal = is_cabal(cabal), sandboxes = as_sandboxes(cabal), wait = True, on_status = cabal_status)
+                self.hsdev_scanner.scan_cabal(cabal = is_cabal(cabal), sandboxes = as_sandboxes(cabal), wait = True, on_status = hsdev_status(s))
 
                 end_time = time.clock()
                 log('loading standard modules info for {0} within {1} seconds'.format(cabal, end_time - begin_time), log_debug)
@@ -1024,9 +1085,28 @@ class HsDevAgent(threading.Thread):
             log('loading standard modules info for {0} failed with {1}'.format(cabal, e), log_error)
 
     @hsdev.use_hsdev
+    def reinspect_path(self, path):
+        begin_time = time.clock()
+        log('reinspecting path {0}'.format(path), log_info)
+        try:
+            with status_message_process('Reinspecting {0}'.format(path), priority = 1) as s:
+                def file_scanned(msg):
+                    if 'progress' in msg:
+                        s.percentage_message(msg['progress']['current'], msg['progress']['total'])
+
+                self.hsdev_scanner.scan(paths = [path], wait = True, on_status = hsdev_status(s))
+
+                end_time = time.clock()
+                log('total inspection time: {0} seconds'.format(end_time - begin_time), log_debug)
+
+        except Exception as e:
+            log('Inspecting path {0} failed: {1}'.format(path, e), log_error)
+
+
+    @hsdev.use_hsdev
     def reinspect_project(self, cabal_dir, index, count):
         begin_time = time.clock()
-        log('reinspecting project ({0})'.format(cabal_dir), log_info)
+        log('reinspecting project {0}'.format(cabal_dir), log_info)
         (project_name, cabal_file) = get_cabal_in_dir(cabal_dir)
 
         try:
@@ -1035,7 +1115,7 @@ class HsDevAgent(threading.Thread):
                     if 'progress' in msg:
                         s.percentage_message(msg['progress']['current'], msg['progress']['total'])
 
-                self.hsdev_scanner.scan(projects = [cabal_dir], wait = True, on_status = file_scanned)
+                self.hsdev_scanner.scan(projects = [cabal_dir], wait = True, on_status = hsdev_status(s))
 
                 end_time = time.clock()
                 log('total inspection time: {0} seconds'.format(end_time - begin_time), log_debug)
@@ -1063,8 +1143,8 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
     def __init__(self):
         self.local_settings = {
             'enable_ghc_mod': None,
-            'use_cabal_dev': None,
-            'cabal_dev_sandbox': None,
+            'use_cabal_sandbox': None,
+            'cabal_sandbox': None,
         }
 
         for s in self.local_settings.keys():
@@ -1161,7 +1241,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         filename = view.file_name()
         if filename:
             (cabal_dir, project_name) = get_cabal_project_dir_and_name_of_file(filename)
-            cabal = 'cabal-dev' if get_setting_async('use_cabal_dev') else 'cabal'
+            cabal = 'cabal sandbox' if get_setting_async('use_cabal_sandbox') else 'cabal'
             if project_name:
                 view.set_status('sublime_haskell_cabal', '{0}: {1}'.format(cabal, project_name))
 
@@ -1228,6 +1308,9 @@ def start_inspector():
 
     hsdev_inspector = HsDevAgent()
     hsdev_inspector.start()
+
+    global INSPECTOR_RUNNING
+    INSPECTOR_RUNNING = True
 
 def plugin_loaded():
     global OUTPUT_PATH
