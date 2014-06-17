@@ -305,7 +305,7 @@ class AutoCompletion(object):
         return set(completions)
 
 
-autocompletion = AutoCompletion()
+autocompletion = None
 
 
 
@@ -1302,6 +1302,9 @@ def start_inspector():
 
     INSPECTOR_RUNNING = True
 
+def start_autocompletion():
+    global autocompletion
+    autocompletion = AutoCompletion()
 
 def plugin_loaded():
     global MODULE_INSPECTOR_SOURCE_PATH
@@ -1326,6 +1329,8 @@ def plugin_loaded():
 
     if INSPECTOR_ENABLED:
         start_inspector()
+
+    start_autocompletion()
 
     # TODO: How to stop_hdevtools() in Sublime Text 2?
     start_hdevtools()
