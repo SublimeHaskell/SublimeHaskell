@@ -212,7 +212,7 @@ def remove_all(port = None):
 def list_modules(cabal = None, project = None, package = None, source = False, standalone = False, port = None):
     return parse_modules(
         hsdev(
-            ['list', 'modules'] +
+            ['modules'] +
             cabal_path(cabal) +
             if_some(project, ['--project', project]) +
             if_some(package, ['--package', package]) +
@@ -220,10 +220,10 @@ def list_modules(cabal = None, project = None, package = None, source = False, s
             (['--stand'] if standalone else []), port = port))
 
 def list_packages(port = None):
-    return hsdev(['list', 'packages'], port = port)
+    return hsdev(['packages'], port = port)
 
 def list_projects(port = None):
-    return hsdev(['list', 'projects'], port = port)
+    return hsdev(['projects'], port = port)
 
 def symbol(name = None, project = None, file = None, module = None, locals = False, package = None, cabal = None, source = False, standalone = False, prefix = None, find = None, port = None):
     return parse_decls(
@@ -544,6 +544,29 @@ def connect_function(fn):
                 return fn(self, *args, **kwargs)
     return wrapped
 
+def command(fn):
+    def wrapped(self, *args, **kwargs):
+        on_resp = kwargs.pop('on_response', None)
+        on_not = kwargs.pop('on_notify', None)
+        on_err = kwargs.pop('on_error', None)
+        (name_, args_, opts_, on_result_) = fn(self, *args, **kwargs)
+        def on_response(r):
+            if on_result_:
+                on_resp(on_result_(r))
+            else:
+                on_resp(r)
+        self.call(
+            name_,
+            args_,
+            opts_,
+            on_response if on_resp else None,
+            on_not,
+            on_err)
+    return wrapped
+
+def cmd(name_, args_, opts_, on_result = None):
+    return (name_, args_, opts_, on_result)
+
 
 
 class HsDev(object):
@@ -552,8 +575,11 @@ class HsDev(object):
         self.connecting = threading.Event()
         self.connected = threading.Event()
         self.socket = None
-        self.hsdev_socket = None
+        self.listener = None
         self.hsdev_address = None
+        self.autoconnect = True
+        self.map = {}
+        self.id = 1
 
         self.connect_fun = None
 
@@ -574,10 +600,9 @@ class HsDev(object):
 
     # Util
 
-    def start_server(as_client = False, port = 4567, cache = None):
+    def start_server(port = 4567, cache = None):
         cmd = concat_args([
             (True, ["hsdev", "server", "start"]),
-            (as_client, ["--as-client"]),
             (port, ["--port", str(port)]),
             (cache, ["--cache", cache])])
 
@@ -597,47 +622,19 @@ class HsDev(object):
 
     # Static creators
 
-    def server(port = 4567, cache = None, autoconnect = False):
-        h = HsDev(port = port)
-        h.accept(autoconnect = autoconnect)
-        start_server(as_client = True, port = port, cache = cache)
-        return h
-
-    def server_async(port = 4567, cache = None, autoconnect = False):
-        h = HsDev(port = port)
-        h.accept_async(autoconnect = autoconnect)
-        start_server(as_client = True, port = port, cache = cache)
-        return h
-
     def client(port = 4567, cache = None, autoconnect = False):
-        start_server(as_client = False, port = port, cache = cache)
+        start_server(port = port, cache = cache)
         h = HsDev(port = port)
         h.connect(autoconnect = autoconnect)
         return h
 
     def client_async(port = 4567, cache = None, autoconnect = False):
-        start_server(as_client = False, port = port, cache = cache)
+        start_server(port = port, cache = cache)
         h = HsDev(port = port)
         h.connect_async(autoconnect = autoconnect)
         return h
 
     # Socket functions
-
-    @connect_function
-    @reconnect_function
-    def accept(self):
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.bind(('127.0.0.1', self.port))
-        self.socket.listen(1)
-        (s, addr) = self.socket.accept()
-        self.hsdev_socket = s
-        self.hsdev_address = addr
-        self.set_connected()
-
-    @reconnect_function
-    def accept_async(self):
-        thread = threading.Thread(target = self.accept)
-        thread.start()
 
     @connect_function
     @reconnect_function
@@ -650,6 +647,8 @@ class HsDev(object):
                 self.socket.connect(('127.0.0.1', self.port))
                 self.hsdev_socket = self.socket
                 self.hsdev_address = '127.0.0.1'
+                self.listener = threading.Thread(target = self.listen)
+                self.listener.start()
                 self.set_connected()
                 log('connected to hsdev server', log_info)
                 return True
@@ -704,7 +703,13 @@ class HsDev(object):
         else:
             log('HsDev.set_connected called while not in connecting state', log_debug)
 
-    def call(self, command, args = [], opts = {}, on_status = None):
+    def on_receive(self, id, on_response = None, on_notify = None, on_error = None):
+        self.map[id] = (on_response, on_notify, on_error)
+
+    def call(self, command, args = [], opts = {}, on_response = None, on_notify = None, on_error = None, id = None):
+        # log
+        call_cmd = 'hsdev {0}'.format(' '.join([command] + args + flatten_opts(opts)))
+
         if not self.is_connected():
             log('Not connected to hsdev', log_error)
             if self.autoconnect:
@@ -713,102 +718,82 @@ class HsDev(object):
                 return None
 
         try:
-            # log
-            call_cmd = 'hsdev {0}'.format(' '.join(command + args + flatten_opts(opts)))
-
             opts.update({'no-file': None})
             msg = json.dumps({
+                'id': id,
                 'command': command,
                 'args': args,
                 'opts': opts })
 
+            if on_response or on_notify or on_error:
+                self.on_receive(id, on_response, on_notify, on_error)
+
             self.hsdev_socket.sendall('{0}\n'.format(msg).encode())
-            r = self.receive_response(on_status)
-            if 'error' in r:
-                if 'details' in r:
-                    log('{0} returns error: {1}, details: {2}'.format(call_cmd, r['error'], r['details']), log_error)
-                else:
-                    log('{0} returns error: {1}'.format(call_cmd, r['error']), log_error)
-                return None
             log(call_cmd, log_trace)
-            return r
         except Exception as e:
             log('{0} fails with exception: {1}'.format(call_cmd, e), log_error)
             log('Connection to hsdev lost', log_error)
             self.close()
             if self.autoconnect:
                 self.reconnect()
-            return None
 
-    def receive_response(self, on_status = None):
-        resp = json.loads(self.receive_response_raw())
-        if 'status' in resp:
-            if on_status:
-                on_status(resp)
-            return self.receive_response(on_status)
-        else:
-            return resp
+    def listen(self):
+        while True:
+            resp = json.loads(self.get_response())
+            if 'id' in resp:
+                if resp['id'] in self.map:
+                    (on_resp, on_not, on_err) = self.map[resp['id']]
+                    if 'notify' in resp:
+                        if on_not:
+                            on_not(resp['notify'])
+                    if 'error' in resp:
+                        log('hsdev returns error: {0}, details: {1}'.format(resp['error'], resp.get('details')), log_error)
+                        if on_err:
+                            on_err(resp['error'])
+                    if 'result' in resp:
+                        if on_resp:
+                            on_resp(resp['result'])
 
-    def receive_response_raw(self):
+    def get_response(self):
         while not '\n' in self.part:
-            self.part = self.part + self.hsdev_socket.recv(65536).decode()
+            self.part = self.part + self.socket.recv(65536).decode()
         (r, _, post) = self.part.partition('\n')
         self.part = post
         return r
 
     # Commands
 
-    def link(self, hold = False):
-        return self.call(['link'], [], concat_opts([(hold, {'hold': None})]))
+    @command
+    def link(self, hold = False, **kwargs):
+        return cmd('link', [], concat_opts([(hold, {'hold': None})]))
 
+    @command
     def ping(self):
-        r = self.call(['ping'], [], {})
-        return r and ('message' in r) and (r['message'] == 'pong')
+        return cmd('ping', [], {}, lambda r: r and ('message' in r) and (r['message'] == 'pong'))
 
-    def scan_cabal(self, cabal = None, sandboxes = [], wait = False, on_status = None):
-        if cabal is None:
-            cabal = not sandboxes # default: --cabal enabled if not sandboxes specified and disabled otherwise
-
+    @command
+    def scan(self, cabal = None, sandboxes = [], projects = [], files = [], paths = []):
         opts = concat_opts([
             (cabal, {'cabal': None}),
             (sandboxes, {'sandbox': sandboxes}),
-            (wait or on_status, {'wait': None}),
-            (on_status, {'status': None})])
+            (projects, {'project': projects}),
+            (files, {'file': files}),
+            (paths, {'path': paths})])
 
-        return self.call(['scan', 'cabal'], [], opts, on_status)
+        return cmd('scan', [], opts)
 
-    def scan_module(self, module, cabal = None, sandboxes = [], wait = False, on_status = None):
-        if cabal is None:
-            cabal = not sandboxes
-
+    @command
+    def rescan(self, cabal = None, sandboxes = [], projects = [], files = [], paths = []):
         opts = concat_opts([
             (cabal, {'cabal': None}),
             (sandboxes, {'sandbox': sandboxes}),
-            (wait or on_status, {'wait': None}),
-            (on_status, {'status': None})])
-
-        return self.call(['scan', 'module'], [module], opts, on_status)
-
-    def scan(self, projects = [], files = [], paths = [], wait = False, on_status = None):
-        opts = concat_opts([
             (projects, {'project': projects}),
             (files, {'file': files}),
-            (paths, {'path': paths}),
-            (wait or on_status, {'wait': None}),
-            (on_status, {'status': None})])
+            (paths, {'path': paths})])
 
-        return self.call(['scan'], [], opts, on_status)
+        return cmd('rescan', [], opts)
 
-    def rescan(self, projects = [], files = [], paths = [], wait = False, on_status = None):
-        opts = concat_opts([
-            (projects, {'project': projects}),
-            (files, {'file': files}),
-            (paths, {'path': paths}),
-            (wait or on_status, {'wait': None}),
-            (on_status, {'status': None})])
-
-        return self.call(['rescan'], [], opts, on_status)
-
+    @command
     def remove(self, cabal = False, sandboxes = [], projects = [], files = [], modules = []):
         opts = concat_opts([
             (cabal, {'cabal': None}),
@@ -817,11 +802,13 @@ class HsDev(object):
             (files, {'file': files}),
             (modules, {'module': modules})])
 
-        return self.call(['remove'], [], opts)
+        return cmd('remove', [], opts)
 
+    @command
     def remove_all(self):
-        return self.call(['remove'], [], {'all': None})
+        return cmd('remove', [], {'all': None})
 
+    @command
     def list_modules(self, cabal = False, sandboxes = None, projects = None, packages = None, source = False, standalone = False):
         opts = concat_opts([
             (cabal, {'cabal': None}),
@@ -831,14 +818,17 @@ class HsDev(object):
             (source, {'src': None}),
             (standalone, {'stand': None})])
 
-        return parse_modules(self.call(['list', 'modules'], [], opts))
+        return cmd('modules', [], opts, parse_modules)
 
+    @command
     def list_packages(self):
-        return self.call(['list', 'packages'], [], {})
+        return cmd('packages', [], {})
 
+    @command
     def list_projects(self):
-        return self.call(['list', 'projects'], [], {})
+        return cmd('projects', [], {})
 
+    @command
     def symbol(self, name = None, project = None, file = None, module = None, locals = False, package = None, cabal = False, sandbox = None, source = False, standalone = False, prefix = None, find = None):
         opts = concat_opts([
             (project, {'project': project}),
@@ -852,8 +842,9 @@ class HsDev(object):
             (standalone, {'stand': None}),
             (prefix, {'prefix': prefix})])
 
-        return parse_decls(self.call(['symbol'], [name] if name else [], opts))
+        return cmd('symbol', [name] if name else [], opts, parse_decls)
 
+    @command
     def module(self, name = None, project = None, file = None, locals = False, package = None, cabal = False, sandbox = None, source = False):
         opts = concat_opts([
             (name, {'module': name}),
@@ -865,35 +856,40 @@ class HsDev(object):
             (sandbox, {'sandbox': sandbox}),
             (source, {'src': None})])
 
-        return parse_module(self.call(['module'], [], opts))
+        return cmd('module', [], opts, parse_module)
 
+    @command
     def project(self, project):
-        return self.call(['project'], [], {'project': project})
+        return cmd('project', [], {'project': project})
 
+    @command
     def lookup(self, name, file, sandbox = None):
         opts = {'file': file}
 
         if sandbox:
             opts.update({'sandbox': sandbox})
 
-        return parse_decls(self.call(['lookup'], [name], opts))
+        return cmd('lookup', [name], opts, parse_decls)
 
+    @command
     def whois(self, name, file, sandbox = None):
         opts = {'file': file}
 
         if sandbox:
             opts.update({'sandbox': sandbox})
 
-        return parse_decls(self.call(['whois'], [name], opts))
+        return cmd('whois', [name], opts, parse_decls)
 
+    @command
     def scope_modules(self, file, sandbox = None):
         opts = {'file': file}
 
         if sandbox:
             opts.update({'sandbox': sandbox})
 
-        return parse_modules(self.call(['scope', 'modules'], [], opts))
+        return cmd('scope modules', [], opts, parse_modules)
 
+    @command
     def scope(self, file, sandbox = None, global_scope = False, prefix = None, find = None):
         opts = concat_opts([
             (True, {'file': file}),
@@ -902,32 +898,62 @@ class HsDev(object):
             (prefix, {'prefix': prefix}),
             (find, {'find': find})])
 
-        return parse_decls(self.call(['scope'], [], opts))
+        return cmd('scope', [], opts, parse_decls)
 
+    @command
     def complete(self, input, file, sandbox = None):
         opts = {'file': file}
 
         if sandbox:
             opts.update({'sandbox': sandbox})
 
-        return parse_decls(self.call(['complete'], [input], opts))
+        return cmd('complete', [input], opts, parse_decls)
 
+    @command
     def hayoo(self, query):
-        return parse_decls(self.call(['hayoo'], [query], {}))
+        return cmd('hayoo', [query], {}, parse_decls)
 
+    @command
     def cabal_list(self, query = None):
-        r = self.call(['cabal', 'list'], [query] if query else [], {})
-        if r is None:
-            return None
-        return [parse_cabal_package(s) for s in r]
+        return cmd()
+        cmd('cabal list', [query] if query else [], {}, lambda r: [parse_cabal_package(s) for s in r] if r else None)
 
+    @command
     def ghcmod_type(self, file, line, column = 1, sandbox = None):
         opts = concat_opts([
             (True, {'file': file}),
             (sandbox, {'sandbox': sandbox})])
 
-        return self.call(['ghc-mod', 'type'], [str(line), str(column)], opts)
+        return cmd('ghc-mod type', [str(line), str(column)], opts)
 
+    @command
     def exit(self):
-        self.call(['exit'], [], {})
-        self.close()
+        return cmd('exit', [], {})
+
+def wait_result(fn, *args, **kwargs):
+    wait_receive = threading.Event()
+    x = {'result': None}
+
+    on_resp = kwargs.get('on_response')
+    on_err = kwargs.get('on_error')
+
+    def wait_response(r):
+        x['result'] = r
+        if on_resp:
+            on_resp(r)
+        wait_receive.set()
+    def wait_error(e):
+        log('hsdev call fails with: {0}'.format(e))
+        if on_err:
+            on_err(e)
+        wait_receive.set()
+
+    tm = kwargs.pop('timeout', 10.0)
+
+    kwargs['on_response'] = wait_response
+    kwargs['on_error'] = wait_error
+
+    fn(*args, **kwargs)
+
+    wait_receive.wait(tm)
+    return x['result']
