@@ -602,7 +602,7 @@ class HsDev(object):
 
     def start_server(port = 4567, cache = None):
         cmd = concat_args([
-            (True, ["hsdev", "server", "start"]),
+            (True, ["hsdev", "start"]),
             (port, ["--port", str(port)]),
             (cache, ["--cache", cache])])
 
