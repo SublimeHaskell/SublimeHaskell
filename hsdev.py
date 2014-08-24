@@ -8,6 +8,7 @@ import subprocess
 import threading
 import json
 import time
+import re
 from functools import reduce
 
 if int(sublime.version()) < 3000:
@@ -54,45 +55,14 @@ def flatten_opts(opts):
 def hsdev_enabled():
     return get_setting_async('enable_hsdev') == True
 
+def hsdev_enable(enable = True):
+    set_setting_async('enable_hsdev', enable)
+
 def use_hsdev(fn):
     def wrapped(*args, **kwargs):
         if hsdev_enabled():
             return fn(*args, **kwargs)
     return wrapped
-
-def call_hsdev_and_wait(arg_list, filename = None, cabal = None, callback = None, **popen_kwargs):
-    cmd = ['hsdev'] + arg_list
-
-    result = None
-
-    def on_line(l):
-        if l:
-            if 'status' in l:
-                callback(l)
-            else:
-                result = l
-
-    def parse_response(s):
-        try:
-            return {} if s.isspace() else json.loads(s)
-        except Exception as e:
-            return {'error' : 'invalid response', 'details' : s}
-
-    log(' '.join(cmd), log_trace)
-    ret = call_and_wait_tool(cmd, 'hsdev', parse_response, filename, on_line if callback else None, check_enabled = False, **popen_kwargs)
-    if ret is not None:
-        result = ret
-
-    return result
-
-def hsdev(arg_list, port = None, on_response = None):
-    r = call_hsdev_and_wait(if_some(port, ['--port', str(port)]) + arg_list, callback = on_response)
-    if r is None:
-        return None
-    if r and 'error' in r:
-        log('hsdev returns error: {0} with details: {1}'.format(r['error'], r['details']), log_error)
-        return None
-    return r
 
 def if_some(x, lst):
     return lst if x is not None else []
@@ -141,190 +111,6 @@ class StatusToMessage(object):
         total = s['progress']['total']
         s.change_message('{0} {1}: {2}'.format(task_name, info, s['status']))
         s.percentage_message(cur, total)
-
-def start(port = None, cache = None, log = None):
-    return hsdev(['server', 'start'] + if_some(cache, ['--cache', cache]) + if_some(log, ['--log', log]), port = port) is not None
-
-def link(port = None, parent = None):
-    return hsdev(['link'] + if_some(parent, ['--parent', parent]), port = port) is not None
-
-def stop(port = None):
-    return hsdev(['server', 'stop'], port = port) is not None
-
-def ping(port = None):
-    return hsdev(['ping'], port = port) == "pong"
-
-def scan(cabal = None, projects = [], files = [], paths = [], modules = [], wait = False, on_status=None, port = None):
-    opts = ['scan']
-    if modules:
-        opts.extend(['module'] + modules)
-        if cabal:
-            opts.extend(['--sandbox', cabal])
-    elif cabal:
-        opts.extend(['cabal'] + cabal_path(cabal))
-    else:
-        args = [['--project', p] for p in projects] + [['-f', f] for f in files] + [['-p', p] for p in paths]
-        opts.extend(list(reduce(lambda x, y: x + y, args)))
-
-    if wait or on_status:
-        opts.extend(['-w', '-s'])
-
-    opts.extend(get_ghc_opts_args(cabal = cabal))
-
-    def onResponse(s):
-        if on_status:
-            on_status(s)
-
-    return hsdev(opts, port = port, on_response = onResponse if wait else None)
-
-def rescan(projects = [], files = [], paths = [], wait = False, on_status = None, port = None):
-    opts = ['rescan']
-    args = [['--project', p] for p in projects] + [['-f', f] for f in files] + [['-p', p] for p in paths]
-
-    if not args:
-        log('hsdev.rescan: must specify at least one param', log_debug)
-        return None
-
-    opts.extend(list(reduce(lambda x, y: x + y, args)))
-
-    if wait or on_status:
-        opts.extend(['-w', '-s'])
-
-    opts.extend(get_ghc_opts_args(filename = file))
-
-    def onResponse(s):
-        if on_status:
-            on_status(s)
-
-    return hsdev(opts, port = port, on_response = onResponse if wait else None)
-
-def remove(cabal = None, project = None, file = None, module = None, port = None):
-    return hsdev(
-        ['remove'] +
-        cabal_path(cabal) +
-        if_some(project, ['--project', project]) +
-        if_some(file, ['-f', file]) +
-        if_some(module, ['-m', module]), port = port)
-
-def remove_all(port = None):
-    return hsdev(['remove', '-a'], port = port)
-
-def list_modules(cabal = None, project = None, package = None, source = False, standalone = False, port = None):
-    return parse_modules(
-        hsdev(
-            ['modules'] +
-            cabal_path(cabal) +
-            if_some(project, ['--project', project]) +
-            if_some(package, ['--package', package]) +
-            (['--src'] if source else []) +
-            (['--stand'] if standalone else []), port = port))
-
-def list_packages(port = None):
-    return hsdev(['packages'], port = port)
-
-def list_projects(port = None):
-    return hsdev(['projects'], port = port)
-
-def symbol(name = None, project = None, file = None, module = None, locals = False, package = None, cabal = None, source = False, standalone = False, prefix = None, find = None, port = None):
-    return parse_decls(
-        hsdev(
-            (['symbol', name] if name else ['symbol']) +
-            if_some(project, ['--project', project]) +
-            if_some(file, ['-f', file]) +
-            if_some(module, ['-m', module]) +
-            (['--locals'] if locals else []) +
-            if_some(package, ['--package', package]) +
-            cabal_path(cabal) +
-            (['--src'] if source else []) +
-            (['--stand'] if standalone else []) +
-            if_some(prefix, ['--prefix', prefix]) +
-            if_some(find, ['--find', find]), port = port))
-
-def module(name = None, locals = False, package = None, project = None, file = None, cabal = None, source = False, port = None):
-    return parse_module(
-        hsdev(
-            ['module'] +
-            (['--locals'] if locals else []) +
-            if_some(name, ['-m', name]) +
-            if_some(package, ['--package', package]) +
-            if_some(project, ['--project', project]) +
-            cabal_path(cabal) +
-            if_some(file, ['-f', file]) +
-            (['--src'] if source else []), port = port))
-
-def project(project, port = None):
-    return hsdev(['project', '--project', project], port = port)
-
-def lookup(name, file, cabal = None, port = None):
-    return parse_decls(
-        hsdev(
-            ['lookup', name, '-f', file] + cabal_path(cabal), port = port))
-
-def whois(name, file, cabal = None, port = None):
-    return parse_decls(
-        hsdev(
-            ['whois', name, '-f', file] + cabal_path(cabal), port = port))
-
-def scope_modules(file, cabal = None, port = None):
-    return parse_modules(
-        hsdev(
-            ['scope', 'modules', '-f', file] + cabal_path(cabal), port = port))
-
-def scope(file, cabal = None, global_scope = False, prefix = None, find = None, port = None):
-    return parse_decls(
-        hsdev(
-            ['scope', '-f', file] +
-            cabal_path(cabal) +
-            (['--global'] if global_scope else []) +
-            if_some(prefix, ['--prefix', prefix]) +
-            if_some(find, ['--find', find]), port = port))
-
-def complete(input, file, cabal = None, port = None):
-    return parse_decls(
-        hsdev(
-            ['complete', input, '-f', file] + cabal_path(cabal), port = port))
-
-def hayoo(query, port = None):
-    return parse_decls(hsdev(['hayoo', query], port = port))
-
-def cabal_list(query = None, port = None):
-    r = hsdev(['cabal', 'list'] + ([query] if query else []), port = port)
-    if r is None:
-        return None
-    return [parse_cabal_package(s) for s in r]
-
-def ghcmod_type(file, line, column = 1, cabal = None, port = None):
-    return hsdev(['ghc-mod', 'type', '--file', file, str(line), str(column)] + cabal_path(cabal), port = port)
-
-def dump(cabal = None, projects = [], files = [], path = None, file = None, port = None):
-    opts = ['dump']
-    if cabal:
-        opts.extend(['cabal'] + cabal_path(cabal))
-    elif projects:
-        opts.extend(['project'] + projects)
-    elif files:
-        opts.extend(['standalone'] + files)
-    
-    if path:
-        opts.extend(['-p', path])
-    if file:
-        opts.extend(['-f', file])
-
-    r = hsdev(opts, port = port)
-    if r:
-        return parse_database(r)
-    else:
-        return r
-
-def load(path = None, file = None, data = None, port = None):
-    return hsdev(
-        ['load'] +
-        if_some(path, ['-p', path]) +
-        if_some(file, ['-f', file]) +
-        if_some(data, ['--data', data]), port = port)
-
-def exit(port = None):
-    return hsdev(['exit'], port = port)
 
 def parse_database(s):
     if not s:
@@ -461,52 +247,6 @@ def parse_cabal_package(d):
         d.get('homepage'),
         d.get('license'))
 
-class HsDevHolder(object):
-    def __init__(self, port = 4567, cache = None):
-        super(HsDevHolder, self).__init__()
-        self.port = port
-        self.cache = cache
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.started_event = threading.Event()
-
-    def is_running(self):
-        return ping(self.port)
-
-    def run_hsdev(self, tries = 10):
-        self.start_hsdev()
-        return self.link_hsdev(tries = tries)
-
-    def start_hsdev(self):
-        start(port = self.port, cache = self.cache)
-
-    def stop_hsdev(self):
-        if self.is_running():
-            exit(port = self.port)
-
-    def link_hsdev(self, tries = 10):
-        for n in range(0, tries):
-            try:
-                log('connecting to hsdev server...', log_info)
-                self.socket.connect(('127.0.0.1', self.port))
-                log('connected to hsdev server', log_info)
-                self.socket.sendall(b'{"command":["link"],"opts":{"hold":null}}\n')
-                self.started_event.set()
-                log('hsdev server started', log_info)
-                return True
-            except:
-                log('failed to connect to hsdev server, wait for a while', log_warning)
-                time.sleep(0.1)
-        return False
-
-    # Wait until linked
-    def wait_hsdev(self, timeout = 60):
-        return self.started_event.wait(timeout)
-
-    # Call hsdev function
-    def call(self, fn, *args, **kwargs):
-        kwargs['port'] = self.port
-        return fn(*args, **kwargs)
-
 def reconnect_function(fn):
     def wrapped(self, *args, **kwargs):
         def run_fn():
@@ -516,8 +256,6 @@ def reconnect_function(fn):
         self.set_reconnect_function(run_fn)
         return run_fn()
     return wrapped
-
-
 
 class begin_connecting(object):
     def __init__(self, agent):
@@ -534,8 +272,6 @@ class begin_connecting(object):
             if self.agent.is_connecting():
                 self.agent.set_unconnected()
 
-
-
 def connect_function(fn):
     def wrapped(self, *args, **kwargs):
         if self.is_unconnected():
@@ -543,34 +279,47 @@ def connect_function(fn):
                 return fn(self, *args, **kwargs)
     return wrapped
 
+def hsdev_command(async):
+    def wrap_function(fn):
+        def wrapped(self, *args, **kwargs):
+            wait_flag = kwargs.pop('wait', not async)
+            on_resp = kwargs.pop('on_response', None)
+            on_not = kwargs.pop('on_notify', None)
+            on_err = kwargs.pop('on_error', None)
+            (name_, args_, opts_, on_result_) = fn(self, *args, **kwargs)
+            def on_response(r):
+                if on_result_:
+                    on_resp(on_result_(r))
+                else:
+                    on_resp(r)
+            r = self.call(
+                name_,
+                args_,
+                opts_,
+                on_response = on_response if on_resp else None,
+                on_notify = on_not,
+                on_error = on_err,
+                wait = wait_flag)
+            if wait_flag:
+                return on_result_(r) if on_result_ else r
+        return wrapped
+    return wrap_function
+
 def command(fn):
-    def wrapped(self, *args, **kwargs):
-        on_resp = kwargs.pop('on_response', None)
-        on_not = kwargs.pop('on_notify', None)
-        on_err = kwargs.pop('on_error', None)
-        (name_, args_, opts_, on_result_) = fn(self, *args, **kwargs)
-        def on_response(r):
-            if on_result_:
-                on_resp(on_result_(r))
-            else:
-                on_resp(r)
-        return self.call(
-            name_,
-            args_,
-            opts_,
-            on_response if on_resp else None,
-            on_not,
-            on_err)
-    return wrapped
+    return hsdev_command(False)(fn)
+
+def async_command(fn):
+    return hsdev_command(True)(fn)
 
 def cmd(name_, args_, opts_, on_result = None):
     return (name_, args_, opts_, on_result)
 
-def call_callback(name, fn, *args, **kwargs):
+def call_callback(fn, name = None, *args, **kwargs):
     try:
-        fn(*args, **kwargs)
+        if fn is not None:
+            fn(*args, **kwargs)
     except Exception as e:
-        log("callback '{0}' throws exception: {1}".format(name, e))
+        log("callback '{0}' throws exception: {1}".format(name or '<unnamed>', e))
 
 
 
@@ -585,6 +334,7 @@ class HsDev(object):
         self.autoconnect = True
         self.map = {}
         self.id = 1
+        self.wait_timeout = 0.1
 
         self.connect_fun = None
 
@@ -605,10 +355,14 @@ class HsDev(object):
     def reconnect(self):
         if self.connect_fun is not None:
             log('Reconnecting to hsdev...', log_info)
-            call_callback('HsDev.on_reconnect', self.on_reconnect)
+            call_callback(self.on_reconnect, name = 'HsDev.on_reconnect')
             self.connect_fun()
 
     # Util
+
+    def check_version():
+        (exit_code, out, err) = call_and_wait(['hsdev', 'version'])
+        return exit_code == 0 and re.match(r'0\.1\.1\..', out) is not None
 
     def start_server(port = 4567, cache = None):
         cmd = concat_args([
@@ -661,7 +415,7 @@ class HsDev(object):
                 self.listener.start()
                 self.set_connected()
                 log('connected to hsdev server', log_info)
-                call_callback('HsDev.on_connected', self.on_connected)
+                call_callback(self.on_connected, name = 'HsDev.on_connected')
                 return True
             except Exception as e:
                 log('failed to connect to hsdev server', log_warning)
@@ -717,7 +471,7 @@ class HsDev(object):
     def on_receive(self, id, on_response = None, on_notify = None, on_error = None):
         self.map[id] = (on_response, on_notify, on_error)
 
-    def call(self, command, args = [], opts = {}, on_response = None, on_notify = None, on_error = None, id = None):
+    def call(self, command, args = [], opts = {}, on_response = None, on_notify = None, on_error = None, wait = False, id = None):
         # log
         call_cmd = 'hsdev {0}'.format(' '.join([command] + args + flatten_opts(opts)))
 
@@ -726,7 +480,7 @@ class HsDev(object):
             if self.autoconnect:
                 self.reconnect()
             if not self.is_connected():
-                return False
+                return None if wait else False
 
         try:
             opts.update({'no-file': None})
@@ -736,16 +490,35 @@ class HsDev(object):
                 'args': args,
                 'opts': opts })
 
-            if on_response or on_notify or on_error:
-                self.on_receive(id, on_response, on_notify, on_error)
+            wait_receive = threading.Event() if wait else None                
+
+            x = {}
+            def on_response_(r):
+                x['result'] = r
+                call_callback(on_response, r)
+                if wait_receive:
+                    wait_receive.set()
+
+            def on_error_(e):
+                call_callback(on_error, e)
+                if wait_receive:
+                    wait_receive.set()
+
+            if wait or on_response or on_notify or on_error:
+                self.on_receive(id, on_response_, on_notify, on_error_)
 
             self.hsdev_socket.sendall('{0}\n'.format(msg).encode())
             log(call_cmd, log_trace)
+
+            if wait:
+                wait_receive.wait(self.wait_timeout)
+                return x.get('result')
+
             return True
         except Exception as e:
             log('{0} fails with exception: {1}'.format(call_cmd, e), log_error)
             log('Connection to hsdev lost', log_error)
-            call_callback('HsDev.on_disconnected', self.on_disconnected)
+            call_callback(self.on_disconnected, name = 'HsDev.on_disconnected')
             self.close()
             if self.autoconnect:
                 self.reconnect()
@@ -785,7 +558,7 @@ class HsDev(object):
     def ping(self):
         return cmd('ping', [], {}, lambda r: r and ('message' in r) and (r['message'] == 'pong'))
 
-    @command
+    @async_command
     def scan(self, cabal = None, sandboxes = [], projects = [], files = [], paths = []):
         opts = concat_opts([
             (cabal, {'cabal': None}),
@@ -796,7 +569,7 @@ class HsDev(object):
 
         return cmd('scan', [], opts)
 
-    @command
+    @async_command
     def rescan(self, cabal = None, sandboxes = [], projects = [], files = [], paths = []):
         opts = concat_opts([
             (cabal, {'cabal': None}),
@@ -807,7 +580,7 @@ class HsDev(object):
 
         return cmd('rescan', [], opts)
 
-    @command
+    @async_command
     def remove(self, cabal = False, sandboxes = [], projects = [], files = [], modules = []):
         opts = concat_opts([
             (cabal, {'cabal': None}),
@@ -818,7 +591,7 @@ class HsDev(object):
 
         return cmd('remove', [], opts)
 
-    @command
+    @async_command
     def remove_all(self):
         return cmd('remove', [], {'all': None})
 
