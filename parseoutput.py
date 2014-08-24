@@ -33,6 +33,9 @@ result_file_regex = r'^(\S*?): line (\d+), column (\d+):$'
 # Structure: ERRORS[filename][m.line] = OutputMessage()
 ERRORS = {}
 
+# Global ref to view with errors
+error_view = None
+
 
 def filename_of_path(p):
     """Returns everything after the last slash or backslash."""
@@ -226,10 +229,19 @@ message_levels = {
 # These next and previous commands were shamelessly copied
 # from the great SublimeClang plugin.
 
+def goto_error(view, filename, line):
+    global error_view
+    if error_view:
+        show_output(view)
+        error_region = error_view.find('{0}: line {1}, column \\d+:(\\n\\s+.*)*'.format(re.escape(filename), line), 0)
+        error_view.add_regions("current_error", [error_region], 'string', 'dot', sublime.HIDDEN)
+        error_view.show(error_region.a)
+    view.window().open_file("%s:%d" % (filename, line), sublime.ENCODED_POSITION)
+
 class SublimeHaskellNextError(SublimeHaskellTextCommand):
     def run(self, edit):
         v = self.view
-        fn = v.file_name().encode("utf-8")
+        fn = v.file_name()
         line, column = v.rowcol(v.sel()[0].a)
         line += 1
         gotoline = -1
@@ -242,7 +254,7 @@ class SublimeHaskellNextError(SublimeHaskellTextCommand):
             if gotoline == -1 and len(ERRORS[fn]) > 0:
                 gotoline = sorted(ERRORS[fn].keys())[0]
         if gotoline != -1:
-            v.window().open_file("%s:%d" % (fn, gotoline), sublime.ENCODED_POSITION)
+            goto_error(v, fn, gotoline)
         else:
             sublime.status_message("No more errors or warnings!")
 
@@ -250,7 +262,7 @@ class SublimeHaskellNextError(SublimeHaskellTextCommand):
 class SublimeHaskellPreviousError(SublimeHaskellTextCommand):
     def run(self, edit):
         v = self.view
-        fn = v.file_name().encode("utf-8")
+        fn = v.file_name()
         line, column = v.rowcol(v.sel()[0].a)
         line += 1
         gotoline = -1
@@ -263,7 +275,7 @@ class SublimeHaskellPreviousError(SublimeHaskellTextCommand):
             if gotoline == -1 and len(ERRORS[fn]) > 0:
                 gotoline = sorted(ERRORS[fn].keys())[-1]
         if gotoline != -1:
-            v.window().open_file("%s:%d" % (fn, gotoline), sublime.ENCODED_POSITION)
+            goto_error(v, fn, gotoline)
         else:
             sublime.status_message("No more errors or warnings!")
 
@@ -292,19 +304,22 @@ def mark_messages_in_view(messages, view):
             sublime.DRAW_OUTLINED)
 
 
-def write_panel(window, text, panel_name = "sublime_haskell_panel"):
-    output_panel(window, text, panel_name = panel_name)
+def write_panel(window, text, panel_name = "sublime_haskell_panel", syntax = None):
+    output_panel(window, text, panel_name = panel_name, syntax = syntax)
 
 def write_output(view, text, cabal_project_dir):
     "Write text to Sublime's output panel."
-    output_view = output_panel(view.window(), text, panel_name = ERROR_PANEL_NAME)
-    output_view.settings().set("result_file_regex", result_file_regex)
-    output_view.settings().set("result_base_dir", cabal_project_dir)
+    global error_view
+    error_view = output_panel(view.window(), text, panel_name = ERROR_PANEL_NAME, syntax = 'HaskellOutputPanel')
+    error_view.settings().set("result_file_regex", result_file_regex)
+    error_view.settings().set("result_base_dir", cabal_project_dir)
 
 
 def hide_output(view):
     view.window().run_command('hide_panel', {'panel': 'output.' + ERROR_PANEL_NAME})
 
+def show_output(view):
+    view.window().run_command('show_panel', {'panel': 'output.' + ERROR_PANEL_NAME})
 
 def parse_output_messages(base_dir, text):
     "Parse text into a list of OutputMessage objects."
