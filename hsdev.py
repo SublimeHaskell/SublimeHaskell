@@ -400,7 +400,7 @@ def parse_declaration(decl):
     try:
         what = decl['decl']['what']
         loc = parse_location(None, decl.get('pos'))
-        docs = decl.get('docs')
+        docs = crlf2lf(decl.get('docs'))
         name = decl['name']
 
         if what == 'function':
@@ -510,9 +510,8 @@ class HsDevHolder(object):
 def reconnect_function(fn):
     def wrapped(self, *args, **kwargs):
         def run_fn():
-            if 'autoconnect' in kwargs:
-                self.autoconnect = kwargs['autoconnect']
-                del kwargs['autoconnect']
+            self.autoconnect = kwargs.pop('autoconnect', False)
+            self.on_reconnect = kwargs.pop('on_reconnect', None)
             return fn(self, *args, **kwargs)
         self.set_reconnect_function(run_fn)
         return run_fn()
@@ -555,7 +554,7 @@ def command(fn):
                 on_resp(on_result_(r))
             else:
                 on_resp(r)
-        self.call(
+        return self.call(
             name_,
             args_,
             opts_,
@@ -566,6 +565,12 @@ def command(fn):
 
 def cmd(name_, args_, opts_, on_result = None):
     return (name_, args_, opts_, on_result)
+
+def call_callback(name, fn, *args, **kwargs):
+    try:
+        fn(*args, **kwargs)
+    except Exception as e:
+        log("callback '{0}' throws exception: {1}".format(name, e))
 
 
 
@@ -585,6 +590,10 @@ class HsDev(object):
 
         self.part = ''
 
+        self.on_connected = None
+        self.on_disconnected = None
+        self.on_reconnect = None
+
     def __del__(self):
         self.close()
 
@@ -596,6 +605,7 @@ class HsDev(object):
     def reconnect(self):
         if self.connect_fun is not None:
             log('Reconnecting to hsdev...', log_info)
+            call_callback('HsDev.on_reconnect', self.on_reconnect)
             self.connect_fun()
 
     # Util
@@ -651,6 +661,7 @@ class HsDev(object):
                 self.listener.start()
                 self.set_connected()
                 log('connected to hsdev server', log_info)
+                call_callback('HsDev.on_connected', self.on_connected)
                 return True
             except Exception as e:
                 log('failed to connect to hsdev server', log_warning)
@@ -715,7 +726,7 @@ class HsDev(object):
             if self.autoconnect:
                 self.reconnect()
             if not self.is_connected():
-                return None
+                return False
 
         try:
             opts.update({'no-file': None})
@@ -730,12 +741,15 @@ class HsDev(object):
 
             self.hsdev_socket.sendall('{0}\n'.format(msg).encode())
             log(call_cmd, log_trace)
+            return True
         except Exception as e:
             log('{0} fails with exception: {1}'.format(call_cmd, e), log_error)
             log('Connection to hsdev lost', log_error)
+            call_callback('HsDev.on_disconnected', self.on_disconnected)
             self.close()
             if self.autoconnect:
                 self.reconnect()
+            return False
 
     def listen(self):
         while True:
@@ -948,7 +962,7 @@ def wait_result(fn, *args, **kwargs):
             on_err(e)
         wait_receive.set()
 
-    tm = kwargs.pop('timeout', 10.0)
+    tm = kwargs.pop('timeout', 0.1)
 
     kwargs['on_response'] = wait_response
     kwargs['on_error'] = wait_error

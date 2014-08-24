@@ -262,7 +262,7 @@ class AutoCompletion(object):
 
     @hsdev.use_hsdev
     def get_current_module_completions(self):
-        return set([m.name for m in hsdev_client().scope_modules(self.current_filename, sandbox = current_sandbox())])
+        return set([m.name for m in hsdev.wait_result(hsdev_client().scope_modules, self.current_filename, sandbox = current_sandbox())])
 
 
 autocompletion = AutoCompletion()
@@ -566,7 +566,7 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
 
             self.full_name = '{0}.{1}'.format(module_word, ident) if module_word else ident
 
-            self.candidates = hsdev.wait_result(hsdev_client().whois, self.full_name, self.current_file_name, sandbox = current_sandbox())
+            self.candidates = hsdev.wait_result(hsdev_client().whois, self.full_name, self.current_file_name, sandbox = current_sandbox())[:1]
 
             if not self.candidates:
                 self.candidates = hsdev.wait_result(hsdev_client().lookup, self.full_name, self.current_file_name, sandbox = current_sandbox())
@@ -629,7 +629,7 @@ def show_declaration_info(view, decl):
     sublime.set_timeout(lambda: view.run_command('sublime_haskell_symbol_info', info), 0)
 
 def show_declaration_info_panel(view, decl):
-    write_panel(view.window(), decl.detailed(), 'sublime_haskell_symbol_info')
+    write_panel(view.window(), decl.detailed(), 'sublime_haskell_symbol_info', syntax = 'HaskellSymbolInfo')
 
 class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
     """
@@ -665,7 +665,7 @@ class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
             self.add_import(self.candidates[0].module.name)
             return
 
-        self.view.window().show_quick_panel([[c.qualified_name()] for c in self.candidates], self.on_done)
+        self.view.window().show_quick_panel([[c.module.name] for c in self.candidates], self.on_done)
 
     def add_import(self, module_name):
         cur_module = hsdev.wait_result(hsdev_client().module, file = self.current_file_name)
@@ -756,7 +756,8 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
         if module_name:
             ms = []
             if scope:
-                ms = [m for m in hsdev_client().scope_modules(
+                ms = [m for m in hsdev.wait_result(
+                    hsdev_client().scope_modules,
                     scope,
                     sandbox = as_sandboxes(cabal)) if m.name == module_name]
             else:
@@ -938,8 +939,10 @@ class HsDevAgent(threading.Thread):
         self.hsdev_enabled = False
 
     def start_hsdev(self):
-        hsdev.HsDev.start_server(cache = HSDEV_CACHE_PATH)
-        self.hsdev.connect_async(autoconnect = True)
+        def start_server_():
+            hsdev.HsDev.start_server(cache = HSDEV_CACHE_PATH)
+        start_server_()
+        self.hsdev.connect_async(autoconnect = True, on_reconnect = start_server_)
         if not self.hsdev.wait():
             log('Unable to connect to hsdev server', log_warning)
         self.hsdev.link()

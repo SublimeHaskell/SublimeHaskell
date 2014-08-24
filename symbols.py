@@ -219,7 +219,7 @@ class Declaration(Symbol):
         info = [
             self.brief(),
             '',
-            self.module.name]
+            'Imported from {0}'.format(self.module.name)]
 
         if self.docs:
             info.extend(['', self.docs])
@@ -227,12 +227,13 @@ class Declaration(Symbol):
         if self.by_source():
             info.append('')
             if self.location.project:
-                info.append('Defined in {0} at {1}'.format(self.location.project, self.location.position()))
+                info.append('Project: {0}'.format(self.location.project))
             else:
-                info.append('Defined at {0}'.format(self.location.position()))
+                info.append('Defined at: {0}'.format(self.location.position()))
         if self.by_cabal():
             info.append('')
-            info.append('Installed in {0} in package {1}'.format(self.location.cabal, self.location.package.package_id()))
+            info.append('Package: {0}'.format(self.location.package.package_id()))
+            info.append('Installed in: {0}'.format(self.location.cabal))
 
         return '\n'.join(info)
 

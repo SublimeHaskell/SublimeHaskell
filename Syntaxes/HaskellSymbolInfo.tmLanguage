@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>keyEquivalent</key>
+	<string>^~G</string>
+	<key>name</key>
+	<string>Haskell Symbol Info Panel</string>
+	<key>patterns</key>
+	<array>
+		<dict>
+			<key>match</key>
+			<string>^(class|type|data|newtype)\s+(\w+)((\s+\w+)*)?$</string>
+			<key>captures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.type.symbolinfo</string>
+				</dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>constant.other.symbolinfo</string>
+				</dict>
+			</dict>
+			<key>name</key>
+			<string>symbol.type.symbolinfo</string>
+		</dict>
+		<dict>
+			<key>match</key>
+			<string>^(\w+)\s+::\s+(.*)$</string>
+			<key>captures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>support.function.symbolinfo</string>
+				</dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>support.type.symbolinfo</string>
+				</dict>
+			</dict>
+			<key>name</key>
+			<string>symbol.function.symbolinfo</string>
+		</dict>
+		<dict>
+			<key>match</key>
+			<string>^Imported from (.*)$</string>
+			<key>captures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.module.symbolinfo</string>
+				</dict>
+			</dict>
+			<key>name</key>
+			<string>comment.import.symbolinfo</string>
+		</dict>
+		<dict>
+			<key>match</key>
+			<string>^(Project|Defined at|Package|Installed in): (.*)$</string>
+			<key>captures</key>
+			<dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>string.quoted.double.symbolinfo</string>
+				</dict>
+			</dict>
+			<key>name</key>
+			<string>comment.details.symbolinfo</string>
+		</dict>
+	</array>
+	<key>repository</key>
+	<dict>
+	</dict>
+	<key>scopeName</key>
+	<string>source</string>
+	<key>uuid</key>
+	<string>6ED96FDF-2496-4770-9175-C3CFCFF1D9E5</string>
+</dict>
+</plist>
