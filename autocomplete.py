@@ -936,11 +936,15 @@ class HsDevAgent(threading.Thread):
         else:
             def start_server_():
                 hsdev.HsDev.start_server(cache = HSDEV_CACHE_PATH)
+            def link_server_():
+                self.hsdev.link()
+
+            self.hsdev.on_connected = link_server_
+
             start_server_()
             self.hsdev.connect_async(autoconnect = True, on_reconnect = start_server_)
             if not self.hsdev.wait():
                 log('Unable to connect to hsdev server', log_warning)
-            self.hsdev.link()
 
     def stop_hsdev(self):
         self.hsdev.close()
