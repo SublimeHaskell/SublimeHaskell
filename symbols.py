@@ -228,8 +228,7 @@ class Declaration(Symbol):
             info.append('')
             if self.location.project:
                 info.append('Project: {0}'.format(self.location.project))
-            else:
-                info.append('Defined at: {0}'.format(self.location.position()))
+            info.append('Defined at: {0}'.format(self.location.position()))
         if self.by_cabal():
             info.append('')
             info.append('Package: {0}'.format(self.location.package.package_id()))

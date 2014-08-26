@@ -249,11 +249,16 @@ def parse_cabal_package(d):
 
 def reconnect_function(fn):
     def wrapped(self, *args, **kwargs):
+        autoconnect_ = kwargs.pop('autoconnect', False)
+        on_reconnect_ = kwargs.pop('on_reconnect', None)
+        just_connect_ = kwargs.pop('just_connect', False)
         def run_fn():
-            self.autoconnect = kwargs.pop('autoconnect', False)
-            self.on_reconnect = kwargs.pop('on_reconnect', None)
+            if not just_connect_:
+                self.autoconnect = autoconnect_
+                self.on_reconnect = on_reconnect_
             return fn(self, *args, **kwargs)
-        self.set_reconnect_function(run_fn)
+        if not just_connect_:
+            self.set_reconnect_function(run_fn)
         return run_fn()
     return wrapped
 
@@ -358,6 +363,8 @@ class HsDev(object):
             log('Reconnecting to hsdev...', log_info)
             call_callback(self.on_reconnect, name = 'HsDev.on_reconnect')
             self.connect_fun()
+        else:
+            log('No reconnect function')
 
     # Util
 
@@ -428,7 +435,7 @@ class HsDev(object):
     def connect_async(self, tries = 10):
         thread = threading.Thread(
             target = self.connect,
-            kwargs = { 'tries' : tries })
+            kwargs = { 'tries' : tries, 'just_connect' : True })
         thread.start()
   
     def wait(self, timeout = None):
