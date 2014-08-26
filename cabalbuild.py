@@ -8,12 +8,12 @@ from threading import Thread
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     from parseoutput import run_chain_build_thread
-    from autocomplete import autocompletion, list_files_in_dir_recursively, hsdev_inspector, hsdev_client
+    import autocomplete
     import hsdev
 else:
     from SublimeHaskell.sublime_haskell_common import *
     from SublimeHaskell.parseoutput import run_chain_build_thread
-    from SublimeHaskell.autocomplete import autocompletion, list_files_in_dir_recursively, hsdev_inspector, hsdev_client
+    import SublimeHaskell.autocomplete as autocomplete
     import SublimeHaskell.hsdev as hsdev
 
 OUTPUT_PANEL_NAME = "haskell_run_output"
@@ -61,11 +61,11 @@ class SublimeHaskellBaseCommand(SublimeHaskellWindowCommand):
 
 # Retrieve projects as dictionary that refers to this app instance
 def get_projects():
-    folder_files = [src for f in sublime.active_window().folders() for src in list_files_in_dir_recursively(f) if os.path.splitext(src)[1] == ".hs"]
+    folder_files = [src for f in sublime.active_window().folders() for src in autocomplete.list_files_in_dir_recursively(f) if os.path.splitext(src)[1] == ".hs"]
     view_files = [v.file_name() for v in sublime.active_window().views() if is_haskell_source(v)]
     active_projects = set([get_cabal_project_dir_of_file(src) for src in (folder_files + view_files)])
 
-    return dict((info['name'], info) for info in (hsdev_client.list_projects() or []) if info['path'] in active_projects)
+    return dict((info['name'], info) for info in (autocomplete.hsdev_client.list_projects() or []) if info['path'] in active_projects)
 
 # Select project from list
 # on_selected accepts name of project and directory of project

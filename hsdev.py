@@ -279,10 +279,11 @@ def connect_function(fn):
                 return fn(self, *args, **kwargs)
     return wrapped
 
-def hsdev_command(async):
+def hsdev_command(async, timeout = None):
     def wrap_function(fn):
         def wrapped(self, *args, **kwargs):
             wait_flag = kwargs.pop('wait', not async)
+            timeout_arg = kwargs.pop('timeout', timeout)
             on_resp = kwargs.pop('on_response', None)
             on_not = kwargs.pop('on_notify', None)
             on_err = kwargs.pop('on_error', None)
@@ -299,14 +300,15 @@ def hsdev_command(async):
                 on_response = on_response if on_resp else None,
                 on_notify = on_not,
                 on_error = on_err,
-                wait = wait_flag)
+                wait = wait_flag,
+                timeout = timeout_arg)
             if wait_flag:
                 return on_result_(r) if on_result_ else r
         return wrapped
     return wrap_function
 
 def command(fn):
-    return hsdev_command(False)(fn)
+    return hsdev_command(False, timeout = 0.5)(fn)
 
 def async_command(fn):
     return hsdev_command(True)(fn)
@@ -334,7 +336,6 @@ class HsDev(object):
         self.autoconnect = True
         self.map = {}
         self.id = 1
-        self.wait_timeout = 0.1
 
         self.connect_fun = None
 
@@ -471,7 +472,7 @@ class HsDev(object):
     def on_receive(self, id, on_response = None, on_notify = None, on_error = None):
         self.map[id] = (on_response, on_notify, on_error)
 
-    def call(self, command, args = [], opts = {}, on_response = None, on_notify = None, on_error = None, wait = False, id = None):
+    def call(self, command, args = [], opts = {}, on_response = None, on_notify = None, on_error = None, wait = False, timeout = None, id = None):
         # log
         call_cmd = 'hsdev {0}'.format(' '.join([command] + args + flatten_opts(opts)))
 
@@ -511,7 +512,7 @@ class HsDev(object):
             log(call_cmd, log_trace)
 
             if wait:
-                wait_receive.wait(self.wait_timeout)
+                wait_receive.wait(timeout)
                 return x.get('result')
 
             return True

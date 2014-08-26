@@ -484,13 +484,7 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
 
     def open(self, location, transient = False):
         log('location is {0}'.format(location.position()), log_trace)
-        view = self.window.open_file(location.position(column = False), sublime.ENCODED_POSITION | sublime.TRANSIENT if transient else sublime.ENCODED_POSITION)
-        if location.column != 0:
-            log('column is not 0', log_trace)
-            rgn = view.find_by_class(view.sel()[0].a, True, sublime.CLASS_WORD_START)
-            log('found region {0}'.format(rgn), log_trace)
-            view.sel().clear()
-            view.sel().add(rgn)
+        view = self.window.open_file(location.position(), sublime.ENCODED_POSITION | sublime.TRANSIENT if transient else sublime.ENCODED_POSITION)
 
 
 
@@ -566,7 +560,7 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
 
             self.full_name = '{0}.{1}'.format(module_word, ident) if module_word else ident
 
-            self.candidates = hsdev_client.whois(self.full_name, self.current_file_name, sandbox = current_sandbox())[:1]
+            self.candidates = (hsdev_client.whois(self.full_name, self.current_file_name, sandbox = current_sandbox()) or [])[:1]
 
             if not self.candidates:
                 self.candidates = hsdev_client.lookup(self.full_name, self.current_file_name, sandbox = current_sandbox())
