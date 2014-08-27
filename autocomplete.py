@@ -1025,7 +1025,7 @@ class HsDevAgent(threading.Thread):
 
                 for f in files:
                     try:
-                        self.reinspect_file(f)
+                        self.reinspect_files(files)
                     except:
                         continue
 
@@ -1126,9 +1126,12 @@ class HsDevAgent(threading.Thread):
             log('Inspecting project {0} failed: {1}'.format(cabal_dir, e), log_error)
 
     @hsdev.use_hsdev
-    def reinspect_file(self, filename):
-        show_status_message('Reinspecting {0}'.format(filename))
-        self.hsdev.scan(files = [filename], on_notify = hsdev_status(s), wait = True)
+    def reinspect_files(self, filenames):
+        try:
+            with status_message_process('Reinspecting files', priority = 1) as s:
+                self.hsdev.scan(files = filenames, on_notify = hsdev_status(s), wait = True)
+        except Exception as e:
+            log('Inspecting files failed: {0}'.format(e), log_error)
 
 def list_files_in_dir_recursively(base_dir):
     """Return a list of a all files in a directory, recursively.
