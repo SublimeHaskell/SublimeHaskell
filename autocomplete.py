@@ -938,6 +938,7 @@ class HsDevAgent(threading.Thread):
                 hsdev.HsDev.start_server(cache = HSDEV_CACHE_PATH)
             def link_server_():
                 self.hsdev.link()
+                self.start_inspect()
 
             self.hsdev.on_connected = link_server_
 
@@ -961,8 +962,6 @@ class HsDevAgent(threading.Thread):
         if hsdev.hsdev_enabled():
             self.hsdev_enabled = True
             self.start_hsdev()
-
-        self.start_inspect()
 
         while True:
             if self.hsdev_enabled_changed:
