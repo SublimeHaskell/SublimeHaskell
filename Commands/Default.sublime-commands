@@ -90,6 +90,10 @@
         "command": "sublime_haskell_go_to_declaration"
     },
     {
+        "caption": "SublimeHaskell: Eval",
+        "command": "sublime_haskell_eval"
+    },
+    {
         "caption": "SublimeHaskell: Browse declarations",
         "command": "sublime_haskell_browse_declarations"
     },
