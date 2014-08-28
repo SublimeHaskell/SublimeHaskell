@@ -889,13 +889,10 @@ class SublimeHaskellEvalCommand(SublimeHaskellTextCommand):
         self.args = [self.view.substr(s) for s in self.view.sel()]
         self.edit = edit
 
-        self.evals = {
-            'Each': self.each,
-            'Each string': self.each_string,
-            'Selection list': self.selection,
-            'Selection string list': self.selection_strings }
+        self.eval_names = ['Each', 'Each string', 'Selection list', 'Selection string list']
+        self.evals = [self.each, self.each_string, self.selection, self.selection_strings]
 
-        self.view.window().show_quick_panel(list(self.evals.keys()), self.on_eval_select)
+        self.view.window().show_quick_panel(self.eval_names, self.on_eval_select)
 
     def is_enabled(self):
         return True
@@ -903,7 +900,7 @@ class SublimeHaskellEvalCommand(SublimeHaskellTextCommand):
     def on_eval_select(self, idx):
         if idx == -1:
             return
-        self.view.window().show_input_panel('function', '', self.evals[list(self.evals.keys())[idx]], None, self.on_cancel)
+        self.view.window().show_input_panel('function', '', self.evals[idx], None, self.on_cancel)
         
     def on_cancel(self):
         return
