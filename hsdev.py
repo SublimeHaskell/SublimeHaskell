@@ -722,6 +722,10 @@ class HsDev(object):
         return cmd('ghc-mod type', [str(line), str(column)], opts)
 
     @command
+    def ghc_eval(self, exprs):
+        return cmd('ghc eval', exprs, {})
+
+    @command
     def exit(self):
         return cmd('exit', [], {})
 
