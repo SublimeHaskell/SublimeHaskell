@@ -906,16 +906,16 @@ class SublimeHaskellEvalCommand(SublimeHaskellTextCommand):
         return
 
     def each(self, f):
-        self.results = hsdev_client.ghc_eval(["{0} {1}".format(f, a) for a in self.args])
+        self.results = hsdev_client.ghc_eval(["({0}) ({1})".format(f, a) for a in self.args])
         self.view.run_command('sublime_haskell_eval_replace', { 'results': self.results })
 
     def each_string(self, f):
-        self.results = hsdev_client.ghc_eval(["{0} {1}".format(f, json.dumps(a)) for a in self.args])
+        self.results = hsdev_client.ghc_eval(["({0}) ({1})".format(f, json.dumps(a)) for a in self.args])
         self.view.run_command('sublime_haskell_eval_replace', {
             'results': [None if 'fail' in r else json.loads(r) for r in self.results] })
 
     def selection(self, f):
-        self.result = hsdev_client.ghc_eval(['{0} [{1}]'.format(f, ", ".join(self.args))])
+        self.result = hsdev_client.ghc_eval(['({0}) [{1}]'.format(f, ", ".join(self.args))])
         if 'fail' in self.result[0]:
             return
         else:
@@ -923,7 +923,7 @@ class SublimeHaskellEvalCommand(SublimeHaskellTextCommand):
             self.view.run_command('sublime_haskell_eval_replace', { 'results': result_list })
 
     def selection_strings(self, f):
-        self.result = hsdev_client.ghc_eval(['{0} [{1}]'.format(f, ", ".join([json.dumps(a) for a in self.args]))])
+        self.result = hsdev_client.ghc_eval(['({0}) [{1}]'.format(f, ", ".join([json.dumps(a) for a in self.args]))])
         if 'fail' in self.result[0]:
             return
         else:
