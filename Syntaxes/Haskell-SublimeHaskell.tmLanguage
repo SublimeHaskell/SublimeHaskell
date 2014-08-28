@@ -169,7 +169,7 @@
 		</dict>
 		<dict>
 			<key>begin</key>
-			<string>\b(import)\b</string>
+			<string>^(import)\b</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>1</key>
@@ -186,7 +186,7 @@
 			<array>
 				<dict>
 					<key>match</key>
-					<string>(qualified|as|hiding)</string>
+					<string>\b(qualified|as|hiding)\b</string>
 					<key>name</key>
 					<string>keyword.other.haskell</string>
 				</dict>
@@ -384,6 +384,83 @@
 					<string>entity.name.function.haskell</string>
 				</dict>
 				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.other.double-colon.haskell</string>
+				</dict>
+			</dict>
+			<key>end</key>
+			<string>$\n?</string>
+			<key>name</key>
+			<string>meta.function.type-declaration.haskell</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>include</key>
+					<string>#type_signature</string>
+				</dict>
+			</array>
+		</dict>
+		<dict>
+			<key>match</key>
+			<string>^(foreign)\s+(import|export)((\s+[\w_]+)*)(\s+\"(\\.|[^\"])*\")?\s*$</string>
+			<key>captures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.other.haskell</string>
+				</dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.other.haskell</string>
+				</dict>
+				<key>3</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.other.haskell</string>
+				</dict>
+				<key>5</key>
+				<dict>
+					<key>name</key>
+					<string>string.quoted.double.haskell</string>
+				</dict>
+			</dict>
+			<key>name</key>
+			<string>meta.function.foreign-declaration.haskell</string>
+		</dict>
+		<dict>
+			<key>begin</key>
+			<string>^(foreign)\s+(import|export)((\s+[\w_]+)*)(\s+\"(\\.|[^\"])*\")?\s+([a-z_][a-zA-Z0-9_']*|\([|!%$+\-.,=&lt;/&gt;]+\))\s*((::)|∷)</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.other.haskell</string>
+				</dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.other.haskell</string>
+				</dict>
+				<key>3</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.other.haskell</string>
+				</dict>
+				<key>5</key>
+				<dict>
+					<key>name</key>
+					<string>string.quoted.double.haskell</string>
+				</dict>
+				<key>7</key>
+				<dict>
+					<key>name</key>
+					<string>entity.name.function.haskell</string>
+				</dict>
+				<key>8</key>
 				<dict>
 					<key>name</key>
 					<string>keyword.other.double-colon.haskell</string>
