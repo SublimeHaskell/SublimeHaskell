@@ -990,7 +990,7 @@ class HsDevAgent(threading.Thread):
 
     def start_hsdev(self):
         if not hsdev.HsDev.check_version():
-            wait_for_window(lambda w: output_error_async(w, 'Please update hsdev to actual version (0.1.1.0)'))
+            wait_for_window(lambda w: output_error_async(w, 'Please update hsdev to actual version (>= 0.1.1.0)'))
             hsdev.hsdev_enable(False)
         else:
             def start_server_():
@@ -1062,7 +1062,7 @@ class HsDevAgent(threading.Thread):
                 dirty_files[:] = []
 
             if len(files_to_reinspect) > 0:
-                loaded_projects = [n['path'] for n in (self.hsdev.list_projects() or [])]
+                loaded_projects = [n['path'] for n in (self.hsdev.list_projects() or []) if 'path' in n]
                 projects = []
                 files = []
                 for f in files_to_reinspect:
