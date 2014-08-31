@@ -714,12 +714,28 @@ class HsDev(object):
         cmd('cabal list', [query] if query else [], {}, lambda r: [parse_cabal_package(s) for s in r] if r else None)
 
     @command
-    def ghcmod_type(self, file, line, column = 1, sandbox = None):
+    def ghcmod_type(self, file, line, column = 1, sandbox = None, ghc = []):
         opts = concat_opts([
             (True, {'file': file}),
+            (ghc, {'ghc': ghc}),
             (sandbox, {'sandbox': sandbox})])
 
         return cmd('ghc-mod type', [str(line), str(column)], opts)
+
+    @command
+    def ghcmod_check(self, files, sandbox = None, ghc = []):
+        opts = concat_opts([
+            (ghc, {'ghc': ghc}),
+            (sandbox, {'sandbox': sandbox})])
+
+        return cmd('ghc-mod check', files, opts)
+
+    @command
+    def ghcmod_lint(self, file, hlint = []):
+        opts = concat_opts([
+            (hlint, {'hlint': hlint})])
+
+        return cmd('ghc-mod lint', [file], opts)
 
     @command
     def ghc_eval(self, exprs):
