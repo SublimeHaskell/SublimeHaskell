@@ -513,7 +513,7 @@ class SublimeHaskellReinspectCabalCommand(SublimeHaskellWindowCommand):
         if old_cabal is not None:
             hsdev_client.remove(cabal = is_cabal(old_cabal), sandboxes = as_sandboxes(old_cabal))
         if new_cabal is not None:
-            hsdev_inspector.mark_cabal(new_cabal)
+            hsdev_client.scan(cabal = is_cabal(new_cabal), sandboxes = as_sandboxes(new_cabal))
 
 class SublimeHaskellReinspectAll(SublimeHaskellWindowCommand):
     def run(self):
