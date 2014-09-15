@@ -27,17 +27,14 @@ def lint_as_hints(msgs):
 
 
 
-def hsdev_check(file):
-    return (autocomplete.hsdev_client.ghcmod_check, [file])
-
-def hsdev_lint(file):
-    return (autocomplete.hsdev_client.ghcmod_lint, file)
+def hsdev_check():
+    return (autocomplete.hsdev_client.ghcmod_check, lambda file: [file], lambda ms: ms)
+def hsdev_lint():
+    return (autocomplete.hsdev_client.ghcmod_lint, lambda file: file, lambda ms: ms)
 
 def messages_as_hints(cmd):
-    def fun(file):
-        c = cmd(file)
-        return (c[0], c[1], lambda ms: [dict(m, level = 'hint') for m in ms])
-    return fun
+    (fn, arg, msg) = cmd
+    return (fn, arg, lambda ms: [dict(m, level = 'hint') for m in ms])
 
 class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
     def run(self, edit):
@@ -52,7 +49,7 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
         else:
             self.status_msg = status_message_process(msg + ': ' + self.filename)
             self.status_msg.start()
-            self.go_chain([(cmd + ((lambda x : x),)) if len(cmd) == 2 else cmd for cmd in cmds])
+            self.go_chain(cmds)
 
     def go_chain(self, cmds):
         try:
@@ -73,7 +70,7 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
                             get_cabal_project_dir_of_file(self.filename) or os.path.dirname(self.filename)))
             else:
                 cmd, tail_cmds = cmds[0], cmds[1:]
-                (fun, arg, modify_messages) = cmd(self.filename)
+                (fun, modify_arg, modify_messages) = cmd
 
                 def on_resp(msgs):
                     self.messages.extend(modify_messages(msgs))
@@ -83,7 +80,7 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
                     self.status_msg.fail()
                     self.go_chain([])
 
-                fun(arg, wait = False, on_response = on_resp, on_error = on_err)
+                fun(modify_arg(self.filename), wait = False, on_response = on_resp, on_error = on_err)
         except Exception as e:
             log('hsdev ghc-mod chain fails with: {0}'.format(e), log_error)
             self.status_msg.stop()
@@ -95,15 +92,15 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
 
 class SublimeHaskellCheck(SublimeHaskellGhcModChain):
     def run(self, edit):
-        self.run_chain([hsdev_check], 'Checking')
+        self.run_chain([hsdev_check()], 'Checking')
 
 class SublimeHaskellLint(SublimeHaskellGhcModChain):
     def run(self, edit):
-        self.run_chain([hsdev_lint], 'Linting')
+        self.run_chain([hsdev_lint()], 'Linting')
 
 class SublimeHaskellCheckAndLint(SublimeHaskellGhcModChain):
     def run(self, edit):
-        self.run_chain([hsdev_check, messages_as_hints(hsdev_lint)], 'Checking and Linting')
+        self.run_chain([hsdev_check(), messages_as_hints(hsdev_lint())], 'Checking and Linting')
 
 
 
