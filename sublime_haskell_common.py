@@ -752,14 +752,19 @@ class with_status_message(object):
         self.show_message = show_message
 
     def __enter__(self):
-        self.show_message(self.msg)
+        self.start()
         return self
 
     def __exit__(self, type, value, traceback):
         if type:
-            self.show_message(self.msg, False)
-        else:
-            self.show_message(self.msg, self.isok)
+            self.fail()
+        self.stop()
+
+    def start(self):
+        self.show_message(self.msg)
+
+    def stop(self):
+        self.show_message(self.msg, self.isok)
 
     def ok(self):
         self.isok = True

@@ -33,6 +33,12 @@ def hsdev_check(file):
 def hsdev_lint(file):
     return (autocomplete.hsdev_client.ghcmod_lint, file)
 
+def messages_as_hints(cmd):
+    def fun(file):
+        c = cmd(file)
+        return (c[0], c[1], lambda ms: [dict(m, level = 'hint') for m in ms])
+    return fun
+
 class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
     def run(self, edit):
         pass
@@ -44,39 +50,43 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
         if not cmds:
             return
         else:
-            self.status_msg = msg + ': ' + self.filename
-            show_status_message_process(self.status_msg)
-            self.go_chain(cmds)
+            self.status_msg = status_message_process(msg + ': ' + self.filename)
+            self.status_msg.start()
+            self.go_chain([(cmd + ((lambda x : x),)) if len(cmd) == 2 else cmd for cmd in cmds])
 
     def go_chain(self, cmds):
-        if not cmds:
-            show_status_message_process(self.status_msg, True)
-            output_text = '\n'.join([
-                '{0}: line {1}, column {2}:\n  {3}: {4}'.format(
-                    m['location']['module']['file'],
-                    m['location']['pos']['line'],
-                    m['location']['pos']['column'],
-                    'Warning' if m['warning'] else 'Error',
-                    m['message'].replace('\n', '\n  ')) for m in self.messages])
-            if output_text:
-                if get_setting_async('show_output_window'):
-                    sublime.set_timeout(lambda: write_output(
-                        self.view,
-                        output_text,
-                        get_cabal_project_dir_of_file(self.filename) or os.path.dirname(self.filename)))
-        else:
-            cmd, tail_cmds = cmds[0], cmds[1:]
-            (fun, arg) = cmd(self.filename)
+        try:
+            if not cmds:
+                self.status_msg.stop()
+                output_text = '\n'.join([
+                    '{0}: line {1}, column {2}:\n  {3}: {4}'.format(
+                        m['location']['module']['file'],
+                        m['location']['pos']['line'],
+                        m['location']['pos']['column'],
+                        m['level'].capitalize(),
+                        m['message'].replace('\n', '\n  ')) for m in self.messages])
+                if output_text:
+                    if get_setting_async('show_output_window'):
+                        sublime.set_timeout(lambda: write_output(
+                            self.view,
+                            output_text,
+                            get_cabal_project_dir_of_file(self.filename) or os.path.dirname(self.filename)))
+            else:
+                cmd, tail_cmds = cmds[0], cmds[1:]
+                (fun, arg, modify_messages) = cmd(self.filename)
 
-            def on_resp(msgs):
-                self.messages.extend(msgs)
-                self.go_chain(tail_cmds)
+                def on_resp(msgs):
+                    self.messages.extend(modify_messages(msgs))
+                    self.go_chain(tail_cmds)
 
-            def on_err(err):
-                show_status_message_process(self.status_msg, False)
-                self.go_chain([])
+                def on_err(err):
+                    self.status_msg.fail()
+                    self.go_chain([])
 
-            fun(arg, wait = False, on_response = on_resp, on_error = on_err)
+                fun(arg, wait = False, on_response = on_resp, on_error = on_err)
+        except Exception as e:
+            log('hsdev ghc-mod chain fails with: {0}'.format(e), log_error)
+            self.status_msg.stop()
 
     def is_enabled(self):
         return is_haskell_source(None)
@@ -93,7 +103,7 @@ class SublimeHaskellLint(SublimeHaskellGhcModChain):
 
 class SublimeHaskellCheckAndLint(SublimeHaskellGhcModChain):
     def run(self, edit):
-        self.run_chain([hsdev_check, hsdev_lint], 'Checking and Linting')
+        self.run_chain([hsdev_check, messages_as_hints(hsdev_lint)], 'Checking and Linting')
 
 
 

@@ -491,13 +491,6 @@ class HsDev(object):
                 return None if wait else False
 
         try:
-            opts.update({'no-file': None})
-            msg = json.dumps({
-                'id': id,
-                'command': command,
-                'args': args,
-                'opts': opts })
-
             wait_receive = threading.Event() if wait else None                
 
             x = {}
@@ -513,7 +506,17 @@ class HsDev(object):
                     wait_receive.set()
 
             if wait or on_response or on_notify or on_error:
+                if id is None:
+                    id = str(self.id)
+                    self.id = self.id + 1
                 self.on_receive(id, on_response_, on_notify, on_error_)
+
+            opts.update({'no-file': None})
+            msg = json.dumps({
+                'id': id,
+                'command': command,
+                'args': args,
+                'opts': opts })
 
             self.hsdev_socket.sendall('{0}\n'.format(msg).encode())
             log(call_cmd, log_trace)
@@ -545,9 +548,11 @@ class HsDev(object):
                         log('hsdev returns error: {0}, details: {1}'.format(resp['error'], resp.get('details')), log_error)
                         if on_err:
                             on_err(resp['error'])
+                        self.map.pop(resp['id'])
                     if 'result' in resp:
                         if on_resp:
                             on_resp(resp['result'])
+                        self.map.pop(resp['id'])
 
     def get_response(self):
         while not '\n' in self.part:
