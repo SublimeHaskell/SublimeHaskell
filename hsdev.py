@@ -419,9 +419,9 @@ class HsDev(object):
                 self.socket.connect(('127.0.0.1', self.port))
                 self.hsdev_socket = self.socket
                 self.hsdev_address = '127.0.0.1'
+                self.set_connected()
                 self.listener = threading.Thread(target = self.listen)
                 self.listener.start()
-                self.set_connected()
                 log('connected to hsdev server', log_info)
                 call_callback(self.on_connected, name = 'HsDev.on_connected')
                 return True
@@ -444,11 +444,11 @@ class HsDev(object):
     def close(self):
         if self.is_unconnected():
             return
+        self.connected.clear()
         if self.hsdev_socket:
             self.hsdev_socket.close()
             self.hsdev_socket = None
         self.socket.close()
-        self.connected.clear()
 
     def is_connecting(self):
         return self.connecting.is_set()
@@ -479,16 +479,40 @@ class HsDev(object):
     def on_receive(self, id, on_response = None, on_notify = None, on_error = None):
         self.map[id] = (on_response, on_notify, on_error)
 
+    def verify_connected(self):
+        if self.is_connected():
+            return True
+        else:
+            log('Not connected to hsdev', log_error)
+            if self.autoconnect:
+                self.reconnect()
+            return self.is_connected()
+
+    def connection_lost(self, fn, e):
+        if self.is_unconnected():
+            return
+        self.close()
+        log('{0}: connection to hsdev lost: {1}'.format(fn, e), log_error)
+        call_callback(self.on_disconnected, name = 'HsDev.on_disconnected')
+
+        # send error to callbacks
+        for on_msg in self.map.values():
+            if on_msg[2]:
+                on_msg[2]('connection lost')
+
+        self.map = {}
+        self.id = 1
+        self.part = ''
+
+        if self.autoconnect:
+            self.reconnect()
+
     def call(self, command, args = [], opts = {}, on_response = None, on_notify = None, on_error = None, wait = False, timeout = None, id = None):
         # log
         call_cmd = 'hsdev {0}'.format(' '.join([command] + args + flatten_opts(opts)))
 
-        if not self.is_connected():
-            log('Not connected to hsdev', log_error)
-            if self.autoconnect:
-                self.reconnect()
-            if not self.is_connected():
-                return None if wait else False
+        if not self.verify_connected():
+            return None if wait else False
 
         try:
             wait_receive = threading.Event() if wait else None                
@@ -528,31 +552,31 @@ class HsDev(object):
             return True
         except Exception as e:
             log('{0} fails with exception: {1}'.format(call_cmd, e), log_error)
-            log('Connection to hsdev lost', log_error)
-            call_callback(self.on_disconnected, name = 'HsDev.on_disconnected')
-            self.close()
-            if self.autoconnect:
-                self.reconnect()
+            self.connection_lost('call', e)
             return False
 
     def listen(self):
-        while True:
-            resp = json.loads(self.get_response())
-            if 'id' in resp:
-                if resp['id'] in self.map:
-                    (on_resp, on_not, on_err) = self.map[resp['id']]
-                    if 'notify' in resp:
-                        if on_not:
-                            on_not(resp['notify'])
-                    if 'error' in resp:
-                        log('hsdev returns error: {0}, details: {1}'.format(resp['error'], resp.get('details')), log_error)
-                        if on_err:
-                            on_err(resp['error'])
-                        self.map.pop(resp['id'])
-                    if 'result' in resp:
-                        if on_resp:
-                            on_resp(resp['result'])
-                        self.map.pop(resp['id'])
+        while self.verify_connected():
+            try:
+                resp = json.loads(self.get_response())
+                if 'id' in resp:
+                    if resp['id'] in self.map:
+                        (on_resp, on_not, on_err) = self.map[resp['id']]
+                        if 'notify' in resp:
+                            if on_not:
+                                on_not(resp['notify'])
+                        if 'error' in resp:
+                            log('hsdev returns error: {0}, details: {1}'.format(resp['error'], resp.get('details')), log_error)
+                            if on_err:
+                                on_err(resp['error'])
+                            self.map.pop(resp['id'])
+                        if 'result' in resp:
+                            if on_resp:
+                                on_resp(resp['result'])
+                            self.map.pop(resp['id'])
+            except Exception as e:
+                self.connection_lost('listen', e)
+                return
 
     def get_response(self):
         while not '\n' in self.part:

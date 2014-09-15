@@ -65,6 +65,7 @@ def preload_settings():
     get_setting('enable_hdevtools')
     get_setting('enable_hdocs')
     get_setting('enable_hsdev')
+    get_setting('inspect_modules')
     get_setting('snippet_replace')
     get_setting('ghc_opts')
     get_setting('log')
@@ -391,11 +392,14 @@ def update_setting(key):
 
 def on_changed_setting(key):
     "Updates setting as it was changed"
+    with sublime_haskell_settings as settings:
+        old_val = settings.get(key)
     val = get_setting(key)
-    with sublime_settings_changes as changes:
-        if key in changes:
-            for fn in changes[key]:
-                fn(key, val)
+    if (old_val is not None) and (old_val != val):
+        with sublime_settings_changes as changes:
+            if key in changes:
+                for fn in changes[key]:
+                    fn(key, val)
 
 
 def get_setting_async(key, default=None):

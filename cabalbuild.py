@@ -201,16 +201,12 @@ class SublimeHaskellSwitchCabalSandboxCommand(SublimeHaskellWindowCommand):
         if new_cabal == 'cabal':
             set_setting('use_cabal_sandbox', False)
         else:
-            set_setting('use_cabal_sandbox', True)
             set_setting('cabal_sandbox', new_cabal)
+            set_setting('use_cabal_sandbox', True)
 
         save_settings()
 
         sublime_status_message('Switched to ' + new_cabal)
-
-        self.window.run_command('sublime_haskell_reinspect_cabal', {
-            'old_cabal': old_cabal,
-            'new_cabal': new_cabal })
 
 
 # Default build system (cabal or cabal-dev)
