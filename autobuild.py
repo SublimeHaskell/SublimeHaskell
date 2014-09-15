@@ -20,11 +20,11 @@ class SublimeHaskellAutobuild(sublime_plugin.EventListener):
         # try to ghc-mod check
         elif get_setting('enable_ghc_mod'):
             if auto_check_enabled and auto_lint_enabled:
-                view.window().run_command('sublime_haskell_ghc_mod_check_and_lint')
+                view.window().run_command('sublime_haskell_check_and_lint')
             elif auto_check_enabled:
-                view.window().run_command('sublime_haskell_ghc_mod_check')
+                view.window().run_command('sublime_haskell_check')
             elif auto_lint_enabled:
-                view.window().run_command('sublime_haskell_ghc_mod_lint')
+                view.window().run_command('sublime_haskell_lint')
 
 
 def current_cabal_build():

@@ -67,15 +67,15 @@
     },
     {
         "caption": "SublimeHaskell: Check",
-        "command": "sublime_haskell_ghc_mod_check"
+        "command": "sublime_haskell_check"
     },
     {
         "caption": "SublimeHaskell: Lint",
-        "command": "sublime_haskell_ghc_mod_lint"
+        "command": "sublime_haskell_lint"
     },
     {
         "caption": "SublimeHaskell: Check & Lint",
-        "command": "sublime_haskell_ghc_mod_check_and_lint"
+        "command": "sublime_haskell_check_and_lint"
     },
     {
         "caption": "SublimeHaskell: Stylish",

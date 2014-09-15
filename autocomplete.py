@@ -12,7 +12,6 @@ if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     import symbols
     import cache
-    import util
     import hdocs
     from ghci import ghci_info
     from haskell_docs import haskell_docs
@@ -23,7 +22,6 @@ else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.symbols as symbols
     import SublimeHaskell.cache as cache
-    import SublimeHaskell.util as util
     import SublimeHaskell.hdocs as hdocs
     from SublimeHaskell.ghci import ghci_info
     from SublimeHaskell.haskell_docs import haskell_docs
@@ -1081,11 +1079,10 @@ class HsDevAgent(threading.Thread):
                     except:
                         continue
 
-                for f in files:
-                    try:
-                        self.reinspect_files(files)
-                    except:
-                        continue
+                try:
+                    self.reinspect_files(files)
+                except:
+                    continue
 
             self.reinspect_event.wait(AGENT_SLEEP_TIMEOUT)
             self.reinspect_event.clear()

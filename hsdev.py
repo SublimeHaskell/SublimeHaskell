@@ -321,7 +321,7 @@ def async_command(fn):
 def cmd(name_, args_, opts_, on_result = None):
     return (name_, args_, opts_, on_result)
 
-def call_callback(fn, name = None, *args, **kwargs):
+def call_callback(fn, *args, name = None, **kwargs):
     try:
         if fn is not None:
             fn(*args, **kwargs)
