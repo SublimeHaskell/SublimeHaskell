@@ -8,13 +8,13 @@ from threading import Thread
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     import autocomplete
-    from parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages, write_output
+    from parseoutput import OutputMessage, parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages, write_output
     from ghci import parse_info
     import symbols
 else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.autocomplete as autocomplete
-    from SublimeHaskell.parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages, write_output
+    from SublimeHaskell.parseoutput import OutputMessage, parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages, write_output
     from SublimeHaskell.ghci import parse_info
     import SublimeHaskell.symbols as symbols
 
@@ -55,19 +55,22 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
         try:
             if not cmds:
                 self.status_msg.stop()
-                output_text = '\n'.join([
-                    '{0}: line {1}, column {2}:\n  {3}: {4}'.format(
-                        m['location']['module']['file'],
-                        m['location']['pos']['line'],
-                        m['location']['pos']['column'],
-                        m['level'].capitalize(),
-                        m['message'].replace('\n', '\n  ')) for m in self.messages])
+                output_messages = [OutputMessage(
+                    m['location']['module']['file'],
+                    m['location']['pos']['line'],
+                    m['location']['pos']['column'],
+                    m['level'].capitalize() + ': ' + m['message'].replace('\n', '\n  '),
+                    m['level']) for m in self.messages]
+
+                set_global_error_messages(output_messages)
+                output_text = format_output_messages(output_messages)
                 if output_text:
                     if get_setting_async('show_output_window'):
                         sublime.set_timeout(lambda: write_output(
                             self.view,
                             output_text,
                             get_cabal_project_dir_of_file(self.filename) or os.path.dirname(self.filename)))
+                    sublime.set_timeout(lambda: mark_messages_in_views(output_messages), 0)
             else:
                 cmd, tail_cmds = cmds[0], cmds[1:]
                 (fun, modify_arg, modify_messages) = cmd
