@@ -91,6 +91,21 @@ It is also useful to add this to your key bindings to redisplay the error panel 
   { "keys": ["ctrl+alt+b"], "command": "show_panel", "args": {"panel": "output.exec"} }
 ```
 
+Using other useful projects with SublimeText
+--------------------------------------------
+
+### [codex](https://hackage.haskell.org/package/codex)
+
+codex allows you to use ctags to jump to definitions that are declared in your cabal dependencies.
+* Install the Sublime `CTags` package via Package Control
+* `cabal install codex`
+* In your project, `codex update`
+* Change `~/.codex` to `tagsCmd: hasktags --ctags --extendedctag --output='$TAGS' '$SOURCES'`
+* In your project, `codex cache clean && codex update`
+* In the Sublime CTags user settings, set `"tag_file": "codex.tags"`
+* You can now jump to the source code of definitions outside of your project.
+
+
 If the ModuleInspector takes too much time
 ------------------------------------------
 
