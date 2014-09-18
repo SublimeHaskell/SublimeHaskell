@@ -94,9 +94,9 @@ It is also useful to add this to your key bindings to redisplay the error panel 
 Using other useful projects with SublimeText
 --------------------------------------------
 
-### [codex](https://hackage.haskell.org/package/codex)
+### Jump-to-definition: codex
 
-codex allows you to use ctags to jump to definitions that are declared in your cabal dependencies.
+[codex](https://hackage.haskell.org/package/codex) allows you to use ctags to jump to definitions that are declared in your cabal dependencies.
 * Install the Sublime `CTags` package via Package Control
 * `cabal install codex`
 * In your project, `codex update`
