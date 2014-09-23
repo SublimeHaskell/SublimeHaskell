@@ -93,15 +93,30 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
 
 
 
+def ghcmod_command(cmdname):
+    def wrap(fn):
+        def wrapper(self, *args, **kwargs):
+            if autocomplete.hsdev_agent_connected():
+                log('Invoking ghc-mod command \'{0}\' via hsdev'.format(cmdname), log_trace)
+                return fn(self, *args, **kwargs)
+            else:
+                log('Invoking ghc-mod command \'{0}\' via ghc-mod'.format(cmdname), log_trace)
+                self.view.window().run_command('sublime_haskell_ghc_mod_{0}'.format(cmdname))
+        return wrapper
+    return wrap
+
 class SublimeHaskellCheck(SublimeHaskellGhcModChain):
+    @ghcmod_command('check')
     def run(self, edit):
         self.run_chain([hsdev_check()], 'Checking')
 
 class SublimeHaskellLint(SublimeHaskellGhcModChain):
+    @ghcmod_command('lint')
     def run(self, edit):
         self.run_chain([hsdev_lint()], 'Linting')
 
 class SublimeHaskellCheckAndLint(SublimeHaskellGhcModChain):
+    @ghcmod_command('check_and_lint')
     def run(self, edit):
         self.run_chain([hsdev_check(), messages_as_hints(hsdev_lint())], 'Checking and Linting')
 

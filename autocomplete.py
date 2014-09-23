@@ -33,9 +33,6 @@ else:
 # If true, files that have not changed will not be re-inspected.
 CHECK_MTIME = True
 
-INSPECTOR_ENABLED = False
-INSPECTOR_RUNNING = False
-
 HSDEV_CACHE_PATH = None
 
 # The agent sleeps this long between inspections.
@@ -515,13 +512,11 @@ class SublimeHaskellReinspectCabalCommand(SublimeHaskellWindowCommand):
 
 class SublimeHaskellReinspectAll(SublimeHaskellWindowCommand):
     def run(self):
-        global INSPECTOR_ENABLED
-
-        if INSPECTOR_ENABLED:
+        if hsdev_inspector.agent_connected():
             hsdev_client.remove_all()
             hsdev_inspector.start_inspect()
         else:
-            show_status_message("inspector_enabled setting is false", isok=False)
+            show_status_message("inspector not connected", isok=False)
 
 
 class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
@@ -991,6 +986,9 @@ def use_inspect_modules(fn):
             return fn(self, *args, **kwargs)
     return wrapped
 
+def hsdev_agent_connected():
+    return hsdev_inspector.agent_connected()
+
 class HsDevAgent(threading.Thread):
     def __init__(self):
         super(HsDevAgent, self).__init__()
@@ -1001,6 +999,9 @@ class HsDevAgent(threading.Thread):
         self.hsdev = hsdev.HsDev()
 
         self.reinspect_event = threading.Event()
+
+    def agent_connected(self):
+        return self.hsdev.is_connected()
 
     def start_hsdev(self):
         if not hsdev.HsDev.check_version():
@@ -1145,7 +1146,7 @@ class HsDevAgent(threading.Thread):
             cabal = current_cabal()
 
         try:
-            with status_message_process('Inspecting {0}', priority = 1) as s:
+            with status_message_process('Inspecting {0}'.format(cabal), priority = 1) as s:
                 self.hsdev.scan(cabal = is_cabal(cabal), sandboxes = as_sandboxes(cabal), on_notify = hsdev_status(s), wait = True)
         except Exception as e:
             log('loading standard modules info for {0} failed with {1}'.format(cabal, e), log_error)
@@ -1153,11 +1154,12 @@ class HsDevAgent(threading.Thread):
     @hsdev.use_hsdev
     @use_inspect_modules
     def inspect(self, paths, projects, files):
-        try:
-            with status_message_process('Inspecting', priority = 1) as s:
-                self.hsdev.scan(paths = paths, projects = projects, files = files, on_notify = hsdev_status(s), wait = True)
-        except Exception as e:
-            log('Inspection failed: {0}'.format(e), log_error)
+        if paths or projects or files:
+            try:
+                with status_message_process('Inspecting', priority = 1) as s:
+                    self.hsdev.scan(paths = paths, projects = projects, files = files, on_notify = hsdev_status(s), wait = True)
+            except Exception as e:
+                log('Inspection failed: {0}'.format(e), log_error)
 
     @hsdev.use_hsdev
     @use_inspect_modules
@@ -1198,6 +1200,9 @@ def list_files_in_dir_recursively(base_dir):
     return files
 
 
+
+def is_inspected_source(view = None):
+    return is_haskell_source(view) or is_cabal_source(view)
 
 class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
     def __init__(self):
@@ -1277,7 +1282,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         start_inspector()
 
         self.set_cabal_status(view)
-        if is_haskell_source(view):
+        if is_inspected_source(view):
             filename = view.file_name()
             if filename:
                 hsdev_inspector.mark_file_dirty(filename)
@@ -1286,7 +1291,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         start_inspector()
 
         self.set_cabal_status(view)
-        if is_haskell_source(view):
+        if is_inspected_source(view):
             filename = view.file_name()
             if filename:
                 hsdev_inspector.mark_file_dirty(filename)
@@ -1297,7 +1302,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         self.set_cabal_status(view)
 
     def on_post_save(self, view):
-        if is_haskell_source(view):
+        if is_inspected_source(view):
             filename = view.file_name()
             if filename:
                 hsdev_inspector.mark_file_dirty(filename)
@@ -1307,6 +1312,8 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             return get_setting('auto_completion_popup')
         elif key == 'haskell_source':
             return is_haskell_source(view)
+        elif key == 'cabal_source':
+            return is_cabal_source(view)
         elif key == 'scanned_source':
             return is_scanned_source(view)
         elif key == 'in_project':

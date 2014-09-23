@@ -61,11 +61,32 @@ class SublimeHaskellBaseCommand(SublimeHaskellWindowCommand):
 
 # Retrieve projects as dictionary that refers to this app instance
 def get_projects():
-    folder_files = [src for f in sublime.active_window().folders() for src in autocomplete.list_files_in_dir_recursively(f) if os.path.splitext(src)[1] == ".hs"]
-    view_files = [v.file_name() for v in sublime.active_window().views() if is_haskell_source(v)]
-    active_projects = set([get_cabal_project_dir_of_file(src) for src in (folder_files + view_files)])
+    if autocomplete.hsdev_agent_connected():
+        folders = sublime.active_window().folders()
+        view_files = [v.file_name() for v in sublime.active_window().views() if is_haskell_source(v) or is_cabal_source(v)]
 
-    return dict((info['name'], info) for info in (autocomplete.hsdev_client.list_projects() or []) if info['path'] in active_projects)
+        def npath(p):
+            return os.path.normcase(os.path.normpath(p))
+
+        def childof(c, p):
+            return npath(c).startswith(npath(p))
+
+        return dict((info['name'], info) for info in filter(
+            lambda p: any([childof(p['path'], f) for f in folders]) or any([childof(src, p['path']) for src in view_files]),
+            (autocomplete.hsdev_client.list_projects() or [])))
+    else:
+        folder_files = [src for f in sublime.active_window().folders() for src in autocomplete.list_files_in_dir_recursively(f) if os.path.splitext(src)[1] in [".hs", ".cabal"]]
+        view_files = [v.file_name() for v in sublime.active_window().views() if is_haskell_source(v) or is_cabal_source(v)]
+        src_files = list(map(lambda p: os.path.normcase(os.path.normpath(p)), folder_files + view_files))
+        active_projects = []
+        while src_files:
+            src = src_files.pop()
+            proj_dir, proj_name = get_cabal_project_dir_and_name_of_file(src)
+            if proj_dir:
+                active_projects.append(proj_name, proj_dir)
+                src_files = [f for f in src_files if not f.startswith(proj_dir)]
+
+        return active_projects
 
 # Select project from list
 # on_selected accepts name of project and directory of project
@@ -84,20 +105,18 @@ def select_project(window, on_selected, filter_project = None):
         return
 
     cabal_project_dir, cabal_project_name = get_cabal_project_dir_and_name_of_view(window.active_view())
+    log('Current project: {0}'.format(cabal_project_name))
 
-    # Returns tuple to sort by
-    #   is this project is current? return False to be first on sort
-    #   name of project to sort alphabetically
-    def compare(proj_name):
-        return (proj_name != cabal_project_name, proj_name)
+    # Sort by name
+    ps.sort(key = lambda p: p[0])
 
-    ps.sort(key = lambda p: compare(p[0]))
+    current_project_idx = next((i for i, p in enumerate(ps) if p[0] == cabal_project_name), -1)
 
     def on_done(idx):
         if idx != -1:
             run_selected(ps[idx])
 
-    window.show_quick_panel(list(map(lambda m: [m[0], m[1]['path']], ps)), on_done)
+    window.show_quick_panel(list(map(lambda m: [m[0], m[1]['path']], ps)), on_done, 0, current_project_idx)
 
 
 def run_build(view, project_name, project_dir, config, use_cabal_sandbox=None):
