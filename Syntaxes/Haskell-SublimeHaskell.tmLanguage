@@ -542,7 +542,7 @@
 			<key>comment</key>
 			<string>In case this regex seems overly general, note that Haskell permits the definition of new operators which can be nearly any string of punctuation characters, such as $%^&amp;*.</string>
 			<key>match</key>
-			<string>[|!%$?~+:\-.=&lt;/&gt;\\]+</string>
+			<string>[|!%$?~+:\-.*=&lt;/&gt;\\]+</string>
 			<key>name</key>
 			<string>keyword.operator.haskell</string>
 		</dict>
@@ -608,7 +608,7 @@
 		<key>infix_op</key>
 		<dict>
 			<key>match</key>
-			<string>(\([|!%$+:\-.=&lt;/&gt;]+\)|\(,+\))</string>
+			<string>(\([|!%$+:\-.*=&lt;/&gt;]+\)|\(,+\))</string>
 			<key>name</key>
 			<string>entity.name.function.infix.haskell</string>
 		</dict>

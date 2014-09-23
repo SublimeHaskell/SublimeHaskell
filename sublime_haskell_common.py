@@ -541,7 +541,15 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
         # Otherwise ghc-mod will fail with 'cannot satisfy package...'
         # Seems, that user directory works well
         # Current source directory is set with -i argument in get_ghc_opts_args
-        exit_code, out, err = call_and_wait(command, cwd=get_source_dir(filename))
+        #
+        # When cabal project is available current directory is set to the project root
+        # to avoid troubles with possible template haskell openFile calls
+        ghc_mod_current_dir = get_source_dir(filename)
+        if filename:
+            cabal_project_dir = get_cabal_project_dir_of_file(filename)
+            if cabal_project_dir:
+                ghc_mod_current_dir = cabal_project_dir
+        exit_code, out, err = call_and_wait(command, cwd=ghc_mod_current_dir)
 
         if exit_code != 0:
             raise Exception("%s exited with status %d and stderr: %s" % (' '.join(command), exit_code, err))
@@ -555,6 +563,8 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
                 + "It is used for LANGUAGE and import autocompletions and type inference.\n"
                 + "Try adjusting the 'add_to_PATH' setting.\n"
                 + "You can also turn this off using the 'enable_ghc_mod' setting.")
+        # Re-raise so that calling code doesn't try to work on the `None` return value
+        raise e
 
 def wait_for_window_callback(on_appear, seconds_to_wait):
     window = sublime.active_window()
