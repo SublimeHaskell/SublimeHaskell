@@ -117,7 +117,10 @@ class Symbol(object):
         JSON contains only line + column
         This function used to merge module location, which contains all other info with line + column
         """
-        self.location = module_loc
+        if self.by_source() and type(module_loc) == Location:
+            self.location.set_file(module_loc)
+        else:
+            self.location = module_loc
 
     def full_name(self):
         return self.module.name + '.' + self.name
