@@ -230,7 +230,7 @@ class SublimeHaskellNextError(sublime_plugin.TextCommand):
     def run(self, edit):
         log("SublimeHaskellNextError")
         v = self.view
-        fn = v.file_name().encode("utf-8")
+        fn = v.file_name()
         line, column = v.rowcol(v.sel()[0].a)
         line += 1
         gotoline = -1
@@ -251,7 +251,7 @@ class SublimeHaskellNextError(sublime_plugin.TextCommand):
 class SublimeHaskellPreviousError(sublime_plugin.TextCommand):
     def run(self, edit):
         v = self.view
-        fn = v.file_name().encode("utf-8")
+        fn = v.file_name()
         line, column = v.rowcol(v.sel()[0].a)
         line += 1
         gotoline = -1
