@@ -221,7 +221,7 @@ class Declaration(Symbol):
         if self.docs:
             info.extend(['', self.docs])
 
-        if self.location:
+        if self.by_source():
             info.append('')
             if self.location.project:
                 info.append('Project: {0}'.format(self.location.project))

@@ -306,7 +306,7 @@ def current_is_cabal():
 
 def as_sandboxes(cabal):
     if cabal == 'cabal':
-        return None
+        return []
     if cabal is None:
         return None
     return [cabal]
