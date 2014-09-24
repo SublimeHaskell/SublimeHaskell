@@ -673,6 +673,12 @@
 					<key>name</key>
 					<string>keyword.other.preprocessor.haskell</string>
 				</dict>
+				<dict>
+					<key>match</key>
+					<string>(?&lt;=LANGUAGE\s)(\w+,?\s)+</string>
+					<key>name</key>
+					<string>extensions.other.preprocessor.haskell</string>
+				</dict>
 			</array>
 		</dict>
 		<key>type_signature</key>
