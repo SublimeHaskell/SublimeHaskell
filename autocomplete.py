@@ -301,10 +301,10 @@ class AutoCompletion(object):
         else:
             with self.async_completions as async_comps:
                 if self.wide_completion == view:
-                    return async_comps.get(None, [])
                     self.wide_completion = None
+                    return async_comps.get(None, [])
                 else:
-                    return async_comps.get(file_name, async_comps.get(None, []))
+                    return async_comps.get(current_file_name, async_comps.get(None, []))
 
         return list(set([s.suggest() for s in suggestions] + import_names))
 
