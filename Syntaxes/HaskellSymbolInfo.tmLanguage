@@ -62,7 +62,7 @@
 		</dict>
 		<dict>
 			<key>match</key>
-			<string>^(Project|Defined at|Package|Installed in): (.*)$</string>
+			<string>^(Project|Defined at|Package|Installed in|Hackage URL): (.*)$</string>
 			<key>captures</key>
 			<dict>
 				<key>2</key>

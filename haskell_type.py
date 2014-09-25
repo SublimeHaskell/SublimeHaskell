@@ -231,7 +231,7 @@ class SublimeHaskellShowType(SublimeHaskellTextCommand):
             return
 
         self.types = types
-        self.output_view = output_panel(self.view.window(), '', panel_name = 'sublime_haskell_show_type')
+        self.output_view = output_panel(self.view.window(), '', panel_name = 'sublime_haskell_show_type', syntax = 'Haskell-SublimeHaskell')
         self.view.window().show_quick_panel([t.typename for t in self.types], self.on_done, 0, -1, self.on_changed)
 
     def on_done(self, idx):
@@ -330,7 +330,7 @@ class SublimeHaskellExpandSelectionExpression(SublimeHaskellShowType):
         self.view.sel().clear()
         self.view.sel().add_all([t.region for t in tr])
 
-        output_panel(self.view.window(), '\n'.join([t.typename for t in tr]), panel_name = 'sublime_haskell_expand_selection_expression')
+        output_panel(self.view.window(), '\n'.join([t.typename for t in tr]), panel_name = 'sublime_haskell_expand_selection_expression', syntax = 'Haskell-SublimeHaskell')
 
     def is_infos_valid(self, selections):
         return self.Infos and all([i.is_valid() for i in self.Infos]) and len(selections) == len(self.Infos) and all([i.is_actual(self.view, s) for i, s in zip(self.Infos, selections)])

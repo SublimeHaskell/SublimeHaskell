@@ -483,7 +483,7 @@ class SublimeHaskellHayoo(SublimeHaskellWindowCommand):
         self.window.show_input_panel("Search string", "", self.on_done, self.on_change, self.on_cancel)
 
     def on_done(self, input):
-        self.decls = hsdev_client.hayoo(input)
+        self.decls = hsdev_client.hayoo(input, pages = 5)
         if not self.decls:
             show_status_message("Nothing found for: {0}".format(input))
             return
@@ -996,7 +996,11 @@ class SublimeHaskellEvalCommand(SublimeHaskellTextCommand):
         self.args = [self.view.substr(s) for s in self.view.sel()]
         self.edit = edit
 
-        self.eval_names = ['Each', 'Each string', 'Selection list', 'Selection string list']
+        self.eval_names = [
+            ['Each', 'Apply function to each selected value'],
+            ['Each string', 'Apply function to each selected string'],
+            ['Selection list', 'Apply function to list of selectied values and replace selections with results'],
+            ['Selection string list', 'Apply function to list of selected string and replace selections with results']]
         self.evals = [self.each, self.each_string, self.selection, self.selection_strings]
 
         self.view.window().show_quick_panel(self.eval_names, self.on_eval_select)

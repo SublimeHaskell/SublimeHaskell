@@ -735,8 +735,12 @@ class HsDev(object):
         return cmd('complete', [input], opts, parse_decls)
 
     @command
-    def hayoo(self, query):
-        return cmd('hayoo', [query], {}, parse_decls)
+    def hayoo(self, query, page = None, pages = None):
+        opts = concat_opts([
+            (page, {'page': page}),
+            (pages, {'pages': pages})])
+
+        return cmd('hayoo', [query], opts, parse_decls)
 
     @command
     def cabal_list(self, query = None):
