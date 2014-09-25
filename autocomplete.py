@@ -409,22 +409,6 @@ class SublimeHaskellComplete(SublimeHaskellTextCommand):
 
 
 class SublimeHaskellBrowseDeclarations(SublimeHaskellTextCommand):
-    def run(self, edit):
-        self.declarations = []
-        decls = hsdev_client.scope(self.view.file_name(), global_scope = True, sandbox = current_sandbox())
-
-        for decl in decls:
-            self.declarations.append([decl.brief(), decl.module.name])
-
-        self.window.show_quick_panel(self.declarations, self.on_done)
-
-    def on_done(self, idx):
-        if idx == -1:
-            return
-        
-
-
-class SublimeHaskellBrowseDeclarations(SublimeHaskellTextCommand):
     """
     Show all available declarations from current cabal and opened projects
     """
@@ -432,7 +416,17 @@ class SublimeHaskellBrowseDeclarations(SublimeHaskellTextCommand):
         self.decls = []
         self.declarations = []
 
-        self.decls = hsdev_client.scope(self.view.file_name(), global_scope = True, sandbox = current_sandbox(), timeout = 5)
+        if not self.view.file_name():
+            show_status_message('Empty filename', False)
+            return
+        self.status = status_message_process('Getting scope of {0}'.format(self.view.file_name()))
+        self.status.start()
+        hsdev_client.scope(self.view.file_name(), global_scope = True, sandbox = current_sandbox(), wait = False, on_response = self.on_receive_scope, on_error = self.on_receive_error)
+
+    def on_receive_scope(self, decls):
+        self.status.stop()
+
+        self.decls = decls
 
         if not self.decls:
             show_status_message("Can't get scope for {0}".format(self.view.file_name()), False)
@@ -441,6 +435,10 @@ class SublimeHaskellBrowseDeclarations(SublimeHaskellTextCommand):
             self.declarations.append([decl.module.name + ': ' + decl.brief()])
 
         self.view.window().show_quick_panel(self.declarations, self.on_done)
+
+    def on_receive_error(self, e):
+        self.status.fail()
+        self.status.stop()
 
     def on_done(self, idx):
         if idx == -1:
