@@ -5,6 +5,7 @@ import re
 import sublime
 import sublime_plugin
 import threading
+import queue
 import time
 import sys
 
@@ -156,6 +157,33 @@ def get_ghcmod_language_pragmas():
 
     return []
 
+# Background worker
+class Worker(threading.Thread):
+    def __init__(self):
+        super(Worker, self).__init__()
+        self.jobs = queue.Queue()
+
+    def run(self):
+        while True:
+            fn, args, kwargs = self.jobs.get()
+            try:
+                fn(*args, **kwargs)
+            except Exception as e:
+                log('worker exception: {0}'.format(e), log_debug)
+
+    def async(self, fn, *args, **kwargs):
+        self.jobs.put((fn, args, kwargs))
+
+worker = None
+
+def run_async(fn, *args, **kwargs):
+    global worker
+    if not worker:
+        worker = Worker()
+        worker.start()
+    worker.async(fn, *args, **kwargs)
+
+
 
 # Autocompletion data
 class AutoCompletion(object):
@@ -174,35 +202,57 @@ class AutoCompletion(object):
 
         self.current_filename = None
 
-        # filename ⇒ preloaded completions or None
+        # filename ⇒ preloaded completions + None ⇒ all completions
         self.async_completions = LockedObject({})
 
     @hsdev.use_hsdev
-    def get_completions_async(self, file_name):
+    def get_completions_async(self, file_name = None):
+        none_comps = []
+        with self.async_completions as async_comps:
+            if file_name in async_comps:
+                return async_comps.get(file_name, [])
+            else:
+                if None not in async_comps:
+                    log('preparing completions', log_debug)
+                    async_comps[None] = list(set([s.suggest() for s in (hsdev_client.symbol() or [])]))
+                none_comps = async_comps.get(None, [])
+
         suggs = []
-
-        current_module = hsdev_client.module(file = file_name)
-        if current_module:
-            suggs = hsdev_client.complete('', file, sandbox = current_sandbox()) or []
-            if not suggestions:
-                # Nothing found, search all accessible names within project
-                suggs = hsdev_client.scope(file, sandbox = current_sandbox(), global_scope = True) or []
-        else:
-            # Module not scanned, complete with anything
-            suggs = hsdev_client.symbol() or []
-
         import_names = []
-        if current_module:
-            # Get qualified imports names
-            import_names.extend([('{0}\tmodule {1}'.format(i.import_as, i.module), i.import_as) for i in current_module.imports if i.import_as])
-            import_names.extend([('{0}\tmodule'.format(i.module), i.module) for i in current_module.imports if i.is_qualified])
+
+        if file_name is None:
+            return none_comps
+        else:
+            log('preparing completions for {0}'.format(file_name), log_debug)
+            current_module = hsdev_client.module(file = file_name)
+            if current_module:
+                suggs = hsdev_client.complete('', file_name, sandbox = current_sandbox()) or []
+                if not suggs:
+                    # Nothing found, search all accessible names within project
+                    suggs = hsdev_client.scope(file_name, sandbox = current_sandbox(), global_scope = True) or []
+
+                # Get qualified imports names
+                import_names.extend([('{0}\tmodule {1}'.format(i.import_as, i.module), i.import_as) for i in current_module.imports if i.import_as])
+                import_names.extend([('{0}\tmodule'.format(i.module), i.module) for i in current_module.imports if i.is_qualified])
 
         with self.async_completions as async_comps:
-            async_comps[file_name] = list(set([s.suggest() for s in suggs] + import_names))
+            async_comps[file_name] = none_comps if not suggs else list(set([s.suggest() for s in suggs] + import_names))
+            return async_comps[file_name]
 
     def drop_completions_async(self):
+        log('drop prepared completions')
         with self.async_completions as async_comps:
-            async_comps = {}
+            async_comps.clear()
+
+    def init_completions_async(self):
+        self.get_completions_async()
+        window = sublime.active_window()
+        if window:
+            view = window.active_view()
+            if view and is_haskell_source(view):
+                filename = view.file_name()
+                if filename:
+                    self.get_completions_async(filename)
 
     @hsdev.use_hsdev
     def get_completions(self, view, prefix, locations):
@@ -235,21 +285,7 @@ class AutoCompletion(object):
                 if q_module:
                     suggestions = q_module.declarations.values()
         else:
-            current_module = hsdev_client.module(file = current_file_name)
-            if current_module:
-                suggestions = hsdev_client.complete(qualified_prefix, current_file_name, sandbox = current_sandbox()) or []
-                if not suggestions:
-                    # Nothing found, search all accessible names within project
-                    suggestions = hsdev_client.scope(current_file_name, sandbox = current_sandbox(), global_scope = True, prefix = qualified_prefix) or []
-            else:
-                # Module not scanned, complete with anything
-                suggestions = hsdev_client.symbol(find = qualified_prefix) or []
-
-        import_names = []
-        if current_module and not is_import_list:
-            # Get qualified imports names
-            import_names.extend([('{0}\tmodule {1}'.format(i.import_as, i.module), i.import_as) for i in current_module.imports if i.import_as])
-            import_names.extend([('{0}\tmodule'.format(i.module), i.module) for i in current_module.imports if i.is_qualified])
+            return self.get_completions_async(current_file_name)
 
         return list(set([s.suggest() for s in suggestions] + import_names))
 
@@ -588,7 +624,7 @@ class SublimeHaskellReinspectCabalCommand(SublimeHaskellWindowCommand):
         if old_cabal is not None:
             hsdev_client.remove(cabal = is_cabal(old_cabal), sandboxes = as_sandboxes(old_cabal))
         if new_cabal is not None:
-            hsdev_client.scan(cabal = is_cabal(new_cabal), sandboxes = as_sandboxes(new_cabal))
+            hsdev_inspector.mark_cabal(new_cabal)
 
 class SublimeHaskellReinspectAll(SublimeHaskellWindowCommand):
     def run(self):
@@ -1184,6 +1220,9 @@ class HsDevAgent(threading.Thread):
             except:
                 pass
 
+            if load_cabal or scan_paths or projects or files:
+                run_async(autocompletion.drop_completions_async)
+                run_async(autocompletion.init_completions_async)
             self.reinspect_event.wait(AGENT_SLEEP_TIMEOUT)
             self.reinspect_event.clear()
 
@@ -1359,6 +1398,12 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             (cabal_dir, project_name) = get_cabal_project_dir_and_name_of_file(filename)
             if project_name:
                 view.set_status('sublime_haskell_cabal', '{0}: {1}'.format(current_cabal(), project_name))
+
+    def on_activated_async(self, view):
+        if is_haskell_source(view):
+            filename = view.file_name()
+            if filename:
+                run_async(autocompletion.get_completions_async, filename)
 
     def on_new(self, view):
         start_inspector()
