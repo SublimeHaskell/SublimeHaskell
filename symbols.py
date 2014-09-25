@@ -206,7 +206,7 @@ class Declaration(Symbol):
 
     def suggest(self):
         """ Returns suggestion for this declaration """
-        return (self.name, self.name)
+        return ('{0}\t{1}'.format(self.name, self.module.name), self.name)
 
     def brief(self):
         return self.name
@@ -245,7 +245,7 @@ class Function(Declaration):
         self.type = function_type
 
     def suggest(self):
-        return (u'{0}\t{1}'.format(self.name, self.type), self.name)
+        return (u'{0} :: {1}\t{2}'.format(self.name, self.type, self.module.name), self.name)
 
     def brief(self):
         return u'{0} :: {1}'.format(self.name, self.type if self.type else u'?')
@@ -261,7 +261,7 @@ class TypeBase(Declaration):
         self.definition = definition
 
     def suggest(self):
-        return (u'{0}\t{1}'.format(self.name, ' '.join(self.args)), self.name)
+        return (u'{0} {1}\t{2}'.format(self.name, ' '.join(self.args), self.module.name), self.name)
 
     def brief(self):
         brief_parts = [self.what]

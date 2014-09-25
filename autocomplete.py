@@ -120,13 +120,21 @@ def get_qualified_symbol(line):
     """
     res = IMPORT_SYMBOL_RE.search(line)
     if res:
-        return (res.group('module'), res.group('identifier') or res.group('operator'), True, bool(res.group('operator')))
+        return (
+            res.group('module'),
+            next(i for i in [res.group('identifier'), res.group('operator')] if i is not None),
+            True,
+            bool(res.group('operator')))
     res = IMPORT_MODULE_RE.search(line)
     if res:
         return (res.group('module'), None, False, False)
     res = SYMBOL_RE.search(line)
     # res always match
-    return (res.group('module'), res.group('identifier') or res.group('operator'), False, bool(res.group('operator')))
+    return (
+        res.group('module'),
+        next(i for i in [res.group('identifier'), res.group('operator')] if i is not None),
+        False,
+        bool(res.group('operator')))
 
 def get_qualified_symbol_at_region(view, region):
     """
@@ -181,22 +189,37 @@ class AutoCompletion(object):
         qualified_prefix = '{0}.{1}'.format(qualified_module, symbol_name) if qualified_module else symbol_name
 
         suggestions = []
-        if is_import_list:
-            current_project = hsdev_client.module(file = current_file_name).location.project
-            if current_project:
-                project_modules = [m.name for m in hsdev_client.list_modules(project = current_project)]
-                if qualified_module in project_modules:
-                    suggestions = hsdev_client.module(name = qualified_name, project = current_project).declarations.values()
-            if not suggestions:
-                suggestions = hsdev_client.module(name = qualified_name, cabal = current_is_cabal(), sandbox = current_sandbox()).declarations.values()
-        else:
-            suggestions = hsdev_client.complete(qualified_prefix, current_file_name, sandbox = current_sandbox()) or []
-            if not suggestions:
-                suggestions = hsdev_client.scope(current_file_name, sandbox = current_sandbox(), global_scope = True, prefix = qualified_prefix) or []
-            if not suggestions:
-                suggestions = hsdev_client.symbol(prefix = qualified_prefix) or []
 
-        return list(set([s.suggest() for s in suggestions]))
+        current_module = hsdev_client.module(file = current_file_name)
+        if current_module:
+            if is_import_list:
+                current_project = current_module.location.project
+                if current_project:
+                    # Search for declarations of qualified_module within current project
+                    proj_module = hsdev_client.module(name = qualified_module, project = current_project)
+                    if proj_module:
+                        suggestions = proj_module.declarations.values()
+                if not suggestions:
+                    # Search for declarations in cabal modules
+                    q_module = hsdev_client.module(name = qualified_module, cabal = current_is_cabal(), sandbox = current_sandbox())
+                    if q_module:
+                        suggestions = q_module.declarations.values()
+            else:
+                suggestions = hsdev_client.complete(qualified_prefix, current_file_name, sandbox = current_sandbox()) or []
+                if not suggestions:
+                    # Nothing found, search all accessible names within project
+                    suggestions = hsdev_client.scope(current_file_name, sandbox = current_sandbox(), global_scope = True, prefix = qualified_prefix) or []
+        else:
+            # Module not scanned, complete with anything
+            suggestions = hsdev_client.symbol(find = qualified_prefix) or []
+
+        import_names = []
+        if current_module:
+            # Get qualified imports names
+            import_names.extend([('{0}\tmodule {1}'.format(i.import_as, i.module), i.import_as) for i in current_module.imports if i.import_as])
+            import_names.extend([('{0}\tmodule'.format(i.module), i.module) for i in current_module.imports if i.is_qualified])
+
+        return list(set([s.suggest() for s in suggestions] + import_names))
 
     @hsdev.use_hsdev
     def completions_for_module(self, module, filename = None):
@@ -341,7 +364,7 @@ class SublimeHaskellBrowseDeclarations(SublimeHaskellTextCommand):
         self.decls = []
         self.declarations = []
 
-        self.decls = hsdev_client.scope(self.view.file_name(), global_scope = True, sandbox = current_sandbox())
+        self.decls = hsdev_client.scope(self.view.file_name(), global_scope = True, sandbox = current_sandbox(), timeout = 5)
 
         if not self.decls:
             show_status_message("Can't get scope for {0}".format(self.view.file_name()), False)
@@ -1288,6 +1311,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 
         end_time = time.clock()
         log('time to get completions: {0} seconds'.format(end_time - begin_time), log_debug)
+        return completions
         # Don't put completions with special characters (?, !, ==, etc.)
         # into completion because that wipes all default Sublime completions:
         # See http://www.sublimetext.com/forum/viewtopic.php?t=8659

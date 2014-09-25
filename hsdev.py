@@ -313,7 +313,7 @@ def hsdev_command(async, timeout = None):
     return wrap_function
 
 def command(fn):
-    return hsdev_command(False, timeout = 0.5)(fn)
+    return hsdev_command(False, timeout = 1)(fn)
 
 def async_command(fn):
     return hsdev_command(True)(fn)
@@ -664,7 +664,8 @@ class HsDev(object):
             (sandbox, {'sandbox': sandbox}),
             (source, {'src': None}),
             (standalone, {'stand': None}),
-            (prefix, {'prefix': prefix})])
+            (prefix, {'prefix': prefix}),
+            (find, {'find': find})])
 
         return cmd('symbol', [name] if name else [], opts, parse_decls)
 
