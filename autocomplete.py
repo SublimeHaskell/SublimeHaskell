@@ -769,9 +769,15 @@ class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
         self.view.window().show_quick_panel([[c.module.name] for c in self.candidates], self.on_done)
 
     def add_import(self, module_name):
-        cur_module = hsdev_client.module(file = self.current_file_name)
+        self.module_name = module_name
+        contents = self.view.substr(sublime.Region(0, self.view.size()))
+        contents_part = contents[0 : list(re.finditer('^import.*$', contents, re.MULTILINE))[-1].end()]
+        call_and_wait_tool(['hsinspect', 'input'], 'hsinspect', contents_part, self.on_inspected, check_enabled = False)
+
+    def on_inspected(self, result):
+        cur_module = hsdev.parse_module(json.loads(result)['module']) if self.view.is_dirty() else hsdev_client.module(file = self.current_file_name)
         imports = sorted(cur_module.imports, key = lambda i: i.location.line)
-        after = [i for i in imports if i.module > module_name]
+        after = [i for i in imports if i.module > self.module_name]
 
         insert_line = 0
         insert_gap = False
@@ -790,12 +796,12 @@ class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
             # Insert at the end of file
             insert_line = self.view.rowcol(self.view.size())[0]
 
-        insert_text = 'import {0}\n'.format(module_name) + ('\n' if insert_gap else '')
+        insert_text = 'import {0}\n'.format(self.module_name) + ('\n' if insert_gap else '')
 
         pt = self.view.text_point(insert_line, 0)
         self.view.insert(self.edit, pt, insert_text)
 
-        show_status_message('Import {0} added'.format(module_name), True)
+        show_status_message('Import {0} added'.format(self.module_name), True)
 
     def on_done(self, idx):
         if idx == -1:

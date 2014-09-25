@@ -28,7 +28,7 @@ class Location(object):
         return ':'.join([self.filename if self.filename else '<no file>', str(self.line)])
 
     def set_file(self, other):
-        if other is not None:
+        if other is not None and type(other) == Location:
             self.filename = other.filename
             self.project = other.project
 

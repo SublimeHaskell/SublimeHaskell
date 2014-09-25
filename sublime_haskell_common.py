@@ -138,7 +138,7 @@ def get_extended_env():
     ext_env['PATH'] = os.pathsep.join(add_to_PATH + [PATH])
     return ext_env
 
-def call_and_wait_tool(command, tool_name, on_result = None, filename = None, on_line = None, check_enabled = True, **popen_kwargs):
+def call_and_wait_tool(command, tool_name, input = '', on_result = None, filename = None, on_line = None, check_enabled = True, **popen_kwargs):
     tool_enabled = 'enable_{0}'.format(tool_name)
 
     if check_enabled and get_setting_async(tool_enabled) != True:
@@ -152,11 +152,11 @@ def call_and_wait_tool(command, tool_name, on_result = None, filename = None, on
 
     try:
         if on_line:
-            for l in call_and_wait(command, split_lines = True, cwd = source_dir, **popen_kwargs):
+            for l in call_and_wait_with_input(command, input, split_lines = True, cwd = source_dir, **popen_kwargs):
                 on_line(mk_result(crlf2lf(decode_bytes(l))))
             return None
         else:
-            exit_code, out, err = call_and_wait(command, cwd = source_dir, **popen_kwargs)
+            exit_code, out, err = call_and_wait_with_input(command, input, cwd = source_dir, **popen_kwargs)
             out = crlf2lf(out)
 
             if exit_code != 0:
