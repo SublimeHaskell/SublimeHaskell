@@ -174,6 +174,36 @@ class AutoCompletion(object):
 
         self.current_filename = None
 
+        # filename ⇒ preloaded completions or None
+        self.async_completions = LockedObject({})
+
+    @hsdev.use_hsdev
+    def get_completions_async(self, file_name):
+        suggs = []
+
+        current_module = hsdev_client.module(file = file_name)
+        if current_module:
+            suggs = hsdev_client.complete('', file, sandbox = current_sandbox()) or []
+            if not suggestions:
+                # Nothing found, search all accessible names within project
+                suggs = hsdev_client.scope(file, sandbox = current_sandbox(), global_scope = True) or []
+        else:
+            # Module not scanned, complete with anything
+            suggs = hsdev_client.symbol() or []
+
+        import_names = []
+        if current_module:
+            # Get qualified imports names
+            import_names.extend([('{0}\tmodule {1}'.format(i.import_as, i.module), i.import_as) for i in current_module.imports if i.import_as])
+            import_names.extend([('{0}\tmodule'.format(i.module), i.module) for i in current_module.imports if i.is_qualified])
+
+        with self.async_completions as async_comps:
+            async_comps[file_name] = list(set([s.suggest() for s in suggs] + import_names))
+
+    def drop_completions_async(self):
+        with self.async_completions as async_comps:
+            async_comps = {}
+
     @hsdev.use_hsdev
     def get_completions(self, view, prefix, locations):
         "Get all the completions that apply to the current file."
@@ -190,31 +220,33 @@ class AutoCompletion(object):
 
         suggestions = []
 
-        current_module = hsdev_client.module(file = current_file_name)
-        if current_module:
-            if is_import_list:
+        if is_import_list:
+            current_module = hsdev_client.module(file = current_file_name)
+            if current_module:
                 current_project = current_module.location.project
                 if current_project:
                     # Search for declarations of qualified_module within current project
                     proj_module = hsdev_client.module(name = qualified_module, project = current_project)
                     if proj_module:
                         suggestions = proj_module.declarations.values()
-                if not suggestions:
-                    # Search for declarations in cabal modules
-                    q_module = hsdev_client.module(name = qualified_module, cabal = current_is_cabal(), sandbox = current_sandbox())
-                    if q_module:
-                        suggestions = q_module.declarations.values()
-            else:
+            if not suggestions:
+                # Search for declarations in cabal modules
+                q_module = hsdev_client.module(name = qualified_module, cabal = current_is_cabal(), sandbox = current_sandbox())
+                if q_module:
+                    suggestions = q_module.declarations.values()
+        else:
+            current_module = hsdev_client.module(file = current_file_name)
+            if current_module:
                 suggestions = hsdev_client.complete(qualified_prefix, current_file_name, sandbox = current_sandbox()) or []
                 if not suggestions:
                     # Nothing found, search all accessible names within project
                     suggestions = hsdev_client.scope(current_file_name, sandbox = current_sandbox(), global_scope = True, prefix = qualified_prefix) or []
-        else:
-            # Module not scanned, complete with anything
-            suggestions = hsdev_client.symbol(find = qualified_prefix) or []
+            else:
+                # Module not scanned, complete with anything
+                suggestions = hsdev_client.symbol(find = qualified_prefix) or []
 
         import_names = []
-        if current_module:
+        if current_module and not is_import_list:
             # Get qualified imports names
             import_names.extend([('{0}\tmodule {1}'.format(i.import_as, i.module), i.import_as) for i in current_module.imports if i.import_as])
             import_names.extend([('{0}\tmodule'.format(i.module), i.module) for i in current_module.imports if i.is_qualified])
