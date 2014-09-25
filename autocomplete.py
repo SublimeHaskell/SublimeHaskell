@@ -202,42 +202,60 @@ class AutoCompletion(object):
 
         self.current_filename = None
 
-        # filename ⇒ preloaded completions + None ⇒ all completions
+        # filename ⇒ (preloaded completions, global scope completions) + None ⇒ all completions
         self.async_completions = LockedObject({})
+        self.wide_completion = None
+
+    def mark_wide_completion(self, view):
+        self.wide_completion = view
 
     @hsdev.use_hsdev
-    def get_completions_async(self, file_name = None):
+    def get_completions_async(self, file_name = None, wide = False):
+        def log_result(r):
+            log(('wide completions: {0}' if wide else 'completions: {0}').format(len(r)), log_trace)
+            return r
         none_comps = []
         with self.async_completions as async_comps:
             if file_name in async_comps:
-                return async_comps.get(file_name, [])
+                return log_result(async_comps.get(file_name, {True:[],False:[]})[wide])
             else:
                 if None not in async_comps:
                     log('preparing completions', log_debug)
-                    async_comps[None] = list(set([s.suggest() for s in (hsdev_client.symbol() or [])]))
+                    async_comps[None] = list(set([s.suggest() for s in (hsdev_client.symbol(timeout = None) or [])]))
+                    async_comps[None].sort(key = lambda k: k[0])
                 none_comps = async_comps.get(None, [])
 
         suggs = []
         import_names = []
+        comps = none_comps
+        global_comps = none_comps
 
         if file_name is None:
-            return none_comps
+            return log_result(none_comps)
         else:
             log('preparing completions for {0}'.format(file_name), log_debug)
             current_module = hsdev_client.module(file = file_name)
             if current_module:
-                suggs = hsdev_client.complete('', file_name, sandbox = current_sandbox()) or []
+                suggs = hsdev_client.complete('', file_name, sandbox = current_sandbox(), timeout = None) or []
+                global_suggs = hsdev_client.scope(file_name, sandbox = current_sandbox(), global_scope = True, timeout = None) or []
                 if not suggs:
-                    # Nothing found, search all accessible names within project
-                    suggs = hsdev_client.scope(file_name, sandbox = current_sandbox(), global_scope = True) or []
+                    suggs = global_suggs
 
                 # Get qualified imports names
                 import_names.extend([('{0}\tmodule {1}'.format(i.import_as, i.module), i.import_as) for i in current_module.imports if i.import_as])
                 import_names.extend([('{0}\tmodule'.format(i.module), i.module) for i in current_module.imports if i.is_qualified])
 
+                comps = [s.suggest() for s in suggs] + import_names
+                global_comps = [s.suggest() for s in global_suggs] + import_names
+
+                comps.sort(key = lambda k: k[0])
+                global_comps.sort(key = lambda k: k[0])
+
         with self.async_completions as async_comps:
-            async_comps[file_name] = none_comps if not suggs else list(set([s.suggest() for s in suggs] + import_names))
-            return async_comps[file_name]
+            async_comps[file_name] = {
+                False: comps,
+                True: global_comps }
+            return log_result(async_comps[file_name][wide])
 
     def drop_completions_async(self):
         log('drop prepared completions')
@@ -285,7 +303,10 @@ class AutoCompletion(object):
                 if q_module:
                     suggestions = q_module.declarations.values()
         else:
-            return self.get_completions_async(current_file_name)
+            wide = self.wide_completion == view
+            if self.wide_completion == view:
+                self.wide_completion = None
+            return self.get_completions_async(current_file_name, wide)
 
         return list(set([s.suggest() for s in suggestions] + import_names))
 
@@ -395,15 +416,19 @@ def can_complete_qualified_symbol(info):
 
 class SublimeHaskellComplete(SublimeHaskellTextCommand):
     """ Shows autocompletion popup """
-    def run(self, edit, characters):
-        for region in self.view.sel():
-            self.view.insert(edit, region.end(), characters)
+    def run(self, edit, characters, wide = False):
+        self.wide = wide
+        if characters:
+            for region in self.view.sel():
+                self.view.insert(edit, region.end(), characters)
 
-        if can_complete_qualified_symbol(get_qualified_symbol_at_region(self.view, self.view.sel()[0])):
-            self.view.run_command("hide_auto_complete")
-            sublime.set_timeout(self.do_complete, 1)
+        # if can_complete_qualified_symbol(get_qualified_symbol_at_region(self.view, self.view.sel()[0])):
+        self.view.run_command("hide_auto_complete")
+        sublime.set_timeout(self.do_complete, 1)
 
     def do_complete(self):
+        if self.wide:
+            autocompletion.mark_wide_completion(self.view)
         self.view.run_command("auto_complete")
 
 

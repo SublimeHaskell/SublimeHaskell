@@ -54,5 +54,11 @@
         "keys": ["ctrl+alt+e"],
         "command": "show_panel",
         "args": { "panel": "output.haskell_error_checker" }
+    },
+    {
+        "keys": ["ctrl+alt+space"],
+        "command": "sublime_haskell_complete",
+        "args": {"characters": "", "wide": true},
+        "context": [ { "key": "haskell_source" } ]
     }
 ]
