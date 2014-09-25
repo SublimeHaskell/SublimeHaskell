@@ -202,7 +202,7 @@ class AutoCompletion(object):
 
         self.current_filename = None
 
-        # filename ⇒ (preloaded completions, global scope completions) + None ⇒ all completions
+        # filename ⇒ preloaded completions + None ⇒ all completions
         self.async_completions = LockedObject({})
         self.wide_completion = None
 
@@ -210,25 +210,27 @@ class AutoCompletion(object):
         self.wide_completion = view
 
     @hsdev.use_hsdev
-    def get_completions_async(self, file_name = None, wide = False):
+    def get_completions_async(self, file_name = None):
         def log_result(r):
-            log(('wide completions: {0}' if wide else 'completions: {0}').format(len(r)), log_trace)
+            log('completions: {0}'.format(len(r)), log_trace)
             return r
         none_comps = []
         with self.async_completions as async_comps:
             if file_name in async_comps:
-                return log_result(async_comps.get(file_name, {True:[],False:[]})[wide])
+                return log_result(async_comps.get(file_name, []))
             else:
-                if None not in async_comps:
-                    log('preparing completions', log_debug)
-                    async_comps[None] = list(set([s.suggest() for s in (hsdev_client.symbol(timeout = None) or [])]))
-                    async_comps[None].sort(key = lambda k: k[0])
                 none_comps = async_comps.get(None, [])
+
+        if not none_comps:
+            log('preparing completions', log_debug)
+            none_comps = list(set([s.suggest() for s in (hsdev_client.symbol(timeout = None) or [])]))
+            none_comps.sort(key = lambda k: k[0])
+            with self.async_completions as async_comps:
+                async_comps[None] = none_comps
 
         suggs = []
         import_names = []
         comps = none_comps
-        global_comps = none_comps
 
         if file_name is None:
             return log_result(none_comps)
@@ -237,25 +239,19 @@ class AutoCompletion(object):
             current_module = hsdev_client.module(file = file_name)
             if current_module:
                 suggs = hsdev_client.complete('', file_name, sandbox = current_sandbox(), timeout = None) or []
-                global_suggs = hsdev_client.scope(file_name, sandbox = current_sandbox(), global_scope = True, timeout = None) or []
-                if not suggs:
-                    suggs = global_suggs
+                # if not suggs:
+                #     suggs = hsdev_client.scope(file_name, sandbox = current_sandbox(), global_scope = True, timeout = None) or []
 
                 # Get qualified imports names
                 import_names.extend([('{0}\tmodule {1}'.format(i.import_as, i.module), i.import_as) for i in current_module.imports if i.import_as])
                 import_names.extend([('{0}\tmodule'.format(i.module), i.module) for i in current_module.imports if i.is_qualified])
 
                 comps = [s.suggest() for s in suggs] + import_names
-                global_comps = [s.suggest() for s in global_suggs] + import_names
-
                 comps.sort(key = lambda k: k[0])
-                global_comps.sort(key = lambda k: k[0])
 
         with self.async_completions as async_comps:
-            async_comps[file_name] = {
-                False: comps,
-                True: global_comps }
-            return log_result(async_comps[file_name][wide])
+            async_comps[file_name] = comps
+            return log_result(async_comps[file_name])
 
     def drop_completions_async(self):
         log('drop prepared completions')
@@ -303,10 +299,12 @@ class AutoCompletion(object):
                 if q_module:
                     suggestions = q_module.declarations.values()
         else:
-            wide = self.wide_completion == view
-            if self.wide_completion == view:
-                self.wide_completion = None
-            return self.get_completions_async(current_file_name, wide)
+            with self.async_completions as async_comps:
+                if self.wide_completion == view:
+                    return async_comps.get(None, [])
+                    self.wide_completion = None
+                else:
+                    return async_comps.get(file_name, async_comps.get(None, []))
 
         return list(set([s.suggest() for s in suggestions] + import_names))
 
