@@ -485,40 +485,20 @@ class SublimeHaskellBrowseDeclarations(SublimeHaskellTextCommand):
     Show all available declarations from current cabal and opened projects
     """
     def run(self, edit):
-        self.decls = []
-        self.declarations = []
-
-        if not self.view.file_name():
-            show_status_message('Empty filename', False)
-            return
-        self.status = status_message_process('Getting scope of {0}'.format(self.view.file_name()))
-        self.status.start()
-        hsdev_client.scope(self.view.file_name(), global_scope = True, sandbox = current_sandbox(), wait = False, on_response = self.on_receive_scope, on_error = self.on_receive_error)
-
-    def on_receive_scope(self, decls):
-        self.status.stop()
-
-        self.decls = decls
-
-        if not self.decls:
-            show_status_message("Can't get scope for {0}".format(self.view.file_name()), False)
-
-        for decl in self.decls:
-            self.declarations.append([decl.module.name + ': ' + decl.brief()])
-
-        self.view.window().show_quick_panel(self.declarations, self.on_done)
-
-    def on_receive_error(self, e):
-        self.status.fail()
-        self.status.stop()
+        self.comps = []
+        with autocompletion.cache as cache_:
+            self.comps = cache_.global_completions()[:]
+        self.view.window().show_quick_panel([brief.split('\t') for brief, name in self.comps], self.on_done)
 
     def on_done(self, idx):
         if idx == -1:
             return
 
-        decl = self.decls[idx]
-
-        show_declaration_info(self.view, decl)
+        brief, name = self.comps[idx]
+        splitted = brief.split('\t')
+        sublime.set_timeout(lambda: self.view.run_command('sublime_haskell_symbol_info', {
+            'decl': name,
+            'module_name': splitted[1]}), 0)
 
 
 
@@ -725,7 +705,10 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
         else:
             self.current_file_name = self.view.file_name()
 
-            (module_word, ident, _, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+            module_word = None
+            ident = decl
+            if not decl:
+                module_word, ident, _, _ = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
 
             if ident is None: # module
                 self.view.window().run_command('sublime_haskell_browse_module', {
@@ -799,7 +782,7 @@ def show_declaration_info(view, decl):
         info['package_name'] = decl.location.package.name
         info['cabal'] = decl.location.cabal
 
-    sublime.set_timeout(lambda: view.run_command('sublime_haskell_symbol_info', info), 0)
+    sublime.set_timeout(lambda: view.run_command('sublime_haskell_symbol_info', {'decl': name}, info), 0)
 
 def show_declaration_info_panel(view, decl):
     write_panel(view.window(), decl.detailed(), 'sublime_haskell_symbol_info', syntax = 'HaskellSymbolInfo')
