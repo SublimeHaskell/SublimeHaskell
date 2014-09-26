@@ -185,6 +185,36 @@ def run_async(fn, *args, **kwargs):
 
 
 
+def sort_completions(comps):
+    comps.sort(key = lambda k: k[0])
+
+def sorted_completions(comps):
+    return sorted(comps, key = lambda k: k[0])
+
+def make_completions(suggestions):
+    return sorted_completions([s.suggest() for s in (suggestions or [])])
+
+class CompletionCache(object):
+    def __init__(self):
+        self.files = {}
+        self.cabal = []
+        self.sources = []
+        self.global_comps = []
+
+    def set_files(self, filename, comps):
+        self.files[filename] = comps
+
+    def set_cabal(self, comps):
+        self.cabal = comps
+        self.global_comps = sorted_completions(self.cabal + self.sources)
+
+    def set_sources(self, comps):
+        self.sources = comps
+        self.global_comps = sorted_completions(self.cabal + self.sources)
+
+    def global_completions(self):
+        return self.global_comps
+
 # Autocompletion data
 class AutoCompletion(object):
     """Information for completion"""
@@ -197,13 +227,13 @@ class AutoCompletion(object):
         # keywords
         # TODO: keywords can't appear anywhere, we can suggest in right places
         self.keyword_completions = map(
-            lambda k: (k + '\t(keyword)', k),
+            lambda k: (k + '\tkeyword', k),
             ['case', 'data', 'instance', 'type', 'where', 'deriving', 'import', 'module'])
 
         self.current_filename = None
 
         # filename ⇒ preloaded completions + None ⇒ all completions
-        self.async_completions = LockedObject({})
+        self.cache = LockedObject(CompletionCache())
         self.wide_completion = None
 
     def mark_wide_completion(self, view):
@@ -215,20 +245,21 @@ class AutoCompletion(object):
             log('completions: {0}'.format(len(r)), log_trace)
             return r
         none_comps = []
-        with self.async_completions as async_comps:
-            if file_name in async_comps:
-                return log_result(async_comps.get(file_name, []))
+        update_cabal = False
+        update_sources = False
+        with self.cache as cache_:
+            if file_name in cache_.files:
+                return log_result(cache_.files.get(file_name, []))
             else:
-                none_comps = async_comps.get(None, [])
+                update_cabal = not cache_.cabal
+                update_sources = not cache_.sources
+        if update_cabal:
+            self.update_cabal_completions()
+        if update_sources:
+            self.update_sources_completions()
+        with self.cache as cache_:
+            none_comps = cache_.global_completions()
 
-        if not none_comps:
-            log('preparing completions', log_debug)
-            none_comps = list(set([s.suggest() for s in (hsdev_client.symbol(timeout = None) or [])]))
-            none_comps.sort(key = lambda k: k[0])
-            with self.async_completions as async_comps:
-                async_comps[None] = none_comps
-
-        suggs = []
         import_names = []
         comps = none_comps
 
@@ -238,7 +269,8 @@ class AutoCompletion(object):
             log('preparing completions for {0}'.format(file_name), log_debug)
             current_module = hsdev_client.module(file = file_name)
             if current_module:
-                suggs = hsdev_client.complete('', file_name, sandbox = current_sandbox(), timeout = None) or []
+                comps = make_completions(
+                    hsdev_client.complete('', file_name, sandbox = current_sandbox(), timeout = None))
                 # if not suggs:
                 #     suggs = hsdev_client.scope(file_name, sandbox = current_sandbox(), global_scope = True, timeout = None) or []
 
@@ -246,20 +278,32 @@ class AutoCompletion(object):
                 import_names.extend([('{0}\tmodule {1}'.format(i.import_as, i.module), i.import_as) for i in current_module.imports if i.import_as])
                 import_names.extend([('{0}\tmodule'.format(i.module), i.module) for i in current_module.imports if i.is_qualified])
 
-                comps = [s.suggest() for s in suggs] + import_names
-                comps.sort(key = lambda k: k[0])
+                comps.extend(import_names)
+                sort_completions(comps)
 
-        with self.async_completions as async_comps:
-            async_comps[file_name] = comps
-            return log_result(async_comps[file_name])
+        with self.cache as cache_:
+            cache_.files[file_name] = comps
+            return log_result(cache_.files[file_name])
 
     def drop_completions_async(self):
         log('drop prepared completions')
-        with self.async_completions as async_comps:
-            async_comps.clear()
+        with self.cache as cache_:
+            cache_.files.clear()
+
+    def update_cabal_completions(self):
+        comps = make_completions(
+            hsdev_client.symbol(cabal = current_is_cabal(), sandbox = current_sandboxes(), timeout = None))
+        log('updating prepared cabal completions: {0}'.format(len(comps)))
+        with self.cache as cache_:
+            cache_.set_cabal(comps)
+
+    def update_sources_completions(self):
+        comps = make_completions(hsdev_client.symbol(source = True, timeout = None))
+        log('updating prepared sources completions: {0}'.format(len(comps)))
+        with self.cache as cache_:
+            cache_.set_sources(comps)
 
     def init_completions_async(self):
-        self.get_completions_async()
         window = sublime.active_window()
         if window:
             view = window.active_view()
@@ -284,29 +328,31 @@ class AutoCompletion(object):
 
         suggestions = []
 
-        if is_import_list:
+        if qualified_module:
             current_module = hsdev_client.module(file = current_file_name)
             if current_module:
-                current_project = current_module.location.project
-                if current_project:
-                    # Search for declarations of qualified_module within current project
-                    proj_module = hsdev_client.module(name = qualified_module, project = current_project)
-                    if proj_module:
-                        suggestions = proj_module.declarations.values()
+                if is_import_list:
+                    current_project = current_module.location.project
+                    if current_project:
+                        # Search for declarations of qualified_module within current project
+                        proj_module = hsdev_client.module(name = qualified_module, project = current_project)
+                        if proj_module:
+                            suggestions = proj_module.declarations.values()
+                else:
+                    suggestions = hsdev_client.complete(qualified_prefix, current_file_name, sandbox = current_sandbox())
             if not suggestions:
                 # Search for declarations in cabal modules
                 q_module = hsdev_client.module(name = qualified_module, cabal = current_is_cabal(), sandbox = current_sandbox())
                 if q_module:
                     suggestions = q_module.declarations.values()
+            return make_completions(suggestions)
         else:
-            with self.async_completions as async_comps:
+            with self.cache as cache_:
                 if self.wide_completion == view:
                     self.wide_completion = None
-                    return async_comps.get(None, [])
+                    return cache_.global_completions()
                 else:
-                    return async_comps.get(current_file_name, async_comps.get(None, []))
-
-        return list(set([s.suggest() for s in suggestions] + import_names))
+                    return cache_.files.get(current_file_name, cache_.global_completions())
 
     @hsdev.use_hsdev
     def completions_for_module(self, module, filename = None):
@@ -315,7 +361,10 @@ class AutoCompletion(object):
         """
         if not module:
             return []
-        return map(lambda d: d.suggest(), hsdev_client.module(name = module, file = filename).declarations.values())
+        m = hsdev_client.module(name = module, file = filename)
+        if not m:
+            return []
+        return make_completions(m.declarations.values())
 
     def completions_for(self, module_name, filename = None):
         """
@@ -388,7 +437,7 @@ class AutoCompletion(object):
             return suffix[0]
 
         module_list = modules if modules else self.get_current_module_completions()
-        return list(set((module_next_name(m) + '\t(module)', module_next_name(m)) for m in module_list if m.startswith(qualified_prefix)))
+        return list(set((module_next_name(m) + '\tmodule', module_next_name(m)) for m in module_list if m.startswith(qualified_prefix)))
 
     @hsdev.use_hsdev
     def get_current_module_completions(self):
@@ -1253,6 +1302,10 @@ class HsDevAgent(threading.Thread):
 
             if load_cabal or scan_paths or projects or files:
                 run_async(autocompletion.drop_completions_async)
+                if load_cabal:
+                    run_async(autocompletion.update_cabal_completions)
+                if scan_paths or projects or files:
+                    run_async(autocompletion.update_sources_completions)
                 run_async(autocompletion.init_completions_async)
             self.reinspect_event.wait(AGENT_SLEEP_TIMEOUT)
             self.reinspect_event.clear()
@@ -1413,15 +1466,18 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 
         end_time = time.clock()
         log('time to get completions: {0} seconds'.format(end_time - begin_time), log_debug)
+        if get_setting('inhibit_completions') and len(completions) != 0:
+            return (completions, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         return completions
+
         # Don't put completions with special characters (?, !, ==, etc.)
         # into completion because that wipes all default Sublime completions:
         # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
         # TODO: work around this
-        comp = [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0].split('\t')[0])]
-        if get_setting('inhibit_completions') and len(comp) != 0:
-            return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
-        return comp
+        # comp = [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0].split('\t')[0])]
+        # if get_setting('inhibit_completions') and len(comp) != 0:
+        #     return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
+        # return comp
 
     def set_cabal_status(self, view):
         filename = view.file_name()

@@ -36,7 +36,7 @@ class LockedObject(object):
     """
 
     def __init__(self, obj, lock = None):
-        self.object_lock = lock if lock else threading.Lock()
+        self.object_lock = lock if lock else threading.RLock()
         self.object = obj
 
     def __enter__(self):
