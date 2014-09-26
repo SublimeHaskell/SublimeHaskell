@@ -782,7 +782,7 @@ def show_declaration_info(view, decl):
         info['package_name'] = decl.location.package.name
         info['cabal'] = decl.location.cabal
 
-    sublime.set_timeout(lambda: view.run_command('sublime_haskell_symbol_info', {'decl': name}, info), 0)
+    sublime.set_timeout(lambda: view.run_command('sublime_haskell_symbol_info', info), 0)
 
 def show_declaration_info_panel(view, decl):
     write_panel(view.window(), decl.detailed(), 'sublime_haskell_symbol_info', syntax = 'HaskellSymbolInfo')
