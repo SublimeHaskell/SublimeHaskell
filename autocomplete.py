@@ -625,8 +625,8 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
                 show_status_message('File {0} is not in project'.format(self.current_filename), False)
                 return
 
-            decls = self.qualified_decls(self.sorted_decls(hsdev_client.symbol(project = current_project)))
-            self.declarations = [[decl.brief(), decl.location.position()] for decl in decls]
+            decls = self.sorted_decls(hsdev_client.symbol(project = current_project))
+            self.declarations = [[decl.brief(), decl.module.name, decl.location.position()] for decl in decls]
         else:
             decls = self.sorted_decls(hsdev_client.symbol(file = self.current_filename, locals = True))
             self.declarations = [[(decl.location.column * ' ') + decl.brief()] for decl in decls]
@@ -643,7 +643,7 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
         return decls
 
     def sorted_decls(self, decls):
-        return list(sorted(decls, key = lambda d: (d.location.filename, d.location.line)))
+        return list(sorted(decls, key = lambda d: d.name))
 
     def closest_idx(self, decls):
         fdecls = list(filter(
@@ -1412,6 +1412,8 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         subscribe_setting('use_cabal_sandbox', self.on_sandbox_changed)
         subscribe_setting('cabal_sandbox', self.on_sandbox_changed)
 
+        self.project_file_name = None
+
     def on_sandbox_changed(self, key, value):
         # to force update async settings
         get_setting('use_cabal_sandbox')
@@ -1514,6 +1516,15 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         start_inspector()
 
         self.set_cabal_status(view)
+
+        window = view.window()
+        if window:
+            if not self.project_file_name:
+                self.project_file_name = window.project_file_name()
+            if window.project_file_name() is not None and window.project_file_name() != self.project_file_name:
+                self.project_file_name = window.project_file_name()
+                log('project switched to {0}, reinspecting'.format(self.project_file_name))
+                window.run_command('sublime_haskell_reinspect_all')
 
     def on_post_save(self, view):
         if is_inspected_source(view):
