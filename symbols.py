@@ -159,10 +159,11 @@ class Module(Symbol):
     """
     Haskell module symbol
     """
-    def __init__(self, module_name, exports = [], imports = [], declarations = {}, location = None, cabal = None, last_inspection_time = 0):
+    def __init__(self, module_name, exports = None, imports = [], declarations = {}, location = None, cabal = None, last_inspection_time = 0):
         super(Module, self).__init__('module', module_name, None, location)
         # List of strings
-        self.exports = exports[:]
+        if exports is not None:
+            self.exports = exports[:]
         # Dictionary from module name to Import object
         self.imports = imports[:]
         for i in self.imports:
