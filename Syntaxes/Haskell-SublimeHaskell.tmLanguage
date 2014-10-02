@@ -652,6 +652,10 @@
 					<key>name</key>
 					<string>meta.other.unknown.haskell</string>
 				</dict>
+				<dict>
+					<key>include</key>
+					<string>#comments</string>
+				</dict>
 			</array>
 		</dict>
 		<key>module_name</key>
