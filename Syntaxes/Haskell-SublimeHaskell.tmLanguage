@@ -570,7 +570,8 @@
 				</dict>
 			</dict>
 			<key>end</key>
-			<string>-\}</string>
+			<string>(?&lt;!#)-\}</string>
+			<!-- ^ Using `(?&lt;!#)-\}` instead of `-\}` so that pragmas don't close block comments. `(?<!#)-}` is a negative lookbehind saying: match `-}` but not when there's a `#` in front of it. -->
 			<key>name</key>
 			<string>comment.block.haskell</string>
 			<key>patterns</key>
