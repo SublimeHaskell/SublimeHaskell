@@ -194,6 +194,10 @@
 					<key>include</key>
 					<string>#module_exports</string>
 				</dict>
+				<dict>
+					<key>include</key>
+					<string>#comments</string>
+				</dict>
 			</array>
 		</dict>
 		<dict>
