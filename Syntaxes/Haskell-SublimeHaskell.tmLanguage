@@ -531,7 +531,8 @@
 		</dict>
 		<dict>
 			<key>match</key>
-			<string>\b[A-Z][A-Za-z_'0-9]*</string>
+			<string>(?&lt;!')\b[A-Z][A-Za-z_'0-9]*</string>
+			<!-- ^ We have to prepend the negative lookbehind (?<!') to forbid single quotes before the word boundary. That is because in contrast to Python's re, Sublime's matching engine treats `my'str` as `my\b'\b'str`, thus detecting constants (constructors) in identifier names like `m'result`. Single quotes are the only such characters allowed in Haskell identifiers. -->
 			<key>name</key>
 			<string>constant.other.haskell</string>
 		</dict>
