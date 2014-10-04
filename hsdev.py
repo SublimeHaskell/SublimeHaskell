@@ -142,6 +142,14 @@ def get_value(dc, ks, defval = None):
     else:
         return dc.get(ks, defval)
 
+# 'cabal' or {'sandbox':path}
+def parse_sandbox(d, defval = None):
+    if type(d) == dict:
+        return get_value(d, 'sandbox', defval)
+    if d == 'cabal':
+        return 'cabal'
+    return defval
+
 def parse_location(d, p = None):
     loc = symbols.Location(
         get_value(d, 'file'),
@@ -152,7 +160,7 @@ def parse_location(d, p = None):
         return loc
     loc = symbols.InstalledLocation(
         symbols.parse_package(get_value(d, 'package')),
-        get_value(d, 'cabal'))
+        parse_sandbox(get_value(d, 'cabal')))
     if not loc.is_null():
         return loc
     loc = symbols.OtherLocation(
