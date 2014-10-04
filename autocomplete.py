@@ -691,6 +691,9 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
 
     """
     def run(self, edit, filename = None, module_name = None, package_name = None, project_name = None, cabal = None, decl = None):
+        if not cabal:
+            cabal = current_cabal()
+
         if decl and (filename or module_name):
             self.full_name = decl
             self.current_file_name = filename
@@ -901,6 +904,9 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
     Browse module symbols
     """
     def run(self, module_name = None, package_name = None, project_name = None, filename = None, cabal = None, scope = None):
+        if not cabal:
+            cabal = current_cabal()
+
         self.candidates = []
 
         m = None
