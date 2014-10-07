@@ -189,7 +189,7 @@ def sort_completions(comps):
     comps.sort(key = lambda k: k[0])
 
 def sorted_completions(comps):
-    return sorted(comps, key = lambda k: k[0])
+    return list(set(comps)) # unique + sort
 
 def make_completions(suggestions):
     return sorted_completions([s.suggest() for s in (suggestions or [])])
