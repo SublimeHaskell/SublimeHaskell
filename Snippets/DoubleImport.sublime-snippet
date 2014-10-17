@@ -1,0 +1,21 @@
+<snippet>
+	<!--
+	Produces imports of the form:
+
+	import qualified Data.Foo as F
+	import           Data.Foo (Foo, fun)
+
+	Foo and F in as and includes sections are determined by the last
+	name in the module string: Foo -> F and Foo, Data.Foo -> F and Foo
+
+	By Alex "Axman6" Mason
+	-->
+	<content><![CDATA[
+import           ${1:Data.Text} (${2:${1/(\w+\.)*(\w+)/$2/}}${3:, fun})
+import qualified $1 as ${4:${1/(\w+\.)*(\w)\w*/$2/}}
+$0
+]]></content>
+	<tabTrigger>impq</tabTrigger>
+	<scope>source.haskell</scope>
+	<description>Import module qualified and unqualified</description>
+</snippet>
