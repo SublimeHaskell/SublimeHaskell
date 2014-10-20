@@ -20,7 +20,7 @@ executable ModuleInspector
   other-extensions:    OverloadedStrings
   build-depends:       base
                       ,ghc
-                      ,haddock
+                      ,haddock-api
                       ,text >=1.0
                       ,containers >=0.4
                       ,directory >=1.0
