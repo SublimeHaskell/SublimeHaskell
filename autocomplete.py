@@ -930,10 +930,7 @@ class InspectorAgent(threading.Thread):
                 '--force-reinstalls', # safely overrides packages in the global db
                 '--disable-library-profiling',
                 '--disable-shared',
-                '--disable-library-for-ghci',
                 '--disable-tests',
-                '--disable-library-coverage',
-                '--disable-benchmarks',
                 '--disable-documentation'],
                 cwd = TOOLS_CABAL_FILE_DIR)
 
