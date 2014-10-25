@@ -910,6 +910,7 @@ class InspectorAgent(threading.Thread):
 
     def run(self):
         # Make sure there is a sandbox here
+        log(InspectorAgent.SANDBOXMSG)
         with status_message(InspectorAgent.SANDBOXMSG) as s:
             exit_code, out, err = call_and_wait(['cabal',
                'sandbox', 'init',
@@ -923,6 +924,7 @@ class InspectorAgent(threading.Thread):
                 return
 
         # Install all the dependencies, if necessary
+        log(InspectorAgent.DEPSMSG)
         with status_message(InspectorAgent.DEPSMSG) as s:
             exit_code, out, err = call_and_wait(['cabal',
                 'install',
@@ -940,8 +942,11 @@ class InspectorAgent(threading.Thread):
                 wait_for_window(lambda w: self.show_errors(w, error_msg))
                 return
 
+            log("Done: Compiling Haskell tools dependencies")
+
 
         # Compile the tools
+        log(InspectorAgent.TOOLSMSG)
         with status_message(InspectorAgent.TOOLSMSG) as s:
 
             exit_code, out, err = call_and_wait(['cabal',
@@ -954,6 +959,8 @@ class InspectorAgent(threading.Thread):
                 error_msg = u"SublimeHaskell: Failed to compile tools\n{0}".format(err)
                 wait_for_window(lambda w: self.show_errors(w, error_msg))
                 return
+
+            log("Done: " + InspectorAgent.TOOLSMSG)
 
         # For first time, inspect all open folders and files
         wait_for_window(lambda w: self.mark_all_files(w))
