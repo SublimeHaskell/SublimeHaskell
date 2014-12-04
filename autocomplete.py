@@ -270,7 +270,7 @@ class AutoCompletion(object):
             current_module = hsdev_client.module(file = file_name)
             if current_module:
                 comps = make_completions(
-                    hsdev_client.complete('', file_name, sandbox = current_sandbox(), timeout = None))
+                    hsdev_client.complete('', file_name, sandbox = current_sandbox(), timeout = None, split_result = True))
                 # if not suggs:
                 #     suggs = hsdev_client.scope(file_name, sandbox = current_sandbox(), global_scope = True, timeout = None) or []
 
@@ -292,13 +292,13 @@ class AutoCompletion(object):
 
     def update_cabal_completions(self):
         comps = make_completions(
-            hsdev_client.symbol(cabal = current_is_cabal(), sandbox = current_sandboxes(), timeout = None))
+            hsdev_client.symbol(cabal = current_is_cabal(), sandbox = current_sandboxes(), timeout = None, split_result = True))
         log('updating prepared cabal completions: {0}'.format(len(comps)))
         with self.cache as cache_:
             cache_.set_cabal(comps)
 
     def update_sources_completions(self):
-        comps = make_completions(hsdev_client.symbol(source = True, timeout = None))
+        comps = make_completions(hsdev_client.symbol(source = True, timeout = None, split_result = True))
         log('updating prepared sources completions: {0}'.format(len(comps)))
         with self.cache as cache_:
             cache_.set_sources(comps)

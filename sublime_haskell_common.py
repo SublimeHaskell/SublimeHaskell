@@ -169,12 +169,12 @@ def call_and_wait_tool(command, tool_name, input = '', on_result = None, filenam
             output_error_async(sublime.active_window(), "SublimeHaskell: {0} was not found!\n'{1}' is set to False".format(tool_name, tool_enabled))
             set_setting_async(tool_enabled, False)
         else:
-            log('{0} fails with {1}'.format(tool_name, e), log_error)
+            log('{0} fails with {1}, command: {2}'.format(tool_name, e, command), log_error)
 
         return None
 
     except Exception as e:
-        log('{0} fails with {1}'.format(tool_name, e), log_error)
+        log('{0} fails with {1}, command: {2}'.format(tool_name, e, command), log_error)
 
     return None
 

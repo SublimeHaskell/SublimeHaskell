@@ -292,7 +292,7 @@ def connect_function(fn):
                 return fn(self, *args, **kwargs)
     return wrapped
 
-def hsdev_command(async, timeout = None):
+def hsdev_command(async = False, timeout = None, is_list = False):
     def wrap_function(fn):
         def wrapped(self, *args, **kwargs):
             wait_flag = kwargs.pop('wait', not async)
@@ -300,33 +300,68 @@ def hsdev_command(async, timeout = None):
             on_resp = kwargs.pop('on_response', None)
             on_not = kwargs.pop('on_notify', None)
             on_err = kwargs.pop('on_error', None)
+            on_res_part = kwargs.pop('on_result_part', None)
+            split_res = kwargs.pop('split_result', on_res_part is not None)
+
             (name_, args_, opts_, on_result_) = fn(self, *args, **kwargs)
-            def on_response(r):
-                if on_result_:
+
+            if is_list and split_res:
+                result = []
+                def on_notify(n):
+                    if 'result-part' in n:
+                        rp = on_result_([n['result-part']])[0]
+                        call_callback(on_res_part, rp)
+                        result.append(rp)
+                    else:
+                        call_callback(on_not, n)
+                def on_response(r):
+                    on_resp(result)
+
+                opts_.update({'split-result': None})
+                r = self.call(
+                    name_,
+                    args_,
+                    opts_,
+                    on_response = on_response if on_resp else None,
+                    on_notify = on_notify,
+                    on_error = on_err,
+                    wait = wait_flag,
+                    timeout = timeout_arg)
+                if wait_flag:
+                    return result
+                return r
+
+            else:
+                def on_response(r):
                     on_resp(on_result_(r))
-                else:
-                    on_resp(r)
-            r = self.call(
-                name_,
-                args_,
-                opts_,
-                on_response = on_response if on_resp else None,
-                on_notify = on_not,
-                on_error = on_err,
-                wait = wait_flag,
-                timeout = timeout_arg)
-            if wait_flag:
-                return on_result_(r) if on_result_ else r
+                r = self.call(
+                    name_,
+                    args_,
+                    opts_,
+                    on_response = on_response if on_resp else None,
+                    on_notify = on_not,
+                    on_error = on_err,
+                    wait = wait_flag,
+                    timeout = timeout_arg)
+                if wait_flag:
+                    return on_result_(r)
+                return r
         return wrapped
     return wrap_function
 
 def command(fn):
-    return hsdev_command(False, timeout = 1)(fn)
+    return hsdev_command(async = False, timeout = 1)(fn)
 
 def async_command(fn):
-    return hsdev_command(True)(fn)
+    return hsdev_command(async = True)(fn)
 
-def cmd(name_, args_, opts_, on_result = None):
+def list_command(fn):
+    return hsdev_command(async = False, timeout = 1, is_list = True)(fn)
+
+def async_list_command(fn):
+    return hsdev_command(async = True, is_list = True)(fn)
+
+def cmd(name_, args_, opts_, on_result = lambda r: r):
     return (name_, args_, opts_, on_result)
 
 def call_callback(fn, *args, name = None, **kwargs):
@@ -395,7 +430,7 @@ class HsDev(object):
         log('Starting hsdev server command: {0}'.format(cmd), log_trace)
         log('Starting hsdev server', log_info)
 
-        ret = call_and_wait_tool(cmd, 'hsdev', parse_response, None, None, check_enabled = False)
+        ret = call_and_wait_tool(cmd, 'hsdev', '', parse_response, None, None, check_enabled = False)
         if ret is not None:
             return ret
         return None
@@ -523,7 +558,7 @@ class HsDev(object):
             return None if wait else False
 
         try:
-            wait_receive = threading.Event() if wait else None                
+            wait_receive = threading.Event() if wait else None
 
             x = {}
             def on_response_(r):
@@ -625,7 +660,7 @@ class HsDev(object):
 
         return cmd('rescan', [], opts)
 
-    @async_command
+    @async_list_command
     def remove(self, cabal = False, sandboxes = [], projects = [], files = [], modules = []):
         opts = concat_opts([
             (cabal, {'cabal': None}),
@@ -636,11 +671,11 @@ class HsDev(object):
 
         return cmd('remove', [], opts)
 
-    @async_command
+    @async_list_command
     def remove_all(self):
         return cmd('remove', [], {'all': None})
 
-    @command
+    @list_command
     def list_modules(self, cabal = False, sandboxes = None, projects = None, packages = None, source = False, standalone = False):
         opts = concat_opts([
             (cabal, {'cabal': None}),
@@ -652,15 +687,15 @@ class HsDev(object):
 
         return cmd('modules', [], opts, parse_modules)
 
-    @command
+    @list_command
     def list_packages(self):
         return cmd('packages', [], {})
 
-    @command
+    @list_command
     def list_projects(self):
         return cmd('projects', [], {})
 
-    @command
+    @list_command
     def symbol(self, name = None, project = None, file = None, module = None, locals = False, package = None, cabal = False, sandbox = None, source = False, standalone = False, prefix = None, find = None):
         opts = concat_opts([
             (project, {'project': project}),
@@ -695,7 +730,7 @@ class HsDev(object):
     def project(self, project):
         return cmd('project', [], {'project': project})
 
-    @command
+    @list_command
     def lookup(self, name, file, sandbox = None):
         opts = {'file': file}
 
@@ -704,7 +739,7 @@ class HsDev(object):
 
         return cmd('lookup', [name], opts, parse_decls)
 
-    @command
+    @list_command
     def whois(self, name, file, sandbox = None):
         opts = {'file': file}
 
@@ -713,7 +748,7 @@ class HsDev(object):
 
         return cmd('whois', [name], opts, parse_decls)
 
-    @command
+    @list_command
     def scope_modules(self, file, sandbox = None):
         opts = {'file': file}
 
@@ -722,7 +757,7 @@ class HsDev(object):
 
         return cmd('scope modules', [], opts, parse_modules)
 
-    @command
+    @list_command
     def scope(self, file, sandbox = None, global_scope = False, prefix = None, find = None):
         opts = concat_opts([
             (True, {'file': file}),
@@ -733,7 +768,7 @@ class HsDev(object):
 
         return cmd('scope', [], opts, parse_decls)
 
-    @command
+    @list_command
     def complete(self, input, file, sandbox = None):
         opts = {'file': file}
 
@@ -742,7 +777,7 @@ class HsDev(object):
 
         return cmd('complete', [input], opts, parse_decls)
 
-    @command
+    @list_command
     def hayoo(self, query, page = None, pages = None):
         opts = concat_opts([
             (page, {'page': page}),
@@ -750,12 +785,12 @@ class HsDev(object):
 
         return cmd('hayoo', [query], opts, parse_decls)
 
-    @command
+    @list_command
     def cabal_list(self, query = None):
         return cmd()
         cmd('cabal list', [query] if query else [], {}, lambda r: [parse_cabal_package(s) for s in r] if r else None)
 
-    @command
+    @list_command
     def ghcmod_type(self, file, line, column = 1, sandbox = None, ghc = []):
         opts = concat_opts([
             (True, {'file': file}),
@@ -764,7 +799,7 @@ class HsDev(object):
 
         return cmd('ghc-mod type', [str(line), str(column)], opts)
 
-    @command
+    @list_command
     def ghcmod_check(self, files, sandbox = None, ghc = []):
         opts = concat_opts([
             (ghc, {'ghc': ghc}),
@@ -772,14 +807,14 @@ class HsDev(object):
 
         return cmd('ghc-mod check', files, opts)
 
-    @command
+    @list_command
     def ghcmod_lint(self, file, hlint = []):
         opts = concat_opts([
             (hlint, {'hlint': hlint})])
 
         return cmd('ghc-mod lint', [file], opts)
 
-    @command
+    @list_command
     def ghc_eval(self, exprs):
         return cmd('ghc eval', exprs, {})
 
