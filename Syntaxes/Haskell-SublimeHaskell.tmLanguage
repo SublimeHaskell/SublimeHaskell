@@ -963,10 +963,14 @@
 					<string>constant.language.empty-list.haskell</string>
 				</dict>
 				<dict>
+					<key>include</key>
+					<string>#comments</string>
+				</dict>
+				<dict>
 					<key>comment</key>
 					<string>In case this regex seems overly general, note that Haskell permits the definition of new operators which can be nearly any string of punctuation characters, such as $%^&amp;*.</string>
 					<key>match</key>
-					<string>[|!%$?~+:.*=&lt;/&gt;\\∘→⇒⇔←⇐≤≥≡⋮\[\]]+</string>
+					<string>[|!%$?~+:.\-*=&lt;/&gt;\\∘→⇒⇔←⇐≤≥≡⋮\[\]]+</string>
 					<key>name</key>
 					<string>keyword.operator.haskell</string>
 				</dict>
@@ -985,10 +989,6 @@
 				<dict>
 					<key>include</key>
 					<string>#data_names</string>
-				</dict>
-				<dict>
-					<key>include</key>
-					<string>#comments</string>
 				</dict>
 			</array>
 		</dict>
