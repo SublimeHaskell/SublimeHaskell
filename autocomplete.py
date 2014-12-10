@@ -682,7 +682,7 @@ class SublimeHaskellReinspectAll(SublimeHaskellWindowCommand):
             hsdev_client.remove_all()
             hsdev_inspector.start_inspect()
         else:
-            show_status_message("inspector not connected", isok=False)
+            show_status_message("inspector not connected", is_ok=False)
 
 
 class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):

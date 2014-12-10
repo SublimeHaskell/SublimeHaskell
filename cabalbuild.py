@@ -63,7 +63,7 @@ class SublimeHaskellBaseCommand(SublimeHaskellWindowCommand):
 def get_projects():
     if autocomplete.hsdev_agent_connected():
         folders = sublime.active_window().folders()
-        view_files = [v.file_name() for v in sublime.active_window().views() if is_haskell_source(v) or is_cabal_source(v)]
+        view_files = [v.file_name() for v in sublime.active_window().views() if (is_haskell_source(v) or is_cabal_source(v)) and v.file_name()]
 
         def npath(p):
             return os.path.normcase(os.path.normpath(p))
@@ -99,6 +99,7 @@ def select_project(window, on_selected, filter_project = None):
         on_selected(psel[0], psel[1]['path'])
 
     if len(ps) == 0:
+        show_status_message("No projects found, did you add some .cabal file?", is_ok = False, priority = 5)
         return
     if len(ps) == 1:  # There's only one project, build it
         run_selected(ps[0])

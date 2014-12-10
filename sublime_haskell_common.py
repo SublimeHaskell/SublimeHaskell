@@ -1,4 +1,4 @@
-import errno
+﻿import errno
 import fnmatch
 import os
 import re
@@ -646,29 +646,14 @@ def sublime_status_message(msg):
     """
     sublime.set_timeout(lambda: sublime.status_message(u'SublimeHaskell: {0}'.format(msg)), 0)
 
-def show_status_message(msg, isok = None):
-    """
-    Show status message with check mark (isok = true), ballot x (isok = false) or ... (isok = None)
-    """
-    mark = u'...'
-    if isok is not None:
-        mark = u' \u2714' if isok else u' \u2718'
-    sublime_status_message(u'{0}{1}'.format(msg, mark))
-
-def with_status_message(msg, action):
-    """
-    Show status message for action with check mark or with ballot x
-    Returns whether action exited properly
-    """
-    try:
-        show_status_message(msg)
-        action()
-        show_status_message(msg, True)
-        return True
-    except SublimeHaskellError as e:
-        show_status_message(msg, False)
-        log(e.reason, log_error)
-        return False
+# def show_status_message(msg, is_ok = None):
+#     """
+#     Show status message with check mark (is_ok = true), ballot x (is_ok = false) or ... (is_ok = None)
+#     """
+#     mark = u'...'
+#     if is_ok is not None:
+#         mark = u' \u2714' if is_ok else u' \u2718'
+#     sublime_status_message(u'{0}{1}'.format(msg, mark))
 
 def crlf2lf(s):
     " CRLF -> LF "
@@ -678,91 +663,168 @@ def crlf2lf(s):
         return ''
     return s.replace('\r\n', '\n')
 
-class StatusMessage(threading.Thread):
-    messages = {}
-    # List of ((priority, time), StatusMessage)
-    # At start, messages adds itself to list, at cancel - removes
-    # First element of list is message with highest priority
-    priorities_lock = threading.Lock()
-    priorities = []
+class LockedObject(object):
+    """
+    Object with lock
+    x = LockedObject(some_value)
+    with x as v:
+        v...
+    """
 
-    def __init__(self, msg, timeout, priority):
-        super(StatusMessage, self).__init__()
-        self.interval = 0.5
-        self.start_timeout = timeout
+    def __init__(self, obj, lock = None):
+        self.object_lock = lock if lock else threading.Lock()
+        self.object = obj
+
+    def __enter__(self):
+        self.object_lock.__enter__()
+        return self.object
+
+    def __exit__(self, type, value, traceback):
+        self.object_lock.__exit__()
+
+class StatusMessage(object):
+    # duration — duration of message
+    # is_process — whether to show dots in message
+    # is_ok — whether to show ✔ (True) or ✘ (False)
+    # Note, that is is_ok is not None, dots will not be shown (is_process is ignored)
+    def __init__(self, msg, duration = 3, timeout = 300, priority = 0, is_process = True, is_ok = None):
+        self.msg = msg
+        self.duration = duration
         self.timeout = timeout
         self.priority = priority
-        self.msg = msg
-        self.times = 0
+        self.is_process = is_process
+        self.is_ok = is_ok
+
+    def is_active(self):
+        if self.is_process:
+            return self.timeout >= 0
+        else:
+            return self.duration >= 0
+
+    def tick(self, interval):
+        if self.is_process:
+            self.timeout = self.timeout - interval
+        else:
+            self.duration = self.duration - interval
+        return self.is_active()
+
+    # Get message with dots or marks
+    def message(self, ticks):
+        if self.is_ok is not None:
+            return u'{0}{1}'.format(self.msg, u' \u2714' if self.is_ok else u' \u2718')
+        if self.is_process:
+            return u'{0}{1}'.format(self.msg, '.' * (ticks % 4))
+        return self.msg
+
+    def change_message(self, new_msg):
+        self.msg = new_msg
+
+    def ok(self):
+        self.is_ok = True
+
+    def fail(self):
+        self.is_ok = False
+
+    def stop(self, is_ok = None):
+        if is_ok is not None:
+            self.is_ok = is_ok
+        self.is_process = False
+
+    def process(msg, timeout = 300, duration = 3, priority = 0):
+        return StatusMessage(msg, duration = duration, timeout = timeout, priority = priority)
+
+    def status(msg, duration = 3, priority = 0, is_ok = None):
+        return StatusMessage(msg, duration = duration, priority = priority, is_process = False, is_ok = is_ok)
+
+class StatusMessagesManager(threading.Thread):
+    # msg ⇒ StatusMessage
+    messages = LockedObject({})
+    # [StatusMessage × time]
+    priorities = LockedObject([])
+
+    def __init__(self):
+        super(StatusMessagesManager, self).__init__()
+        self.daemon = True
+        self.interval = 0.5
         self.event = threading.Event()
-        self.event.set()
+        self.ticks = 0
         self.timer = None
 
     def run(self):
-        self.add_to_priorities()
-        try:
-            self.update_message()
-            while self.event.is_set():
-                self.timer = threading.Timer(self.interval, self.update_message)
-                self.timer.start()
-                self.timer.join()
-        finally:
-            self.remove_from_priorities()
+        while True:
+            try:
+                self.event.wait(60.0)
+                self.event.clear()
+                self.ticks = 0
+                # Ok, there are some messages, start showing them
+                while self.show():
+                    self.timer = threading.Timer(self.interval, self.tick)
+                    self.timer.start()
+                    self.timer.join()
+            except Exception as e:
+                log('Exception in status message: {0}'.format(e), log_error)
 
-    def cancel(self):
-        self.event.clear()
-        if self.timer:
-            self.timer.cancel()
-
-    def update_message(self):
-        dots = self.times % 4
-        self.times += 1
-        self.timeout -= self.interval
-
-        if self.is_highest_priority():
-            sublime_status_message(u'{0}{1}'.format(self.msg, '.' * dots))
-
-        if self.timeout <= 0:
-            self.cancel()
-
-    def add_to_priorities(self):
-        with StatusMessage.priorities_lock:
-            StatusMessage.priorities.append(((self.priority, time.clock()), self))
-            StatusMessage.priorities.sort(key = lambda x: (-x[0][0], x[0][1], x[1]))
-
-    def remove_from_priorities(self):
-        with StatusMessage.priorities_lock:
-            StatusMessage.priorities = [(i, msg) for i, msg in StatusMessage.priorities if msg != self]
-
-    def is_highest_priority(self):
-        with StatusMessage.priorities_lock:
-            if StatusMessage.priorities:
-                return StatusMessage.priorities[0][1] == self
-            else:
+    def show(self):
+        # Show current message, clear event if no events
+        with StatusMessagesManager.priorities as ps:
+            if not ps:
                 return False
+            else:
+                cur_msg, _ = ps[0]
+                sublime_status_message(cur_msg.message(self.ticks))
+                return True
 
-    def change_message(self, new_msg):
-        # There's progress, don't timeout
-        self.timeout = self.start_timeout
-        self.msg = new_msg
+    def tick(self):
+        self.ticks = self.ticks + 1
+        # Tick all messages, remove outdated, resort priority list
+        with StatusMessagesManager.priorities as ps:
+            for p in ps:
+                p[0].tick(self.interval)
+        self.update()
 
-def show_status_message_process(msg, isok = None, timeout = 300, priority = 0):
+    def add(self, new_message):
+        with StatusMessagesManager.priorities as ps:
+            ps.append((new_message, time.clock()))
+        with StatusMessagesManager.messages as ms:
+            ms[new_message.msg] = new_message
+        self.update()
+        self.event.set()
+
+    def get(self, key):
+        with StatusMessagesManager.messages as ms:
+            return ms.get(key)
+
+    def update(self):
+        # Update priority list
+        with StatusMessagesManager.priorities as ps:
+            ps[:] = list(filter(lambda p: p[0].is_active(), ps))
+            # Ended processes goes first, then by priority, and then by time of message addition
+            ps.sort(key = lambda x: (x[0].is_process, -x[0].priority, x[1]))
+        with StatusMessagesManager.messages as ms:
+            ums = dict(filter(lambda m: m[1].is_active(), ms.items()))
+            ms.clear()
+            ms.update(ums)
+
+status_message_manager = None
+
+def show_status_message(msg, is_ok = None, priority = 0):
     """
-    Same as show_status_message, but shows permanently until called with isok not None
+    Show status message with check mark (is_ok = true), ballot x (is_ok = false) or ... (is_ok = None)
+    """
+    status_message_manager.add(StatusMessage.status(msg, priority = priority, is_ok = is_ok))
+
+def show_status_message_process(msg, is_ok = None, timeout = 300, priority = 0):
+    """
+    Same as show_status_message, but shows permanently until called with is_ok not None
     There can be only one message process in time, message with highest priority is shown
     For example, when building project, there must be only message about building
     """
-    if isok is not None:
-        if msg in StatusMessage.messages:
-            StatusMessage.messages[msg].cancel()
-            del StatusMessage.messages[msg]
-        show_status_message(msg, isok)
+    if is_ok is not None:
+        m = status_message_manager.get(msg)
+        if m:
+            m.stop(is_ok = is_ok)
     else:
-        if msg in StatusMessage.messages:
-            StatusMessage.messages[msg].cancel()
-
-        StatusMessage.messages[msg] = StatusMessage(msg, timeout, priority)
-        StatusMessage.messages[msg].start()
+        status_message_manager.add(StatusMessage.process(msg, timeout = timeout, priority = priority))
 
 def is_cabal_source(view = None):
     window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
@@ -789,10 +851,9 @@ def is_haskell_source(view = None):
     return True
 
 class with_status_message(object):
-    def __init__(self, msg, isok, show_message):
+    def __init__(self, msg, is_ok):
         self.msg = msg
-        self.isok = isok
-        self.show_message = show_message
+        self.is_ok = is_ok
 
     def __enter__(self):
         self.start()
@@ -804,29 +865,28 @@ class with_status_message(object):
         self.stop()
 
     def start(self):
-        self.show_message(self.msg)
+        status_message_manager.add(self.msg)
 
     def stop(self):
-        self.show_message(self.msg, self.isok)
+        self.msg.stop(self.is_ok)
 
     def ok(self):
-        self.isok = True
+        self.is_ok = True
 
     def fail(self):
-        self.isok = False
+        self.is_ok = False
 
     def change_message(self, new_msg):
-        if self.msg in StatusMessage.messages:
-            StatusMessage.messages[self.msg].change_message(new_msg)
+        self.msg.change_message(new_msg)
 
     def percentage_message(self, current, total = 100):
         self.change_message('{0} ({1}%)'.format(self.msg, int(current * 100 / total)))
 
-def status_message(msg, isok = True):
-    return with_status_message(msg, isok, show_status_message)
+def status_message(msg, is_ok = True, priority = 0):
+    return with_status_message(StatusMessage.status(msg, priority = priority), is_ok = is_ok)
 
-def status_message_process(msg, isok = True, timeout = 300, priority = 0):
-    return with_status_message(msg, isok, lambda m, ok = None: show_status_message_process(m, ok, timeout, priority))
+def status_message_process(msg, is_ok = True, timeout = 300, priority = 0):
+    return with_status_message(StatusMessage.process(msg, timeout = timeout, priority = priority), is_ok = is_ok)
 
 def sublime_haskell_package_path():
     """Get the path to where this package is installed"""
@@ -840,6 +900,11 @@ def plugin_loaded():
     package_path = sublime_haskell_package_path()
     cache_path = sublime_haskell_cache_path()
 
+    global status_message_manager
+    if not status_message_manager:
+        status_message_manager = StatusMessagesManager()
+        status_message_manager.start()
+
     if not os.path.exists(cache_path):
         os.makedirs(cache_path)
 
@@ -847,25 +912,6 @@ def plugin_loaded():
 
 if int(sublime.version()) < 3000:
     plugin_loaded()
-
-class LockedObject(object):
-    """
-    Object with lock
-    x = LockedObject(some_value)
-    with x as v:
-        v...
-    """
-
-    def __init__(self, obj, lock = None):
-        self.object_lock = lock if lock else threading.Lock()
-        self.object = obj
-
-    def __enter__(self):
-        self.object_lock.__enter__()
-        return self.object
-
-    def __exit__(self, type, value, traceback):
-        self.object_lock.__exit__()
 
 def create_process(command, **kwargs):
     if subprocess.mswindows:
