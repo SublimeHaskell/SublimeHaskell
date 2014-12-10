@@ -28,8 +28,6 @@ import qualified Data.Map as M
 -- keyword.declaration.data.haskell, entity.name.data.haskell, entity.name.constructor.haskell, entity.name.class.haskell, variable.generic.haskell
 data Dat a b = LeftDat a | RightDat b deriving (Eq, Ord, Read, Show)
 
-deriving (Foo, x, Bar)
-
 data LinedData a b =
 	-- Foo
 	LeftLinedData a |
@@ -44,7 +42,9 @@ data Record a = Record {
 	-- comment
 	recordName :: String } deriving (Eq, Show)
 
-data Ord a => GData a b where
+data RecordOneLine a = RecordOneLine { recOne :: String, recTwo :: Int, (****) :: Int → Int → Int }
+
+data GData a b where
 	GLeft :: a -> GData a b
 	-- comment
 	GRight ∷ b → GData a b
@@ -90,6 +90,18 @@ plus x y = SumDat x y
 
 plus' ∷ a → b → SumDat a b
 plus' = SumDat
+
+minus :: Maybe Int → Maybe Int → Maybe Int
+minus (Just n) (Just m)
+	| n ≤ m = Just $ m - n
+	| otherwise = Just $ n - m
+minus _ _ = Nothing
+
+doTest :: Int → IO ()
+doTest 0 = return ()
+doTest n = do
+	print n
+	doTest (n - 1)
 
 -- keyword.operator.infix-call.haskell, entity.name.function.haskell
 (.+.) :: a → b → SumDat a b

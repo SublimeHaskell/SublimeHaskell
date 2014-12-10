@@ -638,11 +638,40 @@
 			<array>
 				<dict>
 					<key>include</key>
-					<string>#function_signature</string>
+					<string>#field_signature</string>
 				</dict>
 				<dict>
 					<key>include</key>
 					<string>#comments</string>
+				</dict>
+			</array>
+		</dict>
+		<key>field_signature</key>
+		<dict>
+			<key>begin</key>
+			<string>([a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))\s*((::)|∷)</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>entity.name.function.haskell</string>
+				</dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.other.double-colon.haskell</string>
+				</dict>
+			</dict>
+			<key>end</key>
+			<string>(?=[,}])</string>
+			<key>name</key>
+			<string>meta.declaration.function.haskell</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>include</key>
+					<string>#type_signature</string>
 				</dict>
 			</array>
 		</dict>

@@ -205,6 +205,17 @@ Find more themes at : https://github.com/daylerees/colour-schemes
 		</dict>
 		<dict>
 			<key>name</key>
+			<string>Entity name constructor</string>
+			<key>scope</key>
+			<string>entity.name.constructor</string>
+			<key>settings</key>
+			<dict>
+				<key>foreground</key>
+				<string>#5EBC7D</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>name</key>
 			<string>Entity name function</string>
 			<key>scope</key>
 			<string>entity.name.function</string>
