@@ -281,6 +281,43 @@
 					<string>entity.name.function.haskell</string>
 				</dict>
 				<dict>
+					<key>begin</key>
+					<string>(?&lt;!')\b([A-Z][A-Za-z_'0-9]*)\s*(\()</string>
+					<!-- ^ We have to prepend the negative lookbehind (?<!') to forbid single quotes before the word boundary. That is because in contrast to Python's re, Sublime's matching engine treats `my'str` as `my\b'\b'str`, thus detecting constants (constructors) in identifier names like `m'result`. Single quotes are the only such characters allowed in Haskell identifiers. -->
+					<key>beginCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>storage.type.haskell entity.name.data.haskell</string>
+						</dict>
+						<key>2</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
+					<key>end</key>
+					<string>(\))</string>
+					<key>endCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
+					<key>name</key>
+					<string>meta.declaration.export.data.haskell</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>include</key>
+							<string>#expression_stuff</string>
+						</dict>
+					</array>
+				</dict>
+				<dict>
 					<key>match</key>
 					<string>(?&lt;!')\b[A-Z][A-Za-z_'0-9]*</string>
 					<!-- ^ We have to prepend the negative lookbehind (?<!') to forbid single quotes before the word boundary. That is because in contrast to Python's re, Sublime's matching engine treats `my'str` as `my\b'\b'str`, thus detecting constants (constructors) in identifier names like `m'result`. Single quotes are the only such characters allowed in Haskell identifiers. -->
@@ -813,7 +850,7 @@
 					<key>match</key>
 					<string>where</string>
 					<key>name</key>
-					<string>keyword.haskell</string>
+					<string>keyword.declaration.data.haskell</string>
 				</dict>
 				<dict>
 					<key>include</key>
@@ -983,7 +1020,7 @@
 			<key>name</key>
 			<string>string.quoted.quasi.haskell</string>
 		</dict>
-		<key>data_names</key>
+		<key>ctor_names</key>
 		<dict>
 			<key>patterns</key>
 			<array>
@@ -991,13 +1028,13 @@
 					<key>match</key>
 					<string>(?&lt;!')\b[A-Z][A-Za-z_'0-9]*</string>
 					<key>name</key>
-					<string>constant.other.haskell entity.name.data.haskell</string>
+					<string>constant.other.haskell entity.name.constructor.haskell</string>
 				</dict>
 				<dict>
 					<key>match</key>
 					<string>\(\)</string>
 					<key>name</key>
-					<string>constant.other.haskell entity.name.data.haskell</string>
+					<string>constant.other.haskell entity.name.constructor.haskell</string>
 				</dict>
 			</array>
 		</dict>
@@ -1094,7 +1131,7 @@
 				</dict>
 				<dict>
 					<key>include</key>
-					<string>#data_names</string>
+					<string>#ctor_names</string>
 				</dict>
 			</array>
 		</dict>
