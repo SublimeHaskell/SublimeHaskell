@@ -127,6 +127,23 @@ def encode_bytes(s):
 def call_and_wait(command, split_lines = False, **popen_kwargs):
     return call_and_wait_with_input(command, '', split_lines, **popen_kwargs)
 
+def call_no_wait(command, **popen_kwargs):
+    """Run the specified command with no block"""
+    if subprocess.mswindows:
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        popen_kwargs['startupinfo'] = startupinfo
+
+    extended_env = get_extended_env()
+
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        stdin=subprocess.PIPE,
+        env=extended_env,
+        **popen_kwargs)
+
 # Get extended environment from settings for Popen
 def get_extended_env():
     ext_env = dict(os.environ)
