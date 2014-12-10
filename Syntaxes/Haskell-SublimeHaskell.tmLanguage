@@ -483,10 +483,66 @@
 					<string>storage.type.haskell entity.name.data.haskell</string>
 				</dict>
 				<dict>
-					<key>match</key>
-					<string>\[|\]</string>
+					<key>begin</key>
+					<string>(\()</string>
+					<key>beginCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
+					<key>end</key>
+					<string>(\))</string>
+					<key>endCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
 					<key>name</key>
-					<string>keyword.operator.haskell punctuation.list.haskell</string>
+					<string>meta.type_signature.brace.haskell</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>include</key>
+							<string>#type_signature</string>
+						</dict>
+					</array>
+				</dict>
+				<dict>
+					<key>begin</key>
+					<string>(\[)</string>
+					<key>beginCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
+					<key>end</key>
+					<string>(\])</string>
+					<key>endCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
+					<key>name</key>
+					<string>meta.type_signature.list.haskell</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>include</key>
+							<string>#type_signature</string>
+						</dict>
+					</array>
 				</dict>
 				<dict>
 					<key>include</key>
