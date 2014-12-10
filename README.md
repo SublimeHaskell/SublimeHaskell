@@ -28,6 +28,9 @@ Optional, but useful:
 * [haskell-docs](http://hackage.haskell.org/package/haskell-docs) (for documentation in 'Symbol info' command, `cabal install haskell-docs`)
 * [hdevtools](https://github.com/bitc/hdevtools) (or [fork for windows](https://github.com/mvoidex/hdevtools)) (for type inference, `cabal install hdevtools`)
 
+Binaries:
+* If your `cabal`, `ghc-mod`, `ghc` etc. are not installed in a system PATH, you have to adjust SublimeHaskell's `add_to_PATH` setting.
+
 Installation
 ------------
 1. Get Sublime Text 2: <http://www.sublimetext.com/>

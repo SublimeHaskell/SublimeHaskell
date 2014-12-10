@@ -90,6 +90,10 @@
 					<key>include</key>
 					<string>#module_exports</string>
 				</dict>
+				<dict>
+					<key>include</key>
+					<string>#comments</string>
+				</dict>
 			</array>
 		</dict>
 		<dict>
@@ -183,7 +187,8 @@
 				</dict>
 			</dict>
 			<key>end</key>
-			<string>-\}</string>
+			<string>(?&lt;!#)-\}</string>
+			<!-- ^ Using `(?&lt;!#)-\}` instead of `-\}` so that pragmas don't close block comments. `(?<!#)-}` is a negative lookbehind saying: match `-}` but not when there's a `#` in front of it. -->
 			<key>name</key>
 			<string>comment.block.haskell</string>
 			<key>patterns</key>
@@ -191,6 +196,10 @@
 				<dict>
 					<key>include</key>
 					<string>#block_comment</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#comments</string>
 				</dict>
 			</array>
 		</dict>
@@ -209,6 +218,24 @@
 					</dict>
 					<key>match</key>
 					<string>(---*(?!([!#\$%&amp;\*\+\./&lt;=&gt;\?@\\\^\|\-~:]|[^[^\p{S}\p{P}]_"'\(\),;\[\]`\{}]))).*$\n?</string> 
+					<!-- ^ See https://www.haskell.org/onlinereport/haskell2010/haskellch10.html -->
+					<!-- The difficulty is to forbid things that create valid operators. -->
+					<!-- OK, now the explanation: -->
+					<!-- First, we match "dashes": -- plus any number of further dashes. -->
+					<!-- We now have to match "any⟨symbol⟩": match any characters that's not "symbol". -->
+					<!--   symbol → ascSymbol | uniSymbol⟨special | _ | " | '⟩ -->
+					<!-- we forbid those two with a negative lookahead: -->
+					<!-- - first forbid the "ascSymbol" symbols !#$%&*+./<=>?@\^|-~: -->
+					<!--   using [!#\$%&amp;\*\+\./&lt;=&gt;\?@\\\^\|\-~:] -->
+					<!-- - then we forbid "uniSymbol⟨special | _ | " | '⟩": all unicode symbols apart from a few. -->
+					<!--   Sublime's regex engine does not allow "Character Class Subtraction", so instead we have to use "double-negative" (http://stackoverflow.com/a/3469155/263061): class-chars can be expressed as [^[^class]chars] -->
+					<!--   Here, class is [\p{S}\p{P}] ("uniSymbol": "any Unicode symbol or punctuation") -->
+					<!--   and chars is _"'\(\),;\[]`\{} (the _"' defined in "symbol", and "special") -->
+					<!--   So using the "double-negative", we get: -->
+					<!--     [^[^\p{S}\p{P}]_"'\(\),;\[\]`\{}] -->
+					<!-- Done. Now we just eat everything until the end of the line. -->
+					<!-- Other relevant info: -->
+					<!-- Chars that have to be escaped in Sublime's regex engine: \^$.|?*+()[]{- -->
 					<key>name</key>
 					<string>comment.line.haskell</string>
 				</dict>
@@ -236,14 +263,27 @@
 			<key>patterns</key>
 			<array>
 				<dict>
+					<!-- tmLanguage cannot capture multiline regexes, that's why we can't simply add a `\\$\s*\\` alternative to `constant.character.escape.haskell` to capture the `\[newline][whitespace]\` Haskell uses for multi-line strings. We have to use begin/end if we want multi-line matches. -->
+					<key>begin</key>
+					<string>\\\s*$</string>
+					<!-- ^ We use `\s*` because Haskell multiline strings do allow whitespace behind the `\` that "ends" the line, even before the line actually ends. -->
+					<key>end</key>
+					<string>\\</string>
+					<key>name</key>
+					<string>constant.character.escape.multilinestring.haskell</string>
+					<!-- We do not currently attempt to detect characters in between the `\`, so `\\n   a   \` will have the `a` counted towards this scope. -->
+				</dict>
+				<dict>
 					<key>match</key>
-					<string>\b[a-z][a-zA-Z_'0-9]*</string>
+					<string>(?&lt;!')\b[a-z][A-Za-z_'0-9]*</string>
+					<!-- ^ We have to prepend the negative lookbehind (?<!') to forbid single quotes before the word boundary. That is because in contrast to Python's re, Sublime's matching engine treats `my'str` as `my\b'\b'str`, thus detecting constants (constructors) in identifier names like `m'result`. Single quotes are the only such characters allowed in Haskell identifiers. -->
 					<key>name</key>
 					<string>entity.name.function.haskell</string>
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b[A-Z][A-Za-z_'0-9]*</string>
+					<string>(?&lt;!')\b[A-Z][A-Za-z_'0-9]*</string>
+					<!-- ^ We have to prepend the negative lookbehind (?<!') to forbid single quotes before the word boundary. That is because in contrast to Python's re, Sublime's matching engine treats `my'str` as `my\b'\b'str`, thus detecting constants (constructors) in identifier names like `m'result`. Single quotes are the only such characters allowed in Haskell identifiers. -->
 					<key>name</key>
 					<string>storage.type.haskell entity.name.data.haskell</string>
 				</dict>
@@ -466,13 +506,13 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b[a-z][a-zA-Z0-9_']*\b</string>
+					<string>(?&lt;!')\b[a-z][A-Za-z_'0-9]*\b</string>
 					<key>name</key>
 					<string>variable.generic.haskell</string>
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b[A-Z][a-zA-Z0-9_']*\b</string>
+					<string>(?&lt;!')\b[A-Z][A-Za-z_'0-9]*\b</string>
 					<key>name</key>
 					<string>entity.name.class.haskell entity.name.data.haskell</string>
 				</dict>
@@ -664,7 +704,7 @@
 		<key>record_declaration</key>
 		<dict>
 			<key>begin</key>
-			<string>\b([A-Z][a-zA-Z0-9_']*)\s*({)</string>
+			<string>(?&lt;!')\b([A-Z][A-Za-z_'0-9]*)\s*({)</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>1</key>
@@ -733,33 +773,10 @@
 		</dict>
 		<key>deriving</key>
 		<dict>
-			<key>begin</key>
-			<string>(deriving)\s*\(</string>
-			<key>beginCaptures</key>
-			<dict>
-				<key>1</key>
-				<dict>
-					<key>name</key>
-					<string>keyword.other.haskell keyword.declaration.data.haskell</string>
-				</dict>
-			</dict>
-			<key>end</key>
-			<string>\)</string>
+			<key>match</key>
+			<string>\b(deriving)\b</string>
 			<key>name</key>
-			<string>meta.declaration.data.deriving.haskell</string>
-			<key>patterns</key>
-			<array>
-				<dict>
-					<key>match</key>
-					<string>\b[A-Z][a-zA-Z_']*</string>
-					<key>name</key>
-					<string>keyword.other.haskell entity.name.class.haskell</string>
-				</dict>
-				<dict>
-					<key>include</key>
-					<string>#comments</string>
-				</dict>
-			</array>
+			<string>keyword.other.haskell keyword.declaration.data.haskell</string>
 		</dict>
 		<key>data_declaration</key>
 		<dict>
@@ -882,6 +899,10 @@
 					<key>include</key>
 					<string>#type_signature</string>
 				</dict>
+				<dict>
+					<key>include</key>
+					<string>#comments</string>
+				</dict>
 			</array>
 		</dict>
 		<key>fixity_declaration</key>
@@ -968,7 +989,7 @@
 			<array>
 		 		<dict>
 					<key>match</key>
-					<string>\b[A-Z][A-Za-z_'0-9]*</string>
+					<string>(?&lt;!')\b[A-Z][A-Za-z_'0-9]*</string>
 					<key>name</key>
 					<string>constant.other.haskell entity.name.data.haskell</string>
 				</dict>

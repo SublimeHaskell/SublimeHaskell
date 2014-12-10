@@ -50,7 +50,7 @@ class OutputMessage(object):
         self.filename = filename
         self.line = int(line)
         self.column = int(column)
-        self.message = message
+        self.message = message.replace(os.linesep, "\n")
         self.level = level
 
     def __unicode__(self):
