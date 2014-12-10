@@ -583,11 +583,11 @@ Find more themes at : https://github.com/daylerees/colour-schemes
 			<key>settings</key>
 			<dict>
 				<key>background</key>
-				<string>#00a8c6</string>
+				<string>#7F1E1E</string>
 				<key>fontStyle</key>
 				<string></string>
 				<key>foreground</key>
-				<string>#f8f8f0</string>
+				<string>#2FBCBC</string>
 			</dict>
 		</dict>
 		<dict>
@@ -598,9 +598,9 @@ Find more themes at : https://github.com/daylerees/colour-schemes
 			<key>settings</key>
 			<dict>
 				<key>background</key>
-				<string>#00a8c6</string>
+				<string>#7F1E1E</string>
 				<key>foreground</key>
-				<string>#f8f8f0</string>
+				<string>#2FBCBC</string>
 			</dict>
 		</dict>
 		<dict>
