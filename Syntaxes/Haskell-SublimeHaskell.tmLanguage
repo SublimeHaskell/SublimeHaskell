@@ -248,7 +248,7 @@
 		<key>infix_op</key>
 		<dict>
 			<key>match</key>
-			<string>(\([^\w\d\)]+\)|\(,+\))</string>
+			<string>(\([^\w\d \)]+\)|\(,+\))</string>
 			<key>name</key>
 			<string>entity.name.function.haskell</string>
 		</dict>
@@ -1080,7 +1080,7 @@
 							<key>name</key>
 							<string>punctuation.definition.entity.haskell</string>
 						</dict>
-						<key>2</key>
+						<key>3</key>
 						<dict>
 							<key>name</key>
 							<string>punctuation.definition.entity.haskell</string>
@@ -1089,7 +1089,7 @@
 					<key>comment</key>
 					<string>In case this regex seems unusual for an infix operator, note that Haskell allows any ordinary function application (elem 4 [1..10]) to be rewritten as an infix expression (4 `elem` [1..10]).</string>
 					<key>match</key>
-					<string>(`)[a-zA-Z_']*?(`)</string>
+					<string>(`)([A-Z][A-Za-z_'0-9]*\.)*[a-z][A-Za-z_'0-9]*(`)</string>
 					<key>name</key>
 					<string>keyword.operator.function.infix.haskell</string>
 				</dict>
