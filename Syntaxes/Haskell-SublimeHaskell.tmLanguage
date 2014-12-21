@@ -250,7 +250,7 @@
 			<key>match</key>
 			<string>(\([^\w\d \)]+\)|\(,+\))</string>
 			<key>name</key>
-			<string>entity.name.function.haskell</string>
+			<string>keyword.operator.haskell</string>
 		</dict>
 		<key>module_exports</key>
 		<dict>
