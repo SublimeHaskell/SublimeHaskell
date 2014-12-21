@@ -519,7 +519,7 @@
 				</dict>
 			</array>
 		</dict>
-		<key>type_signature</key>
+		<key>type</key>
 		<dict>
 			<key>patterns</key>
 			<array>
@@ -586,7 +586,7 @@
 					<array>
 						<dict>
 							<key>include</key>
-							<string>#type_signature</string>
+							<string>#type</string>
 						</dict>
 					</array>
 				</dict>
@@ -617,7 +617,7 @@
 					<array>
 						<dict>
 							<key>include</key>
-							<string>#type_signature</string>
+							<string>#type</string>
 						</dict>
 					</array>
 				</dict>
@@ -630,7 +630,7 @@
 		<key>function_signature</key>
 		<dict>
 			<key>begin</key>
-			<string>^(\s*)([a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))\s*((::)|∷)</string>
+			<string>^(\s*)([a-z_][a-zA-Z0-9_']*|\([^\w\d]+\(\))\s*((::)|∷)</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>2</key>
@@ -652,7 +652,7 @@
 			<array>
 				<dict>
 					<key>include</key>
-					<string>#type_signature</string>
+					<string>#type</string>
 				</dict>
 			</array>
 		</dict>
@@ -672,10 +672,6 @@
 				</dict>
 				<dict>
 					<key>include</key>
-					<string>#function_declarations</string>
-				</dict>
-				<dict>
-					<key>include</key>
 					<string>#expression_stuff</string>
 				</dict>
 			</array>
@@ -683,7 +679,7 @@
 		<key>foreign_function_signature</key>
 		<dict>
 			<key>begin</key>
-			<string>(\s*)([a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))\s*((::)|∷)</string>
+			<string>(\s*)([a-z_][a-zA-Z0-9_']*|\([^\w\d]+\(\))\s*((::)|∷)</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>2</key>
@@ -705,14 +701,14 @@
 			<array>
 				<dict>
 					<key>include</key>
-					<string>#type_signature</string>
+					<string>#type</string>
 				</dict>
 			</array>
 		</dict>
 		<key>constructor_signature</key>
 		<dict>
 			<key>begin</key>
-			<string>^(\s*)([A-Z][a-zA-Z0-9_']*|\([^\w\d]+\))\s*((::)|∷)</string>
+			<string>^(\s*)([A-Z][a-zA-Z0-9_']*|\([^\w\d]+\(\))\s*((::)|∷)</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>2</key>
@@ -734,7 +730,7 @@
 			<array>
 				<dict>
 					<key>include</key>
-					<string>#type_signature</string>
+					<string>#type</string>
 				</dict>
 			</array>
 		</dict>
@@ -782,7 +778,7 @@
 		<key>field_signature</key>
 		<dict>
 			<key>begin</key>
-			<string>([a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))\s*((::)|∷)</string>
+			<string>([a-z_][a-zA-Z0-9_']*|\([^\w\d]+\(\))\s*((::)|∷)</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>1</key>
@@ -804,7 +800,7 @@
 			<array>
 				<dict>
 					<key>include</key>
-					<string>#type_signature</string>
+					<string>#type</string>
 				</dict>
 			</array>
 		</dict>
@@ -870,7 +866,7 @@
 				</dict>
 				<dict>
 					<key>include</key>
-					<string>#type_signature</string>
+					<string>#type</string>
 				</dict>
 			</array>
 		</dict>
@@ -902,7 +898,7 @@
 			<array>
 				<dict>
 					<key>include</key>
-					<string>#type_signature</string>
+					<string>#type</string>
 				</dict>
 			</array>
 		</dict>
@@ -934,7 +930,7 @@
 			<array>
 				<dict>
 					<key>include</key>
-					<string>#type_signature</string>
+					<string>#type</string>
 				</dict>
 				<dict>
 					<key>include</key>
