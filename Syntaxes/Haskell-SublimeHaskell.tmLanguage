@@ -785,15 +785,10 @@
 		<key>record_declaration</key>
 		<dict>
 			<key>begin</key>
-			<string>(?&lt;!')\b([A-Z][A-Za-z_'0-9]*)\s*({)</string>
+			<string>({)</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>1</key>
-				<dict>
-					<key>name</key>
-					<string>constant.other.haskell entity.name.constructor.haskell</string>
-				</dict>
-				<key>2</key>
 				<dict>
 					<key>name</key>
 					<string>keyword.operator.haskell punctuation.record.haskell</string>
@@ -920,7 +915,7 @@
 						</dict>
 					</dict>
 					<key>end</key>
-					<string>(?&lt;!')\b([A-Z][a-zA-Z_0-9']*)\b(?!\s*\{)</string>
+					<string>(?&lt;!')\b([A-Z][a-zA-Z_0-9']*)</string>
 					<key>endCaptures</key>
 					<dict>
 						<key>1</key>
