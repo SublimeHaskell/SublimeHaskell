@@ -671,7 +671,7 @@
 		<key>function_definition</key>
 		<dict>
 			<key>begin</key>
-			<string>^\s*(?&lt;!')\b([a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))\s+(?![^\w\d\s='"\(])(?=.*=)</string>
+			<string>^\s*(?&lt;!')\b([a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))\s+(?![^\w\d\s='"\(])(?=(([\w\d_\s,']*|\(.*\)|\[.*\])\s+)*=)</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>1</key>
