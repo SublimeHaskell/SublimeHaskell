@@ -671,7 +671,7 @@
 		<key>function_definition</key>
 		<dict>
 			<key>begin</key>
-			<string>^\s*(?&lt;!')\b([a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))\s+(?![^\w\d\s=\(])(?=.*=)</string>
+			<string>^\s*(?&lt;!')\b([a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))\s+(?![^\w\d\s='"\(])(?=.*=)</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>1</key>
@@ -703,7 +703,7 @@
 		<key>infix_function_definition</key>
 		<dict>
 			<key>begin</key>
-			<string>^\s*(?=(([a-zA-Z_0-9']+|\(.*\))\s+)+([^\w\d\s_'`]+|`[a-z][a-zA-Z_0-9']*`).*=)</string>
+			<string>^\s*(?=(([a-zA-Z_0-9']+|\(.*\))\s+)+([^\w\d\s_'"`]+|`[a-z][a-zA-Z_0-9']*`).*=)</string>
 			<key>end</key>
 			<string>([^\w\d\s_'`]+|`[a-z][a-zA-Z_0-9']*`)</string>
 			<key>endCaptures</key>
