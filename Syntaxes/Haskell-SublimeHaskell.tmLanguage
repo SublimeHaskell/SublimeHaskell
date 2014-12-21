@@ -869,13 +869,18 @@
 		<key>data_declaration</key>
 		<dict>
 			<key>begin</key>
-			<string>^(\s*)(data|type|newtype)\b</string>
+			<string>^(\s*)(data|type|newtype)\s*([A-Z][a-zA-Z_0-9']*)?</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>2</key>
 				<dict>
 					<key>name</key>
 					<string>keyword.declaration.data.haskell</string>
+				</dict>
+				<key>3</key>
+				<dict>
+					<key>name</key>
+					<string>entity.name.type.haskell</string>
 				</dict>
 			</dict>
 			<key>end</key>

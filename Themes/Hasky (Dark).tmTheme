@@ -183,6 +183,17 @@ Find more themes at : https://github.com/daylerees/colour-schemes
 		</dict>
 		<dict>
 			<key>name</key>
+			<string>Entity name data</string>
+			<key>scope</key>
+			<string>entity.name.type</string>
+			<key>settings</key>
+			<dict>
+				<key>foreground</key>
+				<string>#2FBFBF</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>name</key>
 			<string>Entity name class</string>
 			<key>scope</key>
 			<string>entity.name.class</string>
