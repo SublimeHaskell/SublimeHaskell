@@ -355,7 +355,7 @@
 		<key>module_name</key>
 		<dict>
 			<key>match</key>
-			<string>[A-Z][A-Za-z._']*</string>
+			<string>([A-Z][A-Za-z_'0-9]*)(\.[A-Z][A-Za-z_'0-9]*)*</string>
 			<key>name</key>
 			<string>storage.module.haskell entity.name.module.haskell</string>
 		</dict>
