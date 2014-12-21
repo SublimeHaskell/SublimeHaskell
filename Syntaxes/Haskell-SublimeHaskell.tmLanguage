@@ -909,6 +909,35 @@
 					<string>keyword.declaration.data.haskell</string>
 				</dict>
 				<dict>
+					<key>begin</key>
+					<string>([=\|])</string>
+					<key>beginCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
+					<key>end</key>
+					<string>(?&lt;!')\b([A-Z][a-zA-Z_0-9']*)\b(?!\s*\{)</string>
+					<key>endCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>entity.name.function.haskell entity.name.constructor.haskell</string>
+						</dict>
+					</dict>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>include</key>
+							<string>#comments</string>
+						</dict>
+					</array>
+				</dict>
+				<dict>
 					<key>include</key>
 					<string>#deriving</string>
 				</dict>
