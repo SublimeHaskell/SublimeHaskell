@@ -38,11 +38,11 @@ data LinedData a b =
 		Ord, Read, Show)
 
 data Record a = Record {
-	record :: a,
+	record, record_ :: a,
 	-- comment
 	recordName :: String } deriving (Eq, Show)
 
-data RecordOneLine a = RecordOneLine { recOne :: String, recTwo :: Int, (****) :: Int → Int → Int }
+data RecordOneLine a = RecordOneLine { recOne, recTwo :: String, (****) :: Int → Int → Int }
 
 data GData a b where
 	GLeft :: a -> GData a b
@@ -86,7 +86,7 @@ fun4 = fun3 where
 data SumDat a b = SumDat a b
 
 plus :: a -> b -> SumDat a b
-plus x y = SumDat x y
+x `plus` y = SumDat x y
 
 plus' ∷ a → b → SumDat a b
 plus' = SumDat
