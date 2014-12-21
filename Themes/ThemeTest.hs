@@ -80,7 +80,7 @@ fun4 :: (Show a) ⇒
 	String
 fun4 = fun3 where
 	(.++.) :: Int -> Int -> Int
-	x .++. y = x + y
+	(.++.) x y = x + y
 	infixr 5 .++.
 
 data SumDat a b = SumDat a b
