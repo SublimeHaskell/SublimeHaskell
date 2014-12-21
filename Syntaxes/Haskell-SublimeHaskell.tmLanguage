@@ -630,7 +630,7 @@
 		<key>function_signature</key>
 		<dict>
 			<key>begin</key>
-			<string>^(\s*)(?=.*((::)|∷))</string>
+			<string>^(\s*)(?=([^"]*)\s+((::)|∷))</string>
 			<key>end</key>
 			<string>^(?!\1\s)|(?=})</string>
 			<key>name</key>

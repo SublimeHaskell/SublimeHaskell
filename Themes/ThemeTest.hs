@@ -107,6 +107,11 @@ doTest n = do
 	print n
 	doTest (n - 1)
 
+z1, z2, z3 :: Int
+z1 = 10
+z2 = 10
+Just z3 = Just 10
+
 -- keyword.operator.infix-call.haskell, entity.name.function.haskell
 (.+.) :: a → b → SumDat a b
 x .+. y = x `plus` y
