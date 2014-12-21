@@ -671,17 +671,29 @@
 		<key>function_definition</key>
 		<dict>
 			<key>begin</key>
-			<string>^(\s*)(!?\s)(?=.*=)</string>
+			<string>^\s*(?&lt;!')\b([a-z][A-Za-z_'0-9]*)\b(?!\s*[^\w\s\d=])(?=.*=)</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>entity.name.function.haskell</string>
+				</dict>
+			</dict>
 			<key>end</key>
-			<string>^(?!\1\s)</string>
+			<string>(=)</string>
+			<key>endCaptures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.operator.haskell</string>
+				</dict>
+			</dict>
 			<key>name</key>
 			<string>meta.definition.function.haskell</string>
 			<key>patterns</key>
 			<array>
-				<dict>
-					<key>include</key>
-					<string>#function_declarations</string>
-				</dict>
 				<dict>
 					<key>include</key>
 					<string>#expression_stuff</string>
