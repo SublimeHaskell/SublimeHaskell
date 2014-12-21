@@ -630,26 +630,38 @@
 		<key>function_signature</key>
 		<dict>
 			<key>begin</key>
-			<string>^(\s*)([a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))\s*((::)|∷)</string>
-			<key>beginCaptures</key>
-			<dict>
-				<key>2</key>
-				<dict>
-					<key>name</key>
-					<string>entity.name.function.haskell</string>
-				</dict>
-				<key>3</key>
-				<dict>
-					<key>name</key>
-					<string>keyword.other.double-colon.haskell</string>
-				</dict>
-			</dict>
+			<string>^(\s*)(?=.*((::)|∷))</string>
 			<key>end</key>
 			<string>^(?!\1\s)|(?=})</string>
 			<key>name</key>
 			<string>meta.declaration.function.haskell</string>
 			<key>patterns</key>
 			<array>
+				<dict>
+					<key>begin</key>
+					<string>(?=.*((::)|∷))</string>
+					<key>end</key>
+					<string>((::)|∷)</string>
+					<key>endCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.other.double-colon.haskell</string>
+						</dict>
+					</dict>
+					<key>name</key>
+					<string>meta.declaration.function.names.haskell</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>match</key>
+							<string>((?&lt;!')\b[a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))</string>
+							<key>name</key>
+							<string>entity.name.function.haskell</string>
+						</dict>
+					</array>
+				</dict>
 				<dict>
 					<key>include</key>
 					<string>#type</string>
@@ -778,26 +790,38 @@
 		<key>field_signature</key>
 		<dict>
 			<key>begin</key>
-			<string>([a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))\s*((::)|∷)</string>
-			<key>beginCaptures</key>
-			<dict>
-				<key>1</key>
-				<dict>
-					<key>name</key>
-					<string>entity.name.function.haskell</string>
-				</dict>
-				<key>2</key>
-				<dict>
-					<key>name</key>
-					<string>keyword.other.double-colon.haskell</string>
-				</dict>
-			</dict>
+			<string>(?=.*((::)|∷))</string>
 			<key>end</key>
 			<string>(?=[,}])</string>
 			<key>name</key>
 			<string>meta.declaration.function.haskell</string>
 			<key>patterns</key>
 			<array>
+				<dict>
+					<key>begin</key>
+					<string>(?=.*((::)|∷))</string>
+					<key>end</key>
+					<string>((::)|∷)</string>
+					<key>endCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.other.double-colon.haskell</string>
+						</dict>
+					</dict>
+					<key>name</key>
+					<string>meta.declaration.function.names.haskell</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>match</key>
+							<string>((?&lt;!')\b[a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))</string>
+							<key>name</key>
+							<string>entity.name.function.haskell</string>
+						</dict>
+					</array>
+				</dict>
 				<dict>
 					<key>include</key>
 					<string>#type</string>
