@@ -120,18 +120,6 @@
 		</dict>
 		<!-- declarations and so on -->
 		<dict>
-			<key>include</key>
-			<string>#type_declarations</string>
-		</dict>
-		<dict>
-			<key>include</key>
-			<string>#function_declarations</string>
-		</dict>
-		<dict>
-			<key>include</key>
-			<string>#expression_stuff</string>
-		</dict>
-		<dict>
 			<key>begin</key>
 			<string>^(foreign)\s+(import|export)((\s+[\w_]+))(\s+\"(\\.|[^\"])*\")?\s*</string>
 			<key>beginCaptures</key>
@@ -168,6 +156,18 @@
 					<string>#foreign_function_signature</string>
 				</dict>
 			</array>
+		</dict>
+		<dict>
+			<key>include</key>
+			<string>#type_declarations</string>
+		</dict>
+		<dict>
+			<key>include</key>
+			<string>#function_declarations</string>
+		</dict>
+		<dict>
+			<key>include</key>
+			<string>#expression_stuff</string>
 		</dict>
 	</array>
 	<key>repository</key>
