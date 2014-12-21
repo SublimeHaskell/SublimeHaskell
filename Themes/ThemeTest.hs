@@ -92,10 +92,14 @@ plus' ∷ a → b → SumDat a b
 plus' = SumDat
 
 minus :: Maybe Int → Maybe Int → Maybe Int
-minus (Just n) (Just m)
+minus f@(Just n) (Just m)
 	| n ≤ m = Just $ m - n
 	| otherwise = Just $ n - m
-minus _ _ = Nothing
+Just n `minus` Nothing = Just n
+Nothing `minus` Just m
+	| m ≤ 0 = Just m
+	| m ≡ 0 = Nothing
+	| otherwise = Just (negate m)
 
 doTest :: Int → IO ()
 doTest 0 = return ()
