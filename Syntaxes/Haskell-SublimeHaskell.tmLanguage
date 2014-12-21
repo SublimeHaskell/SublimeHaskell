@@ -656,7 +656,7 @@
 				</dict>
 			</array>
 		</dict>
-		<key>function_declaration</key>
+		<key>function_definition</key>
 		<dict>
 			<key>begin</key>
 			<string>^(\s*)(!?\s)(?=.*=)</string>
@@ -955,7 +955,7 @@
 				</dict>
 				<dict>
 					<key>include</key>
-					<string>#function_declaration</string>
+					<string>#function_definition</string>
 				</dict>
 				<dict>
 					<key>include</key>
