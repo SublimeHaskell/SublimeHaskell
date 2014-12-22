@@ -671,7 +671,7 @@
 		<key>function_definition</key>
 		<dict>
 			<key>begin</key>
-			<string>^\s*(?&lt;!')\b([a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))\s+(?![^\w\d\s='"\(])(?=(([\w\d_\s,']*|\(.*\)|\[.*\])\s+)*=)</string>
+			<string>^\s*(?&lt;!')\b([a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))\s+(?![^\w\d\s='"\(])(?=(([\w\d_\s,'"]*|\(.*\)|\[.*\])\s+)*=)</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>1</key>
@@ -703,7 +703,7 @@
 		<key>infix_function_definition</key>
 		<dict>
 			<key>begin</key>
-			<string>^\s*(?=(([a-zA-Z_0-9']+|\(.*\))\s+)+([^\w\d\s_'"`]+|`[a-z][a-zA-Z_0-9']*`).*=)</string>
+			<string>^\s*(?=(([a-zA-Z_0-9']+|\(.*\))\s+)+([^\w\d\s_'"`\(\)]+|`[a-z][a-zA-Z_0-9']*`).*=)</string>
 			<key>end</key>
 			<string>([^\w\d\s_'`]+|`[a-z][a-zA-Z_0-9']*`)</string>
 			<key>endCaptures</key>
@@ -718,6 +718,42 @@
 			<string>meta.definition.function.haskell</string>
 			<key>patterns</key>
 			<array>
+				<dict>
+					<key>include</key>
+					<string>#expression_stuff</string>
+				</dict>
+			</array>
+		</dict>
+		<key>pattern_function_definition</key>
+		<dict>
+			<key>begin</key>
+			<string>^\s*(?=\(.*\)|\[.*\]|([A-Z][a-zA-Z_0-9']*(\s+([\w\d\s_,']*|\(.*\)|\[.*\]|\{.*\}))*)\s*=)</string>
+			<key>end</key>
+			<string>(=)</string>
+			<key>endCaptures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.operator.haskell</string>
+				</dict>
+			</dict>
+			<key>name</key>
+			<string>meta.definition.function.haskell</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>match</key>
+					<string>(?&lt;!')\b([a-z_][a-zA-Z0-9_']*)\b</string>
+					<key>captures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>entity.name.function.haskell</string>
+						</dict>
+					</dict>
+				</dict>
 				<dict>
 					<key>include</key>
 					<string>#expression_stuff</string>
@@ -869,7 +905,7 @@
 		<key>data_declaration</key>
 		<dict>
 			<key>begin</key>
-			<string>^(\s*)(data|type|newtype)\s*([A-Z][a-zA-Z_0-9']*)?</string>
+			<string>^(\s*)(data|type|newtype)\s+([A-Z][a-zA-Z_0-9']*)?</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>2</key>
@@ -1050,7 +1086,11 @@
 					<key>include</key>
 					<string>#infix_function_definition</string>
 				</dict>
-				<dict>
+<!-- 				<dict>
+					<key>include</key>
+					<string>#pattern_function_definition</string>
+				</dict>
+ -->				<dict>
 					<key>include</key>
 					<string>#fixity_declaration</string>
 				</dict>
