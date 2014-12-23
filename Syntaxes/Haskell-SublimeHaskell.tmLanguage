@@ -902,10 +902,10 @@
 			<key>name</key>
 			<string>keyword.other.haskell keyword.declaration.data.haskell</string>
 		</dict>
-		<key>data_declaration</key>
+		<key>type_declaration</key>
 		<dict>
 			<key>begin</key>
-			<string>^(\s*)(data|type|newtype)\s+([A-Z][a-zA-Z_0-9']*)?</string>
+			<string>^(\s*)(type)\s+([A-Z][a-zA-Z_0-9']*)?</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>2</key>
@@ -921,19 +921,39 @@
 			</dict>
 			<key>end</key>
 			<string>^(?!\1\s)</string>
-			<key>endCaptures</key>
+			<key>name</key>
+			<string>meta.declaration.type.haskell</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>include</key>
+					<string>#comments</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#type</string>
+				</dict>
+			</array>
+		</dict>
+		<key>data_declaration</key>
+		<dict>
+			<key>begin</key>
+			<string>^(\s*)(data|newtype)\s+([A-Z][a-zA-Z_0-9']*)?</string>
+			<key>beginCaptures</key>
 			<dict>
-				<key>1</key>
+				<key>2</key>
 				<dict>
 					<key>name</key>
 					<string>keyword.declaration.data.haskell</string>
 				</dict>
-				<key>2</key>
+				<key>3</key>
 				<dict>
 					<key>name</key>
-					<string>keyword.operator.haskell</string>
+					<string>constant.other.haskell entity.name.type.haskell</string>
 				</dict>
 			</dict>
+			<key>end</key>
+			<string>^(?!\1\s)</string>
 			<key>name</key>
 			<string>meta.declaration.data.haskell</string>
 			<key>patterns</key>
@@ -1103,6 +1123,10 @@
 				<dict>
 					<key>include</key>
 					<string>#data_declaration</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#type_declaration</string>
 				</dict>
 				<dict>
 					<key>include</key>
