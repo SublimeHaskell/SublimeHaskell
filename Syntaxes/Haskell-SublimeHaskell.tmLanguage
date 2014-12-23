@@ -539,7 +539,7 @@
 					<key>match</key>
 					<string>\b(Int(eger)?|Maybe|Either|Bool|Float|Double|Char|String|Ordering|ShowS|ReadS|FilePath|IO(Error)?)\b</string>
 					<key>name</key>
-					<string>storage.type.haskell entity.name.data.haskell</string>
+					<string>storage.type.haskell support.type.haskell</string>
 				</dict>
 				<dict>
 					<key>match</key>
@@ -551,13 +551,13 @@
 					<key>match</key>
 					<string>(?&lt;!')\b[A-Z][A-Za-z_'0-9]*\b</string>
 					<key>name</key>
-					<string>entity.name.class.haskell entity.name.data.haskell</string>
+					<string>storage.type.haskell</string>
 				</dict>
 				<dict>
 					<key>match</key>
 					<string>\(\)</string>
 					<key>name</key>
-					<string>storage.type.haskell entity.name.data.haskell</string>
+					<string>storage.type.haskell</string>
 				</dict>
 				<dict>
 					<key>begin</key>

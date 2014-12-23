@@ -46,7 +46,7 @@ Find more themes at : https://github.com/daylerees/colour-schemes
 				<string>#9d550fb0</string>
 
 				<key>bracketsForeground</key>
-				<string>#26a6a6</string>
+				<string>#5FBFBF</string>
 				<key>bracketsOptions</key>
 				<string>underline</string>
 
@@ -494,7 +494,7 @@ Find more themes at : https://github.com/daylerees/colour-schemes
 				<key>fontStyle</key>
 				<string></string>
 				<key>foreground</key>
-				<string>#26a6a6</string>
+				<string>#5FBFBF</string>
 			</dict>
 		</dict>
 		<dict>
@@ -533,7 +533,7 @@ Find more themes at : https://github.com/daylerees/colour-schemes
 				<key>fontStyle</key>
 				<string></string>
 				<key>foreground</key>
-				<string>#26a6a6</string>
+				<string>#5FBFBF</string>
 			</dict>
 		</dict>
 		<dict>
@@ -559,7 +559,7 @@ Find more themes at : https://github.com/daylerees/colour-schemes
 				<key>fontStyle</key>
 				<string></string>
 				<key>foreground</key>
-				<string>#BF472F</string>
+				<string>#5F9FBF</string>
 			</dict>
 		</dict>
 		<dict>
@@ -572,7 +572,7 @@ Find more themes at : https://github.com/daylerees/colour-schemes
 				<key>fontStyle</key>
 				<string>italic</string>
 				<key>foreground</key>
-				<string>#BF472F</string>
+				<string>#5F9FBF</string>
 			</dict>
 		</dict>
 		<dict>
@@ -746,7 +746,7 @@ Find more themes at : https://github.com/daylerees/colour-schemes
 			<key>settings</key>
 			<dict>
 				<key>foreground</key>
-				<string>#26a6a6</string>
+				<string>#5FBFBF</string>
 			</dict>
 		</dict>
 		<dict>
@@ -870,7 +870,7 @@ Find more themes at : https://github.com/daylerees/colour-schemes
 			<key>settings</key>
 			<dict>
 				<key>foreground</key>
-				<string>#26a6a6</string>
+				<string>#5FBFBF</string>
 				<key>fontStyle</key>
 				<string>italic</string>
 			</dict>
@@ -884,7 +884,7 @@ Find more themes at : https://github.com/daylerees/colour-schemes
 			<key>settings</key>
 			<dict>
 				<key>foreground</key>
-				<string>#26a6a6</string>
+				<string>#5FBFBF</string>
 			</dict>
 		</dict>
 
