@@ -930,6 +930,12 @@
 					<string>#comments</string>
 				</dict>
 				<dict>
+					<key>match</key>
+					<string>=</string>
+					<key>name</key>
+					<string>keyword.operator.haskell</string>
+				</dict>
+				<dict>
 					<key>include</key>
 					<string>#type</string>
 				</dict>
