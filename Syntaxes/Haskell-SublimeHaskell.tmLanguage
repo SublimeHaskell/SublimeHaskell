@@ -255,9 +255,25 @@
 		<key>module_exports</key>
 		<dict>
 			<key>begin</key>
-			<string>\(</string>
+			<string>(\()</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>storage.module.haskell</string>
+				</dict>
+			</dict>
 			<key>end</key>
-			<string>\)</string>
+			<string>(\))</string>
+			<key>endCaptures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>storage.module.haskell</string>
+				</dict>
+			</dict>
 			<key>name</key>
 			<string>meta.declaration.exports.haskell</string>
 			<key>patterns</key>
@@ -357,7 +373,7 @@
 			<key>match</key>
 			<string>([A-Z][A-Za-z_'0-9]*)(\.[A-Z][A-Za-z_'0-9]*)*</string>
 			<key>name</key>
-			<string>storage.module.haskell entity.name.module.haskell</string>
+			<string>storage.module.haskell</string>
 		</dict>
 		<key>pragma</key>
 		<dict>
@@ -1266,7 +1282,7 @@
 						<key>1</key>
 						<dict>
 							<key>name</key>
-							<string>keyword.operator.haskell</string>
+							<string>keyword.operator.haskell punctuation.record.haskell</string>
 						</dict>
 					</dict>
 					<key>end</key>
@@ -1276,7 +1292,7 @@
 						<key>1</key>
 						<dict>
 							<key>name</key>
-							<string>keyword.operator.haskell</string>
+							<string>keyword.operator.haskell punctuation.record.haskell</string>
 						</dict>
 					</dict>
 					<key>name</key>
