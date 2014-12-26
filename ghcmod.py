@@ -70,7 +70,7 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
                             self.view,
                             output_text,
                             get_cabal_project_dir_of_file(self.filename) or os.path.dirname(self.filename)))
-                    sublime.set_timeout(lambda: mark_messages_in_views(output_messages), 0)
+                sublime.set_timeout(lambda: mark_messages_in_views(output_messages), 0)
             else:
                 cmd, tail_cmds = cmds[0], cmds[1:]
                 (fun, modify_arg, modify_messages) = cmd
