@@ -48,7 +48,7 @@ WORD_RE = re.compile(r'^(?P<word>[\w\d\'\.]*)(?P<tail>.*)')
 
 # Checks if we are in an import statement.
 IMPORT_RE = re.compile(r'.*import(\s+qualified)?\s+')
-IMPORT_RE_PREFIX = re.compile(r'^\s*import(\s+qualified)?\s+(.*)$')
+IMPORT_RE_PREFIX = re.compile(r'^\s*import(\s+qualified)?\s+([\w\d\.]*)$')
 IMPORT_QUALIFIED_POSSIBLE_RE = re.compile(r'.*import\s+(?P<qualifiedprefix>\S*)$')
 
 # Checks if a word contains only alhanums, -, and _, and dot
@@ -119,22 +119,24 @@ def get_qualified_name(s):
 def get_qualified_symbol(line):
     """
     Get module context of symbol and symbol itself
-    Returns (module, name, is_import_list, is_operator), where module (or one of) can be None
+    Returns (module, as, name, is_import_list, is_operator), where module (or one of) can be None
     """
     res = IMPORT_SYMBOL_RE.search(line)
     if res:
         return (
             res.group('module'),
+            res.group('as'),
             next(i for i in [res.group('identifier'), res.group('operator')] if i is not None),
             True,
             bool(res.group('operator')))
     res = IMPORT_MODULE_RE.search(line)
     if res:
-        return (res.group('module'), None, False, False)
+        return (res.group('module'), None, None, False, False)
     res = SYMBOL_RE.search(line)
     # res always match
     return (
         res.group('module'),
+        None,
         next(i for i in [res.group('identifier'), res.group('operator')] if i is not None),
         False,
         bool(res.group('operator')))
@@ -338,7 +340,7 @@ class AutoCompletion(object):
 
         self.current_filename = current_file_name
         line_contents = get_line_contents(view, locations[0])
-        (qualified_module, symbol_name, is_import_list, is_operator) = get_qualified_symbol(line_contents)
+        (qualified_module, module_as, symbol_name, is_import_list, is_operator) = get_qualified_symbol(line_contents)
         qualified_prefix = '{0}.{1}'.format(qualified_module, symbol_name) if qualified_module else symbol_name
 
         suggestions = []
@@ -354,7 +356,7 @@ class AutoCompletion(object):
                     current_project = current_module.location.project
                     if current_project:
                         # Search for declarations of qualified_module within current project
-                        proj_module = hsdev_client.module(name = qualified_module, project = current_project)
+                        proj_module = hsdev_client.resolve(name = qualified_module, project = current_project, exports = True)
                         if proj_module:
                             suggestions = proj_module.declarations.values()
                 else:
@@ -398,14 +400,14 @@ class AutoCompletion(object):
 
         # Autocompletion for import statements
         if get_setting('auto_complete_imports'):
-            match_import_list = IMPORT_SYMBOL_RE.search(line_contents)
-            if match_import_list:
-                module_name = match_import_list.group('module')
-                import_list_completions = []
+            # match_import_list = IMPORT_SYMBOL_RE.search(line_contents)
+            # if match_import_list:
+            #     module_name = match_import_list.group('module')
+            #     import_list_completions = []
 
-                import_list_completions.extend(self.completions_for(module_name, self.current_filename))
+            #     import_list_completions.extend(self.completions_for(module_name, self.current_filename))
 
-                return import_list_completions
+            #     return import_list_completions
 
             match_import = IMPORT_RE_PREFIX.match(line_contents)
             if match_import:
@@ -467,7 +469,7 @@ def can_complete_qualified_symbol(info):
     """
     Helper function, returns whether sublime_haskell_complete can run for (module, symbol, is_import_list)
     """
-    (module_name, symbol_name, is_import_list, is_operator) = info
+    (module_name, module_as, symbol_name, is_import_list, is_operator) = info
     if not module_name:
         return False
 
@@ -723,7 +725,7 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
             module_word = None
             ident = decl
             if not decl:
-                module_word, ident, _, _ = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+                module_word, module_as, ident, _, _ = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
 
             if ident is None: # module
                 self.view.window().run_command('sublime_haskell_browse_module', {
@@ -735,9 +737,10 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
                 show_status_message('No symbol selected', False)
                 return
 
+            self.whois_name = '{0}.{1}'.format(module_as or module_word, ident) if module_word else ident
             self.full_name = '{0}.{1}'.format(module_word, ident) if module_word else ident
 
-            self.candidates = (hsdev_client.whois(self.full_name, self.current_file_name, sandbox = current_sandbox()) or [])[:1]
+            self.candidates = (hsdev_client.whois(self.whois_name, self.current_file_name, sandbox = current_sandbox()) or [])[:1]
 
             if not self.candidates:
                 self.candidates = hsdev_client.lookup(self.full_name, self.current_file_name, sandbox = current_sandbox())
@@ -819,7 +822,7 @@ class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
             self.current_file_name = self.view.file_name()
 
         if not self.full_name:
-            (module_word, ident, _, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+            (module_word, module_as, ident, _, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
             self.full_name = '{0}.{1}'.format(module_word, ident) if module_word else ident
 
         if hsdev_client.whois(self.full_name, self.current_file_name, sandbox = current_sandbox()):
@@ -1001,14 +1004,15 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
 
 class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
     def run(self, edit):
-        (module_word, ident, _, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+        (module_word, module_as, ident, _, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
 
+        whois_name = '.'.join(filter(lambda x: x, [module_as or module_word, ident]))
         full_name = '.'.join(filter(lambda x: x, [module_word, ident]))
 
         current_file_name = self.view.file_name()
         current_project = get_cabal_project_dir_of_file(current_file_name)
 
-        candidate = list(filter(lambda d: d.by_source(), hsdev_client.whois(full_name, current_file_name, sandbox = current_sandbox())))
+        candidate = list(filter(lambda d: d.by_source(), hsdev_client.whois(whois_name, current_file_name, sandbox = current_sandbox())))
 
         if candidate and candidate[0].location and candidate[0].location.filename:
             self.view.window().open_file(candidate[0].location.position(), sublime.ENCODED_POSITION)

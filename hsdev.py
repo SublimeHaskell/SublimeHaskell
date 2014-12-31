@@ -1,4 +1,4 @@
-import os
+﻿import os
 import os.path
 import sys
 import socket
@@ -196,17 +196,20 @@ def parse_declaration(decl):
         loc = parse_location(None, decl.get('pos'))
         docs = crlf2lf(decl.get('docs'))
         name = decl['name']
+        imported = []
+        if 'imported' in decl and decl['imported']:
+            imported = [parse_import(d) for d in decl['imported']]
 
         if what == 'function':
-            return symbols.Function(name, decl['decl'].get('type'), docs, loc)
+            return symbols.Function(name, decl['decl'].get('type'), docs, loc, imported)
         elif what == 'type':
-            return symbols.Type(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc)
+            return symbols.Type(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc, imported)
         elif what == 'newtype':
-            return symbols.Newtype(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc)
+            return symbols.Newtype(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc, imported)
         elif what == 'data':
-            return symbols.Data(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc)
+            return symbols.Data(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc, imported)
         elif what == 'class':
-            return symbols.Class(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc)
+            return symbols.Class(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc, imported)
         else:
             return None
     except Exception as e:
@@ -725,6 +728,20 @@ class HsDev(object):
             (source, {'src': None})])
 
         return cmd('module', [], opts, parse_module)
+
+    @command
+    def resolve(self, name = None, project = None, file = None, locals = False, package = None, cabal = False, sandbox = None, exports = False):
+        opts = concat_opts([
+            (name, {'module': name}),
+            (project, {'project': project}),
+            (file, {'file': file}),
+            (locals, {'locals': locals}),
+            (package, {'package': package}),
+            (cabal, {'cabal': None}),
+            (sandbox, {'sandbox': sandbox}),
+            (exports, {'exports': None})])
+
+        return cmd('resolve', [], opts, parse_module)
 
     @command
     def project(self, project):
