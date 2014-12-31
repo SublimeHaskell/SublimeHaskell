@@ -361,7 +361,7 @@ def list_command(fn):
 def async_list_command(fn):
     return hsdev_command(async = True, is_list = True)(fn)
 
-def cmd(name_, args_, opts_, on_result = lambda r: r):
+def cmd(name_, args_ = [], opts_ = {}, on_result = lambda r: r):
     return (name_, args_, opts_, on_result)
 
 def call_callback(fn, *args, name = None, **kwargs):
@@ -787,8 +787,15 @@ class HsDev(object):
 
     @list_command
     def cabal_list(self, query = None):
-        return cmd()
         cmd('cabal list', [query] if query else [], {}, lambda r: [parse_cabal_package(s) for s in r] if r else None)
+
+    @command
+    def ghcmod_lang(self):
+        return cmd('ghc-mod lang')
+
+    @command
+    def ghcmod_flags(self):
+        return cmd('ghc-mod flags')
 
     @list_command
     def ghcmod_type(self, file, line, column = 1, sandbox = None, ghc = []):

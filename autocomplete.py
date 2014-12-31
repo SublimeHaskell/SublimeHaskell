@@ -41,6 +41,8 @@ AGENT_SLEEP_TIMEOUT = 60.0
 
 # Checks if we are in a LANGUAGE pragma.
 LANGUAGE_RE = re.compile(r'.*{-#\s+LANGUAGE.*')
+# Checks if we are in OPTIONS_GHC pragma
+OPTIONS_GHC_RE = re.compile(r'.*{-#\s+OPTIONS_GHC.*')
 
 WORD_RE = re.compile(r'^(?P<word>[\w\d\'\.]*)(?P<tail>.*)')
 
@@ -58,7 +60,7 @@ SYMBOL_RE = re.compile(r'((?P<module>[A-Z][\w\d]*(\.[A-Z][\w\d\']*)*)\.)?((?P<id
 IMPORT_MODULE_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']*(\.[A-Z][\w\d\']*)*)\b')
 # SYMBOL_RE = re.compile(r'((?P<module>\w+(\.\w+)*)\.)?(?P<identifier>((\w*)|([]*)))$')
 # Get symbol module scope and its name within import statement
-IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']*(\.[A-Z][\w\d\']*)*)(\s+as\s+(?P<as>[A-Z][\w\d\']*))?\s*\(.*?((?P<identifier>[a-z][\w\d\']*)|(?P<operator>[!#$%&*+\./<=>?@\\\^|\-~:]+))$')
+IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']*(\.[A-Z][\w\d\']*)*)(\s+as\s+(?P<as>[A-Z][\w\d\']*))?\s*\(.*?((?P<identifier>([a-z][\w\d\']*)?)|(\((?P<operator>[!#$%&*+\.\/<=>?@\\\^|\-~:]*)))$')
 
 def is_scanned_source(view = None):
     window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
@@ -154,6 +156,17 @@ def get_ghcmod_language_pragmas():
 
     if get_setting_async('enable_ghc_mod'):
         return call_ghcmod_and_wait(['lang']).splitlines()
+    elif get_setting_async('enable_hsdev'):
+        return hsdev_client.ghcmod_lang()
+
+    return []
+
+def get_ghcmod_flags_pragmas():
+
+    if get_setting_async('enable_ghc_mod'):
+        return call_ghcmod_and_wait(['flag']).splitlines()
+    elif get_setting_async('enable_hsdev'):
+        return hsdev_client.ghcmod_flags()
 
     return []
 
@@ -220,6 +233,7 @@ class AutoCompletion(object):
     """Information for completion"""
     def __init__(self):
         self.language_pragmas = get_ghcmod_language_pragmas()
+        self.flags_pragmas = get_ghcmod_flags_pragmas()
 
         # cabal name => set of modules, where cabal name is 'cabal' for cabal or sandbox path for cabal-devs
         self.module_completions = LockedObject({})
@@ -274,9 +288,10 @@ class AutoCompletion(object):
                 # if not suggs:
                 #     suggs = hsdev_client.scope(file_name, sandbox = current_sandbox(), global_scope = True, timeout = None) or []
 
-                # Get qualified imports names
+                # Get imports names
+                # Note, that if module imported with 'as', then it can be used only with its synonym instead of full name
                 import_names.extend([('{0}\tmodule {1}'.format(i.import_as, i.module), i.import_as) for i in current_module.imports if i.import_as])
-                import_names.extend([('{0}\tmodule'.format(i.module), i.module) for i in current_module.imports if i.is_qualified])
+                import_names.extend([('{0}\tmodule'.format(i.module), i.module) for i in current_module.imports if not i.import_as])
 
                 comps.extend(import_names)
                 sort_completions(comps)
@@ -378,12 +393,6 @@ class AutoCompletion(object):
         self.current_filename = view.file_name()
         line_contents = get_line_contents(view, locations[0])
 
-        # Autocompletion for LANGUAGE pragmas
-        if get_setting_async('auto_complete_language_pragmas'):
-            match_language = LANGUAGE_RE.match(line_contents)
-            if match_language:
-                return [(to_unicode(c),) * 2 for c in self.language_completions]
-
         # Autocompletion for import statements
         if get_setting('auto_complete_imports'):
             match_import_list = IMPORT_SYMBOL_RE.search(line_contents)
@@ -422,6 +431,9 @@ class AutoCompletion(object):
             match_language = LANGUAGE_RE.match(line_contents)
             if match_language:
                 return [(to_unicode(c),) * 2 for c in self.language_pragmas]
+            match_options = OPTIONS_GHC_RE.match(line_contents)
+            if match_options:
+                return [(to_unicode(c),) * 2 for c in self.flags_pragmas]
 
         return []
 
@@ -1408,33 +1420,33 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             if view:
                 self.set_cabal_status(view)
 
-    def get_special_completions(self, view, prefix, locations):
-        # Contents of the current line up to the cursor
-        line_contents = get_line_contents(view, locations[0])
+    # def get_special_completions(self, view, prefix, locations):
+    #     # Contents of the current line up to the cursor
+    #     line_contents = get_line_contents(view, locations[0])
 
-        # Autocompletion for LANGUAGE pragmas
-        if get_setting('auto_complete_language_pragmas'):
-            # TODO handle multiple selections
-            match_language = LANGUAGE_RE.match(line_contents)
-            if match_language:
-                return [(to_unicode(c),) * 2 for c in autocompletion.language_completions]
+    #     # Autocompletion for LANGUAGE pragmas
+    #     if get_setting('auto_complete_language_pragmas'):
+    #         # TODO handle multiple selections
+    #         match_language = LANGUAGE_RE.match(line_contents)
+    #         if match_language:
+    #             return [(to_unicode(c),) * 2 for c in autocompletion.language_completions]
 
-        # Autocompletion for import statements
-        if get_setting('auto_complete_imports'):
-            match_import = IMPORT_RE.match(line_contents)
-            if match_import:
-                import_completions = [(to_unicode(c),) * 2 for c in autocompletion.get_current_module_completions()]
+    #     # Autocompletion for import statements
+    #     if get_setting('auto_complete_imports'):
+    #         match_import = IMPORT_RE.match(line_contents)
+    #         if match_import:
+    #             import_completions = [(to_unicode(c),) * 2 for c in autocompletion.get_current_module_completions()]
 
-                # Right after "import "? Propose "qualified" as well!
-                qualified_match = IMPORT_QUALIFIED_POSSIBLE_RE.match(line_contents)
-                if qualified_match:
-                    qualified_prefix = qualified_match.group('qualifiedprefix')
-                    if qualified_prefix == "" or "qualified".startswith(qualified_prefix):
-                        import_completions.insert(0, (u"qualified", "qualified "))
+    #             # Right after "import "? Propose "qualified" as well!
+    #             qualified_match = IMPORT_QUALIFIED_POSSIBLE_RE.match(line_contents)
+    #             if qualified_match:
+    #                 qualified_prefix = qualified_match.group('qualifiedprefix')
+    #                 if qualified_prefix == "" or "qualified".startswith(qualified_prefix):
+    #                     import_completions.insert(0, (u"qualified", "qualified "))
 
-                return import_completions
+    #             return import_completions
 
-        return None
+    #     return None
 
     def on_query_completions(self, view, prefix, locations):
         if not is_haskell_source(view):
@@ -1444,7 +1456,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         # Only suggest symbols if the current file is part of a Cabal project.
 
         completions = (autocompletion.get_import_completions(view, prefix, locations) +
-                       autocompletion.get_special_completions(view, prefix, locations))
+            autocompletion.get_special_completions(view, prefix, locations))
 
         if not completions:
             completions = autocompletion.get_completions(view, prefix, locations)
