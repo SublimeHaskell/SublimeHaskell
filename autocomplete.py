@@ -343,6 +343,10 @@ class AutoCompletion(object):
 
         suggestions = []
 
+        wide = self.wide_completion == view
+        if wide: # Drop wide
+            self.wide_completion = None
+
         if qualified_module:
             current_module = hsdev_client.module(file = current_file_name)
             if current_module:
@@ -354,7 +358,7 @@ class AutoCompletion(object):
                         if proj_module:
                             suggestions = proj_module.declarations.values()
                 else:
-                    suggestions = hsdev_client.complete(qualified_prefix, current_file_name, sandbox = current_sandbox())
+                    suggestions = hsdev_client.complete(qualified_prefix, current_file_name, sandbox = current_sandbox(), wide = wide)
             if not suggestions:
                 # Search for declarations in cabal modules
                 q_module = hsdev_client.module(name = qualified_module, cabal = current_is_cabal(), sandbox = current_sandbox())
@@ -363,8 +367,7 @@ class AutoCompletion(object):
             return make_completions(suggestions)
         else:
             with self.cache as cache_:
-                if self.wide_completion == view:
-                    self.wide_completion = None
+                if wide:
                     return cache_.global_completions()
                 else:
                     return cache_.files.get(current_file_name, cache_.global_completions())
@@ -1000,7 +1003,7 @@ class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
     def run(self, edit):
         (module_word, ident, _, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
 
-        full_name = '.'.join([module_word, ident]) if module_word else ident
+        full_name = '.'.join(filter(lambda x: x, [module_word, ident]))
 
         current_file_name = self.view.file_name()
         current_project = get_cabal_project_dir_of_file(current_file_name)

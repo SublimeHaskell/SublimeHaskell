@@ -769,11 +769,11 @@ class HsDev(object):
         return cmd('scope', [], opts, parse_decls)
 
     @list_command
-    def complete(self, input, file, sandbox = None):
-        opts = {'file': file}
-
-        if sandbox:
-            opts.update({'sandbox': sandbox})
+    def complete(self, input, file, sandbox = None, wide = False):
+        opts = concat_opts([
+            (True, {'file': file}),
+            (sandbox, {'sandbox': sandbox}),
+            (wide, {'wide': None})])
 
         return cmd('complete', [input], opts, parse_decls)
 
