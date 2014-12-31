@@ -90,8 +90,16 @@
         "command": "sublime_haskell_go_to_declaration"
     },
     {
-        "caption": "SublimeHaskell: Eval",
-        "command": "sublime_haskell_eval"
+        "caption": "SublimeHaskell: Eval selection",
+        "command": "sublime_haskell_eval_selection"
+    },
+    {
+        "caption": "SublimeHaskell: Apply to selection",
+        "command": "sublime_haskell_apply_to_selection"
+    },
+    {
+        "caption": "SublimeHaskell: Apply to selection list",
+        "command": "sublime_haskell_apply_to_selection_list"
     },
     {
         "caption": "SublimeHaskell: Browse declarations",

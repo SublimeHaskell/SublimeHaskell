@@ -1071,55 +1071,77 @@ class SublimeHaskellEvalReplaceCommand(SublimeHaskellTextCommand):
         return True
 
 
-class SublimeHaskellEvalCommand(SublimeHaskellTextCommand):
+def ghc_eval_x(rs):
+    # Drop 'fail' to be 'None' and unwrap strings
+    # No idea how to call this function
+    def process(i):
+        if type(i) == dict:
+            return None
+        try:
+            x = json.loads(i) # FIXME: Is it ok?
+            if type(x) == str:
+                return x
+        except:
+            return i
+        return i
+    return list(map(process, rs))
+
+def ghc_eval_merge_results(l, r):
+    # Prefer result in 'l', but if there's 'fail' - use result from 'r'
+    return [x or y for x, y in zip(l, r)]
+
+class SublimeHaskellEvalSelectionCommand(SublimeHaskellTextCommand):
     def run(self, edit):
         self.args = [self.view.substr(s) for s in self.view.sel()]
-        self.edit = edit
+        self.results = ghc_eval_x(hsdev_client.ghc_eval(self.args))
 
-        self.eval_names = [
-            ['Each', 'Apply function to each selected value'],
-            ['Each string', 'Apply function to each selected string'],
-            ['Selection list', 'Apply function to list of selectied values and replace selections with results'],
-            ['Selection string list', 'Apply function to list of selected string and replace selections with results']]
-        self.evals = [self.each, self.each_string, self.selection, self.selection_strings]
-
-        self.view.window().show_quick_panel(self.eval_names, self.on_eval_select)
+        self.view.run_command('sublime_haskell_eval_replace', {
+            'results': self.results })
 
     def is_enabled(self):
         return True
 
-    def on_eval_select(self, idx):
-        if idx == -1:
-            return
-        self.view.window().show_input_panel('function', '', self.evals[idx], None, self.on_cancel)
-        
-    def on_cancel(self):
-        return
+class SublimeHaskellApplyToSelectionCommand(SublimeHaskellTextCommand):
+    def run(self, edit):
+        self.args = [self.view.substr(s) for s in self.view.sel()]
+        self.edit = edit
+        self.view.window().show_input_panel('Function', '', self.on_done, None, self.on_cancel)
 
-    def each(self, f):
-        self.results = hsdev_client.ghc_eval(["({0}) ({1})".format(f, a) for a in self.args])
-        self.view.run_command('sublime_haskell_eval_replace', { 'results': self.results })
+    def is_enabled(self):
+        return True
 
-    def each_string(self, f):
-        self.results = hsdev_client.ghc_eval(["({0}) ({1})".format(f, json.dumps(a)) for a in self.args])
+    def on_done(self, f):
+        self.results = ghc_eval_x(hsdev_client.ghc_eval(["({0}) ({1})".format(f, a) for a in self.args]))
+        self.string_results = ghc_eval_x(hsdev_client.ghc_eval(["({0}) ({1})".format(f, json.dumps(a)) for a in self.args]))
+
         self.view.run_command('sublime_haskell_eval_replace', {
-            'results': [None if 'fail' in r else json.loads(r) for r in self.results] })
+            'results': ghc_eval_merge_results(self.results, self.string_results) })
 
-    def selection(self, f):
-        self.result = hsdev_client.ghc_eval(['({0}) [{1}]'.format(f, ", ".join(self.args))])
-        if 'fail' in self.result[0]:
+    def on_cancel(self):
+        pass
+
+class SublimeHaskellApplyToSelectionListCommand(SublimeHaskellTextCommand):
+    def run(self, edit):
+        self.args = [self.view.substr(s) for s in self.view.sel()]
+        self.edit = edit
+        self.view.window().show_input_panel('Function', '', self.on_done, None, self.on_cancel)
+
+    def is_enabled(self):
+        return True
+
+    def on_done(self, f):
+        self.results = ghc_eval_x(hsdev_client.ghc_eval(['({0}) [{1}]'.format(f, ", ".join(self.args))]))
+        self.string_results = ghc_eval_x(hsdev_client.ghc_eval(['({0}) [{1}]'.format(f, ", ".join([json.dumps(a) for a in self.args]))]))
+        self.res = ghc_eval_merge_results(self.results, self.string_results)
+
+        if self.res[0] is None:
             return
         else:
-            result_list = json.loads(self.result[0])
+            result_list = json.loads(self.res[0])
             self.view.run_command('sublime_haskell_eval_replace', { 'results': result_list })
 
-    def selection_strings(self, f):
-        self.result = hsdev_client.ghc_eval(['({0}) [{1}]'.format(f, ", ".join([json.dumps(a) for a in self.args]))])
-        if 'fail' in self.result[0]:
-            return
-        else:
-            result_list = json.loads(self.result[0])
-            self.view.run_command('sublime_haskell_eval_replace', { 'results': result_list })
+    def on_cancel(self):
+        pass
 
 
 
