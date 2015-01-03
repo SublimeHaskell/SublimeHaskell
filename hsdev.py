@@ -679,12 +679,14 @@ class HsDev(object):
         return cmd('remove', [], {'all': None})
 
     @list_command
-    def list_modules(self, cabal = False, sandboxes = None, projects = None, packages = None, source = False, standalone = False):
+    def list_modules(self, module = None, cabal = False, sandboxes = None, projects = None, packages = None, deps = None, source = False, standalone = False):
         opts = concat_opts([
+            (module, {'module': module}),
             (cabal, {'cabal': None}),
             (sandboxes, {'sandbox': sandboxes}),
             (projects, {'project': projects}),
             (packages, {'package': packages}),
+            (deps, {'deps': deps}),
             (source, {'src': None}),
             (standalone, {'stand': None})])
 
@@ -699,12 +701,13 @@ class HsDev(object):
         return cmd('projects', [], {})
 
     @list_command
-    def symbol(self, name = None, project = None, file = None, module = None, locals = False, package = None, cabal = False, sandbox = None, source = False, standalone = False, prefix = None, find = None):
+    def symbol(self, name = None, project = None, file = None, module = None, deps = None, locals = False, package = None, cabal = False, sandbox = None, source = False, standalone = False, prefix = None, find = None):
         opts = concat_opts([
             (project, {'project': project}),
             (file, {'file': file}),
             (module, {'module': module}),
             (locals, {'locals': None}),
+            (deps, {'deps': deps}),
             (package, {'package': package}),
             (cabal, {'cabal': None}),
             (sandbox, {'sandbox': sandbox}),
@@ -716,12 +719,13 @@ class HsDev(object):
         return cmd('symbol', [name] if name else [], opts, parse_decls)
 
     @command
-    def module(self, name = None, project = None, file = None, locals = False, package = None, cabal = False, sandbox = None, source = False):
+    def module(self, name = None, project = None, file = None, deps = None, locals = False, package = None, cabal = False, sandbox = None, source = False):
         opts = concat_opts([
             (name, {'module': name}),
             (project, {'project': project}),
             (file, {'file': file}),
             (locals, {'locals': None}),
+            (deps, {'deps': deps}),
             (package, {'package': package}),
             (cabal, {'cabal': None}),
             (sandbox, {'sandbox': sandbox}),

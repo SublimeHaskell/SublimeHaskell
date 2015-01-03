@@ -61,6 +61,8 @@ IMPORT_MODULE_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']
 # SYMBOL_RE = re.compile(r'((?P<module>\w+(\.\w+)*)\.)?(?P<identifier>((\w*)|([]*)))$')
 # Get symbol module scope and its name within import statement
 IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']*(\.[A-Z][\w\d\']*)*)(\s+as\s+(?P<as>[A-Z][\w\d\']*))?\s*\(.*?((?P<identifier>([a-z][\w\d\']*)?)|(\((?P<operator>[!#$%&*+\.\/<=>?@\\\^|\-~:]*)))$')
+# Export module
+EXPORT_MODULE_RE = re.compile(r'\bmodule\s+[\w\d\.]*$')
 
 def is_scanned_source(view = None):
     window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
@@ -351,9 +353,10 @@ class AutoCompletion(object):
 
         if qualified_module:
             current_module = hsdev_client.module(file = current_file_name)
+            current_project = None
             if current_module:
+                current_project = current_module.location.project
                 if is_import_list:
-                    current_project = current_module.location.project
                     if current_project:
                         # Search for declarations of qualified_module within current project
                         proj_module = hsdev_client.resolve(name = qualified_module, project = current_project, exports = True)
@@ -363,9 +366,26 @@ class AutoCompletion(object):
                     suggestions = hsdev_client.complete(qualified_prefix, current_file_name, sandbox = current_sandbox(), wide = wide)
             if not suggestions:
                 # Search for declarations in cabal modules
-                q_module = hsdev_client.module(name = qualified_module, cabal = current_is_cabal(), sandbox = current_sandbox())
+                q_module = hsdev_client.module(name = qualified_module, cabal = current_is_cabal(), sandbox = current_sandbox(), deps = current_project)
                 if q_module:
                     suggestions = q_module.declarations.values()
+                else:
+                    selected_module = None
+                    # Check ambiguous modules
+                    ms = hsdev_client.list_modules(module = qualified_module, cabal = current_is_cabal(), sandboxes = current_sandboxes(), deps = current_project)
+                    if len(ms) > 1:
+                        # Ok, select some module
+                        src_ms = list(filter(lambda m: m.by_source(), ms))
+                        if src_ms: # Ok, let's get first
+                            selected_module = src_ms[0]
+                        else:
+                            selected_module = list(sorted(ms, key = lambda m: m.location.package.name))[0]
+                    if selected_module:
+                        fname = selected_module.location.filename if selected_module.by_source() else None
+                        pack = selected_module.location.package.name if selected_module.by_cabal() else None
+                        q_module = hsdev_client.module(name = selected_module.name, cabal = current_is_cabal(), sandbox = current_sandbox(), file = fname, package = pack)
+                        if q_module:
+                            suggestions = q_module.declarations.values()
             return make_completions(suggestions)
         else:
             with self.cache as cache_:
@@ -1486,6 +1506,15 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 
         completions = (autocompletion.get_import_completions(view, prefix, locations) +
             autocompletion.get_special_completions(view, prefix, locations))
+
+        # Export list
+        if 'meta.declaration.exports.haskell' in view.scope_name(view.sel()[0].a):
+            line_contents = get_line_contents(view, locations[0])
+            export_module = EXPORT_MODULE_RE.search(line_contents)
+            if export_module:
+                module_word, module_as, ident, _, _ = get_qualified_symbol_at_region(view, view.sel()[0])
+                # TODO: Implement
+
 
         if not completions:
             completions = autocompletion.get_completions(view, prefix, locations)
