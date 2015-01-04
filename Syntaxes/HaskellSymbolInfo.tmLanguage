@@ -62,10 +62,10 @@
 		</dict>
 		<dict>
 			<key>match</key>
-			<string>^(Project|Defined at|Package|Installed in|Hackage URL): (.*)$</string>
+			<string>^(Project|Defined (at|in)|Package|Installed in|Hackage URL): (.*)$</string>
 			<key>captures</key>
 			<dict>
-				<key>2</key>
+				<key>3</key>
 				<dict>
 					<key>name</key>
 					<string>string.quoted.double.symbolinfo</string>

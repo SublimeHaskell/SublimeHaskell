@@ -199,17 +199,20 @@ def parse_declaration(decl):
         imported = []
         if 'imported' in decl and decl['imported']:
             imported = [parse_import(d) for d in decl['imported']]
+        defined = None
+        if 'defined' in decl and decl['defined']:
+            defined = parse_module_id(decl['defined'])
 
         if what == 'function':
-            return symbols.Function(name, decl['decl'].get('type'), docs, loc, imported)
+            return symbols.Function(name, decl['decl'].get('type'), docs, loc, imported, defined)
         elif what == 'type':
-            return symbols.Type(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc, imported)
+            return symbols.Type(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc, imported, defined)
         elif what == 'newtype':
-            return symbols.Newtype(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc, imported)
+            return symbols.Newtype(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc, imported, defined)
         elif what == 'data':
-            return symbols.Data(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc, imported)
+            return symbols.Data(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc, imported, defined)
         elif what == 'class':
-            return symbols.Class(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc, imported)
+            return symbols.Class(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc, imported, defined)
         else:
             return None
     except Exception as e:

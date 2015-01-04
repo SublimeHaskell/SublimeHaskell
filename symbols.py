@@ -103,9 +103,10 @@ class Symbol(object):
     """
     Haskell symbol: module, function, data, class etc.
     """
-    def __init__(self, symbol_type, name, docs = None, location = None, module = None):
+    def __init__(self, symbol_type, name, docs = None, location = None, defined = None, module = None):
         self.what = symbol_type
         self.name = name
+        self.defined = defined
         self.module = module
         self.docs = docs
         self.location = location
@@ -199,8 +200,8 @@ class Module(Symbol):
         return [i.module for i in self.imports if i.import_as == module_alias]
 
 class Declaration(Symbol):
-    def __init__(self, name, decl_type = 'declaration', docs = None, location = None, imported = [], module = None):
-        super(Declaration, self).__init__(decl_type, name, docs, location, module)
+    def __init__(self, name, decl_type = 'declaration', docs = None, location = None, imported = [], defined = None, module = None):
+        super(Declaration, self).__init__(decl_type, name, docs, location, defined, module)
         self.imported = imported[:]
 
     def make_qualified(self):
@@ -221,20 +222,30 @@ class Declaration(Symbol):
         info = [
             self.brief(),
             '',
-            'Imported from {0}'.format(self.module.name if not self.imported else ','.join([i.module for i in self.imported]))]
+            'Imported from {0}'.format(self.module.name if not self.imported else ', '.join(list(set(i.module for i in self.imported))))]
 
         if self.docs:
             info.extend(['', self.docs])
 
         if self.by_source():
-            info.append('')
             if self.location.project:
+                info.append('')
                 info.append('Project: {0}'.format(self.location.project))
-            info.append('Defined at: {0}'.format(self.location.position()))
         if self.by_cabal():
             info.append('')
-            info.append('Package: {0}'.format(self.location.package.package_id()))
             info.append('Installed in: {0}'.format(self.location.cabal))
+            info.append('Package: {0}'.format(self.location.package.package_id()))
+
+        info.append('')
+        loc = self.location
+        name = self.name
+        if self.defined:
+            loc = self.defined.location
+            name = self.defined.name
+        if type(loc) == Location:
+            info.append('Defined at: {0}'.format(loc.position()))
+        elif type(loc) == InstalledLocation:
+            info.append('Defined in: {0}'.format(name))
 
         return '\n'.join(info)
 
@@ -242,8 +253,8 @@ class Function(Declaration):
     """
     Haskell function declaration
     """
-    def __init__(self, name, function_type, docs = None, location = None, inspected = [], module = None):
-        super(Function, self).__init__(name, 'function', docs, location, inspected, module)
+    def __init__(self, name, function_type, docs = None, location = None, imported = [], defined = None, module = None):
+        super(Function, self).__init__(name, 'function', docs, location, imported, defined, module)
         self.type = function_type
 
     def suggest(self):
@@ -256,8 +267,8 @@ class TypeBase(Declaration):
     """
     Haskell type, data or class
     """
-    def __init__(self, name, decl_type, context, args, definition = None, docs = None, location = None, inspected = [], module = None):
-        super(TypeBase, self).__init__(name, decl_type, docs, location, inspected, module)
+    def __init__(self, name, decl_type, context, args, definition = None, docs = None, location = None, imported = [], defined = None, module = None):
+        super(TypeBase, self).__init__(name, decl_type, docs, location, imported, defined, module)
         self.context = context
         self.args = args
         self.definition = definition
@@ -283,29 +294,29 @@ class Type(TypeBase):
     """
     Haskell type synonym
     """
-    def __init__(self, name, context, args, definition = None, docs = None, location = None, inspected = [], module = None):
-        super(Type, self).__init__(name, 'type', context, args, definition, docs, location, inspected, module)
+    def __init__(self, name, context, args, definition = None, docs = None, location = None, imported = [], defined = None, module = None):
+        super(Type, self).__init__(name, 'type', context, args, definition, docs, location, imported, defined, module)
 
 class Newtype(TypeBase):
     """
     Haskell newtype synonym
     """
-    def __init__(self, name, context, args, definition = None, docs = None, location = None, inspected = [], module = None):
-        super(Newtype, self).__init__(name, 'newtype', context, args, definition, docs, location, inspected, module)
+    def __init__(self, name, context, args, definition = None, docs = None, location = None, imported = [], defined = None, module = None):
+        super(Newtype, self).__init__(name, 'newtype', context, args, definition, docs, location, imported, defined, module)
 
 class Data(TypeBase):
     """
     Haskell data declaration
     """
-    def __init__(self, name, context, args, definition = None, docs = None, location = None, inspected = [], module = None):
-        super(Data, self).__init__(name, 'data', context, args, definition, docs, location, inspected, module)
+    def __init__(self, name, context, args, definition = None, docs = None, location = None, imported = [], defined = None, module = None):
+        super(Data, self).__init__(name, 'data', context, args, definition, docs, location, imported, defined, module)
 
 class Class(TypeBase):
     """
     Haskell class declaration
     """
-    def __init__(self, name, context, args, definition = None, docs = None, location = None, inspected = [], module = None):
-        super(Class, self).__init__(name, 'class', context, args, None, docs, location, inspected, module)
+    def __init__(self, name, context, args, definition = None, docs = None, location = None, imported = [], defined = None, module = None):
+        super(Class, self).__init__(name, 'class', context, args, None, docs, location, imported, defined, module)
 
 def update_with(l, r, default_value, f):
     """
