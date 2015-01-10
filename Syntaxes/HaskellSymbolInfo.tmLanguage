@@ -16,35 +16,25 @@
 				<key>1</key>
 				<dict>
 					<key>name</key>
-					<string>keyword.type.symbolinfo</string>
+					<string>keyword.type.symbolinfo keyword.declaration.data.haskell</string>
 				</dict>
 				<key>2</key>
 				<dict>
 					<key>name</key>
-					<string>constant.other.symbolinfo</string>
+					<string>constant.other.symbolinfo entity.name.type.haskell</string>
+				</dict>
+				<key>3</key>
+				<dict>
+					<key>name</key>
+					<string>variable.generic.haskell</string>
 				</dict>
 			</dict>
 			<key>name</key>
 			<string>symbol.type.symbolinfo</string>
 		</dict>
 		<dict>
-			<key>match</key>
-			<string>^(\w+)\s+::\s+(.*)$</string>
-			<key>captures</key>
-			<dict>
-				<key>1</key>
-				<dict>
-					<key>name</key>
-					<string>support.function.symbolinfo</string>
-				</dict>
-				<key>2</key>
-				<dict>
-					<key>name</key>
-					<string>support.type.symbolinfo</string>
-				</dict>
-			</dict>
-			<key>name</key>
-			<string>symbol.function.symbolinfo</string>
+			<key>include</key>
+			<string>#function_signature</string>
 		</dict>
 		<dict>
 			<key>match</key>
@@ -77,6 +67,155 @@
 	</array>
 	<key>repository</key>
 	<dict>
+		<key>type</key>
+		<dict>
+			<key>patterns</key>
+			<array>
+ 				<dict>
+					<key>match</key>
+					<string>-&gt;|→</string>
+					<key>name</key>
+					<string>keyword.operator.arrow.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>=&gt;|⇒</string>
+					<key>name</key>
+					<string>keyword.operator.big-arrow.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>\b(Int(eger)?|Maybe|Either|Bool|Float|Double|Char|String|Ordering|ShowS|ReadS|FilePath|IO(Error)?)\b</string>
+					<key>name</key>
+					<string>storage.type.haskell support.type.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>(?&lt;!')\b[a-z][A-Za-z_'0-9]*\b</string>
+					<key>name</key>
+					<string>variable.generic.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>(?&lt;!')\b[A-Z][A-Za-z_'0-9]*\b</string>
+					<key>name</key>
+					<string>storage.type.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>\(\)</string>
+					<key>name</key>
+					<string>storage.type.haskell</string>
+				</dict>
+				<dict>
+					<key>begin</key>
+					<string>(\()</string>
+					<key>beginCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
+					<key>end</key>
+					<string>(\))</string>
+					<key>endCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
+					<key>name</key>
+					<string>meta.type_signature.brace.haskell</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>include</key>
+							<string>#type</string>
+						</dict>
+					</array>
+				</dict>
+				<dict>
+					<key>begin</key>
+					<string>(\[)</string>
+					<key>beginCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
+					<key>end</key>
+					<string>(\])</string>
+					<key>endCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
+					<key>name</key>
+					<string>meta.type_signature.list.haskell</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>include</key>
+							<string>#type</string>
+						</dict>
+					</array>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#comments</string>
+				</dict>
+			</array>
+		</dict>
+		<key>function_signature</key>
+		<dict>
+			<key>begin</key>
+			<string>^(\s*)(?!--)(?=([\w\d_\s,']*|\(.*\)|\[.*\])\s+((::)|∷))</string>
+			<key>end</key>
+			<string>^(?!\1\s)|(?=})</string>
+			<key>name</key>
+			<string>meta.declaration.function.haskell</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>begin</key>
+					<string>(?=.*((::)|∷))</string>
+					<key>end</key>
+					<string>((::)|∷)</string>
+					<key>endCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.other.double-colon.haskell</string>
+						</dict>
+					</dict>
+					<key>name</key>
+					<string>meta.declaration.function.names.haskell</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>match</key>
+							<string>((?&lt;!')\b[a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))</string>
+							<key>name</key>
+							<string>entity.name.function.haskell</string>
+						</dict>
+					</array>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#type</string>
+				</dict>
+			</array>
+		</dict>
 	</dict>
 	<key>scopeName</key>
 	<string>source</string>

@@ -224,7 +224,7 @@
 			<array>
 				<dict>
 					<key>include</key>
-					<string>#type_signature</string>
+					<string>#type</string>
 				</dict>
 			</array>
 		</dict>
@@ -425,7 +425,7 @@
 			<array>
 				<dict>
 					<key>include</key>
-					<string>#type_signature</string>
+					<string>#type</string>
 				</dict>
 			</array>
 		</dict>
@@ -544,9 +544,9 @@
 		<key>infix_op</key>
 		<dict>
 			<key>match</key>
-			<string>(\([|!%$+:\-.=&lt;/&gt;]+\)|\(,+\))</string>
+			<string>(\([^\w\d \)]+\)|\(,+\))</string>
 			<key>name</key>
-			<string>entity.name.function.infix.haskell</string>
+			<string>keyword.operator.haskell</string>
 		</dict>
 		<key>module_exports</key>
 		<dict>
@@ -593,54 +593,85 @@
 		<key>module_name</key>
 		<dict>
 			<key>match</key>
-			<string>[A-Z][A-Za-z._']*</string>
+			<string>([A-Z][A-Za-z_'0-9]*)(\.[A-Z][A-Za-z_'0-9]*)*</string>
 			<key>name</key>
-			<string>constant.other.module.haskell</string>
+			<string>storage.module.haskell</string>
 		</dict>
 		<key>pragma</key>
 		<dict>
 			<key>begin</key>
-			<string>\{-#</string>
+			<string>(\{-#)\s+([A-Z_]+)\b</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>punctuation.pragma.haskell</string>
+				</dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.preprocessor.haskell pragma.name.haskell</string>
+				</dict>
+			</dict>
 			<key>end</key>
 			<string>#-\}</string>
 			<key>name</key>
-			<string>meta.preprocessor.haskell</string>
+			<string>pragma.haskell</string>
 			<key>patterns</key>
 			<array>
 				<dict>
 					<key>match</key>
-					<string>\b(LANGUAGE|UNPACK|INLINE)\b</string>
+					<string>\b([A-Z][a-z]*)+\b</string>
 					<key>name</key>
-					<string>keyword.other.preprocessor.haskell</string>
+					<string>keyword.other.preprocessor.haskell pragma.support.language.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>(-+[a-z]+)+</string>
+					<key>name</key>
+					<string>keyword.other.preprocessor.haskell pragma.support.flag.haskell</string>
 				</dict>
 			</array>
 		</dict>
 		<key>function_signature</key>
 		<dict>
 			<key>begin</key>
-			<string>\b([a-z_][a-zA-Z0-9_']*|\([|!%$+\-.,=&lt;/&gt;]+\))\s*(::)</string>
-			<key>beginCaptures</key>
-			<dict>
-				<key>1</key>
-				<dict>
-					<key>name</key>
-					<string>entity.name.function.haskell</string>
-				</dict>
-				<key>2</key>
-				<dict>
-					<key>name</key>
-					<string>keyword.other.double-colon.haskell</string>
-				</dict>
-			</dict>
+			<string>^(\s*)(?!--)(?=([\w\d_\s,']*|\(.*\)|\[.*\])\s+((::)|∷))</string>
 			<key>end</key>
-			<string>$\n?</string>
+			<string>^(?!\1\s)|(?=})</string>
 			<key>name</key>
-			<string>meta.function.type-declaration.haskell</string>
+			<string>meta.declaration.function.haskell</string>
 			<key>patterns</key>
 			<array>
 				<dict>
+					<key>begin</key>
+					<string>(?=.*((::)|∷))</string>
+					<key>end</key>
+					<string>((::)|∷)</string>
+					<key>endCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.other.double-colon.haskell</string>
+						</dict>
+					</dict>
+					<key>name</key>
+					<string>meta.declaration.function.names.haskell</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>match</key>
+							<string>((?&lt;!')\b[a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))</string>
+							<key>name</key>
+							<string>entity.name.function.haskell</string>
+						</dict>
+					</array>
+				</dict>
+				<dict>
 					<key>include</key>
-					<string>#type_signature</string>
+					<string>#type</string>
 				</dict>
 			</array>
 		</dict>
@@ -697,65 +728,37 @@
 				</dict>
 			</array>
 		</dict>
-		<key>type_signature</key>
+		<key>type</key>
 		<dict>
 			<key>patterns</key>
 			<array>
-				<dict>
-					<key>captures</key>
-					<dict>
-						<key>1</key>
-						<dict>
-							<key>name</key>
-							<string>entity.other.inherited-class.haskell</string>
-						</dict>
-						<key>2</key>
-						<dict>
-							<key>name</key>
-							<string>variable.other.generic-type.haskell</string>
-						</dict>
-						<key>3</key>
-						<dict>
-							<key>name</key>
-							<string>keyword.other.big-arrow.haskell</string>
-						</dict>
-					</dict>
+ 				<dict>
 					<key>match</key>
-					<string>\(\s*([A-Z][A-Za-z]*)\s+([a-z][A-Za-z_']*)\)\s*(=&gt;)</string>
+					<string>-&gt;|→</string>
 					<key>name</key>
-					<string>meta.class-constraint.haskell</string>
-				</dict>
-				<dict>
-					<key>include</key>
-					<string>#pragma</string>
+					<string>keyword.operator.arrow.haskell</string>
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>-&gt;</string>
+					<string>=&gt;|⇒</string>
 					<key>name</key>
-					<string>keyword.other.arrow.haskell</string>
-				</dict>
-				<dict>
-					<key>match</key>
-					<string>=&gt;</string>
-					<key>name</key>
-					<string>keyword.other.big-arrow.haskell</string>
+					<string>keyword.operator.big-arrow.haskell</string>
 				</dict>
 				<dict>
 					<key>match</key>
 					<string>\b(Int(eger)?|Maybe|Either|Bool|Float|Double|Char|String|Ordering|ShowS|ReadS|FilePath|IO(Error)?)\b</string>
 					<key>name</key>
-					<string>support.type.prelude.haskell</string>
+					<string>storage.type.haskell support.type.haskell</string>
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b[a-z][a-zA-Z0-9_']*\b</string>
+					<string>(?&lt;!')\b[a-z][A-Za-z_'0-9]*\b</string>
 					<key>name</key>
-					<string>variable.other.generic-type.haskell</string>
+					<string>variable.generic.haskell</string>
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b[A-Z][a-zA-Z0-9_']*\b</string>
+					<string>(?&lt;!')\b[A-Z][A-Za-z_'0-9]*\b</string>
 					<key>name</key>
 					<string>storage.type.haskell</string>
 				</dict>
@@ -763,7 +766,69 @@
 					<key>match</key>
 					<string>\(\)</string>
 					<key>name</key>
-					<string>support.constant.unit.haskell</string>
+					<string>storage.type.haskell</string>
+				</dict>
+				<dict>
+					<key>begin</key>
+					<string>(\()</string>
+					<key>beginCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
+					<key>end</key>
+					<string>(\))</string>
+					<key>endCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
+					<key>name</key>
+					<string>meta.type_signature.brace.haskell</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>include</key>
+							<string>#type</string>
+						</dict>
+					</array>
+				</dict>
+				<dict>
+					<key>begin</key>
+					<string>(\[)</string>
+					<key>beginCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
+					<key>end</key>
+					<string>(\])</string>
+					<key>endCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
+					<key>name</key>
+					<string>meta.type_signature.list.haskell</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>include</key>
+							<string>#type</string>
+						</dict>
+					</array>
 				</dict>
 				<dict>
 					<key>include</key>
@@ -780,7 +845,7 @@
 				<key>1</key>
 				<dict>
 					<key>name</key>
-					<string>support.function.command.ghci</string>
+					<string>keyword.other.haskell</string>
 				</dict>
 			</dict>
 			<key>end</key>
@@ -797,7 +862,7 @@
 				<key>1</key>
 				<dict>
 					<key>name</key>
-					<string>keyword.other.haskell</string>
+					<string>keyword.other.haskell keyword.import.haskell</string>
 				</dict>
 			</dict>
 			<key>end</key>
@@ -810,7 +875,7 @@
 					<key>match</key>
 					<string>(qualified|as|hiding)</string>
 					<key>name</key>
-					<string>keyword.other.haskell</string>
+					<string>keyword.other.haskell keyword.import.haskell</string>
 				</dict>
 				<dict>
 					<key>include</key>
