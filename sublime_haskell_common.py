@@ -850,6 +850,18 @@ def is_haskell_source(view = None):
 
     return True
 
+def is_haskell_repl(view = None):
+    window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
+
+    if not window or not view:
+        return False
+
+    syntax_file_for_view = view.settings().get('syntax').lower()
+    if not syntax_file_for_view.endswith("HaskellRepl.tmLanguage".lower()):
+        return False
+
+    return True
+
 class with_status_message(object):
     def __init__(self, msg, is_ok):
         self.msg = msg

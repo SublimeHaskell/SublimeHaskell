@@ -1521,9 +1521,6 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 
         end_time = time.clock()
         log('time to get completions: {0} seconds'.format(end_time - begin_time), log_debug)
-        if get_setting('inhibit_completions') and len(completions) != 0:
-            return (completions, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
-        return completions
 
         # Don't put completions with special characters (?, !, ==, etc.)
         # into completion because that wipes all default Sublime completions:
@@ -1533,6 +1530,10 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         # if get_setting('inhibit_completions') and len(comp) != 0:
         #     return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         # return comp
+
+        if get_setting('inhibit_completions') and len(completions) != 0:
+            return (completions, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
+        return completions
 
     def set_cabal_status(self, view):
         filename = view.file_name()
