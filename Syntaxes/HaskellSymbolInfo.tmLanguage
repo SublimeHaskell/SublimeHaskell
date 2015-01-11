@@ -33,6 +33,10 @@
 		</dict>
 		<dict>
 			<key>include</key>
+			<string>#constructor_signature</string>
+		</dict>
+		<dict>
+			<key>include</key>
 			<string>#function_signature</string>
 		</dict>
 		<dict>
@@ -205,6 +209,35 @@
 						</dict>
 					</array>
 				</dict>
+				<dict>
+					<key>include</key>
+					<string>#type</string>
+				</dict>
+			</array>
+		</dict>
+		<key>constructor_signature</key>
+		<dict>
+			<key>begin</key>
+			<string>^(\s*)([A-Z][a-zA-Z0-9_']*|\([^\w\d]+\))\s*((::)|∷)</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>constant.other.haskell entity.name.constructor.haskell</string>
+				</dict>
+				<key>3</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.other.double-colon.haskell</string>
+				</dict>
+			</dict>
+			<key>end</key>
+			<string>^(?!\1\s)</string>
+			<key>name</key>
+			<string>meta.declaration.function.haskell</string>
+			<key>patterns</key>
+			<array>
 				<dict>
 					<key>include</key>
 					<string>#type</string>
