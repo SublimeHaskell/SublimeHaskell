@@ -982,12 +982,12 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
             if len(ms) == 1:
                 m = hsdev_client.module(
                     name = module_name,
-                    package = package_name,
-                    project = project_name,
-                    cabal = is_cabal(cabal),
-                    sandbox = as_sandboxes(cabal))
+                    package = symbols.location_package_name(ms[0].location),
+                    project = symbols.location_project(ms[0].location),
+                    cabal = is_cabal(symbols.location_cabal(ms[0].location)),
+                    sandbox = as_sandboxes(symbols.location_cabal(ms[0].location)))
             else:
-                self.candidates.extend([(m, [m.name, m.location_string()]) for m in ms])
+                self.candidates.extend([(m, [m.name, m.location.to_string()]) for m in ms])
 
         if m:
             decls = list(m.declarations.values())
@@ -997,9 +997,9 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
             return
 
         if not self.candidates:
-            self.candidates.extend([(m, [m.name, m.location_string()]) for m in hsdev_client.list_modules(
+            self.candidates.extend([(m, [m.name, m.location.to_string()]) for m in hsdev_client.list_modules(
                 cabal = current_is_cabal(), sandboxes = current_sandboxes())])
-            self.candidates.extend([(m, [m.name, m.location_string()]) for m in hsdev_client.list_modules(
+            self.candidates.extend([(m, [m.name, m.location.to_string()]) for m in hsdev_client.list_modules(
                 source = True)])
 
         self.candidates.sort(key = lambda c: c[1][0])

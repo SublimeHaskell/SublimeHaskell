@@ -103,6 +103,21 @@ class OtherLocation(object):
     def is_null(self):
         return self.source is None
 
+def location_package_name(loc):
+    if type(loc) == InstalledLocation and loc.package:
+        return loc.package.name
+    return None
+
+def location_project(loc):
+    if type(loc) == Location and loc.project:
+        return loc.project
+    return None
+
+def location_cabal(loc):
+    if type(loc) == InstalledLocation:
+        return loc.cabal
+    return None
+
 class Symbol(object):
     """
     Haskell symbol: module, function, data, class etc.
@@ -213,22 +228,35 @@ class Declaration(Symbol):
     def make_qualified(self):
         self.name = self.qualified_name()
 
+    def module_name(self):
+        if self.imported:
+            return self.imported[0].module
+        return self.module.name
+
+    def imported_names(self):
+        if self.imported:
+            return sorted(list(set([i.module for i in self.imported])))
+        return [self.module.name]
+
+    def imported_from_name(self):
+        return self.imported_names()[0]
+
     def suggest(self):
         """ Returns suggestion for this declaration """
-        return ('{0}\t{1}'.format(self.name, self.module.name), self.name)
+        return ('{0}\t{1}'.format(self.name, self.imported_from_name()), self.name)
 
     def brief(self):
         return self.name
 
     def qualified_name(self):
-        return '.'.join([self.module.name, self.name])
+        return '.'.join([self.module_name(), self.name])
 
     def detailed(self):
         """ Detailed info for use in Symbol Info command """
         info = [
             self.brief(),
             '',
-            'Imported from {0}'.format(self.module.name if not self.imported else ', '.join(list(set(i.module for i in self.imported))))]
+            'Imported from {0}'.format(', '.join(self.imported_names()))]
 
         if self.docs:
             info.extend(['', self.docs])
@@ -243,14 +271,18 @@ class Declaration(Symbol):
             info.append('Package: {0}'.format(self.location.package.package_id()))
 
         info.append('')
-        loc = self.defined.location or self.location
 
-        if type(loc) == Location:
+        if self.has_source_location():
             info.append('Defined at: {0}'.format(self.get_source_location()))
-        elif type(loc) == InstalledLocation:
-            info.append('Defined in: {0}'.format(loc.name))
+        else:
+            info.append('Defined in: {0}'.format(self.defined_module().name))
 
         return '\n'.join(info)
+
+def wrap_operator(name):
+    if re.match(r"[\w']+", name):
+        return name
+    return "({0})".format(name)
 
 class Function(Declaration):
     """
@@ -261,10 +293,10 @@ class Function(Declaration):
         self.type = function_type
 
     def suggest(self):
-        return (u'{0} :: {1}\t{2}'.format(self.name, self.type, self.module.name), self.name)
+        return (u'{0} :: {1}\t{2}'.format(wrap_operator(self.name), self.type, self.imported_from_name()), self.name)
 
     def brief(self):
-        return u'{0} :: {1}'.format(self.name, self.type if self.type else u'?')
+        return u'{0} :: {1}'.format(wrap_operator(self.name), self.type if self.type else u'?')
 
 class TypeBase(Declaration):
     """
@@ -277,7 +309,7 @@ class TypeBase(Declaration):
         self.definition = definition
 
     def suggest(self):
-        return (u'{0} {1}\t{2}'.format(self.name, ' '.join(self.args), self.module.name), self.name)
+        return (u'{0} {1}\t{2}'.format(self.name, ' '.join(self.args), self.imported_from_name()), self.name)
 
     def brief(self):
         brief_parts = [self.what]
