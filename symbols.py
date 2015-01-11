@@ -239,7 +239,7 @@ class Declaration(Symbol):
         info.append('')
         loc = self.location
         name = self.name
-        if self.defined:
+        if self.defined and not self.by_source():
             loc = self.defined.location
             name = self.defined.name
         if type(loc) == Location:
