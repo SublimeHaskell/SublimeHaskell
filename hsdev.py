@@ -150,11 +150,18 @@ def parse_sandbox(d, defval = None):
         return 'cabal'
     return defval
 
-def parse_location(d, p = None):
+def parse_position(d):
+    if not d:
+        return None
+    line = get_value(d, 'line')
+    column = get_value(d, 'column')
+    if line is not None and column is not None:
+        return symbols.Position(line, column)
+    return None
+
+def parse_location(d):
     loc = symbols.Location(
         get_value(d, 'file'),
-        get_value(p, 'line', 0),
-        get_value(p, 'column', 0),
         get_value(d, 'project'))
     if not loc.is_null():
         return loc
@@ -179,7 +186,7 @@ def parse_cabal(d):
 def parse_import(d):
     if not d:
         return None
-    return symbols.Import(d['name'], d['qualified'], d.get('as'), parse_location(None, d.get('pos')))
+    return symbols.Import(d['name'], d['qualified'], d.get('as'), parse_position(d.get('pos')))
 
 def parse_module_id(d):
     if d is None:
@@ -193,9 +200,9 @@ def parse_module_id(d):
 def parse_declaration(decl):
     try:
         what = decl['decl']['what']
-        loc = parse_location(None, decl.get('pos'))
         docs = crlf2lf(decl.get('docs'))
         name = decl['name']
+        pos = parse_position(decl.get('pos'))
         imported = []
         if 'imported' in decl and decl['imported']:
             imported = [parse_import(d) for d in decl['imported']]
@@ -204,15 +211,15 @@ def parse_declaration(decl):
             defined = parse_module_id(decl['defined'])
 
         if what == 'function':
-            return symbols.Function(name, decl['decl'].get('type'), docs, loc, imported, defined)
+            return symbols.Function(name, decl['decl'].get('type'), docs, None, imported, defined, pos)
         elif what == 'type':
-            return symbols.Type(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc, imported, defined)
+            return symbols.Type(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, None, imported, defined, pos)
         elif what == 'newtype':
-            return symbols.Newtype(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc, imported, defined)
+            return symbols.Newtype(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, None, imported, defined, pos)
         elif what == 'data':
-            return symbols.Data(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc, imported, defined)
+            return symbols.Data(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, None, imported, defined, pos)
         elif what == 'class':
-            return symbols.Class(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, loc, imported, defined)
+            return symbols.Class(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, None, imported, defined, pos)
         else:
             return None
     except Exception as e:
@@ -231,7 +238,7 @@ def parse_module_declaration(d, parse_module_info = True):
         if not decl:
             return None
 
-        decl.update_location(loc)
+        decl.location = loc
 
         decl.module = m
 

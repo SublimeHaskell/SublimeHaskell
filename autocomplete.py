@@ -639,7 +639,7 @@ class SublimeHaskellSearch(SublimeHaskellWindowCommand):
 # General goto command
 class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
     def run(self, project = False):
-        self.files = []
+        self.decls = []
         self.declarations = []
         decls = []
 
@@ -654,11 +654,11 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
                 return
 
             decls = self.sorted_decls(hsdev_client.symbol(project = current_project))
-            self.declarations = [[decl.brief(), decl.module.name, decl.location.position()] for decl in decls]
+            self.declarations = [[decl.brief(), decl.module.name, decl.get_source_location()] for decl in decls]
         else:
             decls = self.sorted_decls(hsdev_client.symbol(file = self.current_filename, locals = True))
-            self.declarations = [[(decl.location.column * ' ') + decl.brief()] for decl in decls]
-        self.files = [decl.location for decl in decls]
+            self.declarations = [[(decl.position.column * ' ') + decl.brief()] for decl in decls]
+        self.decls = decls[:]
 
         if not decls:
             return
@@ -675,25 +675,24 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
 
     def closest_idx(self, decls):
         fdecls = list(filter(
-            lambda d: d[1].location.filename == self.current_filename,
+            lambda d: d[1].defined_location().filename == self.current_filename,
             enumerate(decls)))
         if not fdecls:
             return -1
-        return min(fdecls, key = lambda d: abs(d[1].location.line - self.line))[0]
+        return min(fdecls, key = lambda d: abs(d[1].position.line - self.line))[0]
 
     def on_done(self, idx):
         if idx == -1:
             return
-        self.open(self.files[idx])
+        self.open(self.decls[idx])
 
     def on_highlighted(self, idx):
         if idx == -1:
             return
-        self.open(self.files[idx], True)
+        self.open(self.decls[idx], True)
 
-    def open(self, location, transient = False):
-        log('location is {0}'.format(location.position()), log_trace)
-        view = self.window.open_file(location.position(), sublime.ENCODED_POSITION | sublime.TRANSIENT if transient else sublime.ENCODED_POSITION)
+    def open(self, decl, transient = False):
+        view = self.window.open_file(decl.get_source_location(), sublime.ENCODED_POSITION | sublime.TRANSIENT if transient else sublime.ENCODED_POSITION)
 
 
 
@@ -705,15 +704,15 @@ class SublimeHaskellGoToAnyDeclaration(SublimeHaskellWindowCommand):
         decls = hsdev_client.symbol(source = True)
 
         for decl in decls:
-            self.files.append([decl.location.filename, str(decl.location.line), str(decl.location.column)])
-            self.declarations.append([decl.brief(), decl.location.position()])
+            self.files.apend(decl.get_source_location())
+            self.declarations.append([decl.brief(), decl.get_source_location()])
 
         self.window.show_quick_panel(self.declarations, self.on_done)
 
     def on_done(self, idx):
         if idx == -1:
             return
-        self.window.open_file(':'.join(self.files[idx]), sublime.ENCODED_POSITION)
+        self.window.open_file(self.files[idx], sublime.ENCODED_POSITION)
 
 
 
@@ -880,7 +879,7 @@ class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
 
     def on_inspected(self, result):
         cur_module = hsdev.parse_module(json.loads(result)['module']) if self.view.is_dirty() else hsdev_client.module(file = self.current_file_name)
-        imports = sorted(cur_module.imports, key = lambda i: i.location.line)
+        imports = sorted(cur_module.imports, key = lambda i: i.position.line)
         after = [i for i in imports if i.module > self.module_name]
 
         insert_line = 0
@@ -888,13 +887,13 @@ class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
 
         if len(after) > 0:
             # Insert before after[0]
-            insert_line = after[0].location.line - 1
+            insert_line = after[0].position.line - 1
         elif len(imports) > 0:
             # Insert after all imports
-            insert_line = imports[-1].location.line
+            insert_line = imports[-1].position.line
         elif len(cur_module.declarations) > 0:
             # Insert before first declaration
-            insert_line = min([d.location.line for d in cur_module.declarations.values()]) - 1
+            insert_line = min([d.position.line for d in cur_module.declarations.values()]) - 1
             insert_gap = True
         else:
             # Insert at the end of file
@@ -928,7 +927,7 @@ class SublimeHaskellClearImports(SublimeHaskellTextCommand):
             log("module not scanned")
             return
 
-        imports = sorted(cur_module.imports, key = lambda i: i.location.line)
+        imports = sorted(cur_module.imports, key = lambda i: i.position.line)
 
         (exit_code, cleared, err) = call_and_wait(['hsclearimports', self.current_file_name, '--max-import-list', '16'])
         if exit_code != 0:
@@ -942,7 +941,7 @@ class SublimeHaskellClearImports(SublimeHaskellTextCommand):
             return
 
         for i, ni in zip(imports, new_imports):
-            pt = self.view.text_point(i.location.line - 1, 0)
+            pt = self.view.text_point(i.position.line - 1, 0)
             self.view.replace(edit, self.view.line(pt), ni)
 
 class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
@@ -1045,8 +1044,8 @@ class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
 
         candidate = list(filter(lambda d: d.by_source(), hsdev_client.whois(whois_name, current_file_name, sandbox = current_sandbox())))
 
-        if candidate and candidate[0].location and candidate[0].location.filename:
-            self.view.window().open_file(candidate[0].location.position(), sublime.ENCODED_POSITION)
+        if candidate and candidate[0].has_source_location():
+            self.view.window().open_file(candidate[0].get_source_location(), sublime.ENCODED_POSITION)
             return
 
         candidates = hsdev_client.symbol(name = full_name, source = True)
@@ -1059,14 +1058,14 @@ class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
 
         if len(candidates) + len(module_candidates) == 1:
             if len(candidates) == 1:
-                self.view.window().open_file(candidates[0].location.position(), sublime.ENCODED_POSITION)
+                self.view.window().open_file(candidates[0].get_source_location(), sublime.ENCODED_POSITION)
                 return
             if len(module_candidates) == 1:
-                self.view.window().open_file(module_candidates[0].location.position(), sublime.ENCODED_POSITION)
+                self.view.window().open_file(module_candidates[0].location.filename)
                 return
 
         # many candidates
-        self.select_candidates = [([c.brief(), c.location.position()], True) for c in candidates] + [([m.name, m.location.filename], False) for m in module_candidates]
+        self.select_candidates = [([c.brief(), c.get_source_location()], True) for c in candidates] + [([m.name, m.location.filename], False) for m in module_candidates]
         self.view.window().show_quick_panel([c[0] for c in self.select_candidates], self.on_done, 0, 0, self.on_highlighted)
 
     def on_done(self, idx):
