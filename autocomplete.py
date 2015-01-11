@@ -786,7 +786,7 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
             self.show_symbol_info(self.candidates[0])
             return
 
-        self.view.window().show_quick_panel([[c.qualified_name(), c.location_string()] for c in self.candidates], self.on_done)
+        self.view.window().show_quick_panel([[c.qualified_name(), c.location.to_string()] for c in self.candidates], self.on_done)
 
     def on_done(self, idx):
         if idx == -1:
