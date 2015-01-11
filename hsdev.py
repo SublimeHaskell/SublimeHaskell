@@ -751,8 +751,19 @@ class HsDev(object):
         return cmd('resolve', [], opts, parse_module)
 
     @command
-    def project(self, project):
-        return cmd('project', [], {'project': project})
+    def project(self, project = None, path = None):
+        opts = concat_opts([
+            (project, {'project': project}),
+            (path, {'path': path})])
+
+        return cmd('project', [], opts)
+
+    @command
+    def sandbox(self, path):
+        opts = concat_opts([
+            (path, {'path': path})])
+
+        return cmd('sandbox', [], opts)
 
     @list_command
     def lookup(self, name, file, sandbox = None):

@@ -463,7 +463,7 @@ class AutoCompletion(object):
         return []
 
     @hsdev.use_hsdev
-    def get_module_completions_for(self, qualified_prefix, modules = None):
+    def get_module_completions_for(self, qualified_prefix, modules = None, current_dir = None):
         def module_next_name(mname):
             """
             Returns next name for prefix
@@ -473,13 +473,24 @@ class AutoCompletion(object):
             # Sublime replaces full module name with suffix, if it contains no dots?
             return suffix[0]
 
-        module_list = modules if modules else self.get_current_module_completions()
+        module_list = modules if modules else self.get_current_module_completions(current_dir = current_dir)
         return list(set((module_next_name(m) + '\tmodule', module_next_name(m)) for m in module_list if m.startswith(qualified_prefix)))
 
     @hsdev.use_hsdev
-    def get_current_module_completions(self):
-        return set([m.name for m in hsdev_client.scope_modules(self.current_filename, sandbox = current_sandbox())])
-
+    def get_current_module_completions(self, current_dir = None):
+        if self.current_filename:
+            return set([m.name for m in hsdev_client.scope_modules(self.current_filename or current_dir)])
+        elif current_dir:
+            proj = hsdev_client.project(path = current_dir)
+            if proj and 'path' in proj:
+                return set([m.name for m in hsdev_client.list_modules(deps = proj['path'])])
+            sbox = hsdev_client.sandbox(path = current_dir)
+            if sbox and type(sbox) == dict and 'sandbox' in sbox:
+                sbox = sbox.get('sandbox')
+            if sbox:
+                return set([m.name for m in hsdev_client.list_modules(cabal = is_cabal(sbox), sandboxes = as_sandboxes(sbox))])
+        else:
+            return set([m.name for m in hsdev_client.list_modules(cabal = current_is_cabal(), sandboxes = current_sandboxes())])
 
 autocompletion = AutoCompletion()
 

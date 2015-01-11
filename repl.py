@@ -1,5 +1,6 @@
 import sublime
 import sublime_plugin
+import re
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
@@ -15,6 +16,9 @@ else:
 
 
 
+COMMAND_RE = re.compile(r'^.*:[a-z]*$')
+IMPORT_RE = re.compile(r'^.*\bimport\s(?P<module>[\w\d\.]*)$')
+
 def find_sublime_haskell_repl():
     repls = list(sublimerepl.manager.find_repl('sublime_haskell_repl'))
     return repls
@@ -26,6 +30,30 @@ def run_repl_command(repl, str):
 def show_scope(repl):
     run_repl_command(":show modules")
     run_repl_command(":show imports")
+
+class Repl(object):
+    def __init__(self, view, path = None, project_name = None):
+        self.view = view
+        self.path = path
+        if not path:
+            path = os.path.dirname(view.file_name())
+        self.project_name = project_name
+
+    def is_project(self):
+        return self.project_name is not None
+
+# external_id ⇒ view
+class Repls(object):
+    def __init__(self):
+        self.repls = {}
+
+    def set_repl_view(self, id, view, **kwargs):
+        self.repls[id] = Repl(view, **kwargs)
+
+    def get_repl_view(self, id):
+        return self.repls.get(id)
+
+repls = Repls()
 
 class SublimeHaskellAutocompleteRepl(sublime_plugin.EventListener):
     def __init__(self):
@@ -39,7 +67,20 @@ class SublimeHaskellAutocompleteRepl(sublime_plugin.EventListener):
         if not is_haskell_repl(view):
             return []
 
-        completions = self.repl_commands_completions()
+        repl = sublimerepl.manager.repl_view(view)
+
+        line_contents = autocomplete.get_line_contents(view, locations[0])
+        command = COMMAND_RE.match(line_contents)
+        if command:
+            return self.repl_commands_completions()
+
+        imp = IMPORT_RE.match(line_contents)
+        if imp:
+            m = imp.group('module')
+            r = repls.get_repl_view(repl.external_id)
+            return (autocomplete.autocompletion.get_module_completions_for(m, current_dir = (r.path if r else None)), sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
+
+        completions = []
 
         if get_setting('inhibit_completions') and len(completions) != 0:
             return (completions, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
@@ -57,9 +98,23 @@ def repl_args(**kwargs):
     ret_args.update(kwargs)
     return ret_args
 
+def repl_external_id(id):
+    return "sublime_haskell_repl-{0}".format(make_external_id(id))
+
+def make_external_id(id):
+    return "{0}".format(id.replace("\\", ".").replace(":", ""))
+
+def get_external_id(id):
+    (pre, _, post) = id.partition("-")
+    if ptr == "sublime_haskell_repl":
+        return post
+    else:
+        return None
+
 class SublimeHaskellReplGhci(SublimeHaskellWindowCommand):
     def run(self):
-        self.window.run_command("repl_open", repl_args(cmd = ["ghci"]))
+        self.window.run_command("repl_open", repl_args(
+            cmd = ["ghci"]))
 
     def is_enabled(self):
         return True
@@ -70,7 +125,10 @@ class SublimeHaskellReplGhciCurrentFile(SublimeHaskellWindowCommand):
         if not view:
             show_status_message("No file active", False)
         else:
-            self.window.run_command("repl_open", repl_args(cmd = ["ghci", "$file"]))
+            self.window.run_command("repl_open", repl_args(
+                cmd = ["ghci", "$file"],
+                external_id = repl_external_id(view.file_name())))
+            repls.set_repl_view(repl_external_id(view.file_name()), view)
 
 class SublimeHaskellReplCabal(SublimeHaskellWindowCommand):
     def run(self):
@@ -78,10 +136,14 @@ class SublimeHaskellReplCabal(SublimeHaskellWindowCommand):
         if not view:
             show_status_message("No file active", False)
         else:
-            project_dir = get_cabal_project_dir_of_view(view)
+            project_dir, project_name =  get_cabal_project_dir_and_name_of_view(view)
             if not project_dir:
                 show_status_message("Not in project", False)
-            self.window.run_command("repl_open", repl_args(cmd = ["cabal", "repl"], cwd = project_dir))
+            self.window.run_command("repl_open", repl_args(
+                cmd = ["cabal", "repl"],
+                cwd = project_dir,
+                external_id = repl_external_id(project_dir)))
+            repls.set_repl_view(repl_external_id(project_dir), view, path = project_dir, project_name = project_name)
 
     def is_enabled(self):
         return is_enabled_haskell_command(None, True)

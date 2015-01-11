@@ -9,28 +9,27 @@
 	<key>patterns</key>
 	<array>
 		<dict>
-			<key>match</key>
-			<string>^(class|type|data|newtype)\s+(\w+)((\s+\w+)*)?$</string>
-			<key>captures</key>
+			<key>begin</key>
+			<string>^(class|type|data|newtype)\b</string>
+			<key>beginCaptures</key>
 			<dict>
 				<key>1</key>
 				<dict>
 					<key>name</key>
 					<string>keyword.type.symbolinfo keyword.declaration.data.haskell</string>
 				</dict>
-				<key>2</key>
-				<dict>
-					<key>name</key>
-					<string>constant.other.symbolinfo entity.name.type.haskell</string>
-				</dict>
-				<key>3</key>
-				<dict>
-					<key>name</key>
-					<string>variable.generic.haskell</string>
-				</dict>
 			</dict>
+			<key>end</key>
+			<string>^(?!\s)</string>
 			<key>name</key>
 			<string>symbol.type.symbolinfo</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>include</key>
+					<string>#type</string>
+				</dict>
+			</array>
 		</dict>
 		<dict>
 			<key>include</key>
