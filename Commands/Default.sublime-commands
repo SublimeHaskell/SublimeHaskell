@@ -90,6 +90,10 @@
         "command": "sublime_haskell_go_to_declaration"
     },
     {
+        "caption": "SublimeHaskell: Go to module",
+        "command": "sublime_haskell_go_to_module"
+    },
+    {
         "caption": "SublimeHaskell: Eval selection",
         "command": "sublime_haskell_eval_selection"
     },

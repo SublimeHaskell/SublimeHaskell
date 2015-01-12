@@ -285,12 +285,12 @@ class AutoCompletion(object):
             return log_result(none_comps)
         else:
             log('preparing completions for {0}'.format(file_name), log_debug)
-            current_module = hsdev_client.module(file = file_name)
+            current_module = hsdev_client_back.module(file = file_name)
             if current_module:
                 comps = make_completions(
-                    hsdev_client.complete('', file_name, sandbox = current_sandbox(), timeout = None, split_result = True))
+                    hsdev_client_back.complete('', file_name, sandbox = current_sandbox(), timeout = None, split_result = True))
                 # if not suggs:
-                #     suggs = hsdev_client.scope(file_name, sandbox = current_sandbox(), global_scope = True, timeout = None) or []
+                #     suggs = hsdev_client_back.scope(file_name, sandbox = current_sandbox(), global_scope = True, timeout = None) or []
 
                 # Get imports names
                 # Note, that if module imported with 'as', then it can be used only with its synonym instead of full name
@@ -311,13 +311,13 @@ class AutoCompletion(object):
 
     def update_cabal_completions(self):
         comps = make_completions(
-            hsdev_client.symbol(cabal = current_is_cabal(), sandbox = current_sandboxes(), timeout = None, split_result = True))
+            hsdev_client_back.symbol(cabal = current_is_cabal(), sandbox = current_sandboxes(), timeout = None, split_result = True))
         log('updating prepared cabal completions: {0}'.format(len(comps)))
         with self.cache as cache_:
             cache_.set_cabal(comps)
 
     def update_sources_completions(self):
-        comps = make_completions(hsdev_client.symbol(source = True, timeout = None, split_result = True))
+        comps = make_completions(hsdev_client_back.symbol(source = True, timeout = None, split_result = True))
         log('updating prepared sources completions: {0}'.format(len(comps)))
         with self.cache as cache_:
             cache_.set_sources(comps)
@@ -693,6 +693,18 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
 
     def open(self, decl, transient = False):
         view = self.window.open_file(decl.get_source_location(), sublime.ENCODED_POSITION | sublime.TRANSIENT if transient else sublime.ENCODED_POSITION)
+
+
+
+class SublimeHaskellGoToModule(SublimeHaskellWindowCommand):
+    def run(self):
+        self.modules = hsdev_client.list_modules(source = True)
+        self.window.show_quick_panel([[m.name, m.location.to_string()] for m in self.modules], self.on_done)
+
+    def on_done(self, idx):
+        if idx == -1:
+            return
+        self.window.open_file(self.modules[idx].location.to_string())
 
 
 
@@ -1216,6 +1228,7 @@ class hsdev_status(object):
 
 hsdev_inspector = None
 hsdev_client = None
+hsdev_client_back = None
 
 def dirty(fn):
     def wrapped(self, *args, **kwargs):
@@ -1247,6 +1260,7 @@ class HsDevAgent(threading.Thread):
         self.dirty_files = LockedObject([])
         self.dirty_paths = LockedObject([])
         self.hsdev = hsdev.HsDev()
+        self.hsdev_back = hsdev.HsDev()
 
         self.reinspect_event = threading.Event()
 
@@ -1268,6 +1282,7 @@ class HsDevAgent(threading.Thread):
 
             start_server_()
             self.hsdev.connect_async(autoconnect = True, on_reconnect = start_server_)
+            self.hsdev_back.connect_async(autoconnect = True)
             if not self.hsdev.wait():
                 log('Unable to connect to hsdev server', log_warning)
 
@@ -1404,7 +1419,7 @@ class HsDevAgent(threading.Thread):
 
         try:
             with status_message_process('Inspecting {0}'.format(cabal), priority = 1) as s:
-                self.hsdev.scan(cabal = is_cabal(cabal), sandboxes = as_sandboxes(cabal), on_notify = hsdev_status(s), wait = True)
+                self.hsdev_back.scan(cabal = is_cabal(cabal), sandboxes = as_sandboxes(cabal), on_notify = hsdev_status(s), wait = True)
         except Exception as e:
             log('loading standard modules info for {0} failed with {1}'.format(cabal, e), log_error)
 
@@ -1414,7 +1429,7 @@ class HsDevAgent(threading.Thread):
         if paths or projects or files:
             try:
                 with status_message_process('Inspecting', priority = 1) as s:
-                    self.hsdev.scan(paths = paths, projects = projects, files = files, on_notify = hsdev_status(s), wait = True)
+                    self.hsdev_back.scan(paths = paths, projects = projects, files = files, on_notify = hsdev_status(s), wait = True)
             except Exception as e:
                 log('Inspection failed: {0}'.format(e), log_error)
 
@@ -1423,7 +1438,7 @@ class HsDevAgent(threading.Thread):
     def inspect_path(self, path):
         try:
             with status_message_process('Inspecting path {0}'.format(path), priority = 1) as s:
-                self.hsdev.scan(paths = [path], on_notify = hsdev_status(s), wait = True)
+                self.hsdev_back.scan(paths = [path], on_notify = hsdev_status(s), wait = True)
         except Exception as e:
             log('Inspecting path {0} failed: {1}'.format(path, e), log_error)
 
@@ -1434,7 +1449,7 @@ class HsDevAgent(threading.Thread):
 
         try:
             with status_message_process('Inspecting project {0}', priority = 1) as s:
-                self.hsdev.scan(projects = [cabal_dir], on_notify = hsdev_status(s), wait = True)
+                self.hsdev_back.scan(projects = [cabal_dir], on_notify = hsdev_status(s), wait = True)
         except Exception as e:
             log('Inspecting project {0} failed: {1}'.format(cabal_dir, e), log_error)
 
@@ -1443,7 +1458,7 @@ class HsDevAgent(threading.Thread):
     def inspect_files(self, filenames):
         try:
             with status_message_process('Inspecting files', priority = 1) as s:
-                self.hsdev.scan(files = filenames, on_notify = hsdev_status(s), wait = True)
+                self.hsdev_back.scan(files = filenames, on_notify = hsdev_status(s), wait = True)
         except Exception as e:
             log('Inspecting files failed: {0}'.format(e), log_error)
 
@@ -1625,6 +1640,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 def start_inspector():
     global hsdev_inspector
     global hsdev_client
+    global hsdev_client_back
 
     if hsdev_inspector is not None:
         return ()
@@ -1633,6 +1649,7 @@ def start_inspector():
 
     hsdev_inspector = HsDevAgent()
     hsdev_client = hsdev_inspector.hsdev
+    hsdev_client_back = hsdev_inspector.hsdev_back
     hsdev_inspector.start()
 
 def plugin_loaded():
