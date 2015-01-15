@@ -9,7 +9,7 @@ Requirements
 Necessary:
 * ghc and a recent Haskell Platform (>= 2012 should do fine)
 * cabal
-* Cabal packages: base, bytestring, aeson, haskell-src-exts (>= 1.14.0), haddock (`cabal install aeson haskell-src-exts haddock`)
+* Cabal packages: base, bytestring, aeson, happy, haskell-src-exts (>= 1.14.0), haddock (`cabal install aeson haskell-src-exts haddock`)
 
 Optional, but useful:
 * [hsdev](http://hackage.haskell.org/package/hsdev) (for inspection, enhanced completion, type inference etc, `cabal install hsdev`) disabled by default, enable it with setting `enable_hsdev` setting to `true`.<br>Provides smart completions, and allows commands:
