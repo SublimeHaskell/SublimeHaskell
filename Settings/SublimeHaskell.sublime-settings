@@ -75,9 +75,6 @@
 	"ghc_opts": [],
 
 	// Enable hsdev
-	// git clone https://github.com/mvoidex/hsdev
-	// cd hsdev
-	// cabal install
 	"enable_hsdev": false,
 
 	// Enables hdevtools (it must be installed, cabal install hdevtools)
