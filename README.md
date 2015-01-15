@@ -19,6 +19,7 @@ Optional, but useful:
   * `SublimeHaskell: Clear imports` — remove unnecessary imports and maybe make import list
   * `SublimeHaskell: Browse module` — get declarations for module
   * `SublimeHaskell: Show symbol info` — get help for symbol, `Ctrl+K Ctrl+I`
+  * `SublimeHaskell: Go to module` — go to module, `Ctrl+K Ctrl+P`
   * `SublimeHaskell: Go to declaration` — overrides default, `F12`
   * `SublimeHaskell: Go to any declaration` — list declaration for all haskell sources
   * `Ctrl+R`, `Ctrl+Shift+R` — overrides default, goto symbol and goto symbol in project
