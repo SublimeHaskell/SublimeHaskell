@@ -106,7 +106,7 @@ def make_external_id(id):
 
 def get_external_id(id):
     (pre, _, post) = id.partition("-")
-    if ptr == "sublime_haskell_repl":
+    if pre == "sublime_haskell_repl":
         return post
     else:
         return None
