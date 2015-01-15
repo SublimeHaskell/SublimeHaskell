@@ -1,6 +1,8 @@
 README
 ======
 
+![look](Themes/info+repl.png)
+
 Requirements
 ------------
 
@@ -21,7 +23,23 @@ Optional, but useful:
   * `SublimeHaskell: Go to any declaration` — list declaration for all haskell sources
   * `Ctrl+R`, `Ctrl+Shift+R` — overrides default, goto symbol and goto symbol in project
   * `SublimeHaskell: Hayoo` — search in hayoo
-  * `SublimeHaskell: Eval` — apply haskell function to selections, for example you can select several numbers, then run this command with `* 2`, and numbers will be doubled
+  * Eval commands
+    * `SublimeHaskell: Eval selection` — eval selected expression, for example
+      * `[1..10]` ⤇ `[1,2,3,4,5,6,7,8,9,10]`
+      * `replicate 10 'a'` ⤇ `aaaaaaaaaa` (note no double quotes for string result)
+    * `SublimeHaskell: Apply to selection` — same as above, but applies function to each selection
+      * `foobar` ⫤ `reverse` ⤇ `raboof`
+      * `[1..10]` ⫤ `reverse` ⤇ `[10,9,8,7,6,5,4,3,2,1]`
+      * `1`, `2`, `3` ⫤ `succ` ⤇ `2`, `3`, `4`
+      * `[1..3]` ⫤ `intercalate ", " . map (\i -> "foo" ++ show i)` ⤇ `foo1, foo2, foo3`
+    * `SublimeHaskell: Apply to selection list` — applies function to list made from selections
+      * `foo`, `bar`, `baz` ⫤ `reverse` ⤇ `baz`, `bar`, `foo`
+      * `foo`, `bar`, `baz` ⫤ `sort` ⤇ `bar`, `baz`, `foo`
+  * Repl commands (uses [SublimeREPL](https://github.com/wuub/SublimeREPL) package)
+    * `SublimeHaskell Repl: GHCi` — runs `ghci`
+    * `SublimeHaskell Repl: GHCi current file` — runs `ghci` and loads current file
+    * `SublimeHaskell Repl: Cabal Repl` — runs `cabal repl` for current project
+
 * [ghc-mod](http://hackage.haskell.org/package/ghc-mod) (for import and LANGUAGE completions and type inference, `cabal install ghc-mod`)
 * [stylish-haskell](https://github.com/jaspervdj/stylish-haskell) (for code prettification, `cabal install stylish-haskell`)
 * [cabal-dev](http://hackage.haskell.org/package/cabal-dev) if you want to use it
@@ -30,6 +48,8 @@ Optional, but useful:
 
 Binaries:
 * If your `cabal`, `ghc-mod`, `ghc` etc. are not installed in a system PATH, you have to adjust SublimeHaskell's `add_to_PATH` setting.
+
+There are also [special theme](Themes/Hasky%20\(Dark\).gif) with enhanced haskell entities coloring.
 
 Installation
 ------------
