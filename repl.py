@@ -147,3 +147,15 @@ class SublimeHaskellReplCabal(SublimeHaskellWindowCommand):
 
     def is_enabled(self):
         return is_enabled_haskell_command(None, True)
+
+class SublimeHaskellReplLoad(SublimeHaskellWindowCommand):
+    def run(self):
+        view = self.window.active_view()
+        if not view:
+            show_status_message("No file active", False)
+        else:
+            project_dir, project_name = get_cabal_project_dir_and_name_of_view(view)
+            if not project_dir:
+                self.window.run_command("sublime_haskell_repl_ghci_current_file", {})
+            else:
+                self.window.run_command("sublime_haskell_repl_cabal", {})

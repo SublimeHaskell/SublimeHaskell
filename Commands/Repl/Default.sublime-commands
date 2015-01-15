@@ -10,5 +10,9 @@
     {
         "caption": "SublimeHaskell Repl: Cabal Repl",
         "command": "sublime_haskell_repl_cabal"
+    },
+    {
+        "caption": "SublimeHaskell Repl: Load",
+        "command": "sublime_haskell_repl_load"
     }
 ]

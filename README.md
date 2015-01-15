@@ -40,6 +40,7 @@ Optional, but useful:
     * `SublimeHaskell Repl: GHCi` — runs `ghci`
     * `SublimeHaskell Repl: GHCi current file` — runs `ghci` and loads current file
     * `SublimeHaskell Repl: Cabal Repl` — runs `cabal repl` for current project
+    * `SublimeHaskell Repl: Load` — loads current file or project in repl
 
 * [stylish-haskell](https://github.com/jaspervdj/stylish-haskell) (for code prettification, `cabal install stylish-haskell`)
 * [ghc-mod](http://hackage.haskell.org/package/ghc-mod) (for import and LANGUAGE completions and type inference, `cabal install ghc-mod`, not used if `hsdev` enabled)
