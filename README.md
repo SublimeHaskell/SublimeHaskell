@@ -49,7 +49,8 @@ Optional, but useful:
 Binaries:
 * If your `cabal`, `ghc-mod`, `ghc` etc. are not installed in a system PATH, you have to adjust SublimeHaskell's `add_to_PATH` setting.
 
-There are also [special theme](Themes/Hasky%20\(Dark\).gif) with enhanced haskell entities coloring.
+There are also [special theme](Themes/Hasky%20\(Dark\).gif) with enhanced haskell entities coloring
+![compare](Themes/Hasky%20\(Dark\).small.gif)
 
 Installation
 ------------
