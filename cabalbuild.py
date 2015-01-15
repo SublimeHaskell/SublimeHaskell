@@ -83,10 +83,10 @@ def get_projects():
             src = src_files.pop()
             proj_dir, proj_name = get_cabal_project_dir_and_name_of_file(src)
             if proj_dir:
-                active_projects.append(proj_name, proj_dir)
+                active_projects.append((proj_name, proj_dir))
                 src_files = [f for f in src_files if not f.startswith(proj_dir)]
 
-        return active_projects
+        return dict((name, { 'name': name, 'path': path }) for name, path in active_projects)
 
 # Select project from list
 # on_selected accepts name of project and directory of project
