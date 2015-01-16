@@ -94,27 +94,19 @@ def repl_args(**kwargs):
         "cwd": "$file_path",
         "external_id": "sublime_haskell_repl",
         "syntax": "Packages/SublimeHaskell/Syntaxes/HaskellRepl.tmLanguage" }
+    # Drop this options until https://github.com/wuub/SublimeREPL/pull/395 is merged
+    kwargs.pop('loaded')
+    kwargs.pop('caption')
+    
     ret_args = def_args.copy()
     ret_args.update(kwargs)
     return ret_args
 
-def repl_external_id(id):
-    return "sublime_haskell_repl-{0}".format(make_external_id(id))
-
-def make_external_id(id):
-    return "{0}".format(id.replace("\\", ".").replace(":", ""))
-
-def get_external_id(id):
-    (pre, _, post) = id.partition("-")
-    if pre == "sublime_haskell_repl":
-        return post
-    else:
-        return None
-
 class SublimeHaskellReplGhci(SublimeHaskellWindowCommand):
     def run(self):
         self.window.run_command("repl_open", repl_args(
-            cmd = ["ghci"]))
+            cmd = ["ghci"],
+            caption = "ghci"))
 
     def is_enabled(self):
         return True
@@ -127,7 +119,8 @@ class SublimeHaskellReplGhciCurrentFile(SublimeHaskellWindowCommand):
         else:
             self.window.run_command("repl_open", repl_args(
                 cmd = ["ghci", "$file"],
-                external_id = repl_external_id(view.file_name())))
+                loaded = view.file_name(),
+                caption = "ghci: {0}".format(os.path.basename(view.file_name()))))
             repls.set_repl_view(repl_external_id(view.file_name()), view)
 
 class SublimeHaskellReplCabal(SublimeHaskellWindowCommand):
@@ -142,7 +135,8 @@ class SublimeHaskellReplCabal(SublimeHaskellWindowCommand):
             self.window.run_command("repl_open", repl_args(
                 cmd = ["cabal", "repl"],
                 cwd = project_dir,
-                external_id = repl_external_id(project_dir)))
+                loaded = project_dir,
+                caption = "cabal repl: {0}".format(project_name)))
             repls.set_repl_view(repl_external_id(project_dir), view, path = project_dir, project_name = project_name)
 
     def is_enabled(self):
