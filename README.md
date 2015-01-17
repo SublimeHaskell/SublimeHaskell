@@ -12,7 +12,7 @@ Necessary:
 * Cabal packages: base, bytestring, aeson, happy, haskell-src-exts (>= 1.14.0), haddock (`cabal install aeson haskell-src-exts haddock`)
 
 Optional, but useful:
-* [hsdev](http://hackage.haskell.org/package/hsdev) (for inspection, enhanced completion, type inference etc, `cabal install hsdev`) disabled by default, enable it with setting `enable_hsdev` setting to `true`.<br>Provides smart completions, and allows commands:
+* [hsdev](http://hackage.haskell.org/package/hsdev) (for inspection, enhanced completion, type inference etc, `cabal install hsdev`) disabled by default, enable it with setting `enable_hsdev` setting to `true`.<br>Provides smart completions (`Ctrl+Alt+Space` for _wide_ completion), and allows commands:
   * `SublimeHaskell: Insert import for symbol` — add import for declaration
   * `SublimeHaskell: Find declarations` — find declarations in installed packages and in projects
   * `SublimeHaskell: Search declarations everywhere` — search declarations in hayoo too
