@@ -699,14 +699,18 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
 class SublimeHaskellGoToModule(SublimeHaskellWindowCommand):
     def run(self):
         self.modules = hsdev_client.list_modules(source = True)
-        self.window.show_quick_panel([[m.name, m.location.to_string()] for m in self.modules], self.on_done)
+        self.window.show_quick_panel([[m.name, m.location.to_string()] for m in self.modules], self.on_done, 0, 0, self.on_highlighted)
 
     def on_done(self, idx):
         if idx == -1:
             return
         self.window.open_file(self.modules[idx].location.to_string())
 
+    def on_highlighted(self, idx):
+        if idx == -1:
+            return
 
+        self.window.open_file(self.modules[idx].location.to_string(), sublime.TRANSIENT)
 
 class SublimeHaskellGoToAnyDeclaration(SublimeHaskellWindowCommand):
     def run(self):
