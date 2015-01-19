@@ -1275,6 +1275,29 @@ class SublimeHaskellApplyToSelectionListCommand(SublimeHaskellTextCommand):
         pass
 
 
+class SublimeHaskellAutoFix(SublimeHaskellTextCommand):
+    def run(self, edit):
+        if self.view.file_name():
+            self.messages = hsdev_client.ghcmod_check_lint([self.view.file_name()])
+            self.corrections = list(filter(lambda corr: os.path.samefile(corr.file, self.view.file_name()), hsdev_client.autofix_show(self.messages)))
+            self.view.add_regions('autofix', [c.to_region(self.view) for corr in self.corrections for c in corr.corrector], 'entity.name.function', 'dot', 0)
+            self.types = ['*']
+            self.types.extend(list(set([corr.type for corr in self.corrections])))
+            self.view.window().show_quick_panel(self.types, self.on_done, 0, 0, self.on_highlighted)
+
+    def on_done(self, idx):
+        if idx == -1:
+            return
+
+        hsdev_client.autofix_fix(hsdev.encode_corrections([corr for corr in self.corrections if idx == 0 or corr.type == self.types[idx]]))
+
+        self.view.erase_regions('autofix')
+
+    def on_highlighted(self, idx):
+        if idx == -1:
+            return
+
+        self.view.add_regions('autofix', [c.to_region(self.view) for corr in self.corrections for c in corr.corrector if idx == 0 or corr.type == self.types[idx]], 'entity.name.function', 'dot', 0)
 
 class hsdev_status(object):
     def __init__(self, status_message):

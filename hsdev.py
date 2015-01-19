@@ -268,6 +268,50 @@ def parse_cabal_package(d):
         d.get('homepage'),
         d.get('license'))
 
+def parse_corrections(d):
+    if d is None:
+        return None
+    return [parse_correction(c) for c in d]
+
+def parse_correction(d):
+    return symbols.Correction(
+        d['file'],
+        d['type'],
+        d['description'],
+        d['message'],
+        d['solution'],
+        [parse_corrector(c) for c in d['corrector']])
+
+def parse_corrector(d):
+    return symbols.Corrector(
+        parse_position(d['region']['from']),
+        parse_position(d['region']['to']),
+        d['contents'])
+
+def encode_corrections(cs):
+    return [encode_correction(c) for c in cs]
+
+def encode_correction(c):
+    return {
+        'file': c.file,
+        'type': c.type,
+        'description': c.description,
+        'message': c.message,
+        'solution': c.solution,
+        'corrector': [encode_corrector(v) for v in c.corrector] }
+
+def encode_corrector(c):
+    return {
+        'region': {
+            'from': encode_position(c.start),
+            'to': encode_position(c.end) },
+        'contents': c.contents }
+
+def encode_position(p):
+    return {
+        'line': p.line,
+        'column': p.column }
+
 def reconnect_function(fn):
     def wrapped(self, *args, **kwargs):
         autoconnect_ = kwargs.pop('autoconnect', False)
@@ -857,11 +901,32 @@ class HsDev(object):
         return cmd('ghc-mod check', files, opts)
 
     @list_command
-    def ghcmod_lint(self, file, hlint = []):
+    def ghcmod_lint(self, files, hlint = []):
         opts = concat_opts([
             (hlint, {'hlint': hlint})])
 
-        return cmd('ghc-mod lint', [file], opts)
+        return cmd('ghc-mod lint', files, opts)
+
+    @list_command
+    def ghcmod_check_lint(self, files, sandbox = None, ghc = [], hlint = []):
+        opts = concat_opts([
+            (ghc, {'ghc': ghc}),
+            (sandbox, {'sandbox': sandbox}),
+            (hlint, {'hlint': hlint})])
+
+        return cmd('ghc-mod check-lint', files, opts)
+
+    @command
+    def autofix_show(self, messages):
+        return cmd('autofix show', [], {'data': json.dumps(messages)}, parse_corrections)
+
+    @command
+    def autofix_fix(self, messages, update = []):
+        opts = concat_opts([
+            (True, {'data': json.dumps(messages)}),
+            (update, {'update': json.dumps(update)})])
+
+        return cmd('autofix fix', [], opts, parse_corrections)
 
     @list_command
     def ghc_eval(self, exprs):

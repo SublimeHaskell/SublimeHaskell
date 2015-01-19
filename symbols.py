@@ -1,5 +1,6 @@
 import threading
 import sublime
+import os.path
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
@@ -435,3 +436,28 @@ class CabalPackage(object):
             info.append('License: ' + self.license)
 
         return '\n'.join(info)
+
+class Corrector(object):
+    def __init__(self, start, end, contents):
+        self.start = start
+        self.end = end
+        self.contents = contents
+
+    def to_region(self, view):
+        return sublime.Region(view.text_point(self.start.line, self.start.column), view.text_point(self.end.line, self.end.column))
+
+class Correction(object):
+    def __init__(self, file, type, description, message, solution, corrector):
+        self.file = file
+        self.type = type
+        self.description = description
+        self.message = message
+        self.solution = solution
+        self.corrector = corrector
+
+def mark_corrections(views, corrs):
+    for view in views:
+        if view.file_name() is None:
+            continue
+        corrs_ = [corr for corr in corrs if os.path.samefile(corr.file, view.file_name())]
+        view.add_regions('autofix', [c.to_region(view) for corr in corrs_ for c in corr.corrector], 'entity.name.function', 'dot', 0)

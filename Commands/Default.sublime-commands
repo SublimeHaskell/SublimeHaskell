@@ -153,5 +153,9 @@
     {
         "caption": "Cabal: List",
         "command": "sublime_haskell_cabal_list"
+    },
+    {
+        "caption": "SublimeHaskell: Auto fix",
+        "command": "sublime_haskell_auto_fix"
     }
 ]

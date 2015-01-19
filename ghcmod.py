@@ -30,7 +30,9 @@ def lint_as_hints(msgs):
 def hsdev_check():
     return (autocomplete.hsdev_client.ghcmod_check, lambda file: [file], lambda ms: ms)
 def hsdev_lint():
-    return (autocomplete.hsdev_client.ghcmod_lint, lambda file: file, lambda ms: ms)
+    return (autocomplete.hsdev_client.ghcmod_lint, lambda file: [file], lambda ms: ms)
+def hsdev_check_lint():
+    return (autocomplete.hsdev_client.ghcmod_check_lint, lambda file: [file], lambda ms: ms)
 
 def messages_as_hints(cmd):
     (fn, arg, msg) = cmd
@@ -42,6 +44,8 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
 
     def run_chain(self, cmds, msg):
         self.messages = []
+        self.msgs = []
+        self.corrections = []
         self.filename = self.view.file_name()
         hide_output(self.view)
         if not cmds:
@@ -71,12 +75,15 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
                             output_text,
                             get_cabal_project_dir_of_file(self.filename) or os.path.dirname(self.filename)))
                 sublime.set_timeout(lambda: mark_messages_in_views(output_messages), 0)
+
+                # autocomplete.hsdev_client.autofix_show(self.msgs, on_response = self.on_autofix)
             else:
                 cmd, tail_cmds = cmds[0], cmds[1:]
                 (fun, modify_arg, modify_messages) = cmd
 
                 def on_resp(msgs):
                     self.messages.extend(modify_messages(msgs))
+                    self.msgs.extend(msgs)
                     self.go_chain(tail_cmds)
 
                 def on_err(err):
@@ -87,6 +94,10 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
         except Exception as e:
             log('hsdev ghc-mod chain fails with: {0}'.format(e), log_error)
             self.status_msg.stop()
+
+    def on_autofix(self, corrs):
+        self.corrections = corrs
+        sublime.set_timeout(lambda: symbols.mark_corrections([v for w in sublime.windows() for v in w.views()], self.corrections), 0)
 
     def is_enabled(self):
         return is_haskell_source(None)
