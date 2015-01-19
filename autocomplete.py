@@ -1452,17 +1452,6 @@ class HsDevAgent(threading.Thread):
             self.start_hsdev()
 
         while True:
-            load_cabal = []
-            with self.cabal_to_load as cabal_to_load:
-                load_cabal = cabal_to_load[:]
-                cabal_to_load[:] = []
-
-            for c in load_cabal:
-                try:
-                    self.inspect_cabal(c)
-                except:
-                    continue
-
             scan_paths = []
             with self.dirty_paths as dirty_paths:
                 scan_paths = dirty_paths[:]
@@ -1493,6 +1482,17 @@ class HsDevAgent(threading.Thread):
                 self.inspect(paths = scan_paths, projects = projects, files = files)
             except:
                 pass
+
+            load_cabal = []
+            with self.cabal_to_load as cabal_to_load:
+                load_cabal = cabal_to_load[:]
+                cabal_to_load[:] = []
+
+            for c in load_cabal:
+                try:
+                    self.inspect_cabal(c)
+                except:
+                    continue
 
             if load_cabal or scan_paths or projects or files:
                 run_async(autocompletion.drop_completions_async)
