@@ -1197,36 +1197,47 @@ class hsdev_status(object):
 
     def __call__(self, msg):
         if 'params' in msg and msg['params']:
-            object_type = msg['params']['type']
-            object_name = msg['params']['name']
+            if 'type' in msg['params'] and 'name' in msg['params']:
+                object_type = msg['params']['type']
+                object_name = msg['params']['name']
 
-            if object_type == 'path':
+                if object_type == 'path':
+                    if 'child' in msg and msg['child']:
+                        if 'progress' in msg['child'] and msg['child']['progress'] and msg['child']['params']['type'] == 'module':
+                            status_msg = 'Inspecting path {0} ({1}%)'.format(
+                                object_name,
+                                int(msg['child']['progress']['current'] * 100 / msg['child']['progress']['total']))
+                            self.status_message.change_message(status_msg)
+                        else:
+                            self.__call__(msg['child'])
+                    return
+
+                if object_type == 'project':
+                    status_msg = 'Inspecting project {0}'.format(object_name)
+                    if 'child' in msg and msg['child'] and 'progress' in msg['child'] and msg['child']['progress']:
+                        status_msg = status_msg + ' ({0}%)'.format(
+                            int(msg['child']['progress']['current'] * 100 / msg['child']['progress']['total']))
+                    self.status_message.change_message(status_msg)
+                    return
+
+                if object_type == 'cabal':
+                    status_msg = 'Inspecting {0}'.format(object_name)
+                    self.status_message.change_message(status_msg)
+                    return
+
+                if object_type == 'module':
+                    status_msg = 'Inspecting {0}'.format(object_name)
+                    self.status_message.change_message(status_msg)
+                    return
+            else:
                 if 'child' in msg and msg['child']:
                     if 'progress' in msg['child'] and msg['child']['progress'] and msg['child']['params']['type'] == 'module':
-                        status_msg = 'Inspecting path {0} ({1}%)'.format(
-                            object_name,
+                        status_msg = '{0} ({1}%)'.format(
+                            msg['task'],
                             int(msg['child']['progress']['current'] * 100 / msg['child']['progress']['total']))
+                        self.status_message.change_message(status_msg)
                     else:
                         self.__call__(msg['child'])
-                return
-
-            if object_type == 'project':
-                status_msg = 'Inspecting project {0}'.format(object_name)
-                if 'child' in msg and msg['child'] and 'progress' in msg['child'] and msg['child']['progress']:
-                    status_msg = status_msg + ' ({0}%)'.format(
-                        int(msg['child']['progress']['current'] * 100 / msg['child']['progress']['total']))
-                self.status_message.change_message(status_msg)
-                return
-
-            if object_type == 'cabal':
-                status_msg = 'Inspecting {0}'.format(object_name)
-                self.status_message.change_message(status_msg)
-                return
-
-            if object_type == 'module':
-                status_msg = 'Inspecting {0}'.format(object_name)
-                self.status_message.change_message(status_msg)
-                return
 
 
 
