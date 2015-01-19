@@ -8,6 +8,7 @@ import threading
 import queue
 import time
 import sys
+import webbrowser
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
@@ -712,6 +713,20 @@ class SublimeHaskellGoToModule(SublimeHaskellWindowCommand):
 
         self.window.open_file(self.modules[idx].location.to_string(), sublime.TRANSIENT)
 
+
+class SublimeHaskellGoToHackage(SublimeHaskellTextCommand):
+    def run(self, edit):
+        pack = self.view.settings().get('package')
+        if pack:
+            webbrowser.open('http://hackage.haskell.org/package/{0}'.format(pack))
+
+    def is_enabled(self):
+        return is_haskell_symbol_info(self.view)
+
+    def is_visible(self):
+        return self.view.settings().get('package') is not None
+
+
 class SublimeHaskellGoToAnyDeclaration(SublimeHaskellWindowCommand):
     def run(self):
         self.files = []
@@ -829,6 +844,9 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
     def show_symbol_info(self, decl):
         show_declaration_info_panel(self.view, decl)
 
+    def is_visible(self):
+        return is_haskell_source(self.view) or is_haskell_repl(self.view)
+
 # Show symbol info for declaration via calling command
 def show_declaration_info(view, decl):
     if decl.by_hayoo():
@@ -850,8 +868,12 @@ def show_declaration_info(view, decl):
 
 def show_declaration_info_panel(view, decl):
     v = write_panel(view.window(), decl.detailed(), 'sublime_haskell_symbol_info', syntax = 'HaskellSymbolInfo')
+    v.settings().erase('location')
+    v.settings().erase('package')
     if decl.has_source_location():
         v.settings().set('location', decl.get_source_location())
+    if type(decl.defined_location()) == symbols.InstalledLocation:
+        v.settings().set('package', decl.defined_location().package.package_id())
 
 class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
     """
@@ -930,6 +952,9 @@ class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
         self.view.run_command('sublime_haskell_insert_import_for_symbol', {
             'filename': self.current_file_name,
             'module_name': self.candidates[idx].module.name })
+
+    def is_visible(self):
+        return is_haskell_source(self.view)
 
 
 class SublimeHaskellClearImports(SublimeHaskellTextCommand):
@@ -1114,6 +1139,9 @@ class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
             self.view.window().open_file(selected[0][1], sublime.ENCODED_POSITION | sublime.TRANSIENT)
         else:
             self.view.window().open_file(selected[0][1], sublime.TRANSIENT)
+
+    def is_enabled(self):
+        return is_haskell_source(self.view) or is_haskell_repl(self.view) or (is_haskell_symbol_info(self.view) and self.view.settings().get('location'))
 
 
 class SublimeHaskellEvalReplaceCommand(SublimeHaskellTextCommand):
