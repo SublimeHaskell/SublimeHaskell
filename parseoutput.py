@@ -1,4 +1,5 @@
 import os
+import os.path
 import re
 import sublime
 import sublime_plugin
@@ -205,7 +206,7 @@ def mark_messages_in_views(errors):
             if view_filename is None:
                 continue
             errors_in_view = list(filter(
-                lambda x: are_paths_equal(view_filename, x.filename),
+                lambda x: os.path.samefile(view_filename, x.filename),
                 errors))
             mark_messages_in_view(errors_in_view, v)
     end_time = time.clock()
