@@ -263,12 +263,12 @@ class Declaration(Symbol):
 
         info.append('')
 
-        if self.by_source():
+        if self.has_source_location():
             if self.location.project:
                 info.append('Project: {0}'.format(self.location.project))
-        if self.by_cabal():
-            info.append('Installed in: {0}'.format(self.location.cabal))
-            info.append('Package: {0}'.format(self.location.package.package_id()))
+        else:
+            info.append('Installed in: {0}'.format(self.defined_location().cabal))
+            info.append('Package: {0}'.format(self.defined_location().package.package_id()))
 
         if self.has_source_location():
             info.append('Defined at: {0}'.format(self.get_source_location()))
