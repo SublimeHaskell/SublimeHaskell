@@ -716,10 +716,13 @@ class SublimeHaskellGoToModule(SublimeHaskellWindowCommand):
 
 
 class SublimeHaskellGoToHackage(SublimeHaskellTextCommand):
-    def run(self, edit):
+    def run(self, edit, module = False):
         pack = self.view.settings().get('package')
-        if pack:
+        mod = self.view.settings().get('module')
+        if pack and not module:
             webbrowser.open('http://hackage.haskell.org/package/{0}'.format(pack))
+        elif pack and mod and module:
+            webbrowser.open('http://hackage.haskell.org/package/{0}/docs/{1}.html'.format(pack, mod.replace('.', '-')))
 
     def is_enabled(self):
         return is_haskell_symbol_info(self.view)
@@ -871,10 +874,12 @@ def show_declaration_info_panel(view, decl):
     v = write_panel(view.window(), decl.detailed(), 'sublime_haskell_symbol_info', syntax = 'HaskellSymbolInfo')
     v.settings().erase('location')
     v.settings().erase('package')
+    v.settings().erase('module')
     if decl.has_source_location():
         v.settings().set('location', decl.get_source_location())
     if type(decl.defined_location()) == symbols.InstalledLocation:
         v.settings().set('package', decl.defined_location().package.package_id())
+        v.settings().set('module', decl.defined_module().name)
 
 class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
     """
