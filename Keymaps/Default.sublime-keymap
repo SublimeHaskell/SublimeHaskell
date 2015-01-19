@@ -18,7 +18,7 @@
     {
         "keys": ["f12"],
         "context": [
-            { "key" : "haskell_source" },
+            { "key" : "haskell_source_or_repl" },
             { "key": "scanned_source" } ],
         "command": "sublime_haskell_go_to_declaration"
     },
@@ -26,19 +26,19 @@
     { "keys": ["ctrl+m", "ctrl+i"], "context": [ { "key": "haskell_source" } ], "command": "sublime_haskell_insert_import" },
     { "keys": ["ctrl+k", "ctrl+h", "ctrl+t"], "context": [ { "key" : "haskell_source" } ], "command": "sublime_haskell_show_type" },
     { "keys": ["ctrl+k", "ctrl+h", "ctrl+i"], "context": [ { "key" : "haskell_source" } ], "command": "sublime_haskell_insert_type" },
-    { "keys": ["ctrl+k", "ctrl+i"], "context": [ { "key" : "haskell_source" } ], "command": "sublime_haskell_symbol_info" },
+    { "keys": ["ctrl+k", "ctrl+i"], "context": [ { "key" : "haskell_source_or_repl" } ], "command": "sublime_haskell_symbol_info" },
     { "keys": ["ctrl+k", "ctrl+p"], "context": [ { "key" : "haskell_source" } ], "command": "sublime_haskell_go_to_module" },
     {
         "command": "sublime_haskell_complete",
         "args": {"characters": "."},
         "keys": ["."],
-        "context": [ { "key": "haskell_source" }, { "key": "auto_completion_popup" }, { "key": "is_module_completion" } ]
+        "context": [ { "key": "haskell_source_or_repl" }, { "key": "auto_completion_popup" }, { "key": "is_module_completion" } ]
     },
     {
         "command": "sublime_haskell_complete",
         "args": {"characters": "("},
         "keys": ["("],
-        "context": [ { "key": "haskell_source" }, { "key": "auto_completion_popup" }, { "key": "is_import_completion" } ]
+        "context": [ { "key": "haskell_source_or_repl" }, { "key": "auto_completion_popup" }, { "key": "is_import_completion" } ]
     },
     // Same keybindings as SublimeClang
     {
@@ -60,6 +60,6 @@
         "keys": ["ctrl+alt+space"],
         "command": "sublime_haskell_complete",
         "args": {"characters": "", "wide": true},
-        "context": [ { "key": "haskell_source" } ]
+        "context": [ { "key": "haskell_source_or_repl" } ]
     }
 ]

@@ -862,6 +862,18 @@ def is_haskell_repl(view = None):
 
     return True
 
+def is_haskell_symbol_info(view = None):
+    window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
+
+    if not window or not view:
+        return False
+
+    syntax_file_for_view = view.settings().get('syntax').lower()
+    if not syntax_file_for_view.endswith("HaskellSymbolInfo.tmLanguage".lower()):
+        return False
+
+    return True
+
 class with_status_message(object):
     def __init__(self, msg, is_ok):
         self.msg = msg
@@ -945,7 +957,11 @@ def create_process(command, **kwargs):
 class SublimeHaskellWindowCommand(sublime_plugin.WindowCommand):
     def is_enabled(self):
         return is_enabled_haskell_command(None, False)
+    def is_visible(self):
+        return is_enabled_haskell_command(None, False)
 
 class SublimeHaskellTextCommand(sublime_plugin.TextCommand):
     def is_enabled(self):
+        return is_enabled_haskell_command(self.view, False)
+    def is_visible(self):
         return is_enabled_haskell_command(self.view, False)

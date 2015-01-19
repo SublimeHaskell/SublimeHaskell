@@ -849,7 +849,9 @@ def show_declaration_info(view, decl):
     sublime.set_timeout(lambda: view.run_command('sublime_haskell_symbol_info', info), 0)
 
 def show_declaration_info_panel(view, decl):
-    write_panel(view.window(), decl.detailed(), 'sublime_haskell_symbol_info', syntax = 'HaskellSymbolInfo')
+    v = write_panel(view.window(), decl.detailed(), 'sublime_haskell_symbol_info', syntax = 'HaskellSymbolInfo')
+    if decl.has_source_location():
+        v.settings().set('location', decl.get_source_location())
 
 class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
     """
@@ -1051,6 +1053,15 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
 class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
     def run(self, edit):
         (module_word, module_as, ident, _, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+
+        if is_haskell_symbol_info(self.view): # Go to within symbol info window
+            loc = self.view.settings().get('location')
+            if loc:
+                self.view.window().open_file(loc, sublime.ENCODED_POSITION)
+            else:
+                show_status_message('Source location of {0} not found'.format(ident), False)
+            return
+
 
         whois_name = '.'.join(filter(lambda x: x, [module_as or module_word, ident]))
         full_name = '.'.join(filter(lambda x: x, [module_word, ident]))
@@ -1631,6 +1642,12 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             return get_setting('auto_completion_popup')
         elif key == 'haskell_source':
             return is_haskell_source(view)
+        elif key == 'haskell_source_or_repl':
+            return is_haskell_source(view) or is_haskell_repl(view)
+        elif key == 'haskell_repl':
+            return is_haskell_repl(view)
+        elif key == 'haskell_symbol_info':
+            return is_haskell_symbol_info(view)
         elif key == 'cabal_source':
             return is_cabal_source(view)
         elif key == 'scanned_source':

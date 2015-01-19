@@ -59,6 +59,9 @@ class SublimeHaskellBaseCommand(SublimeHaskellWindowCommand):
     def is_enabled(self):
         return is_enabled_haskell_command(None, False)
 
+    def is_visible(self):
+        return is_enabled_haskell_command(None, False)
+
 # Retrieve projects as dictionary that refers to this app instance
 def get_projects():
     if autocomplete.hsdev_agent_connected():

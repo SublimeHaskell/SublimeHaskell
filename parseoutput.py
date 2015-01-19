@@ -27,6 +27,8 @@ output_regex = re.compile(
 # Extract the filename, line, column, and description from an error message:
 result_file_regex = r'^(\S*?): line (\d+), column (\d+):$'
 
+# Extract the filename, line, column from symbol info
+symbol_file_regex = r'^Defined at: (.*):(\d+):(\d+)$'
 
 # Global list of errors. Used e.g. for jumping to the next one.
 # Properly assigned being a defaultdict in clear_error_marks().
@@ -305,7 +307,9 @@ def mark_messages_in_view(messages, view):
 
 
 def write_panel(window, text, panel_name = "sublime_haskell_panel", syntax = None):
-    output_panel(window, text, panel_name = panel_name, syntax = syntax)
+    info_view = output_panel(window, text, panel_name = panel_name, syntax = syntax)
+    info_view.settings().set("result_file_regex", symbol_file_regex)
+    return info_view
 
 def write_output(view, text, cabal_project_dir):
     "Write text to Sublime's output panel."
