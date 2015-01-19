@@ -688,9 +688,10 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
         self.open(self.decls[idx])
 
     def on_highlighted(self, idx):
-        if idx == -1:
-            return
-        self.open(self.decls[idx], True)
+        pass
+        # if idx == -1:
+        #     return
+        # self.open(self.decls[idx], True)
 
     def open(self, decl, transient = False):
         view = self.window.open_file(decl.get_source_location(), sublime.ENCODED_POSITION | sublime.TRANSIENT if transient else sublime.ENCODED_POSITION)
