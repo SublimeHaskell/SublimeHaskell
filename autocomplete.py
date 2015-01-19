@@ -212,6 +212,9 @@ def sorted_completions(comps):
 def make_completions(suggestions):
     return sorted_completions([s.suggest() for s in (suggestions or [])])
 
+def make_locations(comps):
+    return sorted([[s.brief(), s.get_source_location()] for s in comps if s.has_source_location()], key = lambda k: k[0])
+
 class CompletionCache(object):
     def __init__(self):
         self.files = {}
@@ -229,6 +232,9 @@ class CompletionCache(object):
     def set_sources(self, comps):
         self.sources = comps
         self.global_comps = sorted_completions(self.cabal + self.sources)
+
+    def set_locs(self, locs):
+        self.source_locs = locs
 
     def global_completions(self):
         return self.global_comps
@@ -318,10 +324,13 @@ class AutoCompletion(object):
             cache_.set_cabal(comps)
 
     def update_sources_completions(self):
-        comps = make_completions(hsdev_client_back.symbol(source = True, timeout = None, split_result = True))
+        symbols = hsdev_client_back.symbol(source = True, timeout = None, split_result = True)
+        comps = make_completions(symbols)
+        locs = make_locations(symbols)
         log('updating prepared sources completions: {0}'.format(len(comps)))
         with self.cache as cache_:
             cache_.set_sources(comps)
+            cache_.set_locs(locs)
 
     def init_completions_async(self):
         window = sublime.active_window()
@@ -773,21 +782,14 @@ class SublimeHaskellGoToHackageModule(SublimeHaskellTextCommand):
 
 class SublimeHaskellGoToAnyDeclaration(SublimeHaskellWindowCommand):
     def run(self):
-        self.files = []
-        self.declarations = []
-
-        decls = hsdev_client.symbol(source = True)
-
-        for decl in decls:
-            self.files.apend(decl.get_source_location())
-            self.declarations.append([decl.brief(), decl.get_source_location()])
-
-        self.window.show_quick_panel(self.declarations, self.on_done)
+        with autocompletion.cache as cache_:
+            self.cache_ = cache_
+            self.window.show_quick_panel(cache_.source_locs, self.on_done)
 
     def on_done(self, idx):
         if idx == -1:
             return
-        self.window.open_file(self.files[idx], sublime.ENCODED_POSITION)
+        self.window.open_file(self.cache_.source_locs[idx][1], sublime.ENCODED_POSITION)
 
 
 
