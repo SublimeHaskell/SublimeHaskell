@@ -17,7 +17,7 @@ else:
 
 
 COMMAND_RE = re.compile(r'^.*:[a-z]*$')
-IMPORT_RE = re.compile(r'^.*\bimport\s(?P<module>[\w\d\.]*)$')
+IMPORT_RE = re.compile(r'^.*\bimport\s+(qualified\s+)?(?P<module>[\w\d\.]*)$')
 
 def find_sublime_haskell_repl():
     repls = list(sublimerepl.manager.find_repl('sublime_haskell_repl'))
@@ -94,10 +94,11 @@ def repl_args(**kwargs):
         "cwd": "$file_path",
         "external_id": "sublime_haskell_repl",
         "syntax": "Packages/SublimeHaskell/Syntaxes/HaskellRepl.tmLanguage" }
+        
     # Drop this options until https://github.com/wuub/SublimeREPL/pull/395 is merged
     kwargs.pop('loaded')
     kwargs.pop('caption')
-    
+
     ret_args = def_args.copy()
     ret_args.update(kwargs)
     return ret_args
