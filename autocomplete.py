@@ -715,20 +715,60 @@ class SublimeHaskellGoToModule(SublimeHaskellWindowCommand):
         self.window.open_file(self.modules[idx].location.to_string(), sublime.TRANSIENT)
 
 
-class SublimeHaskellGoToHackage(SublimeHaskellTextCommand):
-    def run(self, edit, module = False):
+class SublimeHaskellGoToHackagePackage(SublimeHaskellTextCommand):
+    def run(self, edit):
         pack = self.view.settings().get('package')
-        mod = self.view.settings().get('module')
-        if pack and not module:
+        if pack:
             webbrowser.open('http://hackage.haskell.org/package/{0}'.format(pack))
-        elif pack and mod and module:
-            webbrowser.open('http://hackage.haskell.org/package/{0}/docs/{1}.html'.format(pack, mod.replace('.', '-')))
 
     def is_enabled(self):
-        return is_haskell_symbol_info(self.view)
+        return self.view.settings().get('package') is not None
 
     def is_visible(self):
-        return self.view.settings().get('package') is not None
+        return is_haskell_symbol_info(self.view)
+
+
+class SublimeHaskellGoToHackageModule(SublimeHaskellTextCommand):
+    def run(self, edit):
+        if is_haskell_symbol_info(self.view):
+            pack = self.view.settings().get('package')
+            mod = self.view.settings().get('module')
+            if pack and mod:
+                webbrowser.open('http://hackage.haskell.org/package/{0}/docs/{1}.html'.format(pack, mod.replace('.', '-')))
+        else:
+            module_word, module_as, ident, _, _ = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+
+            if ident is None: # module
+                ms = []
+                scope = self.view.file_name()
+                if scope:
+                    ms = [m for m in hsdev_client.scope_modules(
+                        scope,
+                        sandbox = current_sandboxes()) if m.name == module_word and m.by_cabal()]
+                else:
+                    ms = [m for m in hsdev_client.list_modules(
+                        cabal = current_is_cabal(),
+                        sandboxes = current_sandboxes()) if m.name == module_word and m.by_cabal()]
+
+                if len(ms) == 0:
+                    show_status_message('Module {0} not found'.format(module_name))
+                    return
+                if len(ms) == 1:
+                    webbrowser.open('http://hackage.haskell.org/package/{0}/docs/{1}.html'.format(ms[0].location.package.package_id(), ms[0].name.replace('.', '-')))
+                else:
+                    self.candidates = ms[:]
+                    self.view.window().show_quick_panel([[m.name, m.location.package.package_id()] for m in self.candidates], self.on_done)
+
+    def on_done(self, idx):
+        if idx == -1:
+            return
+        webbrowser.open('http://hackage.haskell.org/package/{0}/docs/{1}.html'.format(self.candidates[idx].location.package.package_id(), self.candidates[idx].name.replace('.', '-')))
+
+    def is_enabled(self):
+        return (self.view.settings().get('package') is not None) or is_haskell_source(self.view) or is_haskell_repl(self.view)
+
+    def is_visible(self):
+        return is_haskell_symbol_info(self.view) or is_haskell_source(self.view) or is_haskell_repl(self.view)
 
 
 class SublimeHaskellGoToAnyDeclaration(SublimeHaskellWindowCommand):
