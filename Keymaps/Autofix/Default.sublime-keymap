@@ -15,6 +15,11 @@
         "command": "sublime_haskell_auto_fix_fix"
     },
     {
+        "keys": ["alt+enter"],
+        "context": [ { "key": "haskell_autofix" } ],
+        "command": "sublime_haskell_auto_fix_all"
+    },
+    {
         "keys": ["escape"],
         "context": [ { "key": "haskell_autofix" } ],
         "command": "sublime_haskell_auto_fix_stop"
