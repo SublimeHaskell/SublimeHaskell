@@ -1288,12 +1288,12 @@ class SublimeHaskellAutoFix(SublimeHaskellTextCommand):
             self.view.window().show_quick_panel(self.types, self.on_done, 0, 0, self.on_highlighted)
 
     def on_done(self, idx):
+        self.view.erase_regions('autofix')
+
         if idx == -1:
             return
 
         hsdev_client.autofix_fix(hsdev.encode_corrections([corr for corr in self.corrections if idx == 0 or corr.type == self.types[idx]]))
-
-        self.view.erase_regions('autofix')
 
     def on_highlighted(self, idx):
         if idx == -1:
