@@ -663,25 +663,28 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
                 show_status_message('File {0} is not in project'.format(self.current_filename), False)
                 return
 
-            decls = self.sorted_decls(hsdev_client.symbol(project = current_project))
+            decls = self.sorted_decls_name(hsdev_client.symbol(project = current_project))
             self.declarations = [[decl.brief(), decl.module.name, decl.get_source_location()] for decl in decls]
         else:
-            decls = self.sorted_decls(hsdev_client.symbol(file = self.current_filename, locals = True))
+            decls = self.sorted_decls_pos(hsdev_client.symbol(file = self.current_filename, locals = True))
             self.declarations = [[(decl.position.column * ' ') + decl.brief()] for decl in decls]
         self.decls = decls[:]
 
         if not decls:
             return
 
-        self.window.show_quick_panel(self.declarations, self.on_done, 0, self.closest_idx(decls), self.on_highlighted)
+        self.window.show_quick_panel(self.declarations, self.on_done, 0, self.closest_idx(decls), self.on_highlighted if not project else None)
 
     def qualified_decls(self, decls):
         for decl in decls:
             decl.make_qualified()
         return decls
 
-    def sorted_decls(self, decls):
+    def sorted_decls_name(self, decls):
         return list(sorted(decls, key = lambda d: d.name))
+
+    def sorted_decls_pos(self, decls):
+        return list(sorted(decls, key = lambda d: (d.position.line, d.position.column)))
 
     def closest_idx(self, decls):
         fdecls = list(filter(
@@ -697,10 +700,9 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
         self.open(self.decls[idx])
 
     def on_highlighted(self, idx):
-        pass
-        # if idx == -1:
-        #     return
-        # self.open(self.decls[idx], True)
+        if idx == -1:
+            return
+        self.open(self.decls[idx], True)
 
     def open(self, decl, transient = False):
         view = self.window.open_file(decl.get_source_location(), sublime.ENCODED_POSITION | sublime.TRANSIENT if transient else sublime.ENCODED_POSITION)
