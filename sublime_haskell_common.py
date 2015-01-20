@@ -1,4 +1,4 @@
-﻿import errno
+import errno
 import fnmatch
 import os
 import re
