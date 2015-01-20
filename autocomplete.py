@@ -1277,29 +1277,134 @@ class SublimeHaskellApplyToSelectionListCommand(SublimeHaskellTextCommand):
         pass
 
 
-class SublimeHaskellAutoFix(SublimeHaskellTextCommand):
-    def run(self, edit):
-        if self.view.file_name():
-            self.messages = hsdev_client.ghcmod_check_lint([self.view.file_name()])
-            self.corrections = list(filter(lambda corr: os.path.samefile(corr.file, self.view.file_name()), hsdev_client.autofix_show(self.messages)))
-            self.view.add_regions('autofix', [c.to_region(self.view) for corr in self.corrections for c in corr.corrector], 'entity.name.function', 'dot', 0)
-            self.types = ['*']
-            self.types.extend(list(set([corr.type for corr in self.corrections])))
-            self.view.window().show_quick_panel(self.types, self.on_done, 0, 0, self.on_highlighted)
+class AutoFixState(object):
+    def __init__(self, view = None, corrections = [], selected = 0):
+        self.view = view
+        self.corrections = corrections
+        self.selected = selected
 
-    def on_done(self, idx):
+    def is_active(self):
+        return self.view and self.corrections
+
+    def set(self, view, corrections, selected = 0):
+        if self.is_active():
+            self.clear()
+        self.view = view
+        self.view.settings().set('autofix', True)
+        self.view.set_read_only(True)
+        self.corrections = corrections
+        self.selected = selected
+
+    def clear(self):
+        if self.is_active():
+            self.view.set_read_only(False)
+            self.view.settings().erase('autofix')
+            self.unmark()
+            self.view = None
+            self.corrections.clear()
+            self.selected = 0
+
+    def get_corrections(self):
+        corrs = self.corrections[:]
+        cur = corrs.pop(self.selected)
+        return (cur, corrs)
+
+    def current_correction(self):
+        return self.corrections[self.selected]
+
+    def mark(self):
+        (cur, corrs) = self.get_corrections()
+
+        self.view.add_regions('autofix', [c.to_region(self.view) for corr in corrs for c in corr.corrector], 'warning', 'dot', sublime.DRAW_OUTLINED)
+        self.view.add_regions('autofix_current', [c.to_region(self.view) for c in cur.corrector], 'warning', 'dot')
+
+    def unmark(self):
         self.view.erase_regions('autofix')
+        self.view.erase_regions('autofix_current')
 
-        if idx == -1:
+    def count(self):
+        return len(self.corrections)
+
+    def set_selected(self, i):
+        if i < 0 or i >= len(self.corrections):
+            log('AutoFixState.set_selected({0}): out of bound'.format(i), log_error)
             return
+        self.selected = i
+        self.mark()
 
-        hsdev_client.autofix_fix(hsdev.encode_corrections([corr for corr in self.corrections if idx == 0 or corr.type == self.types[idx]]))
+    def fix_current(self):
+        (cur, corrs) = self.get_corrections()
+        self.corrections = hsdev_client.autofix_fix(hsdev.encode_corrections([cur]), rest = hsdev.encode_corrections(corrs), pure = True)
+        if not self.corrections:
+            self.selected = 0
+            self.unmark()
+            return False
+        if self.selected >= len(self.corrections):
+            self.selected = 0
+        self.mark()
+        return True
 
-    def on_highlighted(self, idx):
-        if idx == -1:
-            return
+autofix_state = AutoFixState()
 
-        self.view.add_regions('autofix', [c.to_region(self.view) for corr in self.corrections for c in corr.corrector if idx == 0 or corr.type == self.types[idx]], 'entity.name.function', 'dot', 0)
+
+
+class SublimeHaskellAutoFix(SublimeHaskellWindowCommand):
+    def run(self):
+        if self.window.active_view().file_name():
+            self.messages = hsdev_client.ghcmod_check_lint([self.window.active_view().file_name()])
+            self.corrections = list(filter(lambda corr: os.path.samefile(corr.file, self.window.active_view().file_name()), hsdev_client.autofix_show(self.messages)))
+
+            autofix_state.set(self.window.active_view(), self.corrections)
+            autofix_state.mark()
+
+class SublimeHaskellAutoFixPrevious(SublimeHaskellWindowCommand):
+    def run(self):
+        if autofix_state.is_active() and autofix_state.view == self.window.active_view():
+            if autofix_state.selected > 0:
+                autofix_state.set_selected(autofix_state.selected - 1)
+
+class SublimeHaskellAutoFixNext(SublimeHaskellWindowCommand):
+    def run(self):
+        if autofix_state.is_active() and autofix_state.view == self.window.active_view():
+            if autofix_state.selected + 1 < autofix_state.count():
+                autofix_state.set_selected(autofix_state.selected + 1)
+
+class SublimeHaskellAutoFixFix(SublimeHaskellWindowCommand):
+    def run(self):
+        if autofix_state.is_active() and autofix_state.view == self.window.active_view():
+            autofix_state.unmark()
+
+            self.window.active_view().run_command('sublime_haskell_auto_fix_fix_it')
+
+            autofix_state.fix_current()
+
+class SublimeHaskellAutoFixFixIt(SublimeHaskellTextCommand):
+    def run(self, edit):
+        correction = autofix_state.current_correction()
+        if correction:
+            corrs = sorted(
+                [(corr.to_region(self.view), corr.contents) for corr in correction.corrector],
+                key = lambda c: c[0])
+
+            self.view.set_read_only(False)
+            self.view.add_regions('autofix_fix', [c[0] for c in corrs], 'warning', 'dot', sublime.HIDDEN)
+            for i, (rgn, cts) in enumerate(corrs):
+                rs = self.view.get_regions('autofix_fix')
+                self.view.replace(edit, rs[i], cts)
+            self.view.erase_regions('autofix_fix')
+            self.view.set_read_only(True)
+
+class SublimeHaskellAutoFixStop(SublimeHaskellWindowCommand):
+    def run(self):
+        autofix_state.clear()
+
+class SublimeHaskellReplaceRegions(sublime_plugin.TextCommand):
+    def run(self, edit, replaces):
+        self.view.add_regions('sublime_haskell_replace_regions', [sublime.Region(start, end) for (start, end), text in replaces], 'warning', 'dot', sublime.HIDDEN)
+        for i, (r, text) in enumerate(replaces):
+            rs = self.view.get_regions('sublime_haskell_replace_regions')
+            self.view.replace(edit, rs[i], text)
+        self.view.erase_regions('sublime_haskell_replace_regions')
 
 class hsdev_status(object):
     def __init__(self, status_message):
@@ -1737,6 +1842,8 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
                 hsdev_inspector.mark_file_dirty(filename)
 
     def on_query_context(self, view, key, operator, operand, match_all):
+        if key == 'haskell_autofix':
+            return view.settings().get('autofix')
         if key == 'auto_completion_popup':
             return get_setting('auto_completion_popup')
         elif key == 'haskell_source':

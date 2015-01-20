@@ -921,10 +921,11 @@ class HsDev(object):
         return cmd('autofix show', [], {'data': json.dumps(messages)}, parse_corrections)
 
     @command
-    def autofix_fix(self, messages, update = []):
+    def autofix_fix(self, messages, rest = [], pure = False):
         opts = concat_opts([
             (True, {'data': json.dumps(messages)}),
-            (update, {'update': json.dumps(update)})])
+            (rest, {'rest': json.dumps(rest)}),
+            (pure, {'pure': None})])
 
         return cmd('autofix fix', [], opts, parse_corrections)
 
