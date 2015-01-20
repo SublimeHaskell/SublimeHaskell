@@ -1234,6 +1234,9 @@ class SublimeHaskellEvalSelectionCommand(SublimeHaskellTextCommand):
     def is_enabled(self):
         return True
 
+    def is_visible(self):
+        return True
+
 class SublimeHaskellApplyToSelectionCommand(SublimeHaskellTextCommand):
     def run(self, edit):
         self.args = [self.view.substr(s) for s in self.view.sel()]
@@ -1241,6 +1244,9 @@ class SublimeHaskellApplyToSelectionCommand(SublimeHaskellTextCommand):
         self.view.window().show_input_panel('Function', '', self.on_done, None, self.on_cancel)
 
     def is_enabled(self):
+        return True
+
+    def is_visible(self):
         return True
 
     def on_done(self, f):
@@ -1260,6 +1266,9 @@ class SublimeHaskellApplyToSelectionListCommand(SublimeHaskellTextCommand):
         self.view.window().show_input_panel('Function', '', self.on_done, None, self.on_cancel)
 
     def is_enabled(self):
+        return True
+
+    def is_visible(self):
         return True
 
     def on_done(self, f):
