@@ -1316,7 +1316,9 @@ class AutoFixState(object):
         (cur, corrs) = self.get_corrections()
 
         self.view.add_regions('autofix', [c.to_region(self.view) for corr in corrs for c in corr.corrector], 'warning', 'dot', sublime.DRAW_OUTLINED)
-        self.view.add_regions('autofix_current', [c.to_region(self.view) for c in cur.corrector], 'warning', 'dot')
+        rgns = [c.to_region(self.view) for c in cur.corrector]
+        self.view.add_regions('autofix_current', rgns, 'warning', 'dot')
+        self.view.show(sublime.Region(rgns[0].a, rgns[-1].b))
         write_panel(self.view.window(), cur.message, 'sublime_haskell_auto_fix', syntax = 'HaskellOutputPanel')
 
     def unmark(self):
@@ -1356,8 +1358,9 @@ class SublimeHaskellAutoFix(SublimeHaskellWindowCommand):
             self.messages = hsdev_client.ghcmod_check_lint([self.window.active_view().file_name()])
             self.corrections = list(filter(lambda corr: os.path.samefile(corr.file, self.window.active_view().file_name()), hsdev_client.autofix_show(self.messages)))
 
-            autofix_state.set(self.window.active_view(), self.corrections)
-            autofix_state.mark()
+            if self.corrections:
+                autofix_state.set(self.window.active_view(), self.corrections)
+                autofix_state.mark()
 
 class SublimeHaskellAutoFixPrevious(SublimeHaskellWindowCommand):
     def run(self):
