@@ -42,7 +42,7 @@ class Repl(object):
     def is_project(self):
         return self.project_name is not None
 
-# external_id ⇒ view
+# external_id => view
 class Repls(object):
     def __init__(self):
         self.repls = {}
