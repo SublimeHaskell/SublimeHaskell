@@ -44,7 +44,7 @@ class LockedObject(object):
         return self.object
 
     def __exit__(self, type, value, traceback):
-        self.object_lock.__exit__()
+        self.object_lock.__exit__(type, value, traceback)
 
 # Setting can't be get from not main threads
 # So we using a trick:
@@ -680,7 +680,7 @@ class LockedObject(object):
         return self.object
 
     def __exit__(self, type, value, traceback):
-        self.object_lock.__exit__()
+        self.object_lock.__exit__(value, type, traceback)
 
 class StatusMessage(object):
     # duration — duration of message
