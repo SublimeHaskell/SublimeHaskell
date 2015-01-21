@@ -1,3 +1,5 @@
+# -*- coding: UTF-8 -*-
+
 import errno
 import sublime
 import sublime_plugin

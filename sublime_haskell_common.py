@@ -1,3 +1,5 @@
+# -*- coding: UTF-8 -*-
+
 import errno
 import fnmatch
 import os

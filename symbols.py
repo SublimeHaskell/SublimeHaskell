@@ -1,3 +1,5 @@
+# -*- coding: UTF-8 -*-
+
 import threading
 import sublime
 import os.path

@@ -1,3 +1,5 @@
+# -*- coding: UTF-8 -*-
+
 import sublime
 
 if int(sublime.version()) < 3000:
