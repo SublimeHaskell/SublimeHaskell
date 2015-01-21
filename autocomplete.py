@@ -7,10 +7,15 @@ import re
 import sublime
 import sublime_plugin
 import threading
-import queue
 import time
 import sys
 import webbrowser
+
+try:
+    import queue
+except ImportError:
+    import Queue as queue
+
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
