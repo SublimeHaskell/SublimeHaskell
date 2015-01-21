@@ -423,7 +423,10 @@ def async_list_command(fn):
 def cmd(name_, args_ = [], opts_ = {}, on_result = lambda r: r):
     return (name_, args_, opts_, on_result)
 
-def call_callback(fn, *args, name = None, **kwargs):
+def call_callback(fn, *args, **kwargs):
+    name = kwargs.get('name')
+    if name:
+        del kwargs['name']
     try:
         if fn is not None:
             fn(*args, **kwargs)
