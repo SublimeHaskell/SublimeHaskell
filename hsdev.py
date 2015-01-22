@@ -473,11 +473,11 @@ class HsDev(object):
 
     # Util
 
-    def check_version():
+    def check_version(self):
         (exit_code, out, err) = call_and_wait(['hsdev', 'version'])
         return exit_code == 0 and re.match(r'0\.1\.[1-9]\..', out) is not None
 
-    def start_server(port = 4567, cache = None):
+    def start_server(self, port = 4567, cache = None):
         cmd = concat_args([
             (True, ["hsdev", "start"]),
             (port, ["--port", str(port)]),

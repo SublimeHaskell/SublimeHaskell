@@ -1505,7 +1505,11 @@ def dirty(fn):
     def wrapped(self, *args, **kwargs):
         if not hasattr(self, 'dirty_lock'):
             self.dirty_lock = threading.Lock()
-        acquired = self.dirty_lock.acquire(blocking = False)
+        acquired = None
+        try:
+            acquired = self.dirty_lock.acquire(blocking = False)
+        except TypeError:
+            acquired = self.dirty_lock.acquire(False)
         try:
             return fn(self, *args, **kwargs)
         finally:
@@ -1539,12 +1543,13 @@ class HsDevAgent(threading.Thread):
         return self.hsdev.is_connected()
 
     def start_hsdev(self):
-        if not hsdev.HsDev.check_version():
+        ver = hsdev.HsDev().check_version()
+        if not ver:
             output_error_async(sublime.active_window(), 'Please update hsdev to actual version (>= 0.1.1.0)')
             hsdev.hsdev_enable(False)
         else:
             def start_server_():
-                hsdev.HsDev.start_server(cache = HSDEV_CACHE_PATH)
+                hsdev.HsDev().start_server(cache = HSDEV_CACHE_PATH)
             def link_server_():
                 self.hsdev.link()
                 self.start_inspect()
