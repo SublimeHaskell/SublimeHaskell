@@ -1,3 +1,5 @@
+# -*- coding: UTF-8 -*-
+
 import sublime
 import json
 import time

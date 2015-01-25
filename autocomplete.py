@@ -1,3 +1,5 @@
+# -*- coding: UTF-8 -*-
+
 import json
 import os
 import os.path
@@ -5,10 +7,15 @@ import re
 import sublime
 import sublime_plugin
 import threading
-import queue
 import time
 import sys
 import webbrowser
+
+try:
+    import queue
+except ImportError:
+    import Queue as queue
+
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
@@ -1498,7 +1505,11 @@ def dirty(fn):
     def wrapped(self, *args, **kwargs):
         if not hasattr(self, 'dirty_lock'):
             self.dirty_lock = threading.Lock()
-        acquired = self.dirty_lock.acquire(blocking = False)
+        acquired = None
+        try:
+            acquired = self.dirty_lock.acquire(blocking = False)
+        except TypeError:
+            acquired = self.dirty_lock.acquire(False)
         try:
             return fn(self, *args, **kwargs)
         finally:
@@ -1532,12 +1543,13 @@ class HsDevAgent(threading.Thread):
         return self.hsdev.is_connected()
 
     def start_hsdev(self):
-        if not hsdev.HsDev.check_version():
+        ver = hsdev.HsDev().check_version()
+        if not ver:
             output_error_async(sublime.active_window(), 'Please update hsdev to actual version (>= 0.1.1.0)')
             hsdev.hsdev_enable(False)
         else:
             def start_server_():
-                hsdev.HsDev.start_server(cache = HSDEV_CACHE_PATH)
+                hsdev.HsDev().start_server(cache = HSDEV_CACHE_PATH)
             def link_server_():
                 self.hsdev.link()
                 self.start_inspect()
@@ -1862,12 +1874,15 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 
         window = view.window()
         if window:
-            if not self.project_file_name:
-                self.project_file_name = window.project_file_name()
-            if window.project_file_name() is not None and window.project_file_name() != self.project_file_name:
-                self.project_file_name = window.project_file_name()
-                log('project switched to {0}, reinspecting'.format(self.project_file_name))
-                window.run_command('sublime_haskell_reinspect_all')
+            try:
+                if not self.project_file_name:
+                    self.project_file_name = window.project_file_name()
+                if window.project_file_name() is not None and window.project_file_name() != self.project_file_name:
+                    self.project_file_name = window.project_file_name()
+                    log('project switched to {0}, reinspecting'.format(self.project_file_name))
+                    window.run_command('sublime_haskell_reinspect_all')
+            except AttributeError:
+                pass
 
     def on_post_save(self, view):
         if is_inspected_source(view):

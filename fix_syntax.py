@@ -1,3 +1,5 @@
+# -*- coding: UTF-8 -*-
+
 # Sublime's built-in Haskell lexer (Packages/Haskell/Haskell.tmLanguage)
 # is slightly broken.
 #
