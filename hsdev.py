@@ -300,7 +300,7 @@ def encode_correction(c):
         'description': c.description,
         'message': c.message,
         'solution': c.solution,
-        'corrector': [encode_corrector(v) for v in c.corrector] }
+        'corrector': encode_corrector(c.corrector) }
 
 def encode_corrector(c):
     return {

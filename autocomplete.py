@@ -1333,8 +1333,8 @@ class AutoFixState(object):
     def mark(self):
         (cur, corrs) = self.get_corrections()
 
-        self.view.add_regions('autofix', [c.to_region(self.view) for corr in corrs for c in corr.corrector], 'warning', 'dot', sublime.DRAW_OUTLINED)
-        rgns = [c.to_region(self.view) for c in cur.corrector]
+        self.view.add_regions('autofix', [corr.to_region(self.view) for corr in corrs], 'warning', 'dot', sublime.DRAW_OUTLINED)
+        rgns = [cur.to_region(self.view)]
         self.view.add_regions('autofix_current', rgns, 'warning', 'dot')
         self.view.show(sublime.Region(rgns[0].a, rgns[-1].b))
         write_panel(self.view.window(), cur.message, 'sublime_haskell_auto_fix', syntax = 'HaskellOutputPanel')
@@ -1415,7 +1415,7 @@ class SublimeHaskellAutoFixFixIt(SublimeHaskellTextCommand):
         corrections = autofix_state.corrections[:] if all else [autofix_state.current_correction()]
         if corrections:
             corrs = sorted(
-                [(corr.to_region(self.view), corr.contents) for correction in corrections for corr in correction.corrector],
+                [(correction.to_region(self.view), correction.corrector.contents) for correction in corrections],
                 key = lambda c: c[0])
 
             self.view.set_read_only(False)

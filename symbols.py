@@ -457,9 +457,12 @@ class Correction(object):
         self.solution = solution
         self.corrector = corrector
 
+    def to_region(self, view):
+        return self.corrector.to_region(view)
+
 def mark_corrections(views, corrs):
     for view in views:
         if view.file_name() is None:
             continue
         corrs_ = [corr for corr in corrs if os.path.samefile(corr.file, view.file_name())]
-        view.add_regions('autofix', [c.to_region(view) for corr in corrs_ for c in corr.corrector], 'entity.name.function', 'dot', 0)
+        view.add_regions('autofix', [corr.to_region(view) for corr in corrs_], 'entity.name.function', 'dot', 0)
