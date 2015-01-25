@@ -932,7 +932,10 @@ def show_declaration_info(view, decl):
     sublime.set_timeout(lambda: view.run_command('sublime_haskell_symbol_info', info), 0)
 
 def show_declaration_info_panel(view, decl):
-    v = write_panel(view.window(), decl.detailed(), 'sublime_haskell_symbol_info', syntax = 'HaskellSymbolInfo')
+    info = decl.detailed()
+    if get_setting_async('unicode_symbol_info'):
+        info = info.replace('->', '\u2192').replace('::', '\u2237')
+    v = write_panel(view.window(), info, 'sublime_haskell_symbol_info', syntax = 'HaskellSymbolInfo')
     v.settings().erase('location')
     v.settings().erase('package')
     v.settings().erase('module')
