@@ -1653,10 +1653,7 @@ class HsDevAgent(threading.Thread):
                 cabal_to_load[:] = []
 
             for c in load_cabal:
-                try:
-                    self.inspect_cabal(c)
-                except:
-                    continue
+                run_async(self.inspect_cabal, c)
 
             if load_cabal or scan_paths or projects or files:
                 run_async(autocompletion.drop_completions_async)
