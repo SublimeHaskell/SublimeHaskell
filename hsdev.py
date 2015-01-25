@@ -280,7 +280,7 @@ def parse_correction(d):
         d['description'],
         d['message'],
         d['solution'],
-        [parse_corrector(c) for c in d['corrector']])
+        parse_corrector(d['corrector']))
 
 def parse_corrector(d):
     return symbols.Corrector(

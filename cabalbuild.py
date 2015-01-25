@@ -295,7 +295,7 @@ class SublimeHaskellBuildAutoCommand(SublimeHaskellBaseCommand):
 
                 projects = get_projects()
 
-                if current_project_name in projects:
+                if current_project_name in projects and 'description' in projects[current_project_name]:
                     has_tests = len(projects[current_project_name]['description']['tests']) > 0
 
                 if has_tests:
@@ -310,11 +310,12 @@ class SublimeHaskellRunCommand(SublimeHaskellBaseCommand):
         ps = []
         projects = get_projects()
         for p, info in projects.items():
-            for e in info['description']['executables']:
-                ps.append((p + ": " + e['name'], {
-                    'dir': info['path'],
-                    'name': info['name']
-                    }))
+            if 'description' in info:
+                for e in info['description']['executables']:
+                    ps.append((p + ": " + e['name'], {
+                        'dir': info['path'],
+                        'name': info['name']
+                        }))
 
         # Nothing to run
         if len(ps) == 0:
