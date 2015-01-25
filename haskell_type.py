@@ -263,11 +263,11 @@ class SublimeHaskellInsertType(SublimeHaskellShowType):
         result = self.get_best_type(self.get_types())
         if result:
             r = result.region(self.view)
-            (_, name, _, _) = get_qualified_symbol_at_region(self.view, self.view.word(r.begin()))
+            qsymbol = get_qualified_symbol_at_region(self.view, self.view.word(r.begin()))
             line_begin = self.view.line(r).begin()
             prefix = self.view.substr(sublime.Region(line_begin, r.begin()))
             indent = re.search('(?P<indent>\s*)', prefix).group('indent')
-            signature = '{0}{1} :: {2}\n'.format(indent, name, result.typename)
+            signature = '{0}{1} :: {2}\n'.format(indent, qsymbol.name, result.typename)
             self.view.insert(edit, line_begin, signature)
 
 class ExpandSelectionInfo(object):

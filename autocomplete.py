@@ -126,6 +126,17 @@ def get_qualified_name(s):
     filtered = map(lambda s: list(filter(lambda c: c.isalpha() or c.isdigit() or c == '_', s)), quals)
     return ('.'.join(filtered[0:len(filtered) - 1]), '.'.join(filtered))
 
+class QualifiedSymbol(object):
+    def __init__(self, name = None, module = None, module_as = None, is_import_list = False, is_operator = False):
+        self.name = name
+        self.module = module
+        self.module_as = module_as
+        self.is_import_list = is_import_list
+        self.is_operator = is_operator
+
+    def qualified_name(self):
+        return '{0}.{1}'.format(self.module, self.name) if self.module else self.name
+
 def get_qualified_symbol(line):
     """
     Get module context of symbol and symbol itself
@@ -133,23 +144,21 @@ def get_qualified_symbol(line):
     """
     res = IMPORT_SYMBOL_RE.search(line)
     if res:
-        return (
-            res.group('module'),
-            res.group('as'),
-            next(i for i in [res.group('identifier'), res.group('operator')] if i is not None),
-            True,
-            bool(res.group('operator')))
+        return QualifiedSymbol(
+            name = next(i for i in [res.group('identifier'), res.group('operator')] if i is not None),
+            module = res.group('module'),
+            module_as = res.group('as'),
+            is_import_list = True,
+            is_operator = bool(res.group('operator')))
     res = IMPORT_MODULE_RE.search(line)
     if res:
-        return (res.group('module'), None, None, False, False)
+        return QualifiedSymbol(module = res.group('module'))
     res = SYMBOL_RE.search(line)
     # res always match
-    return (
-        res.group('module'),
-        None,
-        next(i for i in [res.group('identifier'), res.group('operator')] if i is not None),
-        False,
-        bool(res.group('operator')))
+    return QualifiedSymbol(
+        module = res.group('module'),
+        name = next(i for i in [res.group('identifier'), res.group('operator')] if i is not None),
+        is_operator = bool(res.group('operator')))
 
 def get_qualified_symbol_at_region(view, region):
     """
@@ -359,8 +368,8 @@ class AutoCompletion(object):
 
         self.current_filename = current_file_name
         line_contents = get_line_contents(view, locations[0])
-        (qualified_module, module_as, symbol_name, is_import_list, is_operator) = get_qualified_symbol(line_contents)
-        qualified_prefix = '{0}.{1}'.format(qualified_module, symbol_name) if qualified_module else symbol_name
+        qsymbol = get_qualified_symbol(line_contents)
+        qualified_prefix = qsymbol.qualified_name()
 
         suggestions = []
 
@@ -368,28 +377,28 @@ class AutoCompletion(object):
         if wide: # Drop wide
             self.wide_completion = None
 
-        if qualified_module:
+        if qsymbol.module:
             current_module = hsdev_client.module(file = current_file_name)
             current_project = None
             if current_module:
                 current_project = current_module.location.project
-                if is_import_list:
+                if qsymbol.is_import_list:
                     if current_project:
-                        # Search for declarations of qualified_module within current project
-                        proj_module = hsdev_client.resolve(name = qualified_module, project = current_project, exports = True)
+                        # Search for declarations of qsymbol.module within current project
+                        proj_module = hsdev_client.resolve(name = qsymbol.module, project = current_project, exports = True)
                         if proj_module:
                             suggestions = proj_module.declarations.values()
                 else:
                     suggestions = hsdev_client.complete(qualified_prefix, current_file_name, sandbox = current_sandbox(), wide = wide)
             if not suggestions:
                 # Search for declarations in cabal modules
-                q_module = hsdev_client.module(name = qualified_module, cabal = current_is_cabal(), sandbox = current_sandbox(), deps = current_project)
+                q_module = hsdev_client.module(name = qsymbol.module, cabal = current_is_cabal(), sandbox = current_sandbox(), deps = current_project)
                 if q_module:
                     suggestions = q_module.declarations.values()
                 else:
                     selected_module = None
                     # Check ambiguous modules
-                    ms = hsdev_client.list_modules(module = qualified_module, cabal = current_is_cabal(), sandboxes = current_sandboxes(), deps = current_project)
+                    ms = hsdev_client.list_modules(module = qsymbol.module, cabal = current_is_cabal(), sandboxes = current_sandboxes(), deps = current_project)
                     if len(ms) > 1:
                         # Ok, select some module
                         src_ms = list(filter(lambda m: m.by_source(), ms))
@@ -517,14 +526,13 @@ def can_complete_qualified_symbol(info):
     """
     Helper function, returns whether sublime_haskell_complete can run for (module, symbol, is_import_list)
     """
-    (module_name, module_as, symbol_name, is_import_list, is_operator) = info
-    if not module_name:
+    if not info.module:
         return False
 
-    if is_import_list:
-        return module_name in autocompletion.get_current_module_completions()
+    if info.is_import_list:
+        return info.module in autocompletion.get_current_module_completions()
     else:
-        return list(filter(lambda m: m.startswith(module_name), autocompletion.get_current_module_completions())) != []
+        return list(filter(lambda m: m.startswith(info.module), autocompletion.get_current_module_completions())) != []
 
 class SublimeHaskellComplete(SublimeHaskellTextCommand):
     """ Shows autocompletion popup """
@@ -754,19 +762,19 @@ class SublimeHaskellGoToHackageModule(SublimeHaskellTextCommand):
             if pack and mod:
                 webbrowser.open('http://hackage.haskell.org/package/{0}/docs/{1}.html'.format(pack, mod.replace('.', '-')))
         else:
-            module_word, module_as, ident, _, _ = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+            qsymbol = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
 
-            if ident is None: # module
+            if qsymbol.name is None: # module
                 ms = []
                 scope = self.view.file_name()
                 if scope:
                     ms = [m for m in hsdev_client.scope_modules(
                         scope,
-                        sandbox = current_sandboxes()) if m.name == module_word and m.by_cabal()]
+                        sandbox = current_sandboxes()) if m.name == qsymbol.module and m.by_cabal()]
                 else:
                     ms = [m for m in hsdev_client.list_modules(
                         cabal = current_is_cabal(),
-                        sandboxes = current_sandboxes()) if m.name == module_word and m.by_cabal()]
+                        sandboxes = current_sandboxes()) if m.name == qsymbol.module and m.by_cabal()]
 
                 if len(ms) == 0:
                     show_status_message('Module {0} not found'.format(module_name))
@@ -841,7 +849,9 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
             module_word = None
             ident = decl
             if not decl:
-                module_word, module_as, ident, _, _ = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+                qsymbol = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+                module_word = qsymbol.module
+                ident = qsymbol.name
 
             if ident is None: # module
                 self.view.window().run_command('sublime_haskell_browse_module', {
@@ -853,7 +863,7 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
                 show_status_message('No symbol selected', False)
                 return
 
-            self.whois_name = '{0}.{1}'.format(module_as or module_word, ident) if module_word else ident
+            self.whois_name = '{0}.{1}'.format(qsymbol.module_as or module_word, ident) if module_word else ident
             self.full_name = '{0}.{1}'.format(module_word, ident) if module_word else ident
 
             self.candidates = (hsdev_client.whois(self.whois_name, self.current_file_name, sandbox = current_sandbox()) or [])[:1]
@@ -949,8 +959,8 @@ class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
             self.current_file_name = self.view.file_name()
 
         if not self.full_name:
-            (module_word, module_as, ident, _, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
-            self.full_name = '{0}.{1}'.format(module_word, ident) if module_word else ident
+            qsymbol = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+            self.full_name = qsymbol.qualified_name()
 
         if hsdev_client.whois(self.full_name, self.current_file_name, sandbox = current_sandbox()):
             show_status_message('Symbol {0} already in scope'.format(self.full_name))
@@ -1134,19 +1144,19 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
 
 class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
     def run(self, edit):
-        (module_word, module_as, ident, _, _) = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+        qsymbol = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
 
         if is_haskell_symbol_info(self.view): # Go to within symbol info window
             loc = self.view.settings().get('location')
             if loc:
                 self.view.window().open_file(loc, sublime.ENCODED_POSITION)
             else:
-                show_status_message('Source location of {0} not found'.format(ident), False)
+                show_status_message('Source location of {0} not found'.format(qsymbol.name), False)
             return
 
 
-        whois_name = '.'.join(filter(lambda x: x, [module_as or module_word, ident]))
-        full_name = '.'.join(filter(lambda x: x, [module_word, ident]))
+        whois_name = '.'.join(filter(lambda x: x, [qsymbol.module_as or qsymbol.module, qsymbol.name]))
+        full_name = '.'.join(filter(lambda x: x, [qsymbol.module, qsymbol.name]))
 
         current_file_name = self.view.file_name()
         current_project = get_cabal_project_dir_of_file(current_file_name)
@@ -1162,7 +1172,7 @@ class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
         module_candidates = [m for m in hsdev_client.list_modules(source = True) if m.name == full_name]
 
         if not candidates and not module_candidates:
-            show_status_message('Declaration {0} not found'.format(ident), False)
+            show_status_message('Declaration {0} not found'.format(qsymbol.name), False)
             return
 
         if len(candidates) + len(module_candidates) == 1:
@@ -1813,7 +1823,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             line_contents = get_line_contents(view, locations[0])
             export_module = EXPORT_MODULE_RE.search(line_contents)
             if export_module:
-                module_word, module_as, ident, _, _ = get_qualified_symbol_at_region(view, view.sel()[0])
+                qsymbol = get_qualified_symbol_at_region(view, view.sel()[0])
                 # TODO: Implement
 
 
