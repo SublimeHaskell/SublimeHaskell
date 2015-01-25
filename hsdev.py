@@ -1,3 +1,5 @@
+# -*- coding: UTF-8 -*-
+
 import os
 import os.path
 import sys
@@ -421,7 +423,10 @@ def async_list_command(fn):
 def cmd(name_, args_ = [], opts_ = {}, on_result = lambda r: r):
     return (name_, args_, opts_, on_result)
 
-def call_callback(fn, *args, name = None, **kwargs):
+def call_callback(fn, *args, **kwargs):
+    name = kwargs.get('name')
+    if name:
+        del kwargs['name']
     try:
         if fn is not None:
             fn(*args, **kwargs)
@@ -468,11 +473,11 @@ class HsDev(object):
 
     # Util
 
-    def check_version():
+    def check_version(self):
         (exit_code, out, err) = call_and_wait(['hsdev', 'version'])
         return exit_code == 0 and re.match(r'0\.1\.[1-9]\..', out) is not None
 
-    def start_server(port = 4567, cache = None):
+    def start_server(self, port = 4567, cache = None):
         cmd = concat_args([
             (True, ["hsdev", "start"]),
             (port, ["--port", str(port)]),
