@@ -267,9 +267,9 @@ class AutoCompletion(object):
 
         # keywords
         # TODO: keywords can't appear anywhere, we can suggest in right places
-        self.keyword_completions = map(
+        self.keyword_completions = list(map(
             lambda k: (k + '\tkeyword', k),
-            ['case', 'data', 'instance', 'type', 'where', 'deriving', 'import', 'module'])
+            ['do', 'case', 'of', 'let', 'in', 'data', 'instance', 'type', 'newtype', 'where', 'deriving', 'import', 'module']))
 
         self.current_filename = None
 
@@ -412,13 +412,13 @@ class AutoCompletion(object):
                         q_module = hsdev_client.module(name = selected_module.name, cabal = current_is_cabal(), sandbox = current_sandbox(), file = fname, package = pack)
                         if q_module:
                             suggestions = q_module.declarations.values()
-            return make_completions(suggestions)
+            return self.keyword_completions + make_completions(suggestions)
         else:
             with self.cache as cache_:
                 if wide:
-                    return cache_.global_completions()
+                    return self.keyword_completions + cache_.global_completions()
                 else:
-                    return cache_.files.get(current_file_name, cache_.global_completions())
+                    return self.keyword_completions + cache_.files.get(current_file_name, cache_.global_completions())
 
     @hsdev.use_hsdev
     def completions_for_module(self, module, filename = None):
