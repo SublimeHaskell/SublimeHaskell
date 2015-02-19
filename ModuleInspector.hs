@@ -135,10 +135,9 @@ declInfo decl = case decl of
 defInfo :: H.Decl -> [DeclarationInfo]
 defInfo (H.FunBind []) = []
 defInfo (H.FunBind (H.Match loc n _ _ _ _ : _)) = [DeclarationInfo loc "function" (identOfName n) Nothing Nothing Nothing Nothing]
-defInfo (H.PatBind loc pat _ _ _) = map (\name -> DeclarationInfo loc "function" (identOfName name) Nothing Nothing Nothing Nothing) $ names pat where
+defInfo (H.PatBind loc pat _ _) = map (\name -> DeclarationInfo loc "function" (identOfName name) Nothing Nothing Nothing Nothing) $ names pat where
     names :: H.Pat -> [H.Name]
     names (H.PVar n) = [n]
-    names (H.PNeg n) = names n
     names (H.PNPlusK n _) = [n]
     names (H.PInfixApp l _ r) = names l ++ names r
     names (H.PApp _ ns) = concatMap names ns
@@ -156,7 +155,10 @@ defInfo (H.PatBind loc pat _ _ _) = map (\name -> DeclarationInfo loc "function"
 
     fieldNames :: H.PatField -> [H.Name]
     fieldNames (H.PFieldPat _ n) = names n
-    fieldNames (H.PFieldPun n) = [n]
+    fieldNames (H.PFieldPun n0) 
+      | H.Qual _ n <- n0 = [n]
+      | H.UnQual n <- n0 = [n]
+      | otherwise = [] -- Shouldn't ever happen in a pun.  Error instead?
     fieldNames H.PFieldWildcard = []
 defInfo _ = []
 
