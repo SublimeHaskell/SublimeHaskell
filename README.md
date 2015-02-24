@@ -6,15 +6,15 @@ Requirements
 
 Necessary:
 * ghc and a recent Haskell Platform (>= 2012 should do fine)
-* cabal
-* Cabal packages: base, bytestring, aeson, haskell-src-exts (== 1.14.*), haddock (`cabal install aeson haskell-src-exts haddock`)
+* cabal (`cabal install cabal-install-1.20.0.6`)
+* Cabal packages: base, bytestring, aeson, haskell-src-exts (== 1.15.*), haddock (== 2.14.*) (`cabal install aeson haskell-src-exts-1.15.0.1 haddock-2.14.3`)
 * If you are using GHC 7.6, you might have trouble with too new versions of haddock; in that case, try `cabal install haddock --constraint=haddock==2.13.2.1`
 
 Optional, but useful:
-* [ghc-mod](http://hackage.haskell.org/package/ghc-mod) (for import and LANGUAGE completions and type inference, `cabal install ghc-mod`)
-* [stylish-haskell](https://github.com/jaspervdj/stylish-haskell) (for code prettification, `cabal install stylish-haskell`)
+* [ghc-mod](http://hackage.haskell.org/package/ghc-mod) (for import and LANGUAGE completions and type inference, `cabal install ghc-mod-4.1.6 --constraint="haskell-src-exts==1.15.0.1"`)
+* [stylish-haskell](https://github.com/jaspervdj/stylish-haskell) (for code prettification, `cabal install stylish-haskell --constraint="haskell-src-exts==1.15.0.1"`)
 * [cabal-dev](http://hackage.haskell.org/package/cabal-dev) if you want to use it
-* [haskell-docs](http://hackage.haskell.org/package/haskell-docs) (for documentation in 'Symbol info' command, `cabal install haskell-docs`)
+* [haskell-docs](http://hackage.haskell.org/package/haskell-docs) (for documentation in 'Symbol info' command, `cabal install haskell-docs-4.2.2`)
 * [hdevtools](https://github.com/bitc/hdevtools) (or [fork for windows](https://github.com/mvoidex/hdevtools)) (for type inference, `cabal install hdevtools`)
 
 Binaries:
