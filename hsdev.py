@@ -477,11 +477,12 @@ class HsDev(object):
         (exit_code, out, err) = call_and_wait(['hsdev', 'version'])
         return exit_code == 0 and re.match(r'0\.1\.[1-9]\..', out) is not None
 
-    def start_server(self, port = 4567, cache = None):
+    def start_server(self, port = 4567, cache = None, log_file = None):
         cmd = concat_args([
             (True, ["hsdev", "start"]),
             (port, ["--port", str(port)]),
-            (cache, ["--cache", cache])])
+            (cache, ["--cache", cache]),
+            (log_file, ["--log", log_file])])
 
         def parse_response(s):
             try:

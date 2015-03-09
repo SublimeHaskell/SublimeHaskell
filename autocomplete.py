@@ -43,6 +43,7 @@ else:
 CHECK_MTIME = True
 
 HSDEV_CACHE_PATH = None
+HSDEV_LOG = None
 
 # The agent sleeps this long between inspections.
 AGENT_SLEEP_TIMEOUT = 60.0
@@ -1562,7 +1563,7 @@ class HsDevAgent(threading.Thread):
             hsdev.hsdev_enable(False)
         else:
             def start_server_():
-                hsdev.HsDev().start_server(cache = HSDEV_CACHE_PATH)
+                hsdev.HsDev().start_server(cache = HSDEV_CACHE_PATH, log_file = HSDEV_LOG)
             def link_server_():
                 self.hsdev.link()
                 self.start_inspect()
@@ -1951,11 +1952,13 @@ def start_inspector():
 
 def plugin_loaded():
     global HSDEV_CACHE_PATH
+    global HSDEV_LOG
 
     package_path = sublime_haskell_package_path()
     cache_path = sublime_haskell_cache_path()
 
     HSDEV_CACHE_PATH = os.path.join(cache_path, 'hsdev')
+    HSDEV_LOG = os.path.join(HSDEV_CACHE_PATH, 'hsdev.log')
 
     # TODO: How to stop_hdevtools() in Sublime Text 2?
     start_hdevtools()
