@@ -152,6 +152,10 @@ class Symbol(object):
         loc = self.defined_module().location
         return type(loc) == Location and self.position is not None
 
+    def other_location(self):
+        loc = self.defined_module().location
+        return type(loc) == OtherLocation
+
     def get_source_location(self):
         loc = self.defined_module().location
         if type(loc) == Location:
@@ -269,6 +273,8 @@ class Declaration(Symbol):
         if self.has_source_location():
             if self.location.project:
                 info.append('Project: {0}'.format(self.location.project))
+        elif self.other_location():
+            pass
         else:
             info.append('Installed in: {0}'.format(self.defined_location().cabal))
             info.append('Package: {0}'.format(self.defined_location().package.package_id()))
