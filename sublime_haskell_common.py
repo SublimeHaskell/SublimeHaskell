@@ -67,6 +67,7 @@ def preload_settings():
     get_setting('enable_hdevtools')
     get_setting('enable_hdocs')
     get_setting('enable_hsdev')
+    get_setting('hsdev_log_config')
     get_setting('inspect_modules')
     get_setting('snippet_replace')
     get_setting('ghc_opts')

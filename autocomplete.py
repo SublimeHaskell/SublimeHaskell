@@ -1563,7 +1563,7 @@ class HsDevAgent(threading.Thread):
             hsdev.hsdev_enable(False)
         else:
             def start_server_():
-                hsdev.HsDev().start_server(cache = HSDEV_CACHE_PATH, log_file = HSDEV_LOG)
+                hsdev.HsDev().start_server(cache = HSDEV_CACHE_PATH, log_file = HSDEV_LOG, log_config = get_setting_async("hsdev_log_config"))
             def link_server_():
                 self.hsdev.link()
                 self.start_inspect()
@@ -1658,10 +1658,10 @@ class HsDevAgent(threading.Thread):
 
             if load_cabal or scan_paths or projects or files:
                 run_async(autocompletion.drop_completions_async)
-                if load_cabal:
-                    run_async(autocompletion.update_cabal_completions)
-                if scan_paths or projects or files:
-                    run_async(autocompletion.update_sources_completions)
+                # if load_cabal:
+                #     run_async(autocompletion.update_cabal_completions)
+                # if scan_paths or projects or files:
+                #     run_async(autocompletion.update_sources_completions)
                 run_async(autocompletion.init_completions_async)
             self.reinspect_event.wait(AGENT_SLEEP_TIMEOUT)
             self.reinspect_event.clear()
