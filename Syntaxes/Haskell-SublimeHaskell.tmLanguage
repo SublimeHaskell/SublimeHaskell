@@ -738,7 +738,7 @@
 						</dict>
 					</dict>
 					<key>match</key>
-					<string>\(\s*([A-Z][A-Za-z]*)\s+([a-zα-ω][A-Za-z_'α-ωΑ-Ω]*)\)\s*(=&gt;|⇒)</string>
+					<string>\(\s*([A-Z][A-Za-z]*)\s+([a-zαβγδεζηθκιλμνξοπρςστυφχψω][A-Za-z_']*)\)\s*(=&gt;|⇒)</string>
 					<key>name</key>
 					<string>meta.class-constraint.haskell</string>
 				</dict>
