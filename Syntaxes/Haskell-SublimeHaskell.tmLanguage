@@ -386,7 +386,7 @@
 		</dict>
 		<dict>
 			<key>begin</key>
-			<string>^\s*([a-z_][a-zA-Z0-9_']*|\([|!%$+\-.,=&lt;/&gt;]+\))\s*(::)</string>
+			<string>^\s*([a-z_][a-zA-Z0-9_']*|\([|!%$+\-.,=&lt;/&gt;]+\))\s*(::|∷)</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>1</key>
@@ -443,7 +443,7 @@
 		</dict>
 		<dict>
 			<key>begin</key>
-			<string>^(foreign)\s+(import|export)((\s+[\w_]+)*)(\s+\"(\\.|[^\"])*\")?\s+([a-z_][a-zA-Z0-9_']*|\([|!%$+\-.,=&lt;/&gt;]+\))\s*((::)|∷)</string>
+			<string>^(foreign)\s+(import|export)((\s+[\w_]+)*)(\s+\"(\\.|[^\"])*\")?\s+([a-z_][a-zA-Z0-9_']*|\([|!%$+\-.,=&lt;/&gt;]+\))\s*(::)</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>1</key>
@@ -554,7 +554,7 @@
 			<key>comment</key>
 			<string>In case this regex seems overly general, note that Haskell permits the definition of new operators which can be nearly any string of punctuation characters, such as $%^&amp;*.</string>
 			<key>match</key>
-			<string>[|!%$?~+:\-.*=&lt;/&gt;\\]+</string>
+			<string>[|!%$?~+:\-.*=&lt;/&gt;←→\\]+</string>
 			<key>name</key>
 			<string>keyword.operator.haskell</string>
 		</dict>
@@ -738,7 +738,7 @@
 						</dict>
 					</dict>
 					<key>match</key>
-					<string>\(\s*([A-Z][A-Za-z]*)\s+([a-z][A-Za-z_']*)\)\s*(=&gt;)</string>
+					<string>\(\s*([A-Z][A-Za-z]*)\s+([a-zα-ω][A-Za-z_'α-ωΑ-Ω]*)\)\s*(=&gt;|⇒)</string>
 					<key>name</key>
 					<string>meta.class-constraint.haskell</string>
 				</dict>
@@ -748,13 +748,13 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>-&gt;</string>
+					<string>(-&gt;|→)</string>
 					<key>name</key>
 					<string>keyword.other.arrow.haskell</string>
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>=&gt;</string>
+					<string>(=&gt;|⇒)</string>
 					<key>name</key>
 					<string>keyword.other.big-arrow.haskell</string>
 				</dict>
