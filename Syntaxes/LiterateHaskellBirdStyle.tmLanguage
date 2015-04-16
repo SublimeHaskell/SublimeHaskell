@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- Author @wrossmck -->
+<!-- Edited 21 December 2013 to make all non-code a comment -->
+<dict>
+	<key>fileTypes</key>
+	<array>
+		<string>lhs</string>
+	</array>
+	<key>keyEquivalent</key>
+	<string>^~H</string>
+	<key>name</key>
+	<string>Literate Haskell Bird Style</string>
+	<key>patterns</key>
+	<array>
+		<dict>
+			<key>begin</key>
+			<string>^&gt;</string>
+			<key>end</key>
+			<string>$</string>
+			<key>patterns</key>
+			<array>
+				  <dict>
+						<key>include</key>
+						<string>source.haskell</string>
+				  </dict>
+			</array>
+	  	</dict>
+	  	<!-- Remove the next dictionary to turn regular "text" from being comments back into text -->
+	  	<dict>
+				<key>include</key>
+				<string>#comments</string>
+		</dict>
+	</array>
+	<key>repository</key>
+	<dict>
+		<key>comments</key>
+		<dict>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>captures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>punctuation.definition.comment.haskell</string>
+						</dict>
+					</dict>
+					<key>match</key>
+					<string>^((?!^>).)*$</string>
+					<key>name</key>
+					<string>comment.line.double-dash.haskell</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
+	<key>scopeName</key>
+	<string>source.haskell.bird</string>
+	<key>uuid</key>
+	<string>d32ef3c4-1b5e-4782-a1ff-34135f3a5c19</string>
+</dict>
+</plist>
