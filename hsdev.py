@@ -703,24 +703,28 @@ class HsDev(object):
         return cmd('ping', [], {}, lambda r: r and ('message' in r) and (r['message'] == 'pong'))
 
     @async_command
-    def scan(self, cabal = None, sandboxes = [], projects = [], files = [], paths = []):
+    def scan(self, cabal = None, sandboxes = [], projects = [], files = [], paths = [], docs = False, infer = False):
         opts = concat_opts([
             (cabal, {'cabal': None}),
             (sandboxes, {'sandbox': sandboxes}),
             (projects, {'project': projects}),
             (files, {'file': files}),
-            (paths, {'path': paths})])
+            (paths, {'path': paths}),
+            (docs, {'docs': None}),
+            (infer, {'infer': None})])
 
         return cmd('scan', [], opts)
 
     @async_command
-    def rescan(self, cabal = None, sandboxes = [], projects = [], files = [], paths = []):
+    def rescan(self, cabal = None, sandboxes = [], projects = [], files = [], paths = [], docs = False, infer = False):
         opts = concat_opts([
             (cabal, {'cabal': None}),
             (sandboxes, {'sandbox': sandboxes}),
             (projects, {'project': projects}),
             (files, {'file': files}),
-            (paths, {'path': paths})])
+            (paths, {'path': paths}),
+            (docs, {'docs': None}),
+            (infer, {'infer': None})])
 
         return cmd('rescan', [], opts)
 

@@ -334,20 +334,22 @@ class AutoCompletion(object):
             cache_.files.clear()
 
     def update_cabal_completions(self):
-        comps = make_completions(
-            hsdev_client_back.symbol(cabal = current_is_cabal(), sandbox = current_sandboxes(), timeout = None, split_result = True))
-        log('updating prepared cabal completions: {0}'.format(len(comps)))
-        with self.cache as cache_:
-            cache_.set_cabal(comps)
+        pass
+        # comps = make_completions(
+        #     hsdev_client_back.symbol(cabal = current_is_cabal(), sandbox = current_sandboxes(), timeout = None, split_result = True))
+        # log('updating prepared cabal completions: {0}'.format(len(comps)))
+        # with self.cache as cache_:
+        #     cache_.set_cabal(comps)
 
     def update_sources_completions(self):
-        symbols = hsdev_client_back.symbol(source = True, timeout = None, split_result = True)
-        comps = make_completions(symbols)
-        locs = make_locations(symbols)
-        log('updating prepared sources completions: {0}'.format(len(comps)))
-        with self.cache as cache_:
-            cache_.set_sources(comps)
-            cache_.set_locs(locs)
+        pass
+        # symbols = hsdev_client_back.symbol(source = True, timeout = None, split_result = True)
+        # comps = make_completions(symbols)
+        # locs = make_locations(symbols)
+        # log('updating prepared sources completions: {0}'.format(len(comps)))
+        # with self.cache as cache_:
+        #     cache_.set_sources(comps)
+        #     cache_.set_locs(locs)
 
     def init_completions_async(self):
         window = sublime.active_window()
@@ -1165,13 +1167,23 @@ class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
         current_file_name = self.view.file_name()
         current_project = get_cabal_project_dir_of_file(current_file_name)
 
-        candidate = list(filter(lambda d: d.by_source(), hsdev_client.whois(whois_name, current_file_name, sandbox = current_sandbox())))
+        candidates = list(filter(lambda d: d.by_source(), hsdev_client.whois(whois_name, current_file_name, sandbox = current_sandbox())))
 
-        if candidate and candidate[0].has_source_location():
-            self.view.window().open_file(candidate[0].get_source_location(), sublime.ENCODED_POSITION)
+        if candidates and candidates[0].has_source_location():
+            self.view.window().open_file(candidates[0].get_source_location(), sublime.ENCODED_POSITION)
             return
 
-        candidates = hsdev_client.symbol(name = full_name, source = True)
+        if candidates:
+            cands = candidates[:]
+            candidates = []
+            for c in cands:
+                for i in c.imported:
+                    candidates = hsdev_client.symbol(name = c.name, module = i.module, source = True)
+                    if candidates and candidates[0].has_source_location():
+                        self.view.window().open_file(candidates[0].get_source_location(), sublime.ENCODED_POSITION)
+                        return
+
+        candidates = hsdev_client.symbol(name = qsymbol.name, source = True)
 
         module_candidates = [m for m in hsdev_client.list_modules(source = True) if m.name == full_name]
 
@@ -1706,7 +1718,7 @@ class HsDevAgent(threading.Thread):
 
         try:
             with status_message_process('Inspecting {0}'.format(cabal), priority = 1) as s:
-                self.hsdev_back.scan(cabal = is_cabal(cabal), sandboxes = as_sandboxes(cabal), on_notify = hsdev_status(s), wait = True)
+                self.hsdev_back.scan(cabal = is_cabal(cabal), sandboxes = as_sandboxes(cabal), on_notify = hsdev_status(s), wait = True, docs = hdocs.hdocs_enabled())
         except Exception as e:
             log('loading standard modules info for {0} failed with {1}'.format(cabal, e), log_error)
 
@@ -1716,7 +1728,7 @@ class HsDevAgent(threading.Thread):
         if paths or projects or files:
             try:
                 with status_message_process('Inspecting', priority = 1) as s:
-                    self.hsdev_back.scan(paths = paths, projects = projects, files = files, on_notify = hsdev_status(s), wait = True)
+                    self.hsdev_back.scan(paths = paths, projects = projects, files = files, on_notify = hsdev_status(s), wait = True, docs = hdocs.hdocs_enabled())
             except Exception as e:
                 log('Inspection failed: {0}'.format(e), log_error)
 
@@ -1725,7 +1737,7 @@ class HsDevAgent(threading.Thread):
     def inspect_path(self, path):
         try:
             with status_message_process('Inspecting path {0}'.format(path), priority = 1) as s:
-                self.hsdev_back.scan(paths = [path], on_notify = hsdev_status(s), wait = True)
+                self.hsdev_back.scan(paths = [path], on_notify = hsdev_status(s), wait = True, docs = hdocs.hdocs_enabled())
         except Exception as e:
             log('Inspecting path {0} failed: {1}'.format(path, e), log_error)
 
@@ -1736,7 +1748,7 @@ class HsDevAgent(threading.Thread):
 
         try:
             with status_message_process('Inspecting project {0}', priority = 1) as s:
-                self.hsdev_back.scan(projects = [cabal_dir], on_notify = hsdev_status(s), wait = True)
+                self.hsdev_back.scan(projects = [cabal_dir], on_notify = hsdev_status(s), wait = True, docs = hdocs.hdocs_enabled())
         except Exception as e:
             log('Inspecting project {0} failed: {1}'.format(cabal_dir, e), log_error)
 
@@ -1745,7 +1757,7 @@ class HsDevAgent(threading.Thread):
     def inspect_files(self, filenames):
         try:
             with status_message_process('Inspecting files', priority = 1) as s:
-                self.hsdev_back.scan(files = filenames, on_notify = hsdev_status(s), wait = True)
+                self.hsdev_back.scan(files = filenames, on_notify = hsdev_status(s), wait = True, docs = hdocs.hdocs_enabled())
         except Exception as e:
             log('Inspecting files failed: {0}'.format(e), log_error)
 
