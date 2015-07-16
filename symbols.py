@@ -25,6 +25,12 @@ class Position(object):
             return str(self.line)
         return ':'.join([str(self.line), str(self.column)])
 
+    def to_zero_based(self):
+        return Position(self.line - 1, self.column - 1)
+
+    def from_zero_based(self):
+        return Position(self.line + 1, self.column + 1)
+
 class Location(object):
     """
     Location in file at line
@@ -455,12 +461,10 @@ class Corrector(object):
         return sublime.Region(view.text_point(self.start.line, self.start.column), view.text_point(self.end.line, self.end.column))
 
 class Correction(object):
-    def __init__(self, file, type, description, message, solution, corrector):
+    def __init__(self, file, level, message, corrector):
         self.file = file
-        self.type = type
-        self.description = description
+        self.level = level
         self.message = message
-        self.solution = solution
         self.corrector = corrector
 
     def to_region(self, view):

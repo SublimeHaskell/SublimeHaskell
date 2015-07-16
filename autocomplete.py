@@ -1363,7 +1363,12 @@ class AutoFixState(object):
         rgns = [cur.to_region(self.view)]
         self.view.add_regions('autofix_current', rgns, 'warning', 'dot')
         self.view.show(sublime.Region(rgns[0].a, rgns[-1].b))
-        write_panel(self.view.window(), cur.message, 'sublime_haskell_auto_fix', syntax = 'HaskellOutputPanel')
+        write_panel(self.view.window(), self.message(cur), 'sublime_haskell_auto_fix', syntax = 'HaskellOutputPanel')
+
+    def message(self, cur):
+        if cur.corrector.contents:
+            return '{0}\n  Why not:\n    {1}'.format(cur.message, cur.corrector.contents)
+        return cur.message
 
     def unmark(self):
         self.view.erase_regions('autofix')
@@ -1399,7 +1404,7 @@ autofix_state = AutoFixState()
 class SublimeHaskellAutoFix(SublimeHaskellWindowCommand):
     def run(self):
         if self.window.active_view().file_name():
-            self.messages = hsdev_client.ghcmod_check_lint([self.window.active_view().file_name()])
+            self.messages = hsdev_client.ghcmod_check([self.window.active_view().file_name()]) + hsdev_client.hlint([self.window.active_view().file_name()])
             self.corrections = list(filter(lambda corr: os.path.samefile(corr.file, self.window.active_view().file_name()), hsdev_client.autofix_show(self.messages)))
 
             if self.corrections:
@@ -1569,9 +1574,8 @@ class HsDevAgent(threading.Thread):
         return self.hsdev.is_connected()
 
     def start_hsdev(self):
-        ver = hsdev.HsDev().check_version()
-        if not ver:
-            output_error_async(sublime.active_window(), 'Please update hsdev to actual version (>= 0.1.1.0)')
+        if not hsdev.HsDev().check_version([0,1,4,0]):
+            output_error_async(sublime.active_window(), 'Please update hsdev to actual version (>= 0.1.4.0)')
             hsdev.hsdev_enable(False)
         else:
             def start_server_():

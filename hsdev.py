@@ -277,17 +277,15 @@ def parse_corrections(d):
 
 def parse_correction(d):
     return symbols.Correction(
-        d['file'],
-        d['type'],
-        d['description'],
-        d['message'],
-        d['solution'],
-        parse_corrector(d['corrector']))
+        d['source']['file'],
+        d['level'],
+        d['note']['message'],
+        parse_corrector(d['note']['corrector']))
 
 def parse_corrector(d):
     return symbols.Corrector(
-        parse_position(d['region']['from']),
-        parse_position(d['region']['to']),
+        parse_position(d['range']['from']),
+        parse_position(d['range']['to']),
         d['contents'])
 
 def encode_corrections(cs):
@@ -295,16 +293,21 @@ def encode_corrections(cs):
 
 def encode_correction(c):
     return {
-        'file': c.file,
-        'type': c.type,
-        'description': c.description,
-        'message': c.message,
-        'solution': c.solution,
-        'corrector': encode_corrector(c.corrector) }
+        'source': {
+            'project': None,
+            'file': c.file },
+        'level': c.level,
+        'note': {
+            'corrector': encode_corrector(c.corrector),
+            'message': c.message },
+        'region': {
+            'from': encode_position(c.corrector.start.from_zero_based()),
+            'to': encode_position(c.corrector.end.from_zero_based()) }
+        }
 
 def encode_corrector(c):
     return {
-        'region': {
+        'range': {
             'from': encode_position(c.start),
             'to': encode_position(c.end) },
         'contents': c.contents }
@@ -473,9 +476,32 @@ class HsDev(object):
 
     # Util
 
-    def check_version(self):
+    def check_version(self, minimal = [0, 0, 0, 0], maximal = None):
         (exit_code, out, err) = call_and_wait(['hsdev', 'version'])
-        return exit_code == 0 and re.match(r'0\.1\.[1-9]\..', out) is not None
+        if exit_code == 0:
+            m = re.match('(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)\.(?P<build>\d+)', out)
+            if m:
+                major = int(m.group('major'))
+                minor = int(m.group('minor'))
+                revision = int(m.group('revision'))
+                build = int(m.group('build'))
+                ver = [major, minor, revision, build]
+                # Check minimal version
+                for x, y in zip(ver, minimal):
+                    if x < y:
+                        return False
+                    elif x > y:
+                        break
+                # Check maximal version
+                if maximal is not None:
+                    for x, y in zip(ver, maximal):
+                        if x > y:
+                            return False
+                        elif x < y:
+                            break
+                # Checked
+                return True
+        return False
 
     def start_server(self, port = 4567, cache = None, log_file = None, log_config = None):
         cmd = concat_args([
@@ -885,6 +911,12 @@ class HsDev(object):
     @list_command
     def cabal_list(self, query = None):
         cmd('cabal list', [query] if query else [], {}, lambda r: [parse_cabal_package(s) for s in r] if r else None)
+
+    @list_command
+    def hlint(self, files):
+        opts = concat_opts([])
+
+        return cmd('hlint', files, opts)
 
     @command
     def ghcmod_lang(self):

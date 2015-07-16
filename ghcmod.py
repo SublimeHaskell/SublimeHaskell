@@ -32,9 +32,9 @@ def lint_as_hints(msgs):
 def hsdev_check():
     return (autocomplete.hsdev_client.ghcmod_check, lambda file: [file], lambda ms: ms)
 def hsdev_lint():
-    return (autocomplete.hsdev_client.ghcmod_lint, lambda file: [file], lambda ms: ms)
-def hsdev_check_lint():
-    return (autocomplete.hsdev_client.ghcmod_check_lint, lambda file: [file], lambda ms: ms)
+    return (autocomplete.hsdev_client.hlint, lambda file: [file], lambda ms: ms)
+# def hsdev_check_lint():
+#     return (autocomplete.hsdev_client.ghcmod_check_lint, lambda file: [file], lambda ms: ms)
 
 def messages_as_hints(cmd):
     (fn, arg, msg) = cmd
@@ -62,10 +62,10 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
             if not cmds:
                 self.status_msg.stop()
                 output_messages = [OutputMessage(
-                    m['location']['module']['file'],
-                    m['location']['pos']['line'],
-                    m['location']['pos']['column'],
-                    m['level'].capitalize() + ': ' + m['message'].replace('\n', '\n  '),
+                    m['source']['file'],
+                    m['range']['from']['line'],
+                    m['range']['from']['column'],
+                    m['level'].capitalize() + ': ' + m['note']['message'].replace('\n', '\n  '),
                     m['level']) for m in self.messages]
 
                 set_global_error_messages(output_messages)
