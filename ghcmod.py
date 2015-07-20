@@ -10,13 +10,13 @@ from threading import Thread
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     import autocomplete
-    from parseoutput import OutputMessage, parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages, write_output
+    from parseoutput import OutputPoint, OutputMessage, parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages, write_output
     from ghci import parse_info
     import symbols
 else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.autocomplete as autocomplete
-    from SublimeHaskell.parseoutput import OutputMessage, parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages, write_output
+    from SublimeHaskell.parseoutput import OutputPoint, OutputMessage, parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages, write_output
     from SublimeHaskell.ghci import parse_info
     import SublimeHaskell.symbols as symbols
 
@@ -30,9 +30,9 @@ def lint_as_hints(msgs):
 
 
 def hsdev_check():
-    return (autocomplete.hsdev_client.ghcmod_check, lambda file: [file], lambda ms: ms)
+    return (autocomplete.hsdev_client.check, lambda file: [file], lambda ms: ms)
 def hsdev_lint():
-    return (autocomplete.hsdev_client.hlint, lambda file: [file], lambda ms: ms)
+    return (autocomplete.hsdev_client.lint, lambda file: [file], lambda ms: ms)
 # def hsdev_check_lint():
 #     return (autocomplete.hsdev_client.ghcmod_check_lint, lambda file: [file], lambda ms: ms)
 
@@ -63,8 +63,12 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
                 self.status_msg.stop()
                 output_messages = [OutputMessage(
                     m['source']['file'],
-                    m['range']['from']['line'],
-                    m['range']['from']['column'],
+                    OutputPoint(
+                        m['region']['from']['line'],
+                        m['region']['from']['column']),
+                    OutputPoint(
+                        m['region']['to']['line'],
+                        m['region']['to']['column']),
                     m['level'].capitalize() + ': ' + m['note']['message'].replace('\n', '\n  '),
                     m['level']) for m in self.messages]
 

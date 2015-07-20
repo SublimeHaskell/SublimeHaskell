@@ -913,10 +913,26 @@ class HsDev(object):
         cmd('cabal list', [query] if query else [], {}, lambda r: [parse_cabal_package(s) for s in r] if r else None)
 
     @list_command
-    def hlint(self, files):
+    def lint(self, files):
         opts = concat_opts([])
 
-        return cmd('hlint', files, opts)
+        return cmd('lint', files, opts)
+
+    @list_command
+    def check(self, files, sandbox = None, ghc = []):
+        opts = concat_opts([
+            (ghc, {'ghc': ghc}),
+            (sandbox, {'sandbox': sandbox})])
+
+        return cmd('check', files, opts)
+
+    @list_command
+    def check_lint(self, files, sandbox = None, ghc = []):
+        opts = concat_opts([
+            (ghc, {'ghc': ghc}),
+            (sandbox, {'sandbox': sandbox})])
+
+        return cmd('check-lint', files, opts)
 
     @command
     def ghcmod_lang(self):

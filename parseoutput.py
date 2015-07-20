@@ -35,7 +35,7 @@ symbol_file_regex = r'^Defined at: (.*):(\d+):(\d+)$'
 
 # Global list of errors. Used e.g. for jumping to the next one.
 # Properly assigned being a defaultdict in clear_error_marks().
-# Structure: ERRORS[filename][m.line] = OutputMessage()
+# Structure: ERRORS[filename][m.start.line] = OutputMessage()
 ERRORS = {}
 
 # Global ref to view with errors
@@ -48,13 +48,26 @@ def filename_of_path(p):
     # we have forward or backslashes on Windows.
     return re.match(r'(.*[/\\])?(.*)', p).groups()[1]
 
+class OutputPoint(object):
+    def __init__(self, line, column):
+        self.line = int(line)
+        self.column = int(column)
+
+    def __unicode__(self):
+        return u"{0}:{1}".format(self.line, self.column)
+
+    def __str__(self):
+        return self.__unicode__()
+
+    def to_point_of_view(self, view):
+        return view.text_point(self.line - 1, self.column - 1)
 
 class OutputMessage(object):
     "Describe an error or warning message produced by GHC."
-    def __init__(self, filename, line, column, message, level):
+    def __init__(self, filename, start, end, message, level):
         self.filename = filename
-        self.line = int(line)
-        self.column = int(column)
+        self.start = start
+        self.end = end
         self.message = message.replace(os.linesep, "\n")
         self.level = level
 
@@ -62,28 +75,25 @@ class OutputMessage(object):
         # must match result_file_regex
         return u'{0}: line {1}, column {2}:\n  {3}'.format(
             self.filename,
-            self.line,
-            self.column,
+            self.start.line,
+            self.start.column,
             self.message)
 
     def __str__(self):
         return self.__unicode__()
 
     def __repr__(self):
-        return '<OutputMessage {0}:{1}:{2}: {3}>'.format(
+        return '<OutputMessage {0}:{1}-{2}: {3}>'.format(
             filename_of_path(self.filename),
-            self.line,
-            self.column,
+            self.start.__repr__(),
+            self.end.__repr__(),
             self.message[:10] + '..')
 
-    def find_region_in_view(self, view):
+    def to_region_in_view(self, view):
         "Return the Region referred to by this error message."
         # Convert line and column count to zero-based indices:
-        point = view.text_point(self.line - 1, 0)
-        # Return the whole line:
-        region = view.line(point)
-        region = trim_region(view, region)
-        return region
+        return sublime.Region(self.start.to_point_of_view(view), self.end.to_point_of_view(view))
+
 
 
 def clear_error_marks():
@@ -99,7 +109,7 @@ def set_global_error_messages(messages):
     clear_error_marks()
 
     for m in messages:
-        ERRORS[m.filename][m.line].append(m)
+        ERRORS[m.filename][m.start.line].append(m)
 
 
 def run_build_thread(view, cabal_project_dir, msg, cmd, on_done):
@@ -297,7 +307,7 @@ def mark_messages_in_view(messages, view):
         regions[k] = []
 
     for m in messages:
-        regions[m.level].append(m.find_region_in_view(view))
+        regions[m.level].append(m.to_region_in_view(view))
 
     for nm, lev in message_levels.items():
         view.erase_regions(region_key(nm))
