@@ -1404,7 +1404,7 @@ autofix_state = AutoFixState()
 class SublimeHaskellAutoFix(SublimeHaskellWindowCommand):
     def run(self):
         if self.window.active_view().file_name():
-            self.messages = hsdev_client.ghcmod_check([self.window.active_view().file_name()]) + hsdev_client.hlint([self.window.active_view().file_name()])
+            self.messages = hsdev_client.check_lint([self.window.active_view().file_name()])
             self.corrections = list(filter(lambda corr: os.path.samefile(corr.file, self.window.active_view().file_name()), hsdev_client.autofix_show(self.messages)))
 
             if self.corrections:
