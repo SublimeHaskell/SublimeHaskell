@@ -975,11 +975,11 @@ class HsDev(object):
 
         return cmd('ghc-mod check-lint', files, opts)
 
-    @command
+    @list_command
     def autofix_show(self, messages):
         return cmd('autofix show', [], {'data': json.dumps(messages)}, parse_corrections)
 
-    @command
+    @list_command
     def autofix_fix(self, messages, rest = [], pure = False):
         opts = concat_opts([
             (True, {'data': json.dumps(messages)}),
