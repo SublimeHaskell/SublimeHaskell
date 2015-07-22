@@ -380,8 +380,9 @@ def parse_output_messages(view, base_dir, text):
 
     def to_error(m):
         filename, line, column, messy_details = m.groups()
+        line, column = int(line), int(column)
 
-        column = type_column_to_sublime_column(view, line, column)
+        column = ghc_column_to_sublime_column(view, line, column)
         line = line - 1
         return OutputMessage(
             # Record the absolute, normalized path.
