@@ -59,8 +59,11 @@ class OutputPoint(object):
     def __str__(self):
         return self.__unicode__()
 
+    def __eq__(self, other):
+        return self.line == other.line and self.column == other.column
+
     def to_point_of_view(self, view):
-        return view.text_point(self.line - 1, self.column - 1)
+        return view.text_point(self.line, self.column)
 
 class OutputMessage(object):
     "Describe an error or warning message produced by GHC."
@@ -73,10 +76,12 @@ class OutputMessage(object):
 
     def __unicode__(self):
         # must match result_file_regex
+        # TODO: Columns must be recalculated, such that one tab is of tab_size length
+        # We can do this for opened views, but how to do this for files, that are not open?
         return u'{0}: line {1}, column {2}:\n  {3}'.format(
             self.filename,
-            self.start.line,
-            self.start.column,
+            self.start.line + 1,
+            self.start.column + 1,
             self.message)
 
     def __str__(self):
@@ -92,6 +97,8 @@ class OutputMessage(object):
     def to_region_in_view(self, view):
         "Return the Region referred to by this error message."
         # Convert line and column count to zero-based indices:
+        if self.start == self.end: # trimmed full line
+            return trim_region(view.line(self.start.to_point_of_view()))
         return sublime.Region(self.start.to_point_of_view(view), self.end.to_point_of_view(view))
 
 
@@ -184,7 +191,7 @@ def parse_output_messages_and_show(view, msg, base_dir, exit_code, stderr):
     # stderr = stderr.decode('utf-8')
 
     # The process has terminated; parse and display the output:
-    parsed_messages = parse_output_messages(base_dir, stderr)
+    parsed_messages = parse_output_messages(view, base_dir, stderr)
     # The unparseable part (for other errors)
     unparsable = output_regex.sub('', stderr).strip()
 
@@ -338,17 +345,49 @@ def hide_output(view):
 def show_output(view):
     view.window().run_command('show_panel', {'panel': 'output.' + ERROR_PANEL_NAME})
 
-def parse_output_messages(base_dir, text):
+def tabs_offset(view, point):
+    """
+    Returns count of '\t' before point in line multiplied by 7
+    8 is size of type as supposed by ghc-mod, to every '\t' will add 7 to column
+    Subtract this value to get sublime column by ghc-mod column, add to get ghc-mod column by sublime column
+    """
+    cur_line = view.substr(view.line(point))
+    return len(list(filter(lambda ch: ch == '\t', cur_line))) * 7
+
+def sublime_column_to_ghc_column(view, line, column):
+    """
+    Convert sublime zero-based column to ghc-mod column (where tab is 8 length)
+    """
+    return column + tabs_offset(view, view.text_point(line, column)) + 1
+
+def ghc_column_to_sublime_column(view, line, column):
+    """
+    Convert ghc-mod column to sublime zero-based column
+    """
+    cur_line = view.substr(view.line(view.text_point(line - 1, 0)))
+    col = 1
+    real_col = 0
+    for c in cur_line:
+        if col >= column:
+            return real_col
+        col += (8 if c == '\t' else 1)
+        real_col += 1
+    return real_col
+
+def parse_output_messages(view, base_dir, text):
     "Parse text into a list of OutputMessage objects."
     matches = output_regex.finditer(text)
 
     def to_error(m):
         filename, line, column, messy_details = m.groups()
+
+        column = type_column_to_sublime_column(view, line, column)
+        line = line - 1
         return OutputMessage(
             # Record the absolute, normalized path.
             os.path.normpath(os.path.join(base_dir, filename)),
-            line,
-            column,
+            OutputPoint(line, column),
+            OutputPoint(line, column),
             messy_details.strip(),
             'warning' if 'warning' in messy_details.lower() else 'error')
 

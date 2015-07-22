@@ -64,11 +64,11 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
                 output_messages = [OutputMessage(
                     m['source']['file'],
                     OutputPoint(
-                        m['region']['from']['line'],
-                        m['region']['from']['column']),
+                        int(m['region']['from']['line']) - 1,
+                        int(m['region']['from']['column']) - 1),
                     OutputPoint(
-                        m['region']['to']['line'],
-                        m['region']['to']['column']),
+                        int(m['region']['to']['line']) - 1,
+                        int(m['region']['to']['column']) - 1),
                     m['level'].capitalize() + ': ' + m['note']['message'].replace('\n', '\n  '),
                     m['level']) for m in self.messages]
 
@@ -247,7 +247,7 @@ def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb
 
         all_cmds_successful &= success
 
-        parsed = parse_output_messages(file_dir, out)
+        parsed = parse_output_messages(view, file_dir, out)
         for p in parsed:
             parsed_messages.append((cmd, p))
 

@@ -10,6 +10,7 @@ if int(sublime.version()) < 3000:
     import autocomplete
     from hdevtools import hdevtools_type, hdevtools_enabled
     from ghcmod import ghcmod_type, ghcmod_enabled
+    from parseoutput import tabs_offset, sublime_column_to_ghc_column, ghc_column_to_sublime_column
     import hsdev
 else:
     from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, log, log_trace, as_sandboxes, get_ghc_opts
@@ -17,6 +18,7 @@ else:
     import SublimeHaskell.autocomplete as autocomplete
     from SublimeHaskell.hdevtools import hdevtools_type, hdevtools_enabled
     from SublimeHaskell.ghcmod import ghcmod_type, ghcmod_enabled
+    from SublimeHaskell.parseoutput import tabs_offset, sublime_column_to_ghc_column, ghc_column_to_sublime_column
     import SublimeHaskell.hsdev as hsdev
     from functools import reduce
 
@@ -39,35 +41,6 @@ def parse_ghc_mod_type_line(l):
     match = GHCMOD_TYPE_LINE_RE.match(l)
     return match and match.groupdict()
 
-def tabs_offset(view, point):
-    """
-    Returns count of '\t' before point in line multiplied by 7
-    8 is size of type as supposed by ghc-mod, to every '\t' will add 7 to column
-    Subtract this value to get sublime column by ghc-mod column, add to get ghc-mod column by sublime column
-    """
-    cur_line = view.substr(view.line(point))
-    return len(list(filter(lambda ch: ch == '\t', cur_line))) * 7
-
-def sublime_column_to_type_column(view, line, column):
-    """
-    Convert sublime zero-based column to ghc-mod column (where tab is 8 length)
-    """
-    return column + tabs_offset(view, view.text_point(line, column)) + 1
-
-def type_column_to_sublime_column(view, line, column):
-    """
-    Convert ghc-mod column to sublime zero-based column
-    """
-    cur_line = view.substr(view.line(view.text_point(line - 1, 0)))
-    col = 1
-    real_col = 0
-    for c in cur_line:
-        if col >= column:
-            return real_col
-        col += (8 if c == '\t' else 1)
-        real_col += 1
-    return real_col
-
 class FilePosition(object):
     """
     Zero-based sublime file position
@@ -88,7 +61,7 @@ class FilePosition(object):
         return FilePosition(int(l), int(c))
 
     def from_type_pos(view, l, c):
-        return FilePosition(int(l) - 1, type_column_to_sublime_column(view, int(l), int(c)))
+        return FilePosition(int(l) - 1, ghc_column_to_sublime_column(view, int(l), int(c)))
 
     # From one-based line-column
     def from_str(s):
@@ -182,7 +155,7 @@ def haskell_type(view, filename, module_name, line, column, cabal = None):
         if ts:
             return [to_region_type(r) for r in ts]
         return None
-    column = sublime_column_to_type_column(view, line, column)
+    column = sublime_column_to_ghc_column(view, line, column)
     line = line + 1
     if hdevtools_enabled():
         result = hdevtools_type(filename, line, column, cabal = cabal)
