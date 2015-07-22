@@ -49,10 +49,15 @@ def tabs_offset(view, point):
     return len(list(filter(lambda ch: ch == '\t', cur_line))) * 7
 
 def sublime_column_to_type_column(view, line, column):
-    cur_line = view.substr(view.line(view.text_point(line, column)))
-    return column + len(list(filter(lambda ch: ch == '\t', cur_line))) * 7 + 1
+    """
+    Convert sublime zero-based column to ghc-mod column (where tab is 8 length)
+    """
+    return column + tabs_offset(view, view.text_point(line, column)) + 1
 
 def type_column_to_sublime_column(view, line, column):
+    """
+    Convert ghc-mod column to sublime zero-based column
+    """
     cur_line = view.substr(view.line(view.text_point(line - 1, 0)))
     col = 1
     real_col = 0
@@ -64,32 +69,36 @@ def type_column_to_sublime_column(view, line, column):
     return real_col
 
 class FilePosition(object):
+    """
+    Zero-based sublime file position
+    """
+
     def __init__(self, line, column):
         self.line = line
         self.column = column
 
     def point(self, view):
-        # Note, that sublime suppose that '\t' is 'tab_size' length
-        # But '\t' is one character
-        return view.text_point(self.line - 1, type_column_to_sublime_column(view, self.line, self.column))
+        return view.text_point(self.line, self.column)
 
     def to_str(self):
         return '{0}:{1}'.format(self.line, self.column)
 
     def from_point(view, p):
         (l, c) = view.rowcol(p)
-        return FilePosition(int(l + 1), int(c + 1))
+        return FilePosition(int(l), int(c))
 
+    def from_type_pos(view, l, c):
+        return FilePosition(int(l) - 1, type_column_to_sublime_column(view, int(l), int(c)))
+
+    # From one-based line-column
     def from_str(s):
         if not s:
             return None
         [l, c] = s.split(':')
-        return FilePosition(int(l), int(c))
+        return FilePosition(int(l - 1), int(c - 1))
 
 def position_by_point(view, point):
-    tabs = tabs_offset(view, point)
-    (r, c) = view.rowcol(point)
-    return FilePosition(r + 1, c + 1 + tabs)
+    return FilePosition.from_point(view, point)
 
 class RegionType(object):
     def __init__(self, typename, start, end = None):
@@ -145,38 +154,41 @@ def region_by_region(view, region, typename):
 
 TYPE_RE = re.compile(r'(?P<line1>\d+)\s+(?P<col1>\d+)\s+(?P<line2>\d+)\s+(?P<col2>\d+)\s+"(?P<type>.*)"$')
 
-def parse_type_output(s):
+def parse_type_output(view, s):
     result = []
     for l in s.splitlines():
         matched = TYPE_RE.match(l)
         if matched:
             result.append(RegionType(
                 matched.group('type'),
-                FilePosition(int(matched.group('line1')), int(matched.group('col1'))),
-                FilePosition(int(matched.group('line2')), int(matched.group('col2')))))
+                FilePosition.from_type_pos(view, int(matched.group('line1')), int(matched.group('col1'))),
+                FilePosition.from_type_pos(view, int(matched.group('line2')), int(matched.group('col2')))))
 
     return result
 
-def haskell_type(filename, module_name, line, column, cabal = None):
+def haskell_type(view, filename, module_name, line, column, cabal = None):
     result = None
 
     if hsdev.hsdev_enabled():
+        # Convert from hsdev one-based locations to sublime zero-based positions
         def to_file_pos(r):
-            return FilePosition(r['line'], r['column'])
+            return FilePosition(int(r['line']) - 1, int(r['column']) - 1)
         def to_region_type(r):
             return RegionType(
                 r['type'],
                 to_file_pos(r['region']['from']),
                 to_file_pos(r['region']['to']))
-        ts = autocomplete.hsdev_client.ghcmod_type(filename, line, column, sandbox = as_sandboxes(cabal), ghc = get_ghc_opts(filename))
+        ts = autocomplete.hsdev_client.ghcmod_type(filename, line + 1, column + 1, sandbox = as_sandboxes(cabal), ghc = get_ghc_opts(filename))
         if ts:
             return [to_region_type(r) for r in ts]
         return None
+    column = sublime_column_to_type_column(view, line, column)
+    line = line + 1
     if hdevtools_enabled():
         result = hdevtools_type(filename, line, column, cabal = cabal)
     if not result and module_name and ghcmod_enabled():
         result = ghcmod_type(filename, module_name, line, column, cabal = cabal)
-    return parse_type_output(result) if result else None
+    return parse_type_output(view, result) if result else None
 
 def haskell_type_view(view, selection = None):
     filename = view.file_name()
@@ -185,15 +197,15 @@ def haskell_type_view(view, selection = None):
         selection = view.sel()[0]
 
     (r, c) = view.rowcol(selection.b)
-    line = r + 1
-    column = sublime_column_to_type_column(view, r, c)
+    line = r
+    column = c
 
     module_name = None
     m = autocomplete.hsdev_client.module(file = filename)
     if m:
         module_name = m.name
 
-    return haskell_type(filename, module_name, line, column)
+    return haskell_type(view, filename, module_name, line, column)
 
 class SublimeHaskellShowType(SublimeHaskellTextCommand):
     def run(self, edit, filename = None, line = None, column = None):
@@ -206,15 +218,15 @@ class SublimeHaskellShowType(SublimeHaskellTextCommand):
 
         if (not line) or (not column):
             (r, c) = self.view.rowcol(self.view.sel()[0].b)
-            line = r + 1
-            column = sublime_column_to_type_column(self.view, r, c)
+            line = r
+            column = c
 
         module_name = None
         m = autocomplete.hsdev_client.module(file = filename)
         if m:
             module_name = m.name
 
-        return haskell_type(filename, module_name, line, column)
+        return haskell_type(self.view, filename, module_name, line, column)
 
     def get_best_type(self, types):
         if not types:
