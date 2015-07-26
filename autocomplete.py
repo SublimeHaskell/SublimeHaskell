@@ -136,7 +136,17 @@ class QualifiedSymbol(object):
         self.is_operator = is_operator
 
     def qualified_name(self):
+        if self.name is None:
+            return self.module
+        return '{0}.{1}'.format(self.module_as or self.module, self.name) if self.module else self.name
+
+    def full_name(self):
+        if self.name is None:
+            return self.module
         return '{0}.{1}'.format(self.module, self.name) if self.module else self.name
+
+    def is_module(self):
+        return self.name is None and self.module is not None
 
 def get_qualified_symbol(line):
     """
@@ -768,7 +778,7 @@ class SublimeHaskellGoToHackageModule(SublimeHaskellTextCommand):
             qsymbol = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
 
             ms = []
-            if qsymbol.name is None: # module
+            if qsymbol.is_module(): # module
                 scope = self.view.file_name()
                 if scope:
                     ms = [m for m in hsdev_client.scope_modules(
@@ -782,20 +792,19 @@ class SublimeHaskellGoToHackageModule(SublimeHaskellTextCommand):
                 scope = self.view.file_name()
                 if scope:
                     decls = hsdev_client.whois(
-                        '{0}.{1}'.format(qsymbol.module_as or qsymbol.module, qsymbol.name) if qsymbol.module else qsymbol.name,
+                        qsymbol.qualified_name(),
                         file = scope,
                         sandbox = current_sandboxes())
-                    full_name = '{0}.{1}'.format(qsymbol.module, qsymbol.name) if qsymbol.module else qsymbol.name
                     if not decls:
                         decls = hsdev_client.lookup(
-                            full_name,
+                            qsymbol.full_name(),
                             file = scope,
                             sandbox = current_sandboxes())
                     if not decls:
                         decls = hsdev_client.symbo(
-                            name = full_name)
+                            name = qsymbol.full_name())
                     if not decls:
-                        show_status_message('Module for symbol {0} not found'.format(full_name))
+                        show_status_message('Module for symbol {0} not found'.format(qsymbol.full_name()))
                         return
                     ms = [decl.defined_module() for decl in decls]
 
@@ -886,8 +895,8 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
                 show_status_message('No symbol selected', False)
                 return
 
-            self.whois_name = '{0}.{1}'.format(qsymbol.module_as or module_word, ident) if module_word else ident
-            self.full_name = '{0}.{1}'.format(module_word, ident) if module_word else ident
+            self.whois_name = qsymbol.qualified_name()
+            self.full_name = qsymbol.full_name()
 
             self.candidates = (hsdev_client.whois(self.whois_name, self.current_file_name, sandbox = current_sandbox()) or [])[:1]
 
@@ -1180,42 +1189,47 @@ class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
                 show_status_message('Source location of {0} not found'.format(qsymbol.name), False)
             return
 
-
-        whois_name = '.'.join(filter(lambda x: x, [qsymbol.module_as or qsymbol.module, qsymbol.name]))
-        full_name = '.'.join(filter(lambda x: x, [qsymbol.module, qsymbol.name]))
+        whois_name = qsymbol.qualified_name()
+        full_name = qsymbol.full_name()
 
         current_file_name = self.view.file_name()
         current_project = get_cabal_project_dir_of_file(current_file_name)
 
-        candidates = list(filter(lambda d: d.by_source(), hsdev_client.whois(whois_name, current_file_name, sandbox = current_sandbox())))
+        candidates = []
+        module_candidates = []
+        if not qsymbol.is_module():
+            candidates = list(filter(lambda d: d.by_source(), hsdev_client.whois(whois_name, current_file_name, sandbox = current_sandbox())))
 
-        if candidates and candidates[0].has_source_location():
-            self.view.window().open_file(candidates[0].get_source_location(), sublime.ENCODED_POSITION)
-            return
+            if candidates and candidates[0].has_source_location():
+                self.view.window().open_file(candidates[0].get_source_location(), sublime.ENCODED_POSITION)
+                return
 
-        if candidates:
-            cands = candidates[:]
-            candidates = []
-            for c in cands:
-                for i in c.imported:
-                    candidates = hsdev_client.symbol(name = c.name, module = i.module, source = True)
-                    if candidates and candidates[0].has_source_location():
-                        self.view.window().open_file(candidates[0].get_source_location(), sublime.ENCODED_POSITION)
-                        return
+            if candidates:
+                cands = candidates[:]
+                candidates = []
+                for c in cands:
+                    for i in c.imported:
+                        candidates = hsdev_client.symbol(name = c.name, module = i.module, source = True)
+                        if candidates and candidates[0].has_source_location():
+                            self.view.window().open_file(candidates[0].get_source_location(), sublime.ENCODED_POSITION)
+                            return
 
-        candidates = hsdev_client.symbol(name = qsymbol.name, source = True)
-
-        module_candidates = [m for m in hsdev_client.list_modules(source = True) if m.name == full_name]
+            candidates = hsdev_client.symbol(name = qsymbol.name, source = True)
+        else:
+            module_candidates = [m for m in hsdev_client.list_modules(module = full_name, source = True) if m.name == full_name]
 
         if not candidates and not module_candidates:
             show_status_message('Declaration {0} not found'.format(qsymbol.name), False)
             return
 
-        if len(candidates) + len(module_candidates) == 1:
-            if len(candidates) == 1:
+        candidates_len = len(candidates) if candidates is not None else 0
+        module_candidates_len = len(module_candidates) if module_candidates is not None else 0
+
+        if candidates_len + module_candidates_len == 1:
+            if candidates_len == 1:
                 self.view.window().open_file(candidates[0].get_source_location(), sublime.ENCODED_POSITION)
                 return
-            if len(module_candidates) == 1:
+            if module_candidates_len == 1:
                 self.view.window().open_file(module_candidates[0].location.filename)
                 return
 
