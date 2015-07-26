@@ -1424,15 +1424,28 @@ autofix_state = AutoFixState()
 class SublimeHaskellAutoFix(SublimeHaskellWindowCommand):
     def run(self):
         if self.window.active_view().file_name():
-            self.messages = hsdev_client.check_lint([self.window.active_view().file_name()])
-            if self.messages is None:
-                show_status_message('Check & Lint: timeout', False)
-                return
-            self.corrections = list(filter(lambda corr: os.path.samefile(corr.file, self.window.active_view().file_name()), hsdev_client.autofix_show(self.messages)))
+            def on_resp(msgs):
+                self.messages = msgs
+                self.status_msg.stop()
+                if msgs is None:
+                    return
+                sublime.set_timeout(self.on_got_messages, 0)
 
-            if self.corrections:
-                autofix_state.set(self.window.active_view(), self.corrections)
-                autofix_state.mark()
+            def on_err(err):
+                self.status_msg.fail()
+                self.status_msg.stop()
+                show_status_message('Check & Lint: {0}'.format(err), False)
+
+            self.status_msg = status_message_process('Autofix: ' + self.window.active_view().file_name(), priority = 3)
+            self.status_msg.start()
+            hsdev_client.check_lint([self.window.active_view().file_name()], wait = False, on_response = on_resp, on_error = on_err, timeout = 0)
+
+    def on_got_messages(self):
+        self.corrections = list(filter(lambda corr: os.path.samefile(corr.file, self.window.active_view().file_name()), hsdev_client.autofix_show(self.messages)))
+        if self.corrections:
+            autofix_state.set(self.window.active_view(), self.corrections)
+            autofix_state.mark()
+
 
 class SublimeHaskellAutoFixPrevious(SublimeHaskellWindowCommand):
     def run(self):
