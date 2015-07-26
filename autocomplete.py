@@ -767,8 +767,8 @@ class SublimeHaskellGoToHackageModule(SublimeHaskellTextCommand):
         else:
             qsymbol = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
 
+            ms = []
             if qsymbol.name is None: # module
-                ms = []
                 scope = self.view.file_name()
                 if scope:
                     ms = [m for m in hsdev_client.scope_modules(
@@ -778,15 +778,35 @@ class SublimeHaskellGoToHackageModule(SublimeHaskellTextCommand):
                     ms = [m for m in hsdev_client.list_modules(
                         cabal = current_is_cabal(),
                         sandboxes = current_sandboxes()) if m.name == qsymbol.module and m.by_cabal()]
+            else: # symbol
+                scope = self.view.file_name()
+                if scope:
+                    decls = hsdev_client.whois(
+                        '{0}.{1}'.format(qsymbol.module_as or qsymbol.module, qsymbol.name) if qsymbol.module else qsymbol.name,
+                        file = scope,
+                        sandbox = current_sandboxes())
+                    full_name = '{0}.{1}'.format(qsymbol.module, qsymbol.name) if qsymbol.module else qsymbol.name
+                    if not decls:
+                        decls = hsdev_client.lookup(
+                            full_name,
+                            file = scope,
+                            sandbox = current_sandboxes())
+                    if not decls:
+                        decls = hsdev_client.symbo(
+                            name = full_name)
+                    if not decls:
+                        show_status_message('Module for symbol {0} not found'.format(full_name))
+                        return
+                    ms = [decl.defined_module() for decl in decls]
 
-                if len(ms) == 0:
-                    show_status_message('Module {0} not found'.format(module_name))
-                    return
-                if len(ms) == 1:
-                    webbrowser.open('http://hackage.haskell.org/package/{0}/docs/{1}.html'.format(ms[0].location.package.package_id(), ms[0].name.replace('.', '-')))
-                else:
-                    self.candidates = ms[:]
-                    self.view.window().show_quick_panel([[m.name, m.location.package.package_id()] for m in self.candidates], self.on_done)
+            if len(ms) == 0:
+                show_status_message('Module {0} not found'.format(module_name))
+                return
+            if len(ms) == 1:
+                webbrowser.open('http://hackage.haskell.org/package/{0}/docs/{1}.html'.format(ms[0].location.package.package_id(), ms[0].name.replace('.', '-')))
+            else:
+                self.candidates = ms[:]
+                self.view.window().show_quick_panel([[m.name, m.location.package.package_id()] for m in self.candidates], self.on_done)
 
     def on_done(self, idx):
         if idx == -1:
