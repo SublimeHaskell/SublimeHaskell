@@ -1388,7 +1388,7 @@ class AutoFixState(object):
     def message(self, cur):
         if cur.corrector.contents:
             return u'\u2014 {0}\n  Why not:\n\n{1}'.format(cur.message, cur.corrector.contents)
-        return cur.message
+        return u'\u2014 {0}'.format(cur.message)
 
     def unmark(self):
         self.view.erase_regions('autofix')
