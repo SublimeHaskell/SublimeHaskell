@@ -729,13 +729,14 @@ class HsDev(object):
         return cmd('ping', [], {}, lambda r: r and ('message' in r) and (r['message'] == 'pong'))
 
     @async_command
-    def scan(self, cabal = None, sandboxes = [], projects = [], files = [], paths = [], docs = False, infer = False):
+    def scan(self, cabal = None, sandboxes = [], projects = [], files = [], paths = [], ghc = [], docs = False, infer = False):
         opts = concat_opts([
             (cabal, {'cabal': None}),
             (sandboxes, {'sandbox': sandboxes}),
             (projects, {'project': projects}),
             (files, {'file': files}),
             (paths, {'path': paths}),
+            (ghc, {'ghc': ghc}),
             (docs, {'docs': None}),
             (infer, {'infer': None})])
 
