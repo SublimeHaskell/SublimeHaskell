@@ -1387,13 +1387,15 @@ class AutoFixState(object):
 
     def message(self, cur):
         if cur.corrector.contents:
-            return '{0}\n  Why not:\n    {1}'.format(cur.message, cur.corrector.contents)
+            return u'\u2014 {0}\n  Why not:\n\n{1}'.format(cur.message, cur.corrector.contents)
         return cur.message
 
     def unmark(self):
         self.view.erase_regions('autofix')
         self.view.erase_regions('autofix_current')
-        self.view.window().run_command('hide_panel', {'panel': 'output.' + 'sublime_haskell_auto_fix'})
+        w = self.view.window()
+        if w:
+            w.run_command('hide_panel', {'panel': 'output.' + 'sublime_haskell_auto_fix'})
 
     def count(self):
         return len(self.corrections)

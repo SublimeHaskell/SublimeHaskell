@@ -9,9 +9,9 @@
 	<key>patterns</key>
 	<array>
 		<dict>
-			<key>begin</key>
+			<key>match</key>
 			<string>^\s+(Why not:)$</string>
-			<key>beginCaptures</key>
+			<key>captures</key>
 			<dict>
 				<key>1</key>
 				<dict>
@@ -19,21 +19,12 @@
 					<string>string.quoted.double.autofix comment.details.whynot.autofix</string>
 				</dict>
 			</dict>
-			<key>end</key>
-			<string>^ foo$</string>
 			<key>name</key>
 			<string>message.whynot.autofix</string>
-			<key>patterns</key>
-			<array>
-				<dict>
-					<key>include</key>
-					<string>#expression_stuff</string>
-				</dict>
-			</array>
 		</dict>
 		<dict>
 			<key>match</key>
-			<string>^([A-Za-z].*)$</string>
+			<string>^(—\s.*)$</string>
 			<key>captures</key>
 			<dict>
 				<key>1</key>
@@ -44,6 +35,10 @@
 			</dict>
 			<key>name</key>
 			<string>comment.message.autofix</string>
+		</dict>
+		<dict>
+			<key>include</key>
+			<string>#expression_stuff</string>
 		</dict>
 	</array>
 	<key>repository</key>
