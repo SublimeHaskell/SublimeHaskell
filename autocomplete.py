@@ -1383,7 +1383,7 @@ class AutoFixState(object):
         rgns = [cur.to_region(self.view)]
         self.view.add_regions('autofix_current', rgns, 'warning', 'dot')
         self.view.show(sublime.Region(rgns[0].a, rgns[-1].b))
-        write_panel(self.view.window(), self.message(cur), 'sublime_haskell_auto_fix', syntax = 'HaskellOutputPanel')
+        write_panel(self.view.window(), self.message(cur), 'sublime_haskell_auto_fix', syntax = 'HaskellAutoFix')
 
     def message(self, cur):
         if cur.corrector.contents:
@@ -1948,10 +1948,11 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
                 pass
 
     def on_post_save(self, view):
-        if is_inspected_source(view):
-            filename = view.file_name()
-            if filename:
-                hsdev_inspector.mark_file_dirty(filename)
+        pass
+        # if is_inspected_source(view):
+        #     filename = view.file_name()
+        #     if filename:
+        #         hsdev_inspector.mark_file_dirty(filename)
 
     def on_query_context(self, view, key, operator, operand, match_all):
         if key == 'haskell_autofix':
