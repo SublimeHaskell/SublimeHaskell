@@ -484,7 +484,7 @@ def get_source_dir(filename):
         return os.path.dirname(filename)
 
     _project_name, cabal_file = get_cabal_in_dir(cabal_dir)
-    exit_code, out, err = call_and_wait(['hsinspect', 'cabal', cabal_file])
+    exit_code, out, err = call_and_wait(['hsinspect', cabal_file])
 
     if exit_code == 0:
         info = json.loads(out)
