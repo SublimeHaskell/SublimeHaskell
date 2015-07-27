@@ -52,6 +52,8 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
         self.corrections = []
         self.fly_mode = fly_mode
         self.filename = self.view.file_name()
+        if not self.filename:
+            return
         self.contents = None
         if self.view.is_dirty():
             self.contents = self.view.substr(sublime.Region(0, self.view.size()))
