@@ -49,6 +49,9 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
         self.msgs = []
         self.corrections = []
         self.filename = self.view.file_name()
+        self.contents = None
+        if self.view.is_dirty():
+            self.contents = self.view.substr(sublime.Region(0, self.view.size()))
         hide_output(self.view)
         if not cmds:
             return
@@ -85,10 +88,10 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
                 # autocomplete.hsdev_client.autofix_show(self.msgs, on_response = self.on_autofix)
             else:
                 cmd, tail_cmds = cmds[0], cmds[1:]
-                (fun, modify_arg, modify_messages) = cmd
+                (fn, modify_args, modify_msgs) = cmd
 
                 def on_resp(msgs):
-                    self.messages.extend(modify_messages(msgs))
+                    self.messages.extend(modify_msgs(msgs))
                     self.msgs.extend(msgs)
                     self.go_chain(tail_cmds)
 
@@ -96,7 +99,7 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
                     self.status_msg.fail()
                     self.go_chain([])
 
-                fun(modify_arg(self.filename), wait = False, on_response = on_resp, on_error = on_err)
+                fn(modify_args(self.filename), contents = self.contents, wait = False, on_response = on_resp, on_error = on_err)
         except Exception as e:
             log('hsdev ghc-mod chain fails with: {0}'.format(e), log_error)
             self.status_msg.stop()

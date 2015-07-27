@@ -914,24 +914,27 @@ class HsDev(object):
         cmd('cabal list', [query] if query else [], {}, lambda r: [parse_cabal_package(s) for s in r] if r else None)
 
     @list_command
-    def lint(self, files):
-        opts = concat_opts([])
+    def lint(self, files, contents = None):
+        opts = concat_opts([
+            (contents, {'data': json.dumps(contents)})])
 
         return cmd('lint', files, opts)
 
     @list_command
-    def check(self, files, sandbox = None, ghc = []):
+    def check(self, files, sandbox = None, ghc = [], contents = None):
         opts = concat_opts([
             (ghc, {'ghc': ghc}),
-            (sandbox, {'sandbox': sandbox})])
+            (sandbox, {'sandbox': sandbox}),
+            (contents, {'data': json.dumps(contents)})])
 
         return cmd('check', files, opts)
 
     @list_command
-    def check_lint(self, files, sandbox = None, ghc = []):
+    def check_lint(self, files, sandbox = None, ghc = [], contents = None):
         opts = concat_opts([
             (ghc, {'ghc': ghc}),
-            (sandbox, {'sandbox': sandbox})])
+            (sandbox, {'sandbox': sandbox}),
+            (contents, {'data': json.dumps(contents)})])
 
         return cmd('check-lint', files, opts)
 
