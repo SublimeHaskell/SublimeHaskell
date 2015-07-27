@@ -55,7 +55,8 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
         self.contents = None
         if self.view.is_dirty():
             self.contents = self.view.substr(sublime.Region(0, self.view.size()))
-        hide_output(self.view)
+        if not self.fly_mode:
+            hide_output(self.view)
         if not cmds:
             return
         else:
