@@ -10,14 +10,12 @@ from threading import Thread
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     import autocomplete
-    from autobuild import fly_check_done
     from parseoutput import OutputPoint, OutputMessage, parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages, write_output
     from ghci import parse_info
     import symbols
 else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.autocomplete as autocomplete
-    from SublimeHaskell.autobuild import fly_check_done
     from SublimeHaskell.parseoutput import OutputPoint, OutputMessage, parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages, write_output
     from SublimeHaskell.ghci import parse_info
     import SublimeHaskell.symbols as symbols
@@ -90,8 +88,6 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
                             get_cabal_project_dir_of_file(self.filename) or os.path.dirname(self.filename),
                             show_panel = not self.fly_mode))
                 sublime.set_timeout(lambda: mark_messages_in_views(output_messages), 0)
-                if self.fly_mode:
-                    fly_check_done()
 
                 # autocomplete.hsdev_client.autofix_show(self.msgs, on_response = self.on_autofix)
             else:
@@ -111,8 +107,6 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
         except Exception as e:
             log('hsdev ghc-mod chain fails with: {0}'.format(e), log_error)
             self.status_msg.stop()
-            if self.fly_mode:
-                fly_check_done()
 
     def on_autofix(self, corrs):
         self.corrections = corrs
