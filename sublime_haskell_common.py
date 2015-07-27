@@ -624,6 +624,8 @@ def output_text(view, text = None, clear = False):
     view.run_command('sublime_haskell_output_text', { 'text': (text or ''), 'clear': str(clear) })
 
 def output_panel(window, text = '', panel_name = 'sublime_haskell_output_panel', syntax = None, show_panel = True):
+    if not window:
+        return None
     output_view = window.get_output_panel(panel_name)
     if syntax is not None:
         output_view.set_syntax_file('Packages/SublimeHaskell/Syntaxes/{0}.tmLanguage'.format(syntax))
