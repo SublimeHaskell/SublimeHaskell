@@ -51,6 +51,7 @@ class FlyCheckLint(threading.Thread):
         self.view = LockedObject(None)
         self.fly_event = threading.Event()
         self.free_event = threading.Event()
+        self.free()
 
     def modified(self, view):
         with self.view as v:
@@ -77,7 +78,8 @@ class FlyCheckLint(threading.Thread):
                     elif auto_lint_enabled:
                         v.window().run_command('sublime_haskell_lint', {'fly': True})
 
-            self.free_event.wait()
+            self.free_event.wait(60.0)
+            self.free_event.clear()
 
 def fly_check_done():
     global fly_agent
