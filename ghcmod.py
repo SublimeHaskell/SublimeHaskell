@@ -32,15 +32,15 @@ def lint_as_hints(msgs):
 
 
 def hsdev_check():
-    return (autocomplete.hsdev_client.check, lambda file: [file], lambda ms: ms)
+    return (autocomplete.hsdev_client.check, lambda file: [file], lambda ms: ms, { 'ghc': get_setting_async('ghc_opts') })
 def hsdev_lint():
-    return (autocomplete.hsdev_client.lint, lambda file: [file], lambda ms: ms)
+    return (autocomplete.hsdev_client.lint, lambda file: [file], lambda ms: ms, {})
 # def hsdev_check_lint():
-#     return (autocomplete.hsdev_client.ghcmod_check_lint, lambda file: [file], lambda ms: ms)
+#     return (autocomplete.hsdev_client.ghcmod_check_lint, lambda file: [file], lambda ms: ms, { 'ghc': get_setting_async('ghc_opts') })
 
 def messages_as_hints(cmd):
-    (fn, arg, msg) = cmd
-    return (fn, arg, lambda ms: [dict(m, level = 'hint') for m in ms])
+    (fn, arg, msg, kwargs) = cmd
+    return (fn, arg, lambda ms: [dict(m, level = 'hint') for m in ms], kwargs)
 
 class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
     def run(self, edit):
@@ -94,7 +94,7 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
                 # autocomplete.hsdev_client.autofix_show(self.msgs, on_response = self.on_autofix)
             else:
                 cmd, tail_cmds = cmds[0], cmds[1:]
-                (fn, modify_args, modify_msgs) = cmd
+                (fn, modify_args, modify_msgs, kwargs) = cmd
 
                 def on_resp(msgs):
                     self.messages.extend(modify_msgs(msgs))
@@ -105,7 +105,7 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
                     self.status_msg.fail()
                     self.go_chain([])
 
-                fn(modify_args(self.filename), contents = self.contents, wait = False, on_response = on_resp, on_error = on_err)
+                fn(modify_args(self.filename), contents = self.contents, wait = False, on_response = on_resp, on_error = on_err, **kwargs)
         except Exception as e:
             log('hsdev ghc-mod chain fails with: {0}'.format(e), log_error)
             self.status_msg.stop()

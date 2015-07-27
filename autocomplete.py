@@ -1454,7 +1454,7 @@ class SublimeHaskellAutoFix(SublimeHaskellWindowCommand):
 
             self.status_msg = status_message_process('Autofix: ' + self.window.active_view().file_name(), priority = 3)
             self.status_msg.start()
-            hsdev_client.check_lint([self.window.active_view().file_name()], wait = False, on_response = on_resp, on_error = on_err, timeout = 0)
+            hsdev_client.check_lint([self.window.active_view().file_name()], ghc = get_setting_async('ghc_opts'), wait = False, on_response = on_resp, on_error = on_err, timeout = 0)
 
     def on_got_messages(self):
         self.corrections = list(filter(lambda corr: os.path.samefile(corr.file, self.window.active_view().file_name()), hsdev_client.autofix_show(self.messages)))

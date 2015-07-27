@@ -98,7 +98,7 @@ class OutputMessage(object):
         "Return the Region referred to by this error message."
         # Convert line and column count to zero-based indices:
         if self.start == self.end: # trimmed full line
-            return trim_region(view.line(self.start.to_point_of_view(view)))
+            return trim_region(view, view.line(self.start.to_point_of_view(view)))
         return sublime.Region(self.start.to_point_of_view(view), self.end.to_point_of_view(view))
 
 
