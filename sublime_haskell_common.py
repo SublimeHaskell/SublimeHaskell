@@ -70,6 +70,7 @@ def preload_settings():
     get_setting('hsdev_log_config')
     get_setting('inspect_modules')
     get_setting('snippet_replace')
+    get_setting('lint_check_fly')
     get_setting('ghc_opts')
     get_setting('log')
 
@@ -622,13 +623,14 @@ class SublimeHaskellOutputText(sublime_plugin.TextCommand):
 def output_text(view, text = None, clear = False):
     view.run_command('sublime_haskell_output_text', { 'text': (text or ''), 'clear': str(clear) })
 
-def output_panel(window, text = '', panel_name = 'sublime_haskell_output_panel', syntax = None):
+def output_panel(window, text = '', panel_name = 'sublime_haskell_output_panel', syntax = None, show_panel = True):
     output_view = window.get_output_panel(panel_name)
     if syntax is not None:
         output_view.set_syntax_file('Packages/SublimeHaskell/Syntaxes/{0}.tmLanguage'.format(syntax))
     output_text(output_view, text, clear = True)
     output_view.sel().clear()
-    window.run_command('show_panel', { 'panel': ('output.' + panel_name) })
+    if show_panel:
+        window.run_command('show_panel', { 'panel': ('output.' + panel_name) })
     return output_view
 
 

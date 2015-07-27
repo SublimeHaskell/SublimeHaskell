@@ -98,7 +98,7 @@ class OutputMessage(object):
         "Return the Region referred to by this error message."
         # Convert line and column count to zero-based indices:
         if self.start == self.end: # trimmed full line
-            return trim_region(view.line(self.start.to_point_of_view()))
+            return trim_region(view.line(self.start.to_point_of_view(view)))
         return sublime.Region(self.start.to_point_of_view(view), self.end.to_point_of_view(view))
 
 
@@ -331,10 +331,10 @@ def write_panel(window, text, panel_name = "sublime_haskell_panel", syntax = Non
     info_view.settings().set("result_file_regex", symbol_file_regex)
     return info_view
 
-def write_output(view, text, cabal_project_dir):
+def write_output(view, text, cabal_project_dir, show_panel = True):
     "Write text to Sublime's output panel."
     global error_view
-    error_view = output_panel(view.window(), text, panel_name = ERROR_PANEL_NAME, syntax = 'HaskellOutputPanel')
+    error_view = output_panel(view.window(), text, panel_name = ERROR_PANEL_NAME, syntax = 'HaskellOutputPanel', show_panel = show_panel)
     error_view.settings().set("result_file_regex", result_file_regex)
     error_view.settings().set("result_base_dir", cabal_project_dir)
 

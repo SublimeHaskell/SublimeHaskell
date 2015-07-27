@@ -77,6 +77,9 @@
 	// Enable hsdev
 	"enable_hsdev": false,
 
+	// lint & check on the fly
+	"lint_check_fly": false,
+
 	// Enables hdevtools (it must be installed, cabal install hdevtools)
 	// See the add_to_PATH settings to specify a custom location.
 	"enable_hdevtools": true,

@@ -10,12 +10,14 @@ from threading import Thread
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     import autocomplete
+    from autobuild import fly_check_done
     from parseoutput import OutputPoint, OutputMessage, parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages, write_output
     from ghci import parse_info
     import symbols
 else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.autocomplete as autocomplete
+    from SublimeHaskell.autobuild import fly_check_done
     from SublimeHaskell.parseoutput import OutputPoint, OutputMessage, parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages, write_output
     from SublimeHaskell.ghci import parse_info
     import SublimeHaskell.symbols as symbols
@@ -44,10 +46,11 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
     def run(self, edit):
         pass
 
-    def run_chain(self, cmds, msg):
+    def run_chain(self, cmds, msg, fly_mode = False):
         self.messages = []
         self.msgs = []
         self.corrections = []
+        self.fly_mode = fly_mode
         self.filename = self.view.file_name()
         self.contents = None
         if self.view.is_dirty():
@@ -82,8 +85,11 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
                         sublime.set_timeout(lambda: write_output(
                             self.view,
                             output_text,
-                            get_cabal_project_dir_of_file(self.filename) or os.path.dirname(self.filename)))
+                            get_cabal_project_dir_of_file(self.filename) or os.path.dirname(self.filename),
+                            show_panel = not self.fly_mode))
                 sublime.set_timeout(lambda: mark_messages_in_views(output_messages), 0)
+                if self.fly_mode:
+                    fly_check_done()
 
                 # autocomplete.hsdev_client.autofix_show(self.msgs, on_response = self.on_autofix)
             else:
@@ -103,6 +109,8 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
         except Exception as e:
             log('hsdev ghc-mod chain fails with: {0}'.format(e), log_error)
             self.status_msg.stop()
+            if self.fly_mode:
+                fly_check_done()
 
     def on_autofix(self, corrs):
         self.corrections = corrs
@@ -127,18 +135,18 @@ def ghcmod_command(cmdname):
 
 class SublimeHaskellCheck(SublimeHaskellGhcModChain):
     @ghcmod_command('check')
-    def run(self, edit):
-        self.run_chain([hsdev_check()], 'Checking')
+    def run(self, edit, fly = False):
+        self.run_chain([hsdev_check()], 'Checking', fly_mode = fly)
 
 class SublimeHaskellLint(SublimeHaskellGhcModChain):
     @ghcmod_command('lint')
-    def run(self, edit):
-        self.run_chain([hsdev_lint()], 'Linting')
+    def run(self, edit, fly = False):
+        self.run_chain([hsdev_lint()], 'Linting', fly_mode = fly)
 
 class SublimeHaskellCheckAndLint(SublimeHaskellGhcModChain):
     @ghcmod_command('check_and_lint')
-    def run(self, edit):
-        self.run_chain([hsdev_check(), messages_as_hints(hsdev_lint())], 'Checking and Linting')
+    def run(self, edit, fly = False):
+        self.run_chain([hsdev_check(), messages_as_hints(hsdev_lint())], 'Checking and Linting', fly_mode = fly)
 
 
 
