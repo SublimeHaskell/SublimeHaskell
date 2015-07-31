@@ -801,7 +801,7 @@ class SublimeHaskellGoToHackageModule(SublimeHaskellTextCommand):
                             file = scope,
                             sandbox = current_sandboxes())
                     if not decls:
-                        decls = hsdev_client.symbo(
+                        decls = hsdev_client.symbol(
                             name = qsymbol.full_name())
                     if not decls:
                         show_status_message('Module for symbol {0} not found'.format(qsymbol.full_name()))

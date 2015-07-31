@@ -751,7 +751,7 @@ class HsDev(object):
 
         return cmd('docs', [], opts)
 
-     @async_command
+    @async_command
     def infer(self, projects = [], files = [], modules = []):
         opts = concat_opts([
             (projects, {'project': projects}),
@@ -760,7 +760,7 @@ class HsDev(object):
 
         return cmd('infer', [], opts)
 
-   @async_command
+    @async_command
     def rescan(self, cabal = None, sandboxes = [], projects = [], files = [], paths = [], docs = False, infer = False):
         opts = concat_opts([
             (cabal, {'cabal': None}),

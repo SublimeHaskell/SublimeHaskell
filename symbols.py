@@ -331,11 +331,14 @@ class TypeBase(Declaration):
                 brief_parts.append(u'{0} =>'.format(self.context[0]))
             else:
                 brief_parts.append(u'({0}) =>'.format(', '.join(self.context)))
-        brief_parts.append(self.name)
-        if self.args:
-            brief_parts.append(u' '.join(self.args))
+
         if self.definition:
-            brief_parts.append(u' = {0}'.format(self.definition))
+            brief_parts.append(u'{0}'.format(self.definition))
+        else:
+            brief_parts.append(self.name)
+            if self.args:
+                brief_parts.append(u' '.join(self.args))
+
         return u' '.join(brief_parts)
 
 class Type(TypeBase):
