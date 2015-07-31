@@ -743,6 +743,24 @@ class HsDev(object):
         return cmd('scan', [], opts)
 
     @async_command
+    def docs(self, projects = [], files = [], modules = []):
+        opts = concat_opts([
+            (projects, {'project': projects}),
+            (files, {'file': files}),
+            (modules, {'module': modules})])
+
+        return cmd('docs', [], opts)
+
+     @async_command
+    def infer(self, projects = [], files = [], modules = []):
+        opts = concat_opts([
+            (projects, {'project': projects}),
+            (files, {'file': files}),
+            (modules, {'module': modules})])
+
+        return cmd('infer', [], opts)
+
+   @async_command
     def rescan(self, cabal = None, sandboxes = [], projects = [], files = [], paths = [], docs = False, infer = False):
         opts = concat_opts([
             (cabal, {'cabal': None}),
