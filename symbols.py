@@ -325,6 +325,9 @@ class TypeBase(Declaration):
         return (u'{0} {1}\t{2}'.format(self.name, ' '.join(self.args), self.imported_from_name()), self.name)
 
     def brief(self):
+        if self.definition:
+            return self.definition
+
         brief_parts = [self.what]
         if self.context:
             if len(self.context) == 1:
@@ -332,12 +335,9 @@ class TypeBase(Declaration):
             else:
                 brief_parts.append(u'({0}) =>'.format(', '.join(self.context)))
 
-        if self.definition:
-            brief_parts.append(u'{0}'.format(self.definition))
-        else:
-            brief_parts.append(self.name)
-            if self.args:
-                brief_parts.append(u' '.join(self.args))
+        brief_parts.append(self.name)
+        if self.args:
+            brief_parts.append(u' '.join(self.args))
 
         return u' '.join(brief_parts)
 
@@ -367,7 +367,7 @@ class Class(TypeBase):
     Haskell class declaration
     """
     def __init__(self, name, context, args, definition = None, docs = None, location = None, imported = [], defined = None, position = None, module = None):
-        super(Class, self).__init__(name, 'class', context, args, None, docs, location, imported, defined, position, module)
+        super(Class, self).__init__(name, 'class', context, args, definition, docs, location, imported, defined, position, module)
 
 def update_with(l, r, default_value, f):
     """
