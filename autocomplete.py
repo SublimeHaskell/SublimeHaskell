@@ -857,6 +857,37 @@ class SublimeHaskellReinspectAll(SublimeHaskellWindowCommand):
         else:
             show_status_message("inspector not connected", is_ok=False)
 
+class SublimeHaskellInferDocs(SublimeHaskellTextCommand):
+    """
+    Infer types and scan docs for current module
+    """
+    def run(self, edit, filename = None):
+        self.current_file_name = filename or self.view.file_name()
+        self.status_msg = status_message_process("Scanning docs for {0}".format(self.current_file_name), priority = 3)
+        self.status_msg.start()
+
+        def run_infer():
+            self.status_msg = status_message_process("Inferring types for {0}".format(self.current_file_name), priority = 3)
+            self.status_msg.start()
+
+            def on_resp_(r):
+                self.status_msg.stop()
+            def on_err_(e):
+                self.status_msg.fail()
+                self.status_msg.stop()
+
+            hsdev_client.infer(files = [self.current_file_name], on_response = on_resp_, on_error = on_err_)
+
+        def on_resp(r):
+            self.status_msg.stop()
+            run_infer()
+
+        def on_err(e):
+            self.status_msg.fail()
+            self.status_msg.stop()
+            run_infer()
+
+        hsdev_client.docs(files = [self.current_file_name], on_response = on_resp, on_error = on_err)
 
 class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
     """

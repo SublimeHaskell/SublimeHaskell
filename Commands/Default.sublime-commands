@@ -138,6 +138,10 @@
         "command": "sublime_haskell_reinspect_all"
     },
     {
+        "caption": "SublimeHaskell: Scan docs and infer types",
+        "command": "sublime_haskell_infer_docs"
+    },
+    {
         "caption": "SublimeHaskell: Go to next error",
         "command": "sublime_haskell_next_error"
     },
