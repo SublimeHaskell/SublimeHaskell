@@ -7,8 +7,20 @@ Requirements
 Necessary:
 * ghc and a recent Haskell Platform (>= 2012 should do fine)
 * cabal
-* Cabal packages: base, bytestring, aeson, haskell-src-exts (== 1.14.*), haddock (`cabal install aeson haskell-src-exts haddock`)
+* Cabal packages: base, bytestring, aeson, haskell-src-exts (== 1.14.\*), haddock (`cabal install aeson haskell-src-exts haddock`)
 * If you are using GHC 7.6, you might have trouble with too new versions of haddock; in that case, try `cabal install haddock --constraint=haddock==2.13.2.1`
+
+Install all the dependencies by issuing this command:
+
+```sh
+cabal install ghc-mod \
+  --constraint="ghc-mod==4.*" \
+  --constraint="haskell-src-exts==1.14.*" \
+  --constraint="hlint==1.9.*" \
+  --constraint="hscolour<1.21"
+```
+
+(hlint >= 1.9.21 requires new hscolour and haskell-src-exts >= 1.16)
 
 Optional, but useful:
 * [ghc-mod](http://hackage.haskell.org/package/ghc-mod) (for import and LANGUAGE completions and type inference, `cabal install ghc-mod`)
