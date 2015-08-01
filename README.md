@@ -1,8 +1,6 @@
-README
-======
+# README
 
-Requirements
-------------
+## Requirements
 
 Necessary:
 * ghc and a recent Haskell Platform (>= 2012 should do fine)
@@ -32,14 +30,14 @@ Optional, but useful:
 Binaries:
 * If your `cabal`, `ghc-mod`, `ghc` etc. are not installed in a system PATH, you have to adjust SublimeHaskell's `add_to_PATH` setting.
 
-Installation
-------------
+## Installation
+
 1. Get Sublime Text 2: <http://www.sublimetext.com/>
 2. Install the Sublime Package Control package: <http://wbond.net/sublime_packages/package_control/installation>
 3. Use Package Control to install this package (SublimeHaskell)
 
-Usage
------
+## Usage
+
 In short: Press `Shift-Ctrl-P` and type `haskell` to explore all commands.
 
 When editing Haskell source files that are part of a Cabal project, automatic error highlighting and enhanced auto-completion are available.
@@ -63,8 +61,7 @@ To insert inferred type use `Insert type` (`ctrl-k ctrl-h ctrl-i`).
 You can jump between the errors and warnings with `F4` and `Shift-F4`.
 To show hidden error output, use command `Show error panel` (`ctrl-alt-e`)
 
-Build Systems
--------------
+## Build Systems
 
 You don't have to use SublimeHaskell's built-in build functionality.
 
@@ -106,8 +103,7 @@ It is also useful to add this to your key bindings to redisplay the error panel 
   { "keys": ["ctrl+alt+b"], "command": "show_panel", "args": {"panel": "output.exec"} }
 ```
 
-Using other useful projects with SublimeText
---------------------------------------------
+## Using other useful projects with SublimeText
 
 ### Jump-to-definition
 
@@ -133,9 +129,7 @@ and `cabal install hasktags`.
 * You can now jump to the source code of definitions outside of your project.
 * The commands `CTags: Show Symbols` and `CTags: Rebuild Tags` currently don't work with `codex`
 
-
-If the ModuleInspector takes too much time
-------------------------------------------
+## If the ModuleInspector takes too much time
 
 The `ModuleInspector` is a program that looks at your Haskell environment to provide auto completion.
 
