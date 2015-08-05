@@ -81,7 +81,7 @@ def get_projects():
             (autocomplete.hsdev_client.list_projects() or [])))
     else:
         folder_files = [src for f in sublime.active_window().folders() for src in autocomplete.list_files_in_dir_recursively(f) if os.path.splitext(src)[1] in [".hs", ".cabal"]]
-        view_files = [v.file_name() for v in sublime.active_window().views() if is_haskell_source(v) or is_cabal_source(v)]
+        view_files = [v.file_name() for v in sublime.active_window().views() if (is_haskell_source(v) or is_cabal_source(v)) and v.file_name()]
         src_files = list(map(lambda p: os.path.normcase(os.path.normpath(p)), folder_files + view_files))
         active_projects = []
         while src_files:
