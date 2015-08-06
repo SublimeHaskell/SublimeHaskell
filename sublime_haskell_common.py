@@ -24,6 +24,9 @@ SUBLIME_ERROR_PANEL_NAME = 'haskell_sublime_load'
 # Used to detect hs-source-dirs for project
 CABAL_INSPECTOR_EXE_PATH = None
 
+def python3():
+    return PyV3
+
 # unicode function
 def to_unicode(s):
     return s if PyV3 else unicode(s)

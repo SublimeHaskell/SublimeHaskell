@@ -1624,9 +1624,9 @@ def dirty(fn):
         if not hasattr(self, 'dirty_lock'):
             self.dirty_lock = threading.Lock()
         acquired = None
-        try:
+        if python3():
             acquired = self.dirty_lock.acquire(blocking = False)
-        except TypeError:
+        else:
             acquired = self.dirty_lock.acquire(False)
         try:
             return fn(self, *args, **kwargs)
