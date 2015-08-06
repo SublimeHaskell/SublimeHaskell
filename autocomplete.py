@@ -186,19 +186,19 @@ def get_qualified_symbol_at_region(view, region):
 # Gets available LANGUAGE options and import modules from ghc-mod
 def get_ghcmod_language_pragmas():
 
-    if get_setting_async('enable_ghc_mod'):
-        return call_ghcmod_and_wait(['lang']).splitlines()
-    elif get_setting_async('enable_hsdev'):
+    if get_setting_async('enable_hsdev'):
         return hsdev_client.ghcmod_lang()
+    elif get_setting_async('enable_ghc_mod'):
+        return call_ghcmod_and_wait(['lang']).splitlines()
 
     return []
 
 def get_ghcmod_flags_pragmas():
 
-    if get_setting_async('enable_ghc_mod'):
-        return call_ghcmod_and_wait(['flag']).splitlines()
-    elif get_setting_async('enable_hsdev'):
+    if get_setting_async('enable_hsdev'):
         return hsdev_client.ghcmod_flags()
+    elif get_setting_async('enable_ghc_mod'):
+        return call_ghcmod_and_wait(['flag']).splitlines()
 
     return []
 
@@ -270,8 +270,8 @@ class CompletionCache(object):
 class AutoCompletion(object):
     """Information for completion"""
     def __init__(self):
-        self.language_pragmas = get_ghcmod_language_pragmas()
-        self.flags_pragmas = get_ghcmod_flags_pragmas()
+        self.language_pragmas = []
+        self.flags_pragmas = []
 
         # cabal name => set of modules, where cabal name is 'cabal' for cabal or sandbox path for cabal-devs
         self.module_completions = LockedObject({})
@@ -494,9 +494,13 @@ class AutoCompletion(object):
             # TODO handle multiple selections
             match_language = LANGUAGE_RE.match(line_contents)
             if match_language:
+                if not self.language_pragmas:
+                    self.language_pragmas = get_ghcmod_language_pragmas()
                 return [(to_unicode(c),) * 2 for c in self.language_pragmas]
             match_options = OPTIONS_GHC_RE.match(line_contents)
             if match_options:
+                if not self.flags_pragmas:
+                    self.flags_pragmas = get_ghcmod_flags_pragmas()
                 return [(to_unicode(c),) * 2 for c in self.flags_pragmas]
 
         return []
