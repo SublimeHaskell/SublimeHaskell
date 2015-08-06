@@ -1318,7 +1318,7 @@ def ghc_eval_x(rs):
             x = json.loads(i) # FIXME: Is it ok?
             if type(x) == str:
                 return x
-        except:
+        except ValueError:
             return i
         return i
     return list(map(process, rs))
