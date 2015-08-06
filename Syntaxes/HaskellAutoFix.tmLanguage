@@ -10,6 +10,12 @@
 	<array>
 		<dict>
 			<key>match</key>
+			<string>^Press (.*)$</string>
+			<key>name</key>
+			<string>keyword.other.autofix</string>
+		</dict>
+		<dict>
+			<key>match</key>
 			<string>^\s+(Why not:)$</string>
 			<key>captures</key>
 			<dict>

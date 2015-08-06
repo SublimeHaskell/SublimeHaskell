@@ -1438,7 +1438,10 @@ class AutoFixState(object):
         rgns = [cur.to_region(self.view)]
         self.view.add_regions('autofix_current', rgns, 'warning', 'dot')
         self.view.show(sublime.Region(rgns[0].a, rgns[-1].b))
-        write_panel(self.view.window(), self.message(cur), 'sublime_haskell_auto_fix', syntax = 'HaskellAutoFix')
+        write_panel(self.view.window(), 'Press {0}\n\n{1}'.format(self.keys(), self.message(cur)), 'sublime_haskell_auto_fix', syntax = 'HaskellAutoFix')
+
+    def keys(self):
+        return u'↑ ↓ ↵ ctrl+z ctrl+y esc'
 
     def message(self, cur):
         if cur.corrector.contents:
