@@ -1391,16 +1391,17 @@ class SublimeHaskellApplyToSelectionListCommand(SublimeHaskellTextCommand):
 
 
 class AutoFixState(object):
-    def __init__(self, view = None, corrections = [], selected = 0, history = []):
+    def __init__(self, view = None, corrections = [], selected = 0, undo_history = [], redo_history = []):
         self.view = view
         self.corrections = corrections
         self.selected = selected
-        self.history = history[:]
+        self.undo_history = undo_history[:]
+        self.redo_history = redo_history[:]
 
     def is_active(self):
         return self.view and self.corrections
 
-    def set(self, view, corrections, selected = 0, history = []):
+    def set(self, view, corrections, selected = 0, undo_history = [], redo_history = []):
         if self.is_active():
             self.clear()
         self.view = view
@@ -1408,7 +1409,8 @@ class AutoFixState(object):
         self.view.set_read_only(True)
         self.corrections = corrections
         self.selected = selected
-        self.history = history[:]
+        self.undo_history = undo_history[:]
+        self.redo_history = redo_history[:]
 
     def clear(self):
         if self.view:
@@ -1417,7 +1419,8 @@ class AutoFixState(object):
             self.unmark()
             self.view = None
             self.corrections.clear()
-            self.history.clear()
+            self.undo_history.clear()
+            self.redo_history.clear()
             self.selected = 0
 
     def get_corrections(self):
@@ -1460,7 +1463,8 @@ class AutoFixState(object):
         self.mark()
 
     def fix_current(self):
-        self.history.append((self.corrections[:], self.selected))
+        self.undo_history.append((self.corrections[:], self.selected))
+        self.redo_history.clear()
         (cur, corrs) = self.get_corrections()
         self.corrections = hsdev_client.autofix_fix(hsdev.encode_corrections([cur]), rest = hsdev.encode_corrections(corrs), pure = True)
         if not self.corrections:
@@ -1473,12 +1477,26 @@ class AutoFixState(object):
         return True
 
     def has_undo(self):
-        return len(self.history) > 0
+        return len(self.undo_history) > 0
 
     def undo(self):
         if not self.has_undo():
             return False
-        (corrs, sel) = self.history.pop()
+        (corrs, sel) = self.undo_history.pop()
+        self.redo_history.append((self.corrections[:], self.selected))
+        self.corrections = corrs[:]
+        self.selected = sel
+        self.mark()
+        return True
+
+    def has_redo(self):
+        return len(self.redo_history) > 0
+
+    def redo(self):
+        if not self.has_redo():
+            return False
+        (corrs, sel) = self.redo_history.pop()
+        self.undo_history.append((self.corrections[:], self.selected))
         self.corrections = corrs[:]
         self.selected = sel
         self.mark()
@@ -1578,6 +1596,17 @@ class SublimeHaskellAutoFixUndo(SublimeHaskellAutoFixWindowBase):
 
     def is_enabled(self):
         return super(SublimeHaskellAutoFixUndo, self).is_enabled() and autofix_state.has_undo()
+
+class SublimeHaskellAutoFixRedo(SublimeHaskellAutoFixWindowBase):
+    def run(self):
+        autofix_state.unmark()
+        self.window.active_view().set_read_only(False)
+        self.window.active_view().run_command('redo')
+        self.window.active_view().set_read_only(True)
+        autofix_state.redo()
+
+    def is_enabled(self):
+        return super(SublimeHaskellAutoFixRedo, self).is_enabled() and autofix_state.has_redo()
 
 class SublimeHaskellAutoFixStop(SublimeHaskellAutoFixWindowBase):
     def run(self):

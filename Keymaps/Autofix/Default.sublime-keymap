@@ -25,6 +25,11 @@
         "command": "sublime_haskell_auto_fix_undo"
     },
     {
+        "keys": ["ctrl+y"],
+        "context": [ { "key": "haskell_autofix" } ],
+        "command": "sublime_haskell_auto_fix_redo"
+    },
+    {
         "keys": ["escape"],
         "context": [ { "key": "haskell_autofix" } ],
         "command": "sublime_haskell_auto_fix_stop"
