@@ -438,6 +438,36 @@ def call_callback(fn, *args, **kwargs):
 
 
 
+class HsDevCallbacks(object):
+    def __init__(self, id, command, on_response = None, on_notify = None, on_error = None):
+        self.id = id
+        self.command = command
+        self.start_time = time.clock()
+        self.on_response = on_response
+        self.on_notify = on_notify
+        self.on_error = on_error
+
+    def time(self):
+        return time.clock() - self.start_time if self.start_time is not None else None
+
+    def log_time(self):
+        log('{0}: {1} seconds'.format(self.command, self.time()), log_trace)
+
+    def call_response(self, r):
+        self.log_time()
+        call_callback(self.on_response, r)
+
+    def call_notify(self, n):
+        call_callback(self.on_notify, n)
+
+    def call_error(self, e, ds = None):
+        self.log_time()
+        if ds is not None:
+            log('{0} returns error: {1}, details: {2}'.format(self.command, e, ds), log_error)
+        else:
+            log('{0} returns error: {1}'.format(self.command, e), log_error)
+        call_callback(self.on_error, e)
+
 class HsDev(object):
     def __init__(self, port = 4567):
         self.port = port
@@ -609,8 +639,8 @@ class HsDev(object):
         else:
             log('HsDev.set_connected called while not in connecting state', log_debug)
 
-    def on_receive(self, id, on_response = None, on_notify = None, on_error = None):
-        self.map[id] = (on_response, on_notify, on_error)
+    def on_receive(self, id, command, on_response = None, on_notify = None, on_error = None):
+        self.map[id] = HsDevCallbacks(id, command, on_response, on_notify, on_error)
 
     def verify_connected(self):
         if self.is_connected():
@@ -630,8 +660,7 @@ class HsDev(object):
 
         # send error to callbacks
         for on_msg in self.map.values():
-            if on_msg[2]:
-                on_msg[2]('connection lost')
+            on_msg.on_error('connection lost')
 
         self.map = {}
         self.id = 1
@@ -642,6 +671,7 @@ class HsDev(object):
 
     def call(self, command, args = [], opts = {}, on_response = None, on_notify = None, on_error = None, wait = False, timeout = None, id = None):
         # log
+        args_cmd = 'hsdev {0}'.format(' '.join([command] + args))
         call_cmd = 'hsdev {0}'.format(' '.join([command] + args + flatten_opts(opts)))
 
         if not self.verify_connected():
@@ -666,7 +696,7 @@ class HsDev(object):
                 if id is None:
                     id = str(self.id)
                     self.id = self.id + 1
-                self.on_receive(id, on_response_, on_notify, on_error_)
+                self.on_receive(id, args_cmd, on_response_, on_notify, on_error_)
 
             opts.update({'no-file': None})
             msg = json.dumps({
@@ -694,18 +724,14 @@ class HsDev(object):
                 resp = json.loads(self.get_response())
                 if 'id' in resp:
                     if resp['id'] in self.map:
-                        (on_resp, on_not, on_err) = self.map[resp['id']]
+                        callbacks = self.map[resp['id']]
                         if 'notify' in resp:
-                            if on_not:
-                                on_not(resp['notify'])
+                            callbacks.call_notify(resp['notify'])
                         if 'error' in resp:
-                            log('hsdev returns error: {0}, details: {1}'.format(resp['error'], resp.get('details')), log_error)
-                            if on_err:
-                                on_err(resp['error'])
+                            callbacks.call_error(resp['error'], resp.get('details'))
                             self.map.pop(resp['id'])
                         if 'result' in resp:
-                            if on_resp:
-                                on_resp(resp['result'])
+                            callbacks.call_response(resp['result'])
                             self.map.pop(resp['id'])
             except Exception as e:
                 self.connection_lost('listen', e)
