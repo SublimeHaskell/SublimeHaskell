@@ -1748,8 +1748,8 @@ class HsDevAgent(threading.Thread):
 
             try:
                 self.inspect(paths = scan_paths, projects = projects, files = files)
-            except:
-                pass
+            except Exception as e:
+                log('HsDevAgent inspect exception: {0}'.format(e))
 
             load_cabal = []
             with self.cabal_to_load as cabal_to_load:
@@ -1761,10 +1761,6 @@ class HsDevAgent(threading.Thread):
 
             if load_cabal or scan_paths or projects or files:
                 run_async(autocompletion.drop_completions_async)
-                # if load_cabal:
-                #     run_async(autocompletion.update_cabal_completions)
-                # if scan_paths or projects or files:
-                #     run_async(autocompletion.update_sources_completions)
                 run_async(autocompletion.init_completions_async)
             self.reinspect_event.wait(AGENT_SLEEP_TIMEOUT)
             self.reinspect_event.clear()
