@@ -5,7 +5,7 @@ import sublime_plugin
 import re
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, log, log_trace, as_sandboxes, get_ghc_opts
+    from sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, log, log_trace, as_sandboxes, get_ghc_opts, is_haskell_source, show_panel
     from autocomplete import autocompletion, get_qualified_symbol_at_region
     import autocomplete
     from hdevtools import hdevtools_type, hdevtools_enabled
@@ -13,7 +13,7 @@ if int(sublime.version()) < 3000:
     from parseoutput import tabs_offset, sublime_column_to_ghc_column, ghc_column_to_sublime_column
     import hsdev
 else:
-    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, log, log_trace, as_sandboxes, get_ghc_opts
+    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, log, log_trace, as_sandboxes, get_ghc_opts, is_haskell_source, show_panel
     from SublimeHaskell.autocomplete import autocompletion, get_qualified_symbol_at_region
     import SublimeHaskell.autocomplete as autocomplete
     from SublimeHaskell.hdevtools import hdevtools_type, hdevtools_enabled
@@ -87,7 +87,7 @@ class RegionType(object):
 
     def show(self, view):
         expr = self.substr(view)
-        fmt = '{0} :: {1}' if len(expr.splitlines()) == 1 else '{0}\n:: {1}'
+        fmt = '{0} :: {1}' if len(expr.splitlines()) == 1 else '{0}\n\t:: {1}'
         return fmt.format(self.substr(view), self.typename)
 
     def precise_in_region(self, view, other):
@@ -241,6 +241,25 @@ class SublimeHaskellShowType(SublimeHaskellTextCommand):
     def is_enabled(self):
         return is_enabled_haskell_command(self.view, False)
 
+class SublimeHaskellShowTypes(SublimeHaskellShowType):
+    def run(self, edit, filename = None, line = None, column = None):
+        result = self.get_types(filename, int(line) if line else None, int(column) if column else None)
+        self.show_types(result)
+
+    def show_types(self, types):
+        if not types:
+            show_status_message("Can't infer type", False)
+            return
+
+        self.types = types
+        self.output_view = output_panel(self.view.window(), '', panel_name = 'sublime_haskell_show_type', syntax = 'Haskell-SublimeHaskell', show_panel = False)
+
+        regions = []
+        for t in self.types:
+            output_text(self.output_view, '{0}\n'.format(t.show(self.view)), clear = False)
+            regions.append(sublime.Region(self.output_view.size() - 1 - len(t.typename), self.output_view.size() - 1))
+        self.output_view.add_regions('types', regions, 'comment', '', sublime.DRAW_OUTLINED)
+        show_panel(self.view.window(), panel_name = 'sublime_haskell_show_type')
 
 # Works only with the cursor being in the name of a toplevel function so far.
 class SublimeHaskellInsertType(SublimeHaskellShowType):
