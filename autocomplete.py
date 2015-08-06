@@ -1984,12 +1984,15 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 
         window = view.window()
         if window:
-            if not self.project_file_name:
-                self.project_file_name = window.project_file_name()
-            if window.project_file_name() is not None and window.project_file_name() != self.project_file_name:
-                self.project_file_name = window.project_file_name()
-                log('project switched to {0}, reinspecting'.format(self.project_file_name))
-                window.run_command('sublime_haskell_reinspect_all')
+            if int(sublime.version()) < 3000:
+                pass
+            else:
+                if not self.project_file_name:
+                    self.project_file_name = window.project_file_name()
+                if window.project_file_name() is not None and window.project_file_name() != self.project_file_name:
+                    self.project_file_name = window.project_file_name()
+                    log('project switched to {0}, reinspecting'.format(self.project_file_name))
+                    window.run_command('sublime_haskell_reinspect_all')
 
     def on_post_save(self, view):
         pass
