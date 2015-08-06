@@ -1109,7 +1109,8 @@ class SublimeHaskellClearImports(SublimeHaskellTextCommand):
 
         imports = sorted(cur_module.imports, key = lambda i: i.position.line)
 
-        (exit_code, cleared, err) = call_and_wait(['hsclearimports', self.current_file_name, '--max-import-list', '16'])
+        cmd = ['hsclearimports', self.current_file_name, '--max-import-list', '16']
+        (exit_code, cleared, err) = call_and_wait(cmd)
         if exit_code != 0:
             log('hsclearimports error: {0}'.format(err), log_error)
             return
@@ -1120,9 +1121,15 @@ class SublimeHaskellClearImports(SublimeHaskellTextCommand):
             log('different number of imports: {0} and {1}'.format(len(imports), len(new_imports)), log_error)
             return
 
+        log('replacing imports for {0}'.format(self.current_file_name), log_trace)
+        erased = 0
         for i, ni in zip(imports, new_imports):
-            pt = self.view.text_point(i.position.line - 1, 0)
-            self.view.replace(edit, self.view.line(pt), ni)
+            pt = self.view.text_point(i.position.line - 1 - erased, 0)
+            if ni.endswith('()'):
+                self.view.erase(edit, self.view.full_line(pt))
+                erased = erased + 1
+            else:
+                self.view.replace(edit, self.view.line(pt), ni)
 
 class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
     """
