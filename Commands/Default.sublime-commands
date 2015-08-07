@@ -22,8 +22,8 @@
         "command": "sublime_haskell_show_types"
     },
     {
-        "caption": "SublimeHaskell: Show all types",
-        "command": "sublime_haskell_show_all_types"
+        "caption": "SublimeHaskell: Show/hide all types",
+        "command": "sublime_haskell_toggle_all_types"
     },
     {
         "caption": "SublimeHaskell: Insert type",

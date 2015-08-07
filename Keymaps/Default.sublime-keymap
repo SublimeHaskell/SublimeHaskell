@@ -26,7 +26,7 @@
     { "keys": ["ctrl+m", "ctrl+i"], "context": [ { "key": "haskell_source" } ], "command": "sublime_haskell_insert_import" },
     { "keys": ["ctrl+k", "ctrl+h", "ctrl+t"], "context": [ { "key" : "haskell_source" } ], "command": "sublime_haskell_show_type" },
     { "keys": ["ctrl+k", "ctrl+h", "ctrl+i"], "context": [ { "key" : "haskell_source" } ], "command": "sublime_haskell_insert_type" },
-    { "keys": ["ctrl+t", "h"], "context": [ { "key" : "haskell_source" } ], "command": "sublime_haskell_show_all_types" },
+    { "keys": ["ctrl+t", "h"], "context": [ { "key" : "haskell_source" } ], "command": "sublime_haskell_toggle_all_types" },
     { "keys": ["ctrl+t", "a"], "context": [ { "key" : "haskell_source" } ], "command": "sublime_haskell_show_types" },
     { "keys": ["ctrl+t", "s"], "context": [ { "key" : "haskell_source" } ], "command": "sublime_haskell_show_type" },
     { "keys": ["ctrl+t", "i"], "context": [ { "key" : "haskell_source" } ], "command": "sublime_haskell_insert_type" },

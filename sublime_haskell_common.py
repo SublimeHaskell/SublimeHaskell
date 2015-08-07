@@ -639,6 +639,9 @@ def output_panel(window, text = '', panel_name = 'sublime_haskell_output_panel',
         window.run_command('show_panel', { 'panel': ('output.' + panel_name) })
     return output_view
 
+def hide_panel(window, panel_name = 'sublime_haskell_output_panel'):
+    window.run_command('hide_panel', { 'panel': ('output.' + panel_name) })
+
 def show_panel(window, panel_name = 'sublime_haskell_output_panel'):
     window.run_command('show_panel', { 'panel': ('output.' + panel_name) })
 
