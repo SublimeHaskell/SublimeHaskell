@@ -22,6 +22,10 @@
         "command": "sublime_haskell_show_types"
     },
     {
+        "caption": "SublimeHaskell: Show all types",
+        "command": "sublime_haskell_show_all_types"
+    },
+    {
         "caption": "SublimeHaskell: Insert type",
         "command": "sublime_haskell_insert_type"
     },

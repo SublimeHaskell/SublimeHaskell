@@ -982,6 +982,15 @@ class HsDev(object):
 
         return cmd('check-lint', files, opts)
 
+    @list_command
+    def types(self, file, sandbox = None, ghc = [], contents = None):
+        opts = concat_opts([
+            (ghc, {'ghc': ghc}),
+            (sandbox, {'sandbox': sandbox}),
+            (contents, {'data': json.dumps(contents)})])
+
+        return cmd('types', [file], opts)
+
     @command
     def ghcmod_lang(self):
         return cmd('ghc-mod lang')

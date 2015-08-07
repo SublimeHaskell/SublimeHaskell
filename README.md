@@ -23,6 +23,7 @@ Optional, but useful:
   * `SublimeHaskell: Go to declaration` — overrides default, `F12`
   * `SublimeHaskell: Go to any declaration` — list declaration for all haskell sources
   * `Ctrl+R`, `Ctrl+Shift+R` — overrides default, goto symbol and goto symbol in project
+  * `SublimeHaskell: Show all types` — get all types and highlight while selection modifies
   * `SublimeHaskell: Hayoo` — search in hayoo
   * `SublimeHaskell: Auto fix` — [auto fix](Commands/AutoFix.gif) some of warnings and/or errors (for now redundant imports and hlint hints)
   * `SublimeHaskell: Scan docs and infer types` — as long as scanning docs for sources and inferring types is long process, it's disabled by default, but this command can be used to scan docs and infer types for currently opened view
