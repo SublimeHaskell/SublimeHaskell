@@ -109,6 +109,7 @@ class SublimeHaskellReplGhci(SublimeHaskellWindowCommand):
     def run(self):
         self.window.run_command("repl_open", repl_args(
             cmd = ["ghci"],
+            loaded = None,
             caption = "ghci"))
 
     def is_enabled(self):
