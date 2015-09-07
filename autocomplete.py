@@ -861,6 +861,24 @@ class SublimeHaskellReinspectAll(SublimeHaskellWindowCommand):
         else:
             show_status_message("inspector not connected", is_ok=False)
 
+class SublimeHaskellScanContents(SublimeHaskellTextCommand):
+    """
+    Scan module contents
+    """
+    def run(self, edit, filename = None):
+        self.current_file_name = filename or self.view.file_name()
+        self.status_msg = status_message_process("Scanning {0}".format(self.current_file_name), priority = 3)
+        self.status_msg.start()
+
+        def on_resp(r):
+            self.status_msg.stop()
+
+        def on_err(r):
+            self.status_msg.fail()
+            self.status_msg.stop()
+
+        hsdev_client.scan(contents = {self.current_file_name: self.view.substr(sublime.Region(0, self.view.size()))}, on_response = on_resp, on_error = on_err)
+
 class SublimeHaskellInferDocs(SublimeHaskellTextCommand):
     """
     Infer types and scan docs for current module

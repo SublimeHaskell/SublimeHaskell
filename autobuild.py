@@ -22,6 +22,9 @@ class SublimeHaskellAutobuild(sublime_plugin.EventListener):
         auto_lint_enabled = get_setting('enable_auto_lint')
         cabal_project_dir, cabal_project_name = get_cabal_project_dir_and_name_of_view(view)
 
+        # don't flycheck
+        self.fly_agent.nofly()
+
         # auto build enabled and file within a cabal project
         if auto_build_enabled and cabal_project_dir is not None:
             view.window().run_command('sublime_haskell_build_auto')
@@ -55,6 +58,11 @@ class FlyCheckLint(threading.Thread):
             v[:] = [view]
         self.event.set()
 
+    def nofly(self):
+        with self.view as v:
+            v[:] = []
+        self.event.set()
+
     def run(self):
         while True:
             self.event.wait()
@@ -69,6 +77,7 @@ class FlyCheckLint(threading.Thread):
                 continue
             auto_check_enabled = get_setting_async('enable_auto_check')
             auto_lint_enabled = get_setting_async('enable_auto_lint')
+            sublime.set_timeout(lambda: view_.window().run_command('sublime_haskell_scan_contents'), 0)
             if auto_check_enabled and auto_lint_enabled:
                 sublime.set_timeout(lambda: view_.window().run_command('sublime_haskell_check_and_lint', {'fly': True}), 0)
             elif auto_check_enabled:

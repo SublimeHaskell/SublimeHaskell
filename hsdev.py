@@ -477,7 +477,7 @@ class HsDev(object):
         self.listener = None
         self.hsdev_address = None
         self.autoconnect = True
-        self.map = {}
+        self.map = LockedObject({})
         self.id = 1
 
         self.connect_fun = None
@@ -640,7 +640,8 @@ class HsDev(object):
             log('HsDev.set_connected called while not in connecting state', log_debug)
 
     def on_receive(self, id, command, on_response = None, on_notify = None, on_error = None):
-        self.map[id] = HsDevCallbacks(id, command, on_response, on_notify, on_error)
+        with self.map as m:
+            m[id] = HsDevCallbacks(id, command, on_response, on_notify, on_error)
 
     def verify_connected(self):
         if self.is_connected():
@@ -659,10 +660,11 @@ class HsDev(object):
         call_callback(self.on_disconnected, name = 'HsDev.on_disconnected')
 
         # send error to callbacks
-        for on_msg in self.map.values():
-            on_msg.on_error('connection lost')
+        with self.map as m:
+            for on_msg in m.values():
+                on_msg.on_error('connection lost')
+            m.clear()
 
-        self.map = {}
         self.id = 1
         self.part = ''
 
@@ -723,16 +725,21 @@ class HsDev(object):
             try:
                 resp = json.loads(self.get_response())
                 if 'id' in resp:
-                    if resp['id'] in self.map:
-                        callbacks = self.map[resp['id']]
+                    callbacks = None
+                    with self.map as m:
+                        if resp['id'] in m:
+                            callbacks = m[resp['id']]
+                    if callbacks:
                         if 'notify' in resp:
                             callbacks.call_notify(resp['notify'])
                         if 'error' in resp:
                             callbacks.call_error(resp['error'], resp.get('details'))
-                            self.map.pop(resp['id'])
+                            with self.map as m:
+                                m.pop(resp['id'])
                         if 'result' in resp:
                             callbacks.call_response(resp['result'])
-                            self.map.pop(resp['id'])
+                            with self.map as m:
+                                m.pop(resp['id'])
             except Exception as e:
                 self.connection_lost('listen', e)
                 return
@@ -755,12 +762,13 @@ class HsDev(object):
         return cmd('ping', [], {}, lambda r: r and ('message' in r) and (r['message'] == 'pong'))
 
     @async_command
-    def scan(self, cabal = None, sandboxes = [], projects = [], files = [], paths = [], ghc = [], docs = False, infer = False):
+    def scan(self, cabal = None, sandboxes = [], projects = [], files = [], paths = [], ghc = [], contents = {}, docs = False, infer = False):
         opts = concat_opts([
             (cabal, {'cabal': None}),
             (sandboxes, {'sandbox': sandboxes}),
             (projects, {'project': projects}),
             (files, {'file': files}),
+            (contents, {'data': json.dumps(contents)}),
             (paths, {'path': paths}),
             (ghc, {'ghc': ghc}),
             (docs, {'docs': None}),
