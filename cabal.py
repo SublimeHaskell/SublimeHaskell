@@ -20,7 +20,7 @@ class SublimeHaskellCabalList(SublimeHaskellWindowCommand):
 		self.window.show_input_panel("Cabal list", "", self.on_done, self.on_change, self.on_cancel)
 
 	def on_done(self, input):
-		self.packages = hsdev_client().cabal_list(input)
+		self.packages = hsdev_client.cabal_list(input)
 		if not self.packages:
 			show_status_message("Package {0} not found".format(input))
 			return
