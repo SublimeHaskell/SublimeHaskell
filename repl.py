@@ -135,12 +135,27 @@ class SublimeHaskellReplCabal(SublimeHaskellWindowCommand):
             project_dir, project_name =  get_cabal_project_dir_and_name_of_view(view)
             if not project_dir:
                 show_status_message("Not in project", False)
-            self.window.run_command("repl_open", repl_args(
-                cmd = ["cabal", "repl"],
-                cwd = project_dir,
-                loaded = project_dir,
-                caption = "cabal repl: {0}".format(project_name)))
-            repls.set_repl_view(repl_external_id(project_dir), view, path = project_dir, project_name = project_name)
+            proj_info = autocomplete.hsdev_client.project(project_name)
+            self.project_name = project_name
+            self.project_dir = project_dir
+            self.names = [project_name]
+            if proj_info:
+                self.names.extend([executable['name'] for executable in proj_info['description']['executables']])
+                self.names.extend([test['name'] for test in proj_info['description']['tests']])
+            if len(self.names) > 1:
+                self.window.show_quick_panel(self.names, self.on_done)
+            else:
+                self.on_done(0)
+
+    def on_done(self, idx):
+        if idx == -1:
+            return
+        self.window.run_command("repl_open", repl_args(
+            cmd = ["cabal", "repl", self.names[idx]],
+            cwd = self.project_dir,
+            loaded = self.project_dir,
+            caption = "cabal repl: {0}/{1}".format(self.project_name, self.names[idx])))
+        repls.set_repl_view(repl_external_id(self.project_dir), view, path = self.project_dir, project_name = self.project_name)
 
     def is_enabled(self):
         return is_enabled_haskell_command(None, True)
