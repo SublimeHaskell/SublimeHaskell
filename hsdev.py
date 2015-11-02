@@ -284,8 +284,8 @@ def parse_correction(d):
 
 def parse_corrector(d):
     return symbols.Corrector(
-        parse_position(d['range']['from']),
-        parse_position(d['range']['to']),
+        parse_position(d['region']['from']),
+        parse_position(d['region']['to']),
         d['contents'])
 
 def encode_corrections(cs):
@@ -307,7 +307,7 @@ def encode_correction(c):
 
 def encode_corrector(c):
     return {
-        'range': {
+        'region': {
             'from': encode_position(c.start),
             'to': encode_position(c.end) },
         'contents': c.contents }
@@ -352,6 +352,8 @@ def connect_function(fn):
         if self.is_unconnected():
             with begin_connecting(self):
                 return fn(self, *args, **kwargs)
+        else:
+            log('hsdev already connected', log_warning)
     return wrapped
 
 def hsdev_command(async = False, timeout = None, is_list = False):
@@ -647,9 +649,7 @@ class HsDev(object):
         if self.is_connected():
             return True
         else:
-            log('Not connected to hsdev', log_error)
-            if self.autoconnect:
-                self.reconnect()
+            self.connection_lost('verify_connected', 'no connection')
             return self.is_connected()
 
     def connection_lost(self, fn, e):
