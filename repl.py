@@ -138,10 +138,10 @@ class SublimeHaskellReplCabal(SublimeHaskellWindowCommand):
             proj_info = autocomplete.hsdev_client.project(project_name)
             self.project_name = project_name
             self.project_dir = project_dir
-            self.names = [project_name]
+            self.names = ['lib:{0}'.format(project_name)]
             if proj_info:
-                self.names.extend([executable['name'] for executable in proj_info['description']['executables']])
-                self.names.extend([test['name'] for test in proj_info['description']['tests']])
+                self.names.extend(['exe:{0}'.format(executable['name']) for executable in proj_info['description']['executables']])
+                self.names.extend(['test:{0}'.format(test['name']) for test in proj_info['description']['tests']])
             if len(self.names) > 1:
                 self.window.show_quick_panel(self.names, self.on_done)
             else:
