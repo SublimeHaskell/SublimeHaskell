@@ -191,26 +191,12 @@ def run_ghcmods(cmds, msg, alter_messages_cb=None):
         if alter_messages_cb:
             alter_messages_cb(msgs)
 
-        def compare(l, r):
-            # sort by file equality to file_name
-            res = cmp(l[1].filename != file_shown_in_view, r[1].filename != file_shown_in_view)
-            if res == 0:
-                # then by file
-                res = cmp(l[1].filename, r[1].filename)
-                if res == 0:
-                    # then by line
-                    res = cmp(l[1].line, r[1].line)
-                    if res == 0:
-                        # then by column
-                        res = cmp(l[1].column, r[1].column)
-            return res
-
         def sort_key(a):
             return (
                 a[1].filename != file_shown_in_view,
                 a[1].filename,
-                a[1].line,
-                a[1].column
+                a[1].start.line,
+                a[1].start.column
             )
 
         msgs.sort(key=sort_key)
