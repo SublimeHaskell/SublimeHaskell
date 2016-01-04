@@ -130,3 +130,17 @@ The `ModuleInspector` is a program that looks at your Haskell environment to pro
 Depending on your environment, this may take very long.
 
 You can disable it with the `"inspect_modules": false` setting.
+
+### Troubleshooting
+
+- If you get a similar error to this when installing `hsdev`…
+  
+  ```
+  Failed to install haskell-src-exts-1.16.0.1
+  Build log ( ~/.cabal/logs/haskell-src-exts-1.16.0.1.log ):
+  Configuring haskell-src-exts-1.16.0.1...
+  setup-Simple-Cabal-1.18.1.4-x86_64-osx-ghc-7.8.3: The program 'happy' version
+  >=1.17 is required but it could not be found.
+  ```
+  
+  …manually install `happy` using `cabal install happy` and try again.
