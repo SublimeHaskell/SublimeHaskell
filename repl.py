@@ -107,8 +107,9 @@ def repl_args(**kwargs):
 
 class SublimeHaskellReplGhci(SublimeHaskellWindowCommand):
     def run(self):
+        opts = get_setting('ghci_opts') or []
         self.window.run_command("repl_open", repl_args(
-            cmd = ["ghci"],
+            cmd = ["ghci"] + opts,
             caption = "ghci"))
 
     def is_enabled(self):
@@ -120,8 +121,9 @@ class SublimeHaskellReplGhciCurrentFile(SublimeHaskellWindowCommand):
         if not view:
             show_status_message("No file active", False)
         else:
+            opts = get_setting('ghci_opts') or []
             self.window.run_command("repl_open", repl_args(
-                cmd = ["ghci", "$file"],
+                cmd = ["ghci", "$file"] + opts,
                 loaded = view.file_name(),
                 caption = "ghci: {0}".format(os.path.basename(view.file_name()))))
             repls.set_repl_view(repl_external_id(view.file_name()), view)
