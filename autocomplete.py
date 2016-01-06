@@ -1707,7 +1707,7 @@ class HsDevAgent(threading.Thread):
 
     def start_hsdev(self):
         if not hsdev.HsDev().check_version([0,1,5,0]):
-            output_error_async(sublime.active_window(), 'Please update hsdev to actual version (>= 0.1.4.0)')
+            output_error_async(sublime.active_window(), 'Please update hsdev to actual version (>= 0.1.5.0)')
             hsdev.hsdev_enable(False)
         else:
             def start_server_():
