@@ -557,7 +557,7 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
     ghc_opts_args = get_ghc_opts_args(filename, add_package_db = False, cabal = cabal)
 
     try:
-        command = attach_cabal_sandbox(['ghc-mod'] + arg_list + ghc_opts_args, cabal)
+        command = attach_cabal_sandbox(['ghc-mod'] + ghc_opts_args + arg_list, cabal)
 
         # log('running ghc-mod: {0}'.format(command))
 

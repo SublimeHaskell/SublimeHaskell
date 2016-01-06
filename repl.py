@@ -110,6 +110,7 @@ class SublimeHaskellReplGhci(SublimeHaskellWindowCommand):
         opts = get_setting('ghci_opts') or []
         self.window.run_command("repl_open", repl_args(
             cmd = ["ghci"] + opts,
+            loaded = None,
             caption = "ghci"))
 
     def is_enabled(self):
