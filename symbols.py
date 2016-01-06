@@ -50,6 +50,9 @@ class Location(object):
     def is_null(self):
         return self.project is None and self.filename is None
 
+    def get_id(self):
+        return self.filename
+
 def source_location(loc, pos):
     """ Returns filename:line:column """
     if not pos:
@@ -96,6 +99,9 @@ class InstalledLocation(object):
     def is_null(self):
         return self.package is None
 
+    def get_id(self):
+        return '{0}:{1}'.format(self.cabal, self.package.package_id())
+
 class OtherLocation(object):
     """
     Other module location
@@ -111,6 +117,9 @@ class OtherLocation(object):
 
     def is_null(self):
         return self.source is None
+
+    def get_id(self):
+        return '[{0}]'.format(self.source)
 
 def location_package_name(loc):
     if type(loc) == InstalledLocation and loc.package:
@@ -232,6 +241,11 @@ class Module(Symbol):
         Returns list of unaliased modules
         """
         return [i.module for i in self.imports if i.import_as == module_alias]
+
+    def get_location_id(self):
+        if type(self.location) == InstalledLocation:
+            return '{0}:{1}'.format(self.location.get_id(), self.name)
+        return self.location.get_id()
 
 class Declaration(Symbol):
     def __init__(self, name, decl_type = 'declaration', docs = None, location = None, imported = [], defined = None, position = None, module = None):

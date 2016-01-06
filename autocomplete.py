@@ -73,18 +73,24 @@ IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']
 # Export module
 EXPORT_MODULE_RE = re.compile(r'\bmodule\s+[\w\d\.]*$')
 
+def head_of(l):
+    if len(l) > 0:
+        return l[0]
+    else:
+        return None
+
 def is_scanned_source(view = None):
     window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
     if file_shown_in_view is None:
         return False
-    m = hsdev_client.module(file = file_shown_in_view)
+    m = head_of(hsdev_client.module(file = file_shown_in_view))
     return m is not None
 
 def is_in_project(view = None):
     window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
     if file_shown_in_view is None:
         return False
-    m = hsdev_client.module(file = file_shown_in_view)
+    m = head_of(hsdev_client.module(file = file_shown_in_view))
     if m is None:
         return False
     return m.location.project is not None
@@ -319,10 +325,10 @@ class AutoCompletion(object):
             return log_result(none_comps)
         else:
             log('preparing completions for {0}'.format(file_name), log_debug)
-            current_module = hsdev_client_back.module(file = file_name)
+            current_module = head_of(hsdev_client_back.module(file = file_name))
             if current_module:
                 comps = make_completions(
-                    hsdev_client_back.complete('', file_name, sandbox = current_sandbox(), timeout = None, split_result = True))
+                    hsdev_client_back.complete('', file_name, timeout = None, split_result = True))
                 # if not suggs:
                 #     suggs = hsdev_client_back.scope(file_name, sandbox = current_sandbox(), global_scope = True, timeout = None) or []
 
@@ -391,40 +397,19 @@ class AutoCompletion(object):
             self.wide_completion = None
 
         if qsymbol.module:
-            current_module = hsdev_client.module(file = current_file_name)
+            current_module = head_of(hsdev_client.module(file = current_file_name))
             current_project = None
             if current_module:
                 current_project = current_module.location.project
                 if qsymbol.is_import_list:
                     if current_project:
                         # Search for declarations of qsymbol.module within current project
-                        proj_module = hsdev_client.resolve(name = qsymbol.module, project = current_project, exports = True)
+                        q_module = head_of([m for m in hsdev_client.scope_modules(file = current_file_name) if m.name == qsymbol.module])
+                        proj_module = hsdev_client.resolve(file = q_module.location.file, exports = True)
                         if proj_module:
                             suggestions = proj_module.declarations.values()
                 else:
-                    suggestions = hsdev_client.complete(qualified_prefix, current_file_name, sandbox = current_sandbox(), wide = wide)
-            if not suggestions:
-                # Search for declarations in cabal modules
-                q_module = hsdev_client.module(name = qsymbol.module, cabal = current_is_cabal(), sandbox = current_sandbox(), deps = current_project)
-                if q_module:
-                    suggestions = q_module.declarations.values()
-                else:
-                    selected_module = None
-                    # Check ambiguous modules
-                    ms = hsdev_client.list_modules(module = qsymbol.module, cabal = current_is_cabal(), sandboxes = current_sandboxes(), deps = current_project)
-                    if len(ms) > 1:
-                        # Ok, select some module
-                        src_ms = list(filter(lambda m: m.by_source(), ms))
-                        if src_ms: # Ok, let's get first
-                            selected_module = src_ms[0]
-                        else:
-                            selected_module = list(sorted(ms, key = lambda m: m.location.package.name))[0]
-                    if selected_module:
-                        fname = selected_module.location.filename if selected_module.by_source() else None
-                        pack = selected_module.location.package.name if selected_module.by_cabal() else None
-                        q_module = hsdev_client.module(name = selected_module.name, cabal = current_is_cabal(), sandbox = current_sandbox(), file = fname, package = pack)
-                        if q_module:
-                            suggestions = q_module.declarations.values()
+                    suggestions = hsdev_client.complete(qualified_prefix, current_file_name, wide = wide)
             return self.keyword_completions + make_completions(suggestions)
         else:
             with self.cache as cache_:
@@ -440,7 +425,7 @@ class AutoCompletion(object):
         """
         if not module:
             return []
-        m = hsdev_client.module(name = module, file = filename)
+        m = head_of(hsdev_client.module(module = module if filename is None else None, file = filename))
         if not m:
             return []
         return make_completions(m.declarations.values())
@@ -531,9 +516,9 @@ class AutoCompletion(object):
             if sbox and type(sbox) == dict and 'sandbox' in sbox:
                 sbox = sbox.get('sandbox')
             if sbox:
-                return set([m.name for m in hsdev_client.list_modules(cabal = is_cabal(sbox), sandboxes = as_sandboxes(sbox))])
+                return set([m.name for m in hsdev_client.list_modules(sandbox = sbox)])
         else:
-            return set([m.name for m in hsdev_client.list_modules(cabal = current_is_cabal(), sandboxes = current_sandboxes())])
+            return set([m.name for m in hsdev_client.list_modules(sandbox = current_cabal())])
 
 autocompletion = AutoCompletion()
 
@@ -597,7 +582,7 @@ class SublimeHaskellFindDeclarations(SublimeHaskellWindowCommand):
         self.window.show_input_panel("Search string", "", self.on_done, self.on_change, self.on_cancel)
 
     def on_done(self, input):
-        self.decls = hsdev_client.symbol(find = input)
+        self.decls = hsdev_client.symbol(input = input, search_type = 'regex')
         if not self.decls:
             show_status_message("Nothing found for: {0}".format(input))
             return
@@ -625,7 +610,7 @@ class SublimeHaskellHayoo(SublimeHaskellWindowCommand):
         self.window.show_input_panel("Search string", "", self.on_done, self.on_change, self.on_cancel)
 
     def on_done(self, input):
-        self.decls = hsdev_client.hayoo(input, pages = 5)
+        self.decls = hsdev_client.hayoo(input, page = 0, pages = 5)
         if not self.decls:
             show_status_message("Nothing found for: {0}".format(input))
             return
@@ -654,8 +639,8 @@ class SublimeHaskellSearch(SublimeHaskellWindowCommand):
 
     def on_done(self, input):
         self.decls = []
-        self.decls.extend(hsdev_client.symbol(find = input) or [])
-        self.decls.extend(hsdev_client.hayoo(input) or [])
+        self.decls.extend(hsdev_client.symbol(input = input, search_type = 'infix') or [])
+        self.decls.extend(hsdev_client.hayoo(input, page = 0, pages = 5) or [])
         if not self.decls:
             show_status_message("Nothing found for: {0}".format(input))
             return
@@ -690,7 +675,7 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
         (self.line, self.column) = self.view.rowcol(self.view.sel()[0].a)
 
         if project:
-            current_project = hsdev_client.module(file = self.current_filename).location.project
+            current_project = head_of(hsdev_client.module(file = self.current_filename)).location.project
             if not current_project:
                 show_status_message('File {0} is not in project'.format(self.current_filename), False)
                 return
@@ -698,7 +683,7 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
             decls = self.sorted_decls_name(hsdev_client.symbol(project = current_project))
             self.declarations = [[decl.brief(), decl.module.name, decl.get_source_location()] for decl in decls]
         else:
-            decls = self.sorted_decls_pos(hsdev_client.symbol(file = self.current_filename, locals = True))
+            decls = self.sorted_decls_pos(hsdev_client.symbol(file = self.current_filename))
             self.declarations = [[(decl.position.column * ' ') + decl.brief()] for decl in decls]
         self.decls = decls[:]
 
@@ -786,27 +771,24 @@ class SublimeHaskellGoToHackageModule(SublimeHaskellTextCommand):
                 scope = self.view.file_name()
                 if scope:
                     ms = [m for m in hsdev_client.scope_modules(
-                        scope,
-                        sandbox = current_sandboxes()) if m.name == qsymbol.module and m.by_cabal()]
+                        scope) if m.name == qsymbol.module and m.by_cabal()]
                 else:
                     ms = [m for m in hsdev_client.list_modules(
-                        cabal = current_is_cabal(),
-                        sandboxes = current_sandboxes()) if m.name == qsymbol.module and m.by_cabal()]
+                        sandbox = current_cabal()) if m.name == qsymbol.module and m.by_cabal()]
             else: # symbol
                 scope = self.view.file_name()
                 if scope:
                     decls = hsdev_client.whois(
                         qsymbol.qualified_name(),
-                        file = scope,
-                        sandbox = current_sandboxes())
+                        file = scope)
                     if not decls:
                         decls = hsdev_client.lookup(
                             qsymbol.full_name(),
-                            file = scope,
-                            sandbox = current_sandboxes())
+                            file = scope)
                     if not decls:
                         decls = hsdev_client.symbol(
-                            name = qsymbol.full_name())
+                            input = qsymbol.full_name(),
+                            search_type = 'exact')
                     if not decls:
                         show_status_message('Module for symbol {0} not found'.format(qsymbol.full_name()))
                         return
@@ -856,7 +838,6 @@ class SublimeHaskellReinspectCabalCommand(SublimeHaskellWindowCommand):
 class SublimeHaskellReinspectAll(SublimeHaskellWindowCommand):
     def run(self):
         if hsdev_inspector.agent_connected():
-            hsdev_client.remove_all()
             hsdev_inspector.start_inspect()
         else:
             show_status_message("inspector not connected", is_ok=False)
@@ -919,15 +900,12 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
     def run(self, edit, filename = None, module_name = None, package_name = None, project_name = None, cabal = None, decl = None):
         if decl and (filename or module_name):
             self.full_name = decl
-            self.current_file_name = filename
-            self.candidates = hsdev_client.symbol(
-                name = decl,
-                project = project_name,
+            self.current_file_name = self.view.file_name()
+            self.candidates = hsdev_client.scope(
+                input = decl,
+                search_type = 'exact',
                 file = self.current_file_name,
-                module = module_name,
-                package = package_name,
-                cabal = is_cabal(cabal),
-                sandbox = as_sandboxes(cabal))
+                global_scope = True)
         else:
             self.current_file_name = self.view.file_name()
 
@@ -951,13 +929,13 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
             self.whois_name = qsymbol.qualified_name()
             self.full_name = qsymbol.full_name()
 
-            self.candidates = (hsdev_client.whois(self.whois_name, self.current_file_name, sandbox = current_sandbox()) or [])[:1]
+            self.candidates = (hsdev_client.whois(self.whois_name, self.current_file_name) or [])[:1]
 
             if not self.candidates:
-                self.candidates = hsdev_client.lookup(self.full_name, self.current_file_name, sandbox = current_sandbox())
+                self.candidates = hsdev_client.lookup(self.full_name, self.current_file_name)
 
             if not self.candidates:
-                self.candidates = hsdev_client.symbol(name = self.full_name)
+                self.candidates = hsdev_client.symbol(input = self.full_name, search_type = 'exact')
 
         if not self.candidates:
             show_status_message('Symbol {0} not found'.format(self.full_name))
@@ -984,7 +962,7 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
             return
 
         (module_name, ident_name) = self.candidates[idx]
-        info = hsdev_client.whois('{0}.{1}'.format(module_name, ident_name), self.view.file_name(), sandbox = current_sandbox())
+        info = hsdev_client.whois('{0}.{1}'.format(module_name, ident_name), self.view.file_name())
 
         if info:
             self.show_symbol_info(info[0])
@@ -1050,11 +1028,11 @@ class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
             qsymbol = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
             self.full_name = qsymbol.qualified_name()
 
-        if hsdev_client.whois(self.full_name, self.current_file_name, sandbox = current_sandbox()):
+        if hsdev_client.whois(self.full_name, self.current_file_name):
             show_status_message('Symbol {0} already in scope'.format(self.full_name))
             return
 
-        self.candidates = hsdev_client.lookup(self.full_name, self.current_file_name, sandbox = current_sandbox())
+        self.candidates = hsdev_client.lookup(self.full_name, self.current_file_name)
 
         if not self.candidates:
             show_status_message('Symbol {0} not found'.format(self.full_name))
@@ -1073,7 +1051,7 @@ class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
         call_and_wait_tool(['hsinspect', 'input'], 'hsinspect', contents_part, self.on_inspected, check_enabled = False)
 
     def on_inspected(self, result):
-        cur_module = hsdev.parse_module(json.loads(result)['module']) if self.view.is_dirty() else hsdev_client.module(file = self.current_file_name)
+        cur_module = hsdev.parse_module(json.loads(result)['module']) if self.view.is_dirty() else head_of(hsdev_client.module(file = self.current_file_name))
         imports = sorted(cur_module.imports, key = lambda i: i.position.line)
         after = [i for i in imports if i.module > self.module_name]
 
@@ -1120,7 +1098,7 @@ class SublimeHaskellClearImports(SublimeHaskellTextCommand):
         if not self.current_file_name:
             self.current_file_name = self.view.file_name()
 
-        cur_module = hsdev_client.module(file = self.current_file_name)
+        cur_module = head_of(hsdev_client.module(file = self.current_file_name))
         if not cur_module:
             log("module not scanned")
             return
@@ -1158,12 +1136,7 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
 
         m = None
         if filename:
-            m = hsdev_client.module(
-                file = filename,
-                package = package_name,
-                project = project_name,
-                cabal = is_cabal(cabal),
-                sandbox = as_sandboxes(cabal))
+            m = head_of(hsdev_client.module(file = filename))
             if not m:
                 show_status_message('Module {0} not found'.format(filename))
                 return
@@ -1172,25 +1145,16 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
             ms = []
             if scope:
                 ms = [m for m in hsdev_client.scope_modules(
-                    scope,
-                    sandbox = as_sandboxes(cabal)) if m.name == module_name]
+                    scope) if m.name == module_name]
             else:
                 ms = [m for m in hsdev_client.list_modules(
-                    packages = package_name,
-                    projects = project_name,
-                    cabal = is_cabal(cabal),
-                    sandboxes = as_sandboxes(cabal)) if m.name == module_name]
+                    deps = project_name) if m.name == module_name]
 
             if len(ms) == 0:
                 show_status_message('Module {0} not found'.format(module_name))
                 return
             if len(ms) == 1:
-                m = hsdev_client.module(
-                    name = module_name,
-                    package = symbols.location_package_name(ms[0].location),
-                    project = symbols.location_project(ms[0].location),
-                    cabal = is_cabal(symbols.location_cabal(ms[0].location)),
-                    sandbox = as_sandboxes(symbols.location_cabal(ms[0].location)))
+                m = head_of(hsdev_client.module(module_name, search_type = 'exact', deps = scope or project_name))
             else:
                 self.candidates.extend([(m, [m.name, m.location.to_string()]) for m in ms])
 
@@ -1202,8 +1166,6 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
             return
 
         if not self.candidates:
-            self.candidates.extend([(m, [m.name, m.location.to_string()]) for m in hsdev_client.list_modules(
-                cabal = current_is_cabal(), sandboxes = current_sandboxes())])
             self.candidates.extend([(m, [m.name, m.location.to_string()]) for m in hsdev_client.list_modules(
                 source = True)])
 
@@ -1258,7 +1220,7 @@ class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
         candidates = []
         module_candidates = []
         if not qsymbol.is_module():
-            candidates = list(filter(lambda d: d.by_source(), hsdev_client.whois(whois_name, current_file_name, sandbox = current_sandbox())))
+            candidates = list(filter(lambda d: d.by_source(), hsdev_client.whois(whois_name, current_file_name)))
 
             if candidates and candidates[0].has_source_location():
                 self.view.window().open_file(candidates[0].get_source_location(), sublime.ENCODED_POSITION)
@@ -1269,14 +1231,14 @@ class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
                 candidates = []
                 for c in cands:
                     for i in c.imported:
-                        candidates = hsdev_client.symbol(name = c.name, module = i.module, source = True)
+                        candidates = [s for s in hsdev_client.symbol(input = c.name, search_type = 'exact', source = True) if s.module.name == i.module]
                         if candidates and candidates[0].has_source_location():
                             self.view.window().open_file(candidates[0].get_source_location(), sublime.ENCODED_POSITION)
                             return
 
-            candidates = hsdev_client.symbol(name = qsymbol.name, source = True)
+            candidates = hsdev_client.symbol(input = qsymbol.name, search_type = 'exact', source = True)
         else:
-            module_candidates = [m for m in hsdev_client.list_modules(module = full_name, source = True) if m.name == full_name]
+            module_candidates = [m for m in hsdev_client.list_modules(source = True) if m.name == full_name]
 
         if not candidates and not module_candidates:
             show_status_message('Declaration {0} not found'.format(qsymbol.name), False)
@@ -1744,7 +1706,7 @@ class HsDevAgent(threading.Thread):
         return self.hsdev.is_connected()
 
     def start_hsdev(self):
-        if not hsdev.HsDev().check_version([0,1,4,0]):
+        if not hsdev.HsDev().check_version([0,1,5,0]):
             output_error_async(sublime.active_window(), 'Please update hsdev to actual version (>= 0.1.4.0)')
             hsdev.hsdev_enable(False)
         else:
@@ -1888,7 +1850,7 @@ class HsDevAgent(threading.Thread):
 
         try:
             with status_message_process('Inspecting {0}'.format(cabal), priority = 1) as s:
-                self.hsdev_back.scan(cabal = is_cabal(cabal), sandboxes = as_sandboxes(cabal), on_notify = hsdev_status(s), wait = True, docs = hdocs.hdocs_enabled())
+                self.hsdev_back.scan(sandboxes = [cabal], on_notify = hsdev_status(s), wait = True, docs = hdocs.hdocs_enabled())
         except Exception as e:
             log('loading standard modules info for {0} failed with {1}'.format(cabal, e), log_error)
 

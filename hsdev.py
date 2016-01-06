@@ -126,7 +126,7 @@ def parse_decls(s):
         return None
     return [parse_module_declaration(decl) for decl in s]
 
-def parse_modules(s):
+def parse_modules_brief(s):
     if s is None:
         return None
     return [parse_module_id(m) for m in s]
@@ -259,6 +259,11 @@ def parse_module(d):
         parse_location(d.get('location')),
         parse_cabal(d.get('location')))
 
+def parse_modules(ds):
+    if ds is None:
+        return None
+    return [parse_module(d) for d in ds]
+
 def parse_cabal_package(d):
     if d is None:
         return None
@@ -367,7 +372,7 @@ def hsdev_command(async = False, timeout = None, is_list = False):
             on_res_part = kwargs.pop('on_result_part', None)
             split_res = kwargs.pop('split_result', on_res_part is not None)
 
-            (name_, args_, opts_, on_result_) = fn(self, *args, **kwargs)
+            (name_, opts_, on_result_) = fn(self, *args, **kwargs)
 
             if is_list and split_res:
                 result = []
@@ -384,7 +389,6 @@ def hsdev_command(async = False, timeout = None, is_list = False):
                 opts_.update({'split-result': None})
                 r = self.call(
                     name_,
-                    args_,
                     opts_,
                     on_response = on_response if on_resp else None,
                     on_notify = on_notify,
@@ -400,7 +404,6 @@ def hsdev_command(async = False, timeout = None, is_list = False):
                     on_resp(on_result_(r))
                 r = self.call(
                     name_,
-                    args_,
                     opts_,
                     on_response = on_response if on_resp else None,
                     on_notify = on_not,
@@ -425,8 +428,8 @@ def list_command(fn):
 def async_list_command(fn):
     return hsdev_command(async = True, is_list = True)(fn)
 
-def cmd(name_, args_ = [], opts_ = {}, on_result = lambda r: r):
-    return (name_, args_, opts_, on_result)
+def cmd(name_, opts_ = {}, on_result = lambda r: r):
+    return (name_, opts_, on_result)
 
 def call_callback(fn, *args, **kwargs):
     name = kwargs.get('name')
@@ -671,10 +674,10 @@ class HsDev(object):
         if self.autoconnect:
             self.reconnect()
 
-    def call(self, command, args = [], opts = {}, on_response = None, on_notify = None, on_error = None, wait = False, timeout = None, id = None):
+    def call(self, command, opts = {}, on_response = None, on_notify = None, on_error = None, wait = False, timeout = None, id = None):
         # log
-        args_cmd = 'hsdev {0}'.format(' '.join([command] + args))
-        call_cmd = 'hsdev {0}'.format(' '.join([command] + args + flatten_opts(opts)))
+        args_cmd = 'hsdev {0}'.format(command)
+        call_cmd = 'hsdev {0} with {1}'.format(command, opts)
 
         if not self.verify_connected():
             return None if wait else False
@@ -700,12 +703,10 @@ class HsDev(object):
                     self.id = self.id + 1
                 self.on_receive(id, args_cmd, on_response_, on_notify, on_error_)
 
-            opts.update({'no-file': None})
-            msg = json.dumps({
-                'id': id,
-                'command': command,
-                'args': args,
-                'opts': opts })
+            opts.update({'no-file': True})
+            opts.update({'id': id, 'command': command})
+            msg = json.dumps(opts, separators = (',', ':'))
+            log('json message: {0}'.format(msg), log_debug)
 
             self.hsdev_socket.sendall('{0}\n'.format(msg).encode())
             log(call_cmd, log_trace)
@@ -755,249 +756,197 @@ class HsDev(object):
 
     @command
     def link(self, hold = False, **kwargs):
-        return cmd('link', [], concat_opts([(hold, {'hold': None})]))
+        return cmd('link', {
+            'hold': hold })
 
     @command
     def ping(self):
-        return cmd('ping', [], {}, lambda r: r and ('message' in r) and (r['message'] == 'pong'))
+        return cmd('ping', {}, lambda r: r and ('message' in r) and (r['message'] == 'pong'))
 
     @async_command
-    def scan(self, cabal = None, sandboxes = [], projects = [], files = [], paths = [], ghc = [], contents = {}, docs = False, infer = False):
-        opts = concat_opts([
-            (cabal, {'cabal': None}),
-            (sandboxes, {'sandbox': sandboxes}),
-            (projects, {'project': projects}),
-            (files, {'file': files}),
-            (contents, {'data': json.dumps(contents)}),
-            (paths, {'path': paths}),
-            (ghc, {'ghc': ghc}),
-            (docs, {'docs': None}),
-            (infer, {'infer': None})])
-
-        return cmd('scan', [], opts)
+    def scan(self, sandboxes = [], projects = [], files = [], paths = [], ghc = [], contents = {}, docs = False, infer = False):
+        return cmd('scan', {
+            'projects': projects,
+            'sandboxes': list(map(lambda s: 'cabal' if s == 'cabal' else {'sandbox': s}, sandboxes)),
+            'files': files,
+            'paths': paths,
+            'contents': [{'file': f, 'contents': cts} for f, cts in contents.items()],
+            'ghc-opts': ghc,
+            'docs': docs,
+            'infer': infer })
 
     @async_command
     def docs(self, projects = [], files = [], modules = []):
-        opts = concat_opts([
-            (projects, {'project': projects}),
-            (files, {'file': files}),
-            (modules, {'module': modules})])
-
-        return cmd('docs', [], opts)
+        return cmd('docs', {
+            'projects': projects,
+            'files': files,
+            'modules': modules })
 
     @async_command
     def infer(self, projects = [], files = [], modules = []):
-        opts = concat_opts([
-            (projects, {'project': projects}),
-            (files, {'file': files}),
-            (modules, {'module': modules})])
-
-        return cmd('infer', [], opts)
-
-    @async_command
-    def rescan(self, cabal = None, sandboxes = [], projects = [], files = [], paths = [], docs = False, infer = False):
-        opts = concat_opts([
-            (cabal, {'cabal': None}),
-            (sandboxes, {'sandbox': sandboxes}),
-            (projects, {'project': projects}),
-            (files, {'file': files}),
-            (paths, {'path': paths}),
-            (docs, {'docs': None}),
-            (infer, {'infer': None})])
-
-        return cmd('rescan', [], opts)
+        return cmd('infer', {
+            'projects': projects,
+            'files': files,
+            'modules': modules })
 
     @async_list_command
-    def remove(self, cabal = False, sandboxes = [], projects = [], files = [], modules = []):
-        opts = concat_opts([
-            (cabal, {'cabal': None}),
-            (sandboxes, {'sandbox': sandboxes}),
-            (projects, {'project': projects}),
-            (files, {'file': files}),
-            (modules, {'module': modules})])
-
-        return cmd('remove', [], opts)
-
-    @async_list_command
-    def remove_all(self):
-        return cmd('remove', [], {'all': None})
+    def remove(self, sandboxes = [], projects = [], files = [], packages = []):
+        return cmd('remove', {
+            'projects': projects,
+            'sandboxes': list(map(lambda s: 'cabal' if s == 'cabal' else {'sandbox': s}, sandboxes)),
+            'files': files,
+            'packages': packages })
 
     @list_command
-    def list_modules(self, module = None, cabal = False, sandboxes = None, projects = None, packages = None, deps = None, source = False, standalone = False):
-        opts = concat_opts([
-            (module, {'module': module}),
-            (cabal, {'cabal': None}),
-            (sandboxes, {'sandbox': sandboxes}),
-            (projects, {'project': projects}),
-            (packages, {'package': packages}),
-            (deps, {'deps': deps}),
-            (source, {'src': None}),
-            (standalone, {'stand': None})])
-
-        return cmd('modules', [], opts, parse_modules)
+    def list_modules(self, project = None, file = None, module = None, deps = None, sandbox = None, cabal = False, package = None, source = False, standalone = False):
+        f = []
+        if project:
+            f = {'project': project}
+        if file:
+            f = {'file': file}
+        if module:
+            f = {'module': module}
+        if deps:
+            f = {'deps': deps}
+        if sandbox:
+            f = {'cabal':{'sandbox':sandbox}}
+        if cabal:
+            f = {'cabal':'cabal'}
+        if package:
+            f = {'package': package}
+        if source:
+            f = 'sourced'
+        if standalone:
+            f = 'standalone'
+        return cmd('modules', {'filter': f}, parse_modules_brief)
 
     @list_command
     def list_packages(self):
-        return cmd('packages', [], {})
+        return cmd('packages', {})
 
     @list_command
     def list_projects(self):
-        return cmd('projects', [], {})
+        return cmd('projects', {})
 
     @list_command
-    def symbol(self, name = None, project = None, file = None, module = None, deps = None, locals = False, package = None, cabal = False, sandbox = None, source = False, standalone = False, prefix = None, find = None):
-        opts = concat_opts([
-            (project, {'project': project}),
-            (file, {'file': file}),
-            (module, {'module': module}),
-            (locals, {'locals': None}),
-            (deps, {'deps': deps}),
-            (package, {'package': package}),
-            (cabal, {'cabal': None}),
-            (sandbox, {'sandbox': sandbox}),
-            (source, {'src': None}),
-            (standalone, {'stand': None}),
-            (prefix, {'prefix': prefix}),
-            (find, {'find': find})])
+    def symbol(self, input = "", search_type = 'prefix', project = None, file = None, module = None, deps = None, sandbox = None, cabal = False, package = None, source = False, standalone = False):
+        # search_type is one of: exact, prefix, infix, suffix, regex
+        q = {'input': input, 'type': search_type}
 
-        return cmd('symbol', [name] if name else [], opts, parse_decls)
+        f = []
+        if project:
+            f = {'project': project}
+        if file:
+            f = {'file': file}
+        if module:
+            f = {'module': module}
+        if deps:
+            f = {'deps': deps}
+        if sandbox:
+            f = {'cabal':{'sandbox':sandbox}}
+        if cabal:
+            f = {'cabal':'cabal'}
+        if package:
+            f = {'package': package}
+        if source:
+            f = 'sourced'
+        if standalone:
+            f = 'standalone'
 
-    @command
-    def module(self, name = None, project = None, file = None, deps = None, locals = False, package = None, cabal = False, sandbox = None, source = False):
-        opts = concat_opts([
-            (name, {'module': name}),
-            (project, {'project': project}),
-            (file, {'file': file}),
-            (locals, {'locals': None}),
-            (deps, {'deps': deps}),
-            (package, {'package': package}),
-            (cabal, {'cabal': None}),
-            (sandbox, {'sandbox': sandbox}),
-            (source, {'src': None})])
-
-        return cmd('module', [], opts, parse_module)
+        return cmd('symbol', {'query': q, 'filter': f}, parse_decls)
 
     @command
-    def resolve(self, name = None, project = None, file = None, locals = False, package = None, cabal = False, sandbox = None, exports = False):
-        opts = concat_opts([
-            (name, {'module': name}),
-            (project, {'project': project}),
-            (file, {'file': file}),
-            (locals, {'locals': locals}),
-            (package, {'package': package}),
-            (cabal, {'cabal': None}),
-            (sandbox, {'sandbox': sandbox}),
-            (exports, {'exports': None})])
+    def module(self, input = "", search_type = 'prefix', project = None, file = None, module = None, deps = None, sandbox = None, cabal = False, package = None, source = False, standalone = False):
+        q = {'input': input, 'type': search_type}
 
-        return cmd('resolve', [], opts, parse_module)
+        f = []
+        if project:
+            f = {'project': project}
+        if file:
+            f = {'file': file}
+        if module:
+            f = {'module': module}
+        if deps:
+            f = {'deps': deps}
+        if sandbox:
+            f = {'cabal':{'sandbox':sandbox}}
+        if cabal:
+            f = {'cabal':'cabal'}
+        if package:
+            f = {'package': package}
+        if source:
+            f = 'sourced'
+        if standalone:
+            f = 'standalone'
+
+        return cmd('module', {'query': q, 'filter': f}, parse_modules)
+
+    @command
+    def resolve(self, file, exports = False):
+        return cmd('resolve', {'file': file, 'exports': exports}, parse_module)
 
     @command
     def project(self, project = None, path = None):
-        opts = concat_opts([
-            (project, {'project': project}),
-            (path, {'path': path})])
-
-        return cmd('project', [], opts)
+        return cmd('project', {'name': project} if project else {'path': path})
 
     @command
     def sandbox(self, path):
-        opts = concat_opts([
-            (path, {'path': path})])
-
-        return cmd('sandbox', [], opts)
+        return cmd('sandbox', {'path': path})
 
     @list_command
-    def lookup(self, name, file, sandbox = None):
-        opts = {'file': file}
-
-        if sandbox:
-            opts.update({'sandbox': sandbox})
-
-        return cmd('lookup', [name], opts, parse_decls)
+    def lookup(self, name, file):
+        return cmd('lookup', {'name': name, 'file': file}, parse_decls)
 
     @list_command
-    def whois(self, name, file, sandbox = None):
-        opts = {'file': file}
-
-        if sandbox:
-            opts.update({'sandbox': sandbox})
-
-        return cmd('whois', [name], opts, parse_decls)
+    def whois(self, name, file):
+        return cmd('whois', {'name': name, 'file': file}, parse_decls)
 
     @list_command
-    def scope_modules(self, file, sandbox = None):
-        opts = {'file': file}
-
-        if sandbox:
-            opts.update({'sandbox': sandbox})
-
-        return cmd('scope modules', [], opts, parse_modules)
+    def scope_modules(self, file):
+        return cmd('scope modules', {'file': file}, parse_modules_brief)
 
     @list_command
-    def scope(self, file, sandbox = None, global_scope = False, prefix = None, find = None):
-        opts = concat_opts([
-            (True, {'file': file}),
-            (sandbox, {'sandbox': sandbox}),
-            (global_scope, {'global': None}),
-            (prefix, {'prefix': prefix}),
-            (find, {'find': find})])
-
-        return cmd('scope', [], opts, parse_decls)
+    def scope(self, input, file, search_type = 'prefix', global_scope = False):
+        return cmd('scope', {'query':{'input':input, 'type': search_type}, 'global': global_scope, 'file': file}, parse_decls)
 
     @list_command
-    def complete(self, input, file, sandbox = None, wide = False):
-        opts = concat_opts([
-            (True, {'file': file}),
-            (sandbox, {'sandbox': sandbox}),
-            (wide, {'wide': None})])
-
-        return cmd('complete', [input], opts, parse_decls)
+    def complete(self, input, file, wide = False):
+        return cmd('complete', {'prefix': input, 'wide': wide, 'file': file}, parse_decls)
 
     @list_command
     def hayoo(self, query, page = None, pages = None):
-        opts = concat_opts([
-            (page, {'page': page}),
-            (pages, {'pages': pages})])
-
-        return cmd('hayoo', [query], opts, parse_decls)
+        return cmd('hayoo', {'query': query, 'page': page or 0, 'pages': pages or 1}, parse_decls)
 
     @list_command
-    def cabal_list(self, query = None):
-        cmd('cabal list', [query] if query else [], {}, lambda r: [parse_cabal_package(s) for s in r] if r else None)
+    def cabal_list(self, packages):
+        cmd('cabal list', {'packages': packages}, lambda r: [parse_cabal_package(s) for s in r] if r else None)
 
     @list_command
     def lint(self, files, contents = None):
-        opts = concat_opts([
-            (contents, {'data': json.dumps(contents)})])
-
-        return cmd('lint', files, opts)
-
-    @list_command
-    def check(self, files, sandbox = None, ghc = [], contents = None):
-        opts = concat_opts([
-            (ghc, {'ghc': ghc}),
-            (sandbox, {'sandbox': sandbox}),
-            (contents, {'data': json.dumps(contents)})])
-
-        return cmd('check', files, opts)
+        return cmd('lint', {
+            'files': files,
+            'contents': [{'file': f, 'contents': cts} for f, cts in contents.items()]})
 
     @list_command
-    def check_lint(self, files, sandbox = None, ghc = [], contents = None):
-        opts = concat_opts([
-            (ghc, {'ghc': ghc}),
-            (sandbox, {'sandbox': sandbox}),
-            (contents, {'data': json.dumps(contents)})])
-
-        return cmd('check-lint', files, opts)
+    def check(self, files, ghc = [], contents = None):
+        return cmd('check', {
+            'files': files,
+            'contents': [{'file': f, 'contents': cts} for f, cts in contents.items()],
+            'ghc-opts': ghc})
 
     @list_command
-    def types(self, file, sandbox = None, ghc = [], contents = None):
-        opts = concat_opts([
-            (ghc, {'ghc': ghc}),
-            (sandbox, {'sandbox': sandbox}),
-            (contents, {'data': json.dumps(contents)})])
+    def check_lint(self, files, ghc = [], contents = None):
+        return cmd('check-lint', {
+            'files': files,
+            'contents': [{'file': f, 'contents': cts} for f, cts in contents.items()],
+            'ghc-opts': ghc})
 
-        return cmd('types', [file], opts)
+    @list_command
+    def types(self, file, ghc = [], contents = None):
+        return cmd('types', {
+            'files': files,
+            'contents': [{'file': f, 'contents': cts} for f, cts in contents.items()],
+            'ghc-opts': ghc})
 
     @command
     def ghcmod_lang(self):
@@ -1008,58 +957,39 @@ class HsDev(object):
         return cmd('ghc-mod flags')
 
     @list_command
-    def ghcmod_type(self, file, line, column = 1, sandbox = None, ghc = []):
-        opts = concat_opts([
-            (True, {'file': file}),
-            (ghc, {'ghc': ghc}),
-            (sandbox, {'sandbox': sandbox})])
-
-        return cmd('ghc-mod type', [str(line), str(column)], opts)
+    def ghcmod_type(self, file, line, column = 1, ghc = []):
+        return cmd('ghc-mod type', {
+            'position': {'line': int(line),'column': int(column)},
+            'file': file,
+            'ghc-opts': ghc })
 
     @list_command
-    def ghcmod_check(self, files, sandbox = None, ghc = []):
-        opts = concat_opts([
-            (ghc, {'ghc': ghc}),
-            (sandbox, {'sandbox': sandbox})])
-
-        return cmd('ghc-mod check', files, opts)
+    def ghcmod_check(self, files, ghc = []):
+        return cmd('ghc-mod check', {'files': files, 'ghc-opts': ghc})
 
     @list_command
     def ghcmod_lint(self, files, hlint = []):
-        opts = concat_opts([
-            (hlint, {'hlint': hlint})])
-
-        return cmd('ghc-mod lint', files, opts)
+        return cmd('ghc-mod lint', {'files': files, 'hlint-opts': hlint})
 
     @list_command
-    def ghcmod_check_lint(self, files, sandbox = None, ghc = [], hlint = []):
-        opts = concat_opts([
-            (ghc, {'ghc': ghc}),
-            (sandbox, {'sandbox': sandbox}),
-            (hlint, {'hlint': hlint})])
-
-        return cmd('ghc-mod check-lint', files, opts)
+    def ghcmod_check_lint(self, files, ghc = [], hlint = []):
+        return cmd('ghc-mod check-lint', {'files': files, 'ghc-opts': ghc, 'hlint-opts': hlint})
 
     @list_command
     def autofix_show(self, messages):
-        return cmd('autofix show', [], {'data': json.dumps(messages)}, parse_corrections)
+        return cmd('autofix show', {'messages': json.dumps(messages)}, parse_corrections)
 
     @list_command
     def autofix_fix(self, messages, rest = [], pure = False):
-        opts = concat_opts([
-            (True, {'data': json.dumps(messages)}),
-            (rest, {'rest': json.dumps(rest)}),
-            (pure, {'pure': None})])
-
-        return cmd('autofix fix', [], opts, parse_corrections)
+        return cmd('autofix fix', {'messages': json.dumps(messages), 'rest': json.dumps(rest), 'pure': pure}, parse_corrections)
 
     @list_command
     def ghc_eval(self, exprs):
-        return cmd('ghc eval', exprs, {})
+        return cmd('ghc eval', {'exprs': exprs})
 
     @command
     def exit(self):
-        return cmd('exit', [], {})
+        return cmd('exit', {})
 
 def wait_result(fn, *args, **kwargs):
     wait_receive = threading.Event()

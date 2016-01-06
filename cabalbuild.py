@@ -33,8 +33,8 @@ cabal_config = {
     # Commands with warnings:
     # Run fast, incremental build first. Then build everything with -Wall and -fno-code
     # If the incremental build fails, the second step is not executed.
-    'build_then_warnings': {'steps': [['build'], ['build', '-v0', '--ghc-options=-fforce-recomp -Wall -fno-code']], 'message': 'Building'},
-    'typecheck_then_warnings': {'steps': [['build', '--ghc-options=-c'], ['build', '-v0', '--ghc-options=-fforce-recomp -Wall -fno-code']], 'message': 'Checking'},
+    'build_then_warnings': {'steps': [['build'], ['build', '-v0', '--ghc-options=-fforce-recomp -fno-code']], 'message': 'Building'},
+    'typecheck_then_warnings': {'steps': [['build', '--ghc-options=-c'], ['build', '-v0', '--ghc-options=-fforce-recomp -fno-code']], 'message': 'Checking'},
 
     'rebuild': {'steps': [['clean'], ['configure', '--enable-tests'], ['build']], 'message': 'Rebuilding'},
     'install': {'steps': [['install', '--enable-tests']], 'message': 'Installing'},
