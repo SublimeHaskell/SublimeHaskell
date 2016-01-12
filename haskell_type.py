@@ -5,7 +5,7 @@ import sublime_plugin
 import re
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, log, log_trace, as_sandboxes, get_ghc_opts, is_haskell_source, show_panel, hide_panel
+    from sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, log, log_trace, as_sandboxes, get_ghc_opts, is_haskell_source, show_panel, hide_panel, head_of
     from autocomplete import autocompletion, get_qualified_symbol_at_region
     import autocomplete
     from hdevtools import hdevtools_type, hdevtools_enabled
@@ -13,7 +13,7 @@ if int(sublime.version()) < 3000:
     from parseoutput import tabs_offset, sublime_column_to_ghc_column, ghc_column_to_sublime_column
     import hsdev
 else:
-    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, log, log_trace, as_sandboxes, get_ghc_opts, is_haskell_source, show_panel, hide_panel
+    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, log, log_trace, as_sandboxes, get_ghc_opts, is_haskell_source, show_panel, hide_panel, head_of
     from SublimeHaskell.autocomplete import autocompletion, get_qualified_symbol_at_region
     import SublimeHaskell.autocomplete as autocomplete
     from SublimeHaskell.hdevtools import hdevtools_type, hdevtools_enabled
@@ -151,7 +151,7 @@ def haskell_type(view, filename, module_name, line, column, cabal = None):
                 r['type'],
                 to_file_pos(r['region']['from']),
                 to_file_pos(r['region']['to']))
-        ts = autocomplete.hsdev_client.ghcmod_type(filename, line + 1, column + 1, sandbox = as_sandboxes(cabal), ghc = get_ghc_opts(filename))
+        ts = autocomplete.hsdev_client.ghcmod_type(filename, line + 1, column + 1, ghc = get_ghc_opts(filename))
         if ts:
             return [to_region_type(r) for r in ts]
         return None
@@ -160,7 +160,7 @@ def haskell_type(view, filename, module_name, line, column, cabal = None):
     if hdevtools_enabled():
         result = hdevtools_type(filename, line, column, cabal = cabal)
     if not result and module_name and ghcmod_enabled():
-        result = ghcmod_type(filename, module_name, line, column, cabal = cabal)
+        result = ghcmod_type(filename, module_name, line, column)
     return parse_type_output(view, result) if result else None
 
 def haskell_type_view(view, selection = None):
@@ -174,7 +174,7 @@ def haskell_type_view(view, selection = None):
     column = c
 
     module_name = None
-    m = autocomplete.hsdev_client.module(file = filename)
+    m = head_of(autocomplete.hsdev_client.module(file = filename))
     if m:
         module_name = m.name
 
@@ -192,7 +192,7 @@ def haskell_types(filename, on_result, cabal = None):
                 to_file_pos(r['region']['to']))
         def on_resp(rs):
             on_result([to_region_type(r) for r in rs])
-        autocomplete.hsdev_client.types(filename, sandbox = as_sandboxes(cabal), ghc = get_ghc_opts(filename), wait = False, on_response = on_resp)
+        autocomplete.hsdev_client.types(files = [filename], ghc = get_ghc_opts(filename), wait = False, on_response = on_resp)
 
 class SublimeHaskellShowType(SublimeHaskellTextCommand):
     def run(self, edit, filename = None, line = None, column = None):
@@ -209,7 +209,7 @@ class SublimeHaskellShowType(SublimeHaskellTextCommand):
             column = c
 
         module_name = None
-        m = autocomplete.hsdev_client.module(file = filename)
+        m = head_of(autocomplete.hsdev_client.module(file = filename))
         if m:
             module_name = m.name
 

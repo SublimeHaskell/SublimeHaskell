@@ -906,7 +906,7 @@ class HsDev(object):
         return cmd('scope modules', {'file': file}, parse_modules_brief)
 
     @list_command
-    def scope(self, input, file, search_type = 'prefix', global_scope = False):
+    def scope(self, file, input = '', search_type = 'prefix', global_scope = False):
         return cmd('scope', {'query':{'input':input, 'type': search_type}, 'global': global_scope, 'file': file}, parse_decls)
 
     @list_command
@@ -922,27 +922,29 @@ class HsDev(object):
         cmd('cabal list', {'packages': packages}, lambda r: [parse_cabal_package(s) for s in r] if r else None)
 
     @list_command
-    def lint(self, files, contents = None):
+    def lint(self, files = [], contents = {}, hlint = []):
         return cmd('lint', {
             'files': files,
-            'contents': [{'file': f, 'contents': cts} for f, cts in contents.items()]})
+            'contents': [{'file': f, 'contents': cts} for f, cts in contents.items()],
+            'hlint-opts': hlint})
 
     @list_command
-    def check(self, files, ghc = [], contents = None):
+    def check(self, files = [], contents = {}, ghc = []):
         return cmd('check', {
             'files': files,
             'contents': [{'file': f, 'contents': cts} for f, cts in contents.items()],
             'ghc-opts': ghc})
 
     @list_command
-    def check_lint(self, files, ghc = [], contents = None):
+    def check_lint(self, files = [], contents = {}, ghc = [], hlint = []):
         return cmd('check-lint', {
             'files': files,
             'contents': [{'file': f, 'contents': cts} for f, cts in contents.items()],
-            'ghc-opts': ghc})
+            'ghc-opts': ghc,
+            'hlint-opts': hlint})
 
     @list_command
-    def types(self, file, ghc = [], contents = None):
+    def types(self, files = [], contents = {}, ghc = []):
         return cmd('types', {
             'files': files,
             'contents': [{'file': f, 'contents': cts} for f, cts in contents.items()],
@@ -977,11 +979,11 @@ class HsDev(object):
 
     @list_command
     def autofix_show(self, messages):
-        return cmd('autofix show', {'messages': json.dumps(messages)}, parse_corrections)
+        return cmd('autofix show', {'messages': messages}, parse_corrections)
 
     @list_command
     def autofix_fix(self, messages, rest = [], pure = False):
-        return cmd('autofix fix', {'messages': json.dumps(messages), 'rest': json.dumps(rest), 'pure': pure}, parse_corrections)
+        return cmd('autofix fix', {'messages': messages, 'rest': rest, 'pure': pure}, parse_corrections)
 
     @list_command
     def ghc_eval(self, exprs):

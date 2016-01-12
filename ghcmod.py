@@ -52,9 +52,9 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
         self.filename = self.view.file_name()
         if not self.filename:
             return
-        self.contents = None
+        self.contents = {}
         if self.view.is_dirty():
-            self.contents = self.view.substr(sublime.Region(0, self.view.size()))
+            self.contents[self.filename] = self.view.substr(sublime.Region(0, self.view.size()))
         if not self.fly_mode:
             hide_output(self.view)
         if not cmds:

@@ -121,6 +121,12 @@ def get_haskell_command_window_view_file_project(view = None):
     return window, view, file_name
 
 
+def head_of(l):
+    if len(l) > 0:
+        return l[0]
+    else:
+        return None
+
 def decode_bytes(s):
     if s is None:
         return None
