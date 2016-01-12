@@ -1147,7 +1147,7 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
     """
     def run(self, module_name = None, package_name = None, project_name = None, filename = None, cabal = None, scope = None):
         self.candidates = []
-        self.current_file_name = self.view.file_name()
+        self.current_file_name = self.window.active_view().file_name()
 
         m = None
 
