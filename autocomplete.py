@@ -402,9 +402,14 @@ class AutoCompletion(object):
                     if current_project:
                         # Search for declarations of qsymbol.module within current project
                         q_module = head_of([m for m in hsdev_client.scope_modules(file = current_file_name) if m.name == qsymbol.module])
-                        proj_module = hsdev_client.resolve(file = q_module.location.file, exports = True)
-                        if proj_module:
-                            suggestions = proj_module.declarations.values()
+                        if q_module.by_source():
+                            proj_module = hsdev_client.resolve(file = q_module.location.file, exports = True)
+                            if proj_module:
+                                suggestions = proj_module.declarations.values()
+                        elif q_module.by_cabal():
+                            cabal_module = head_of(hsdev_client.module(q_module.name, search_type = 'exact', package = q_module.location.package.name))
+                            if cabal_module:
+                                suggestions = cabal_module.declarations.values()
                 else:
                     suggestions = hsdev_client.complete(qualified_prefix, current_file_name, wide = wide)
             return self.keyword_completions + make_completions(suggestions)

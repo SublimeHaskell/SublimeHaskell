@@ -247,6 +247,15 @@ class Module(Symbol):
             return '{0}:{1}'.format(self.location.get_id(), self.name)
         return self.location.get_id()
 
+    def by_source(self):
+        return type(self.location) == Location
+
+    def by_cabal(self):
+        return type(self.location) == InstalledLocation
+
+    def by_hayoo(self):
+        return type(self.location) == OtherLocation
+
 class Declaration(Symbol):
     def __init__(self, name, decl_type = 'declaration', docs = None, location = None, imported = [], defined = None, position = None, module = None):
         super(Declaration, self).__init__(decl_type, name, docs, location, defined, position, module)
