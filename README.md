@@ -23,11 +23,11 @@ Optional, but useful:
   * `SublimeHaskell: Go to declaration` — overrides default, `F12`
   * `SublimeHaskell: Go to any declaration` — list declaration for all haskell sources
   * `Ctrl+R`, `Ctrl+Shift+R` — overrides default, goto symbol and goto symbol in project
-  * `SublimeHaskell: Show all types` — get all types and highlight while selection modifies
+  * `SublimeHaskell: Show/hide all types` — get all types and [highlight](Commands/Types.gif) while selection modifies, `Ctrl+T, h`
   * `SublimeHaskell: Hayoo` — search in hayoo
-  * `SublimeHaskell: Auto fix` — [auto fix](Commands/AutoFix.gif) some of warnings and/or errors (for now redundant imports and hlint hints)
+  * `SublimeHaskell: Auto fix` — [auto fix (gif)](Commands/AutoFix.gif) some of warnings and/or errors (for now redundant imports and hlint hints)
   * `SublimeHaskell: Scan docs and infer types` — as long as scanning docs for sources and inferring types is long process, it's disabled by default, but this command can be used to scan docs and infer types for currently opened view
-  * Eval commands
+  * Eval commands — see [animation](Commands/Eval.gif)
     * `SublimeHaskell: Eval selection` — eval selected expression, for example
       * `[1..10]` ⤇ `[1,2,3,4,5,6,7,8,9,10]`
       * `replicate 10 'a'` ⤇ `aaaaaaaaaa` (note no double quotes for string result)
@@ -47,6 +47,7 @@ Optional, but useful:
   * Context menu commands
     * `Open package on Hackage` — works within symbol info panel, opens Hackage page
     * `Open module on Hackage` — words in symbol info panel and in sources, opens Hackage page for selected module
+  * Check & Lint / Update on the fly — automatically [checks and lints](Commands/FlyCheck.gif) on idle and rescans actual source, so that [completions are updated](Commands/ScanContents.gif)
 
 * [stylish-haskell](https://github.com/jaspervdj/stylish-haskell) (for code prettification, `cabal install stylish-haskell`)
 * [ghc-mod](http://hackage.haskell.org/package/ghc-mod) (for import and LANGUAGE completions and type inference, `cabal install ghc-mod`, not used if `hsdev` enabled)

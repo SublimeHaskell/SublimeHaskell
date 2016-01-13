@@ -215,18 +215,23 @@ def parse_declaration(decl):
         if what == 'function':
             return symbols.Function(name, decl['decl'].get('type'), docs, None, imported, defined, pos)
         elif what == 'type':
-            return symbols.Type(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, None, imported, defined, pos)
+            return symbols.Type(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args', []), decl['decl']['info'].get('def'), docs, None, imported, defined, pos)
         elif what == 'newtype':
-            return symbols.Newtype(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, None, imported, defined, pos)
+            return symbols.Newtype(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args', []), decl['decl']['info'].get('def'), docs, None, imported, defined, pos)
         elif what == 'data':
-            return symbols.Data(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, None, imported, defined, pos)
+            return symbols.Data(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args', []), decl['decl']['info'].get('def'), docs, None, imported, defined, pos)
         elif what == 'class':
-            return symbols.Class(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args'), decl['decl']['info'].get('def'), docs, None, imported, defined, pos)
+            return symbols.Class(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args', []), decl['decl']['info'].get('def'), docs, None, imported, defined, pos)
         else:
             return None
     except Exception as e:
         log('Error pasring declaration: {0}'.format(e), log_error)
         return None
+
+def parse_declarations(decls):
+    if decls is None:
+        return None
+    return [parse_declaration(d) for d in decls]
 
 def parse_module_declaration(d, parse_module_info = True):
     try:
@@ -899,7 +904,7 @@ class HsDev(object):
 
     @list_command
     def whois(self, name, file):
-        return cmd('whois', {'name': name, 'file': file}, parse_decls)
+        return cmd('whois', {'name': name, 'file': file}, parse_declarations)
 
     @list_command
     def scope_modules(self, file):
@@ -907,11 +912,11 @@ class HsDev(object):
 
     @list_command
     def scope(self, file, input = '', search_type = 'prefix', global_scope = False):
-        return cmd('scope', {'query':{'input':input, 'type': search_type}, 'global': global_scope, 'file': file}, parse_decls)
+        return cmd('scope', {'query':{'input':input, 'type': search_type}, 'global': global_scope, 'file': file}, parse_declarations)
 
     @list_command
     def complete(self, input, file, wide = False):
-        return cmd('complete', {'prefix': input, 'wide': wide, 'file': file}, parse_decls)
+        return cmd('complete', {'prefix': input, 'wide': wide, 'file': file}, parse_declarations)
 
     @list_command
     def hayoo(self, query, page = None, pages = None):

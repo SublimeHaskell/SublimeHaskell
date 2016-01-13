@@ -263,10 +263,15 @@ class Declaration(Symbol):
     def imported_names(self):
         if self.imported:
             return sorted(list(set([i.module for i in self.imported])))
-        return [self.module.name]
+        if self.module:
+            return [self.module.name]
+        return []
 
     def imported_from_name(self):
-        return self.imported_names()[0]
+        inames = self.imported_names()
+        if inames:
+            return self.imported_names()[0]
+        return ''
 
     def suggest(self):
         """ Returns suggestion for this declaration """

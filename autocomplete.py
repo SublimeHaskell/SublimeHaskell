@@ -322,7 +322,7 @@ class AutoCompletion(object):
             current_module = head_of(hsdev_client_back.module(file = file_name))
             if current_module:
                 comps = make_completions(
-                    hsdev_client_back.complete('', file_name, timeout = None, split_result = True))
+                    hsdev_client_back.complete('', file_name, timeout = None))
                 # if not suggs:
                 #     suggs = hsdev_client_back.scope(file_name, sandbox = current_sandbox(), global_scope = True, timeout = None) or []
 
@@ -338,10 +338,13 @@ class AutoCompletion(object):
             cache_.files[file_name] = comps
             return log_result(cache_.files[file_name])
 
-    def drop_completions_async(self):
+    def drop_completions_async(self, file_name = None):
         log('drop prepared completions')
         with self.cache as cache_:
-            cache_.files.clear()
+            if file_name is None:
+                cache_.files.clear()
+            elif file_name in cache_.files:
+                del cache_.files[file_name]
 
     def update_cabal_completions(self):
         pass
@@ -869,6 +872,7 @@ class SublimeHaskellScanContents(SublimeHaskellTextCommand):
 
         def on_resp(r):
             self.status_msg.stop()
+            update_completions_async([self.current_file_name])
 
         def on_err(r):
             self.status_msg.fail()
@@ -1703,6 +1707,11 @@ def use_inspect_modules(fn):
 def hsdev_agent_connected():
     return hsdev_inspector.agent_connected()
 
+def update_completions_async(files):
+    for f in files:
+        run_async(autocompletion.drop_completions_async, f)
+    run_async(autocompletion.init_completions_async)
+
 class HsDevAgent(threading.Thread):
     def __init__(self):
         super(HsDevAgent, self).__init__()
@@ -1720,7 +1729,7 @@ class HsDevAgent(threading.Thread):
 
     def start_hsdev(self):
         if not hsdev.HsDev().check_version([0,1,5,0]):
-            output_error_async(sublime.active_window(), 'Please update hsdev to actual version (>= 0.1.5.0)')
+            output_error_async(sublime.active_window(), 'Please update hsdev to actual version (>= 0.1.5.2)')
             hsdev.hsdev_enable(False)
         else:
             def start_server_():
@@ -1818,8 +1827,7 @@ class HsDevAgent(threading.Thread):
                 run_async(self.inspect_cabal, c)
 
             if load_cabal or scan_paths or projects or files:
-                run_async(autocompletion.drop_completions_async)
-                run_async(autocompletion.init_completions_async)
+                update_completions_async(files)
             self.reinspect_event.wait(AGENT_SLEEP_TIMEOUT)
             self.reinspect_event.clear()
 
@@ -2053,11 +2061,10 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
                     window.run_command('sublime_haskell_reinspect_all')
 
     def on_post_save(self, view):
-        pass
-        # if is_inspected_source(view):
-        #     filename = view.file_name()
-        #     if filename:
-        #         hsdev_inspector.mark_file_dirty(filename)
+        if is_inspected_source(view):
+            filename = view.file_name()
+            if filename:
+                hsdev_inspector.mark_file_dirty(filename)
 
     def on_query_context(self, view, key, operator, operand, match_all):
         if key == 'haskell_autofix':
