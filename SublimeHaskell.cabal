@@ -28,7 +28,8 @@ executable ModuleInspector
   if impl(ghc < 7.8.2)
     build-depends:     haddock < 2.15
   else
-    build-depends:     haddock-api
+    build-depends:     haddock-api == 2.16.*
+                      ,haddock-library == 1.2.*
 
   default-language:    Haskell2010
 

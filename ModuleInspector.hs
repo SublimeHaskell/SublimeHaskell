@@ -18,11 +18,13 @@ import qualified System.Directory as Dir
 import System.IO
 
 import qualified Name (Name, getOccString, occNameString)
-import qualified Module (moduleNameString)
+import qualified OccName (OccName)
+import qualified Module (ModuleName, moduleNameString)
 import qualified SrcLoc as Loc
 import qualified HsDecls
 import qualified HsBinds
 import qualified Documentation.Haddock as Doc
+import qualified Documentation.Haddock.Types as DocT
 
 -- | All the information extracted from a codebase.
 data ModuleInfo = ModuleInfo
@@ -182,8 +184,10 @@ documentationMap iface = M.fromList $ concatMap toDoc $ Doc.ifaceExportItems ifa
         _ -> []
 
     extractDocs :: Doc.DocForDecl Name.Name -> Maybe String
-    extractDocs (mbDoc, _) = fmap printDoc $ Doc.documentationDoc mbDoc where
-        printDoc :: Doc.Doc Name.Name -> String
+    extractDocs (mbDoc, _) = fmap (printDoc . unDoc) $ Doc.documentationDoc mbDoc where
+        unDoc :: DocT.MetaDoc mod id -> Doc.DocH mod id
+        unDoc (DocT.MetaDoc meta doc) = doc
+        printDoc :: Doc.DocH (Module.ModuleName, OccName.OccName) Name.Name -> String
         printDoc Doc.DocEmpty = ""
         printDoc (Doc.DocAppend l r) = printDoc l ++ printDoc r
         printDoc (Doc.DocString s) = s
