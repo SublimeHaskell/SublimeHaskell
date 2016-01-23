@@ -24,7 +24,7 @@ executable ModuleInspector
                       ,containers >=0.4
                       ,directory >=1.0
                       ,aeson >= 0.7
-                      ,haskell-src-exts == 1.14.*
+                      ,haskell-src-exts == 1.15.0.1
   if impl(ghc < 7.8.2)
     build-depends:     haddock < 2.15
   else

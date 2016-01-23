@@ -176,7 +176,7 @@ documentationMap iface = M.fromList $ concatMap toDoc $ Doc.ifaceExportItems ifa
     extractNames (Loc.L _ d) = case d of
         HsDecls.TyClD ty -> [locatedName $ HsDecls.tcdLName ty]
         HsDecls.SigD sig -> case sig of
-            HsBinds.TypeSig names _ -> map locatedName names
+            HsBinds.TypeSig names _ _ -> map locatedName names
             HsBinds.GenericSig names _ -> map locatedName names
             _ -> []
         _ -> []
