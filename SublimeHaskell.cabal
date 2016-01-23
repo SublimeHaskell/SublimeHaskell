@@ -38,7 +38,7 @@ executable CabalInspector
   main-is:             CabalInspector.hs
 
   build-depends:       base
-                      ,Cabal >=1.14
+                      ,Cabal >=1.18
                       ,text >=1.0
                       ,aeson >= 0.7
 
