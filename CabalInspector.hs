@@ -74,7 +74,7 @@ analyzeCabal source = case parsePackageDescription source of
         cabalTests = fmap (toTest . second PD.condTreeData) $ PD.condTestSuites r }
     ParseFailed e -> Left $ "Parse failed: " ++ show e
     where
-        toLibrary (PD.Library exposeds _ info) = CabalLibrary (map components exposeds) (toInfo info)
+        toLibrary library = CabalLibrary (map components (PD.exposedModules library)) (toInfo (PD.libBuildInfo library))
         toExecutable (name, PD.Executable _ path info) = CabalExecutable name path (toInfo info)
         toTest (name, PD.TestSuite _ _ info enabled) = CabalTest name enabled (toInfo info)
         toInfo info = Info {
