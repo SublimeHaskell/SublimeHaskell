@@ -305,8 +305,8 @@ class Declaration(Symbol):
         info.append('')
 
         if self.has_source_location():
-            if self.location.project:
-                info.append('Project: {0}'.format(self.location.project))
+            if self.defined_location().project:
+                info.append('Project: {0}'.format(self.defined_location().project))
         elif self.other_location():
             pass
         else:
