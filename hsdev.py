@@ -600,7 +600,7 @@ class HsDev(object):
                 return True
             except Exception as e:
                 log('failed to connect to hsdev server', log_warning)
-                time.sleep(0.1)
+                time.sleep(0.5)
 
         return False
 
