@@ -588,7 +588,7 @@ class HsDev(object):
 
         for n in range(0, tries):
             try:
-                log('connecting to hsdev server...', log_info)
+                log('connecting to hsdev server ({})...'.format(n), log_info)
                 self.socket.connect(('127.0.0.1', self.port))
                 self.hsdev_socket = self.socket
                 self.hsdev_address = '127.0.0.1'
