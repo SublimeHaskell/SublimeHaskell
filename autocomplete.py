@@ -210,23 +210,23 @@ class Worker(threading.Thread):
 
     def run(self):
         while True:
-            fn, args, kwargs = self.jobs.get()
+            name, fn, args, kwargs = self.jobs.get()
             try:
                 fn(*args, **kwargs)
             except Exception as e:
-                log('worker exception: {0}'.format(e), log_debug)
+                log('worker: job {0} fails with {1}'.format(name, e), log_debug)
 
-    def async(self, fn, *args, **kwargs):
-        self.jobs.put((fn, args, kwargs))
+    def async(self, name, fn, *args, **kwargs):
+        self.jobs.put((name, fn, args, kwargs))
 
 worker = None
 
-def run_async(fn, *args, **kwargs):
+def run_async(name, fn, *args, **kwargs):
     global worker
     if not worker:
         worker = Worker()
         worker.start()
-    worker.async(fn, *args, **kwargs)
+    worker.async(name, fn, *args, **kwargs)
 
 
 
@@ -1714,8 +1714,8 @@ def hsdev_agent_connected():
 
 def update_completions_async(files):
     for f in files:
-        run_async(autocompletion.drop_completions_async, f)
-    run_async(autocompletion.init_completions_async)
+        run_async('drop completions', autocompletion.drop_completions_async, f)
+    run_async('init completions', autocompletion.init_completions_async)
 
 class HsDevAgent(threading.Thread):
     def __init__(self):
@@ -1829,7 +1829,7 @@ class HsDevAgent(threading.Thread):
                 cabal_to_load[:] = []
 
             for c in load_cabal:
-                run_async(self.inspect_cabal, c)
+                run_async('inspect cabal {0}'.format(c), self.inspect_cabal, c)
 
             if load_cabal or scan_paths or projects or files:
                 update_completions_async(files)
@@ -2028,7 +2028,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         if is_haskell_source(view):
             filename = view.file_name()
             if filename:
-                run_async(autocompletion.get_completions_async, filename)
+                run_async('get completions for {0}'.format(filename), autocompletion.get_completions_async, filename)
 
     def on_new(self, view):
         start_inspector()
