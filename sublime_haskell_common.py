@@ -725,7 +725,7 @@ def plugin_loaded():
     if not os.path.exists(cache_path):
         os.makedirs(cache_path)
 
-    CABAL_INSPECTOR_EXE_PATH = os.path.join(cache_path, 'CabalInspector')
+    CABAL_INSPECTOR_EXE_PATH = os.path.join(cache_path, 'tools/dist/build/CabalInspector/CabalInspector')
     preload_settings()
 
 if int(sublime.version()) < 3000:

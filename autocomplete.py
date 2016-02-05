@@ -29,12 +29,11 @@ else:
 # If true, files that have not changed will not be re-inspected.
 CHECK_MTIME = True
 
-MODULE_INSPECTOR_SOURCE_PATH = None
+TOOLS_CABAL_FILE_DIR = None
+TOOLS_BUILD_DIR = None
+TOOLS_SANDBOX_DIR = None
 MODULE_INSPECTOR_EXE_PATH = None
-MODULE_INSPECTOR_OBJ_DIR = None
-CABAL_INSPECTOR_SOURCE_PATH = None
 CABAL_INSPECTOR_EXE_PATH = None
-CABAL_INSPECTOR_OBJ_DIR = None
 INSPECTOR_ENABLED = False
 INSPECTOR_RUNNING = False
 
@@ -905,36 +904,54 @@ class InspectorAgent(threading.Thread):
         # Event that is set (notified) when files have changed
         self.reinspect_event = threading.Event()
 
-    CABALMSG = 'Compiling Haskell CabalInspector'
-    MODULEMSG = 'Compiling Haskell ModuleInspector'
+    SANDBOXMSG = 'Initializing Haskell tools sandbox'
+    DEPSMSG = 'Compiling Haskell tools dependencies. This can take several minutes, be patient!'
+    TOOLSMSG = 'Compiling Haskell tools'
 
     def run(self):
-        # Compile the CabalInspector:
-        with status_message(InspectorAgent.CABALMSG) as s:
-
-            exit_code, out, err = call_and_wait(['ghc',
-                '--make', CABAL_INSPECTOR_SOURCE_PATH,
-                '-o', CABAL_INSPECTOR_EXE_PATH,
-                '-outputdir', CABAL_INSPECTOR_OBJ_DIR])
+        # Make sure there is a sandbox here
+        with status_message(InspectorAgent.SANDBOXMSG) as s:
+            exit_code, out, err = call_and_wait(['cabal',
+               'sandbox', 'init',
+               '--sandbox='+TOOLS_SANDBOX_DIR],
+                cwd = TOOLS_CABAL_FILE_DIR)
 
             if exit_code != 0:
                 s.fail()
-                error_msg = u"SublimeHaskell: Failed to compile CabalInspector\n{0}".format(err)
+                error_msg = u"SublimeHaskell: Failed to initialize a Cabal sandbox\n{0}".format(err)
                 wait_for_window(lambda w: self.show_errors(w, error_msg))
-                # Continue anyway
+                return
 
-        # Compile the ModuleInspector:
-        with status_message(InspectorAgent.MODULEMSG) as s:
-
-            exit_code, out, err = call_and_wait(['ghc',
-                '--make', MODULE_INSPECTOR_SOURCE_PATH,
-                '-package', 'ghc',
-                '-o', MODULE_INSPECTOR_EXE_PATH,
-                '-outputdir', MODULE_INSPECTOR_OBJ_DIR])
+        # Install all the dependencies, if necessary
+        with status_message(InspectorAgent.DEPSMSG) as s:
+            exit_code, out, err = call_and_wait(['cabal',
+                'install',
+                '--only-dependencies',
+                '--force-reinstalls', # safely overrides packages in the global db
+                '--disable-library-profiling',
+                '--disable-shared',
+                '--disable-tests',
+                '--disable-documentation'],
+                cwd = TOOLS_CABAL_FILE_DIR)
 
             if exit_code != 0:
                 s.fail()
-                error_msg = u"SublimeHaskell: Failed to compile ModuleInspector\n{0}".format(err)
+                error_msg = u"SublimeHaskell: Failed to install tool dependencies\n{0}".format(err)
+                wait_for_window(lambda w: self.show_errors(w, error_msg))
+                return
+
+
+        # Compile the tools
+        with status_message(InspectorAgent.TOOLSMSG) as s:
+
+            exit_code, out, err = call_and_wait(['cabal',
+                'build',
+                '--builddir='+TOOLS_BUILD_DIR],
+                cwd = TOOLS_CABAL_FILE_DIR)
+
+            if exit_code != 0:
+                s.fail()
+                error_msg = u"SublimeHaskell: Failed to compile tools\n{0}".format(err)
                 wait_for_window(lambda w: self.show_errors(w, error_msg))
                 return
 
@@ -1304,24 +1321,22 @@ def start_inspector():
 
 
 def plugin_loaded():
-    global MODULE_INSPECTOR_SOURCE_PATH
+    global TOOLS_CABAL_FILE_DIR
+    global TOOLS_BUILD_DIR
+    global TOOLS_SANDBOX_DIR
     global MODULE_INSPECTOR_EXE_PATH
-    global MODULE_INSPECTOR_OBJ_DIR
-    global CABAL_INSPECTOR_SOURCE_PATH
     global CABAL_INSPECTOR_EXE_PATH
-    global CABAL_INSPECTOR_OBJ_DIR
     global INSPECTOR_ENABLED
     global INSPECTOR_RUNNING
 
     package_path = sublime_haskell_package_path()
     cache_path = sublime_haskell_cache_path()
 
-    MODULE_INSPECTOR_SOURCE_PATH = os.path.join(package_path, 'ModuleInspector.hs')
-    MODULE_INSPECTOR_EXE_PATH = os.path.join(cache_path, 'ModuleInspector')
-    MODULE_INSPECTOR_OBJ_DIR = os.path.join(cache_path, 'obj/ModuleInspector')
-    CABAL_INSPECTOR_SOURCE_PATH = os.path.join(package_path, 'CabalInspector.hs')
-    CABAL_INSPECTOR_EXE_PATH = os.path.join(cache_path, 'CabalInspector')
-    CABAL_INSPECTOR_OBJ_DIR = os.path.join(cache_path, 'obj/CabalInspector')
+    TOOLS_CABAL_FILE_DIR  = package_path
+    TOOLS_BUILD_DIR = os.path.join(cache_path, 'tools/dist')
+    TOOLS_SANDBOX_DIR = os.path.join(cache_path, 'tools/cabal-sandbox')
+    MODULE_INSPECTOR_EXE_PATH = os.path.join(TOOLS_BUILD_DIR, 'build/ModuleInspector/ModuleInspector')
+    CABAL_INSPECTOR_EXE_PATH = os.path.join(TOOLS_BUILD_DIR, 'build/CabalInspector/CabalInspector')
     INSPECTOR_ENABLED = get_setting('inspect_modules')
 
     if INSPECTOR_ENABLED:
