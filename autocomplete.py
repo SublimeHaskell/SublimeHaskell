@@ -1785,7 +1785,7 @@ class HsDevAgent(threading.Thread):
             if value:
                 log("starting hsdev", log_info)
                 self.start_hsdev()
-                self.hsdev.remove_all()
+                # self.hsdev.remove_all()
                 self.start_inspect()
             else:
                 log("stopping hsdev", log_info)
