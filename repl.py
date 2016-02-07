@@ -7,12 +7,10 @@ import re
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     import autocomplete
-    import symbols
     import hsdev
 else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.autocomplete as autocomplete
-    import SublimeHaskell.symbols as symbols
     import SublimeHaskell.hsdev as hsdev
     import SublimeREPL.sublimerepl as sublimerepl
 

@@ -90,10 +90,6 @@
         "command": "sublime_haskell_stylish"
     },
     {
-        "caption": "SublimeHaskell: Go to any declaration",
-        "command": "sublime_haskell_go_to_any_declaration"
-    },
-    {
         "caption": "SublimeHaskell: Go to declaration",
         "command": "sublime_haskell_go_to_declaration"
     },
@@ -133,10 +129,10 @@
         "caption": "SublimeHaskell: Insert import for symbol",
         "command": "sublime_haskell_insert_import_for_symbol"
     },
-    {
-        "caption": "SublimeHaskell: Clear imports",
-        "command": "sublime_haskell_clear_imports"
-    },
+    // {
+    //     "caption": "SublimeHaskell: Clear imports",
+    //     "command": "sublime_haskell_clear_imports"
+    // },
     {
         "caption": "SublimeHaskell: Switch Cabal sandbox",
         "command": "sublime_haskell_switch_cabal_sandbox"

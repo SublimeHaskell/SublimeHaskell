@@ -102,6 +102,12 @@ class InstalledLocation(object):
     def get_id(self):
         return '{0}:{1}'.format(self.cabal, self.package.package_id())
 
+    def is_cabal(self):
+        return self.cabal == 'cabal'
+
+    def sandbox(self):
+        return None if self.is_cabal() else self.cabal
+
 class OtherLocation(object):
     """
     Other module location
@@ -140,48 +146,11 @@ class Symbol(object):
     """
     Haskell symbol: module, function, data, class etc.
     """
-    def __init__(self, symbol_type, name, docs = None, location = None, defined = None, position = None, module = None):
+    def __init__(self, symbol_type, name):
         self.what = symbol_type
         self.name = name
-        self.defined = defined
-        self.position = position
-        self.module = module
-        self.docs = docs
-        self.location = location
 
         self.tags = {}
-
-    def full_name(self):
-        return self.module.name + '.' + self.name
-
-    def by_source(self):
-        return type(self.location) == Location
-
-    def by_cabal(self):
-        return type(self.location) == InstalledLocation
-
-    def by_hayoo(self):
-        return type(self.location) == OtherLocation
-
-    def has_source_location(self):
-        loc = self.defined_module().location
-        return type(loc) == Location and self.position is not None
-
-    def other_location(self):
-        loc = self.defined_module().location
-        return type(loc) == OtherLocation
-
-    def get_source_location(self):
-        loc = self.defined_module().location
-        if type(loc) == Location:
-            return source_location(loc, self.position)
-        return None
-
-    def defined_module(self):
-        return self.defined or self.module
-
-    def defined_location(self):
-        return self.defined_module().location
 
 class Import(object):
     """
@@ -205,7 +174,8 @@ class Module(Symbol):
     Haskell module symbol
     """
     def __init__(self, module_name, exports = None, imports = [], declarations = {}, location = None, cabal = None, last_inspection_time = 0):
-        super(Module, self).__init__('module', module_name, None, location)
+        super(Module, self).__init__('module', module_name)
+        self.location = location
         # List of strings
         if exports is not None:
             self.exports = exports[:]
@@ -257,9 +227,33 @@ class Module(Symbol):
         return type(self.location) == OtherLocation
 
 class Declaration(Symbol):
-    def __init__(self, name, decl_type = 'declaration', docs = None, location = None, imported = [], defined = None, position = None, module = None):
-        super(Declaration, self).__init__(decl_type, name, docs, location, defined, position, module)
+    def __init__(self, name, decl_type = 'declaration', docs = None, imported = [], defined = None, position = None, module = None):
+        super(Declaration, self).__init__(decl_type, name)
+        self.docs = docs
         self.imported = imported[:]
+        self.defined = defined
+        self.position = position
+        self.module = module
+
+    def defined_module(self):
+        return self.defined or self.module
+
+    def by_source(self):
+        return type(self.defined_module().location) == Location
+
+    def by_cabal(self):
+        return type(self.defined_module().location) == InstalledLocation
+
+    def by_hayoo(self):
+        return type(self.defined_module().location) == OtherLocation
+
+    def has_source_location(self):
+        return self.by_source() and self.position is not None
+
+    def get_source_location(self):
+        if self.has_source_location():
+            return source_location(self.defined_module().location, self.position)
+        return None
 
     def make_qualified(self):
         self.name = self.qualified_name()
@@ -272,8 +266,8 @@ class Declaration(Symbol):
     def imported_names(self):
         if self.imported:
             return sorted(list(set([i.module for i in self.imported])))
-        if self.module:
-            return [self.module.name]
+        # if self.module:
+        #     return [self.module.name]
         return []
 
     def imported_from_name(self):
@@ -294,24 +288,22 @@ class Declaration(Symbol):
 
     def detailed(self):
         """ Detailed info for use in Symbol Info command """
-        info = [
-            self.brief(),
-            '',
-            'Imported from {0}'.format(', '.join(self.imported_names()))]
+        info = [self.brief()]
+
+        if self.imported_names():
+            info.extend(['', 'Imported from {0}'.format(', '.join(self.imported_names()))])
 
         if self.docs:
             info.extend(['', self.docs])
 
         info.append('')
 
-        if self.has_source_location():
-            if self.defined_location().project:
-                info.append('Project: {0}'.format(self.defined_location().project))
-        elif self.other_location():
-            pass
-        else:
-            info.append('Installed in: {0}'.format(self.defined_location().cabal))
-            info.append('Package: {0}'.format(self.defined_location().package.package_id()))
+        if self.by_source():
+            if self.defined_module().location.project:
+                info.append('Project: {0}'.format(self.defined_module().location.project))
+        elif self.by_cabal():
+            info.append('Installed in: {0}'.format(self.defined_module().location.cabal))
+            info.append('Package: {0}'.format(self.defined_module().location.package.package_id()))
 
         if self.has_source_location():
             info.append('Defined at: {0}'.format(self.get_source_location()))
@@ -329,8 +321,8 @@ class Function(Declaration):
     """
     Haskell function declaration
     """
-    def __init__(self, name, function_type, docs = None, location = None, imported = [], defined = None, position = None, module = None):
-        super(Function, self).__init__(name, 'function', docs, location, imported, defined, position, module)
+    def __init__(self, name, function_type, docs = None, imported = [], defined = None, position = None, module = None):
+        super(Function, self).__init__(name, 'function', docs, imported, defined, position, module)
         self.type = function_type
 
     def suggest(self):
@@ -343,8 +335,8 @@ class TypeBase(Declaration):
     """
     Haskell type, data or class
     """
-    def __init__(self, name, decl_type, context, args, definition = None, docs = None, location = None, imported = [], defined = None, position = None, module = None):
-        super(TypeBase, self).__init__(name, decl_type, docs, location, imported, defined, position, module)
+    def __init__(self, name, decl_type, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
+        super(TypeBase, self).__init__(name, decl_type, docs, imported, defined, position, module)
         self.context = context
         self.args = args
         self.definition = definition
@@ -373,29 +365,29 @@ class Type(TypeBase):
     """
     Haskell type synonym
     """
-    def __init__(self, name, context, args, definition = None, docs = None, location = None, imported = [], defined = None, position = None, module = None):
-        super(Type, self).__init__(name, 'type', context, args, definition, docs, location, imported, defined, position, module)
+    def __init__(self, name, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
+        super(Type, self).__init__(name, 'type', context, args, definition, docs, imported, defined, position, module)
 
 class Newtype(TypeBase):
     """
     Haskell newtype synonym
     """
-    def __init__(self, name, context, args, definition = None, docs = None, location = None, imported = [], defined = None, position = None, module = None):
-        super(Newtype, self).__init__(name, 'newtype', context, args, definition, docs, location, imported, defined, position, module)
+    def __init__(self, name, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
+        super(Newtype, self).__init__(name, 'newtype', context, args, definition, docs, imported, defined, position, module)
 
 class Data(TypeBase):
     """
     Haskell data declaration
     """
-    def __init__(self, name, context, args, definition = None, docs = None, location = None, imported = [], defined = None, position = None, module = None):
-        super(Data, self).__init__(name, 'data', context, args, definition, docs, location, imported, defined, position, module)
+    def __init__(self, name, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
+        super(Data, self).__init__(name, 'data', context, args, definition, docs, imported, defined, position, module)
 
 class Class(TypeBase):
     """
     Haskell class declaration
     """
-    def __init__(self, name, context, args, definition = None, docs = None, location = None, imported = [], defined = None, position = None, module = None):
-        super(Class, self).__init__(name, 'class', context, args, definition, docs, location, imported, defined, position, module)
+    def __init__(self, name, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
+        super(Class, self).__init__(name, 'class', context, args, definition, docs, imported, defined, position, module)
 
 def update_with(l, r, default_value, f):
     """

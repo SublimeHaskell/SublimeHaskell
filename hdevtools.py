@@ -10,11 +10,9 @@ import threading
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     from ghci import parse_info
-    import symbols
 else:
     from SublimeHaskell.sublime_haskell_common import *
     from SublimeHaskell.ghci import parse_info
-    import SublimeHaskell.symbols as symbols
 
 
 def show_hdevtools_error_and_disable():

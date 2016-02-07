@@ -213,15 +213,15 @@ def parse_declaration(decl):
             defined = parse_module_id(decl['defined'])
 
         if what == 'function':
-            return symbols.Function(name, decl['decl'].get('type'), docs, None, imported, defined, pos)
+            return symbols.Function(name, decl['decl'].get('type'), docs, imported, defined, pos)
         elif what == 'type':
-            return symbols.Type(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args', []), decl['decl']['info'].get('def'), docs, None, imported, defined, pos)
+            return symbols.Type(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args', []), decl['decl']['info'].get('def'), docs, imported, defined, pos)
         elif what == 'newtype':
-            return symbols.Newtype(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args', []), decl['decl']['info'].get('def'), docs, None, imported, defined, pos)
+            return symbols.Newtype(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args', []), decl['decl']['info'].get('def'), docs, imported, defined, pos)
         elif what == 'data':
-            return symbols.Data(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args', []), decl['decl']['info'].get('def'), docs, None, imported, defined, pos)
+            return symbols.Data(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args', []), decl['decl']['info'].get('def'), docs, imported, defined, pos)
         elif what == 'class':
-            return symbols.Class(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args', []), decl['decl']['info'].get('def'), docs, None, imported, defined, pos)
+            return symbols.Class(name, decl['decl']['info'].get('ctx'), decl['decl']['info'].get('args', []), decl['decl']['info'].get('def'), docs, imported, defined, pos)
         else:
             return None
     except Exception as e:
@@ -244,8 +244,6 @@ def parse_module_declaration(d, parse_module_info = True):
 
         if not decl:
             return None
-
-        decl.location = loc
 
         decl.module = m
 
@@ -804,26 +802,27 @@ class HsDev(object):
 
     @list_command
     def list_modules(self, project = None, file = None, module = None, deps = None, sandbox = None, cabal = False, package = None, source = False, standalone = False):
-        f = []
+        fs = []
         if project:
-            f = {'project': project}
+            fs.append({'project': project})
         if file:
-            f = {'file': file}
+            fs.append({'file': file})
         if module:
-            f = {'module': module}
+            fs.append({'module': module})
         if deps:
-            f = {'deps': deps}
+            fs.append({'deps': deps})
         if sandbox:
-            f = {'cabal':{'sandbox':sandbox}}
+            fs.append({'cabal':{'sandbox': sandbox}})
         if cabal:
-            f = {'cabal':'cabal'}
+            fs.append({'cabal':'cabal'})
         if package:
-            f = {'package': package}
+            fs.append({'package': package})
         if source:
-            f = 'sourced'
+            fs.append('sourced')
         if standalone:
-            f = 'standalone'
-        return cmd('modules', {'filter': f}, parse_modules_brief)
+            fs.append('standalone')
+
+        return cmd('modules', {'filters': fs}, parse_modules_brief)
 
     @list_command
     def list_packages(self):
@@ -834,57 +833,57 @@ class HsDev(object):
         return cmd('projects', {})
 
     @list_command
-    def symbol(self, input = "", search_type = 'prefix', project = None, file = None, module = None, deps = None, sandbox = None, cabal = False, package = None, source = False, standalone = False):
+    def symbol(self, input = "", search_type = 'prefix', project = None, file = None, module = None, deps = None, sandbox = None, cabal = False, package = None, source = False, standalone = False, locals = False):
         # search_type is one of: exact, prefix, infix, suffix, regex
         q = {'input': input, 'type': search_type}
 
-        f = []
+        fs = []
         if project:
-            f = {'project': project}
+            fs.append({'project': project})
         if file:
-            f = {'file': file}
+            fs.append({'file': file})
         if module:
-            f = {'module': module}
+            fs.append({'module': module})
         if deps:
-            f = {'deps': deps}
+            fs.append({'deps': deps})
         if sandbox:
-            f = {'cabal':{'sandbox':sandbox}}
+            fs.append({'cabal':{'sandbox': sandbox}})
         if cabal:
-            f = {'cabal':'cabal'}
+            fs.append({'cabal':'cabal'})
         if package:
-            f = {'package': package}
+            fs.append({'package': package})
         if source:
-            f = 'sourced'
+            fs.append('sourced')
         if standalone:
-            f = 'standalone'
+            fs.append('standalone')
 
-        return cmd('symbol', {'query': q, 'filter': f}, parse_decls)
+        return cmd('symbol', {'query': q, 'filters': fs, 'locals': locals}, parse_decls)
 
     @command
     def module(self, input = "", search_type = 'prefix', project = None, file = None, module = None, deps = None, sandbox = None, cabal = False, package = None, source = False, standalone = False):
         q = {'input': input, 'type': search_type}
 
-        f = []
+        fs = []
         if project:
-            f = {'project': project}
+            fs.append({'project': project})
         if file:
-            f = {'file': file}
+            fs.append({'file': file})
         if module:
-            f = {'module': module}
+            fs.append({'module': module})
         if deps:
-            f = {'deps': deps}
+            fs.append({'deps': deps})
         if sandbox:
-            f = {'cabal':{'sandbox':sandbox}}
+            fs.append({'cabal':{'sandbox': sandbox}})
         if cabal:
-            f = {'cabal':'cabal'}
+            fs.append({'cabal':'cabal'})
         if package:
-            f = {'package': package}
+            fs.append({'package': package})
         if source:
-            f = 'sourced'
+            fs.append('sourced')
         if standalone:
-            f = 'standalone'
+            fs.append('standalone')
 
-        return cmd('module', {'query': q, 'filter': f}, parse_modules)
+        return cmd('module', {'query': q, 'filters': fs}, parse_modules)
 
     @command
     def resolve(self, file, exports = False):
@@ -907,12 +906,12 @@ class HsDev(object):
         return cmd('whois', {'name': name, 'file': file}, parse_declarations)
 
     @list_command
-    def scope_modules(self, file):
-        return cmd('scope modules', {'file': file}, parse_modules_brief)
+    def scope_modules(self, file, input = '', search_type = 'prefix'):
+        return cmd('scope modules', {'query': {'input': input, 'type': search_type}, 'file': file}, parse_modules_brief)
 
     @list_command
     def scope(self, file, input = '', search_type = 'prefix', global_scope = False):
-        return cmd('scope', {'query':{'input':input, 'type': search_type}, 'global': global_scope, 'file': file}, parse_declarations)
+        return cmd('scope', {'query': {'input': input, 'type': search_type}, 'global': global_scope, 'file': file}, parse_declarations)
 
     @list_command
     def complete(self, input, file, wide = False):
