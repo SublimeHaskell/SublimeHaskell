@@ -247,7 +247,6 @@ def find_file_in_parent_dir(subdirectory, filename_pattern):
         if last_dir == current_dir:
             return None
 
-
 def are_paths_equal(path, other_path):
     "Test whether filesystem paths are equal."
     path = os.path.abspath(path)
@@ -359,6 +358,31 @@ def set_setting(key, value):
 
 def set_setting_async(key, value):
     sublime.set_timeout(lambda: set_setting(key, value), 0)
+
+def _toggle_setting(key, is_asynchronous = True):
+    """
+    'Flips' a Boolean setting.
+    WARNING: Does no typechecking for Boolean input before being applied.
+    """
+    function = None
+
+    if is_asynchronous:
+        function = set_setting_async
+    else
+        function = set_setting
+
+    with sublime_haskell_settings as settings:
+        if settings[key]:
+            function(key, False)
+        else
+            function(key, True)
+
+def toggle_setting(key):
+    _toggle_setting(key, is_asynchronous = True)
+
+def toggle_setting_async(key):
+    _toggle_setting(key, is_asynchronous = False)
+
 
 def ghci_package_db(cabal = None):
     if cabal == 'cabal':

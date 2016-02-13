@@ -26,6 +26,10 @@
         "command": "sublime_haskell_symbol_info"
     },
     {
+        "caption": "SublimeHaskell: Toggle symbol info at status bar",
+        "command": "sublime_haskell_toggle_symbol_info_status_bar"
+    },
+    {
         "caption": "SublimeHaskell: Browse module",
         "command": "sublime_haskell_browse_module"
     },
