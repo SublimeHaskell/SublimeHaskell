@@ -21,7 +21,6 @@ Optional, but useful:
   * `SublimeHaskell: Show symbol info` — get help for symbol, `Ctrl+K Ctrl+I`
   * `SublimeHaskell: Go to module` — go to module, `Ctrl+K Ctrl+P`
   * `SublimeHaskell: Go to declaration` — overrides default, `F12`
-  * `SublimeHaskell: Go to any declaration` — list declaration for all haskell sources
   * `Ctrl+R`, `Ctrl+Shift+R` — overrides default, goto symbol and goto symbol in project
   * `SublimeHaskell: Show/hide all types` — get all types and [highlight](Commands/Types.gif) while selection modifies, `Ctrl+T, h`
   * `SublimeHaskell: Hayoo` — search in hayoo
