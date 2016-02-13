@@ -20,27 +20,71 @@ else:
 
 OUTPUT_PANEL_NAME = "haskell_run_output"
 
-cabal_tool = {
-    True: {'command': 'cabal-dev', 'message': 'Cabal-Dev', 'extra': lambda cmd: attach_sandbox(cmd)},
-    False: {'command': 'cabal', 'message': 'Cabal', 'extra': lambda cmd: cmd},
+build_tool = {
+    'cabal': {'command': 'cabal', 'name': 'cabal'},
+    'stack': {'command': 'stack', 'name': 'stack'}
 }
 
-cabal_config = {
-    'clean': {'steps': [['clean']], 'message': 'Cleaning'},
-    'configure': {'steps': [['configure', '--enable-tests']], 'message': 'Configure'},
-    'build': {'steps': [['build']], 'message': 'Building'},
-    'typecheck': {'steps': [['build', '--ghc-options=-c']], 'message': 'Checking'},
+def same_steps(steps):
+    return {'cabal': steps, 'stack': steps}
+
+build_tool_config = {
+    'clean': {
+        'message': 'Cleaning',
+        'steps': same_steps([['clean']])
+    },
+    'configure': {
+        'message': 'Configuring',
+        'steps': {
+            'cabal': [['configure', '--enable-tests']],
+            'stack': []
+        }
+    },
+    'build': {
+        'message': 'Building',
+        'steps': same_steps([['build']])
+    },
+    'typecheck': {
+        'message': 'Checking',
+        'steps': same_steps([['build', '--ghc-options=-c']])
+    },
     # Commands with warnings:
     # Run fast, incremental build first. Then build everything with -Wall and -fno-code
     # If the incremental build fails, the second step is not executed.
-    'build_then_warnings': {'steps': [['build'], ['build', '-v0', '--ghc-options=-fforce-recomp -fno-code']], 'message': 'Building'},
-    'typecheck_then_warnings': {'steps': [['build', '--ghc-options=-c'], ['build', '-v0', '--ghc-options=-fforce-recomp -fno-code']], 'message': 'Checking'},
+    'build_then_warnings': {
+        'message': 'Building',
+        'steps': {
+            'cabal': [['build'], ['build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
+            'stack': [['build']] # FIXME: What commands to use?
+        }
+    },
+    'typecheck_then_warnings': {
+        'message': 'Checking',
+        'steps': {
+            'cabal': [['build', '--ghc-options=-c'], ['build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
+            'stack': [['build']] # FIXME: What command to use?
+        }
+    },
 
-    'rebuild': {'steps': [['clean'], ['configure', '--enable-tests'], ['build']], 'message': 'Rebuilding'},
-    'install': {'steps': [['install', '--enable-tests']], 'message': 'Installing'},
-    'test': {'steps': [['test']], 'message': 'Testing'}
+    'rebuild': {
+        'message': 'Rebuilding',
+        'steps': {
+            'cabal': [['clean'], ['configure', '--enable-tests'], ['build']],
+            'stack': [['clean'], ['build']]
+        }
+    },
+    'install': {
+        'message': 'Installing',
+        'steps': {
+            'cabal': [['install', '--enable-tests']],
+            'stack': [['install']]
+        }
+    },
+    'test': {
+        'message': 'Testing',
+        'steps': same_steps([['test']])
+    }
 }
-
 
 # GLOBAL STATE
 
@@ -52,10 +96,10 @@ projects_being_built = set()
 # Base command
 class SublimeHaskellBaseCommand(SublimeHaskellWindowCommand):
 
-    def build(self, command, use_cabal_sandbox=None, filter_project = None):
+    def build(self, command, filter_project = None):
         select_project(
             self.window,
-            lambda n, d: run_build(self.window.active_view(), n, d, cabal_config[command], use_cabal_sandbox),
+            lambda n, d: run_build(self.window.active_view(), n, d, build_tool_config[command]),
             filter_project = filter_project)
 
     def is_enabled(self):
@@ -125,7 +169,7 @@ def select_project(window, on_selected, filter_project = None):
     window.show_quick_panel(list(map(lambda m: [m[0], m[1]['path']], ps)), on_done, 0, current_project_idx)
 
 
-def run_build(view, project_name, project_dir, config, use_cabal_sandbox=None):
+def run_build(view, project_name, project_dir, config):
     global projects_being_built
 
     # Don't build if a build is already running for this project
@@ -138,25 +182,22 @@ def run_build(view, project_name, project_dir, config, use_cabal_sandbox=None):
     # Set project as building
     projects_being_built.add(project_name)
 
-    # Run cabal or cabal-dev
-    if use_cabal_sandbox is None:
-        use_cabal_sandbox = get_setting_async('use_cabal_sandbox')
+    is_stack = is_stack_project(project_dir)
+    build_tool_name = 'stack' if is_stack else 'cabal'
 
-    tool = cabal_tool[use_cabal_sandbox]
+    tool = build_tool[build_tool_name]
 
-    # Title of tool: Cabal, Cabal-Dev
-    tool_title = tool['message']
+    # Title of tool: Cabal, Stack
+    tool_title = tool['name']
     # Title of action: Cleaning, Building, etc.
     action_title = config['message']
-    # Extra arguments lambda
-    extra_args = tool['extra']
-    # Tool name: cabal, cabal-dev
+    # Tool name: cabal
     tool_name = tool['command']
     # Tool arguments (commands): build, clean, etc.
-    tool_steps = config['steps']
+    tool_steps = config['steps'][build_tool_name]
 
     # Assemble command lines to run (possibly multiple steps)
-    commands = [extra_args([tool_name] + step) for step in tool_steps]
+    commands = [[tool_name] + step for step in tool_steps]
 
     log('running build commands: {0}'.format(commands), log_trace)
 
@@ -168,70 +209,9 @@ def run_build(view, project_name, project_dir, config, use_cabal_sandbox=None):
     run_chain_build_thread(
         view,
         project_dir,
-        tool_title + ': ' + action_title + ' ' + project_name,
+        '{0} {1} with {2}'.format(action_title, project_name, tool_title),
         commands,
         on_done=done_callback)
-
-
-class SublimeHaskellSwitchCabalSandboxCommand(SublimeHaskellWindowCommand):
-    def run(self):
-        use_cabal_sandbox = get_setting('use_cabal_sandbox')
-        sandbox = get_setting('cabal_sandbox')
-        sandboxes = get_setting('cabal_sandbox_list')
-
-        sandboxes.append(sandbox)
-        sandboxes = list(set(sandboxes))
-        set_setting('cabal_sandbox_list', sandboxes)
-
-        # No sandboxes
-        if len(sandboxes) == 0:
-            sublime_status_message('There is nothing to switch to')
-            self.switch_cabal('cabal')
-            return
-
-        # One sandbox, just switch
-        if len(sandboxes) == 1:
-            self.switch_cabal('cabal' if use_cabal_sandbox else sandbox)
-            return
-
-        # Many sandboxes, show list
-        self.sorted_sands = sandboxes
-        # Move previously used sandbox (or cabal) on top
-        self.sorted_sands.remove(sandbox)
-        if use_cabal_sandbox:
-            self.sorted_sands.insert(0, sandbox)
-            self.sorted_sands.insert(0, "<Cabal>")
-        else:
-            self.sorted_sands.insert(0, "<Cabal>")
-            self.sorted_sands.insert(0, sandbox)
-
-        self.window.show_quick_panel(self.sorted_sands, self.on_done)
-
-    def on_done(self, idx):
-        if idx == -1:
-            return
-
-        selected = self.sorted_sands[idx]
-        if selected == "<Cabal>":
-            self.switch_cabal('cabal')
-        else:
-            self.switch_cabal(selected)
-
-    def switch_cabal(self, new_cabal):
-        old_cabal = current_cabal()
-
-        if new_cabal == old_cabal:
-            return
-
-        if new_cabal == 'cabal':
-            set_setting('use_cabal_sandbox', False)
-        else:
-            set_setting('cabal_sandbox', new_cabal)
-            set_setting('use_cabal_sandbox', True)
-
-        save_settings()
-
-        sublime_status_message('Switched to ' + new_cabal)
 
 
 # Default build system (cabal or cabal-dev)
@@ -290,20 +270,22 @@ class SublimeHaskellBuildAutoCommand(SublimeHaskellBaseCommand):
             if not build_command:
                 output_error(self.window, "SublimeHaskell: invalid auto_build_mode '%s'" % build_mode)
 
-            config = copy.deepcopy(cabal_config[build_command])
+            config = build_tool_config[build_command]
 
-            if run_tests:
-                has_tests = False
+            # TODO: Auto run tests
 
-                projects = get_projects()
+            # if run_tests:
+            #     has_tests = False
 
-                if current_project_name in projects and 'description' in projects[current_project_name]:
-                    has_tests = len(projects[current_project_name]['description']['tests']) > 0
+            #     projects = get_projects()
 
-                if has_tests:
-                    config['steps'].extend(cabal_config['test']['steps'])
+            #     if current_project_name in projects and 'description' in projects[current_project_name]:
+            #         has_tests = len(projects[current_project_name]['description']['tests']) > 0
 
-            run_build(self.window.active_view(), current_project_name, current_project_dir, config, None)
+            #     if has_tests:
+            #         config['steps'].extend(cabal_config['test']['steps'])
+
+            run_build(self.window.active_view(), current_project_name, current_project_dir, config)
 
 
 class SublimeHaskellRunCommand(SublimeHaskellBaseCommand):

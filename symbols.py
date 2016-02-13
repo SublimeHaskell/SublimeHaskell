@@ -428,11 +428,8 @@ def is_within_project(module, project):
 def is_within_cabal(module, cabal = None):
     """
     Returns whether module loaded from cabal specified
-    If cabal is None, used current cabal
     """
-    if not cabal:
-        cabal = current_cabal()
-    return module.cabal == cabal
+    return cabal is not None and module.cabal == cabal
 
 def is_by_sources(module):
     """

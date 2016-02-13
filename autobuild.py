@@ -28,14 +28,12 @@ class SublimeHaskellAutobuild(sublime_plugin.EventListener):
         # auto build enabled and file within a cabal project
         if auto_build_enabled and cabal_project_dir is not None:
             view.window().run_command('sublime_haskell_build_auto')
-        # try to ghc-mod check
-        elif get_setting('enable_ghc_mod'):
-            if auto_check_enabled and auto_lint_enabled:
-                view.window().run_command('sublime_haskell_check_and_lint')
-            elif auto_check_enabled:
-                view.window().run_command('sublime_haskell_check')
-            elif auto_lint_enabled:
-                view.window().run_command('sublime_haskell_lint')
+        elif auto_check_enabled and auto_lint_enabled:
+            view.window().run_command('sublime_haskell_check_and_lint')
+        elif auto_check_enabled:
+            view.window().run_command('sublime_haskell_check')
+        elif auto_lint_enabled:
+            view.window().run_command('sublime_haskell_lint')
 
     def on_modified(self, view):
         lint_check_fly = get_setting('lint_check_fly')
@@ -84,17 +82,3 @@ class FlyCheckLint(threading.Thread):
                 sublime.set_timeout(lambda: view_.window().run_command('sublime_haskell_check', {'fly': True}), 0)
             elif auto_lint_enabled:
                 sublime.set_timeout(lambda: view_.window().run_command('sublime_haskell_lint', {'fly': True}), 0)
-
-
-
-def current_cabal_build():
-    """Current cabal build command"""
-    args = []
-    if get_setting('use_cabal_sandbox'):
-        args += ['cabal-dev']
-    else:
-        args += ['cabal']
-
-    args += ['build']
-
-    return attach_sandbox(args)

@@ -61,9 +61,6 @@ class LockedObject(object):
 def preload_settings():
     # Now we can use get_setting_async for 'add_to_PATH' safely
     get_setting('add_to_PATH')
-    get_setting('use_cabal_sandbox')
-    get_setting('cabal_sandbox')
-    get_setting('cabal_sandbox_list')
     get_setting('enable_auto_build')
     get_setting('show_output_window')
     get_setting('enable_ghc_mod')
@@ -297,6 +294,9 @@ def get_cabal_in_dir(cabal_dir):
             return (project_name, os.path.join(cabal_dir, entry))
     return (None, None)
 
+def is_stack_project(project_dir):
+    """Search for stack.yaml in parent directories"""
+    return find_file_in_parent_dir(project_dir, "stack.yaml") is not None
 
 def find_file_in_parent_dir(subdirectory, filename_pattern):
     """Look for a file with the specified name in a parent directory of the
@@ -331,9 +331,6 @@ def is_cabal(cabal):
         return None
     return False
 
-def current_is_cabal():
-    return is_cabal(current_cabal())
-
 def as_sandboxes(cabal):
     if cabal == 'cabal':
         return []
@@ -341,64 +338,10 @@ def as_sandboxes(cabal):
         return None
     return [cabal]
 
-def current_cabal():
-    """
-    Returns current cabal-dev sandbox or 'cabal'
-    """
-    if get_setting_async('use_cabal_sandbox'):
-        return get_setting_async('cabal_sandbox')
-    else:
-        return 'cabal'
-
-def current_sandbox():
-    """
-    Returns current cabal-def sandbox or None
-    """
-    if get_setting_async('use_cabal_sandbox'):
-        return get_setting_async('cabal_sandbox')
-    else:
-        return None
-
-def current_sandboxes():
-    return as_sandboxes(current_sandbox())
-
-def cabal_name_by_sandbox(sandbox):
-    if not sandbox:
-        return current_cabal()
-    return sandbox
-
 def sandbox_by_cabal_name(cabal):
     if cabal == 'cabal':
         return None
     return cabal
-
-def attach_sandbox(cmd, sandbox = None):
-    """Attach sandbox arguments to command"""
-    if not sandbox:
-        sandbox = get_setting_async('cabal_sandbox')
-    if len(sandbox) > 0:
-        return cmd + ['-s', sandbox]
-    return cmd
-
-
-def try_attach_sandbox(cmd, sandbox = None):
-    """Attach sandbox if use_cabal_sandbox enabled"""
-    if not get_setting_async('use_cabal_sandbox'):
-        return cmd
-    return attach_sandbox(cmd, sandbox)
-
-
-def attach_cabal_sandbox(cmd, cabal = None):
-    """
-    Attach sandbox if cabal is sandbox path, attach nothing on 'cabal',
-    and attach sandbox by settings on None
-    """
-    if not cabal:
-        cabal = current_cabal()
-    if cabal == 'cabal':
-        return cmd
-    return cmd + ['-s', cabal]
-
 
 def get_settings():
     return sublime.load_settings("SublimeHaskell.sublime-settings")
@@ -465,14 +408,11 @@ def subscribe_setting(key, fn):
 
 
 def ghci_package_db(cabal = None):
-    if cabal == 'cabal':
+    if not cabal or cabal == 'cabal':
         return None
-    dev = True if cabal else get_setting_async('use_cabal_sandbox')
-    box = cabal if cabal else get_setting_async('cabal_sandbox')
-    if dev and box:
-        package_conf = (filter(lambda x: re.match('packages-(.*)\.conf', x), os.listdir(box)) + [None])[0]
-        if package_conf:
-            return os.path.join(box, package_conf)
+    package_conf = (filter(lambda x: re.match('packages-(.*)\.conf', x), os.listdir(cabal)) + [None])[0]
+    if package_conf:
+        return os.path.join(cabal, package_conf)
     return None
 
 def ghci_append_package_db(cmd, cabal = None):
@@ -563,7 +503,7 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
     ghc_opts_args = get_ghc_opts_args(filename, add_package_db = False, cabal = cabal)
 
     try:
-        command = attach_cabal_sandbox(['ghc-mod'] + ghc_opts_args + arg_list, cabal)
+        command = ['ghc-mod'] + ghc_opts_args + arg_list
 
         # log('running ghc-mod: {0}'.format(command))
 
@@ -732,7 +672,8 @@ class StatusMessage(object):
     # Get message with dots or marks
     def message(self, ticks):
         if self.is_ok is not None:
-            return u'{0}{1}'.format(self.msg, u' \u2714' if self.is_ok else u' \u2718')
+            # return u'{0} {1}'.format(self.msg, u'\u2714' if self.is_ok else u'\u2718')
+            return u'{0} {1}'.format(self.msg, u'[ok]' if self.is_ok else u'[error]')
         if self.is_process:
             return u'{0}{1}'.format(self.msg, '.' * (ticks % 4))
         return self.msg

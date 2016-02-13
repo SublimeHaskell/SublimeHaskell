@@ -78,13 +78,13 @@ def hsinspect(module = None, file = None, cabal = None, ghc_opts = []):
     cmd = ['hsinspect']
     on_result = lambda s: s
     if module:
-        cmd.extend(['module', module])
+        cmd.extend([module])
         on_result = parse_module
     elif file:
-        cmd.extend(['file', file])
+        cmd.extend([file])
         on_result = parse_module
     elif cabal:
-        cmd.extend(['cabal', cabal])
+        cmd.extend([cabal])
     else:
         log('hsinspect must specify module, file or cabal', log_debug)
         return None

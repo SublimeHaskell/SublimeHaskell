@@ -321,8 +321,6 @@ class AutoCompletion(object):
             if current_module:
                 comps = make_completions(
                     hsdev_client_back.complete('', file_name, timeout = None))
-                # if not suggs:
-                #     suggs = hsdev_client_back.scope(file_name, sandbox = current_sandbox(), global_scope = True, timeout = None) or []
 
                 # Get imports names
                 # Note, that if module imported with 'as', then it can be used only with its synonym instead of full name
@@ -346,21 +344,9 @@ class AutoCompletion(object):
 
     def update_cabal_completions(self):
         pass
-        # comps = make_completions(
-        #     hsdev_client_back.symbol(cabal = current_is_cabal(), sandbox = current_sandboxes(), timeout = None, split_result = True))
-        # log('updating prepared cabal completions: {0}'.format(len(comps)))
-        # with self.cache as cache_:
-        #     cache_.set_cabal(comps)
 
     def update_sources_completions(self):
         pass
-        # symbols = hsdev_client_back.symbol(source = True, timeout = None, split_result = True)
-        # comps = make_completions(symbols)
-        # locs = make_locations(symbols)
-        # log('updating prepared sources completions: {0}'.format(len(comps)))
-        # with self.cache as cache_:
-        #     cache_.set_sources(comps)
-        #     cache_.set_locs(locs)
 
     def init_completions_async(self):
         window = sublime.active_window()
@@ -534,7 +520,7 @@ class AutoCompletion(object):
             if sbox:
                 return set([m.name for m in hsdev_client.list_modules(sandbox = sbox)])
         else:
-            return set([m.name for m in hsdev_client.list_modules(sandbox = current_cabal())])
+            return set([m.name for m in hsdev_client.list_modules(cabal = True)])
 
 autocompletion = AutoCompletion()
 
@@ -811,8 +797,7 @@ class SublimeHaskellGoToHackageModule(SublimeHaskellTextCommand):
                     ms = [m for m in hsdev_client.scope_modules(
                         scope, input = qsymbol.module, search_type = 'exact') if m.by_cabal()]
                 else:
-                    ms = [m for m in hsdev_client.list_modules(
-                        sandbox = current_cabal()) if m.name == qsymbol.module and m.by_cabal()]
+                    ms = [m for m in hsdev_client.list_modules(cabal = True) if m.name == qsymbol.module and m.by_cabal()]
             else: # symbol
                 scope = self.view.file_name()
                 if scope:
@@ -863,15 +848,6 @@ class SublimeHaskellGoToAnyDeclaration(SublimeHaskellWindowCommand):
         if idx == -1:
             return
         self.window.open_file(self.cache_.source_locs[idx][1], sublime.ENCODED_POSITION)
-
-
-
-class SublimeHaskellReinspectCabalCommand(SublimeHaskellWindowCommand):
-    def run(self, old_cabal = None, new_cabal = None):
-        if old_cabal is not None:
-            hsdev_client.remove(cabal = is_cabal(old_cabal), sandboxes = as_sandboxes(old_cabal))
-        if new_cabal is not None:
-            hsdev_inspector.mark_cabal(new_cabal)
 
 class SublimeHaskellReinspectAll(SublimeHaskellWindowCommand):
     def run(self):
@@ -1091,7 +1067,7 @@ class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
         self.module_name = module_name
         contents = self.view.substr(sublime.Region(0, self.view.size()))
         contents_part = contents[0 : list(re.finditer('^import.*$', contents, re.MULTILINE))[-1].end()]
-        call_and_wait_tool(['hsinspect', 'input'], 'hsinspect', contents_part, self.on_inspected, check_enabled = False)
+        call_and_wait_tool(['hsinspect'], 'hsinspect', contents_part, self.on_inspected, check_enabled = False)
 
     def on_inspected(self, result):
         cur_module = hsdev.parse_module(json.loads(result)['module']) if self.view.is_dirty() else head_of(hsdev_client.module(file = self.current_file_name))
@@ -1796,23 +1772,9 @@ class HsDevAgent(threading.Thread):
             if value:
                 self.mark_all_files()
 
-    def sandbox_changed(self, key, value):
-        # Force update async settings
-        get_setting('use_cabal_sandbox')
-        get_setting('cabal_sandbox')
-
-        if self.current_cabal != current_cabal():
-            sublime.active_window().run_command('sublime_haskell_reinspect_cabal', {
-                'old_cabal': self.current_cabal,
-                'new_cabal': current_cabal() })
-            self.current_cabal = current_cabal()
-
     def run(self):
         subscribe_setting('enable_hsdev', self.on_hsdev_enabled)
         subscribe_setting('inspect_modules', self.on_inspect_modules_changed)
-        subscribe_setting('use_cabal_sandbox', self.sandbox_changed)
-        self.current_cabal = current_cabal()
-        subscribe_setting('cabal_sandbox', self.sandbox_changed)
 
         if hsdev.hsdev_enabled():
             self.start_hsdev()
@@ -1890,21 +1852,16 @@ class HsDevAgent(threading.Thread):
 
     @dirty
     def mark_cabal(self, cabal_name = None):
-        if not cabal_name:
-            cabal_name = current_cabal()
         with self.cabal_to_load as cabal_to_load:
-            cabal_to_load.append(cabal_name)
+            cabal_to_load.append(cabal_name or 'cabal')
 
     @hsdev.use_hsdev
     def inspect_cabal(self, cabal = None):
-        if not cabal:
-            cabal = current_cabal()
-
         try:
-            with status_message_process('Inspecting {0}'.format(cabal), priority = 1) as s:
-                self.hsdev_back.scan(sandboxes = [cabal], on_notify = hsdev_status(s), wait = True, docs = hdocs.hdocs_enabled())
+            with status_message_process('Inspecting {0}'.format(cabal or 'cabal'), priority = 1) as s:
+                self.hsdev_back.scan(sandboxes = [cabal or 'cabal'], on_notify = hsdev_status(s), wait = True, docs = hdocs.hdocs_enabled())
         except Exception as e:
-            log('loading standard modules info for {0} failed with {1}'.format(cabal, e), log_error)
+            log('loading standard modules info for {0} failed with {1}'.format(cabal or 'cabal', e), log_error)
 
     @hsdev.use_hsdev
     @use_inspect_modules
@@ -1961,49 +1918,7 @@ def is_inspected_source(view = None):
 
 class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
     def __init__(self):
-        subscribe_setting('use_cabal_sandbox', self.on_sandbox_changed)
-        subscribe_setting('cabal_sandbox', self.on_sandbox_changed)
-
         self.project_file_name = None
-
-    def on_sandbox_changed(self, key, value):
-        # to force update async settings
-        get_setting('use_cabal_sandbox')
-        get_setting('cabal_sandbox')
-
-        window = sublime.active_window()
-        if window:
-            view = window.active_view()
-            if view:
-                self.set_cabal_status(view)
-
-    # def get_special_completions(self, view, prefix, locations):
-    #     # Contents of the current line up to the cursor
-    #     line_contents = get_line_contents(view, locations[0])
-
-    #     # Autocompletion for LANGUAGE pragmas
-    #     if get_setting('auto_complete_language_pragmas'):
-    #         # TODO handle multiple selections
-    #         match_language = LANGUAGE_RE.match(line_contents)
-    #         if match_language:
-    #             return [(to_unicode(c),) * 2 for c in autocompletion.language_completions]
-
-    #     # Autocompletion for import statements
-    #     if get_setting('auto_complete_imports'):
-    #         match_import = IMPORT_RE.match(line_contents)
-    #         if match_import:
-    #             import_completions = [(to_unicode(c),) * 2 for c in autocompletion.get_current_module_completions()]
-
-    #             # Right after "import "? Propose "qualified" as well!
-    #             qualified_match = IMPORT_QUALIFIED_POSSIBLE_RE.match(line_contents)
-    #             if qualified_match:
-    #                 qualified_prefix = qualified_match.group('qualifiedprefix')
-    #                 if qualified_prefix == "" or "qualified".startswith(qualified_prefix):
-    #                     import_completions.insert(0, (u"qualified", "qualified "))
-
-    #             return import_completions
-
-    #     return None
 
     def on_query_completions(self, view, prefix, locations):
         if not is_haskell_source(view):
@@ -2048,7 +1963,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         if filename:
             (cabal_dir, project_name) = get_cabal_project_dir_and_name_of_file(filename)
             if project_name:
-                view.set_status('sublime_haskell_cabal', '{0}: {1}'.format(current_cabal(), project_name))
+                view.set_status('sublime_haskell_cabal', '{0}: {1}'.format('cabal', project_name)) # TODO: Set some useful status instead of this
 
     def on_activated_async(self, view):
         if is_haskell_source(view):

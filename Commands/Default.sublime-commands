@@ -134,10 +134,6 @@
     //     "command": "sublime_haskell_clear_imports"
     // },
     {
-        "caption": "SublimeHaskell: Switch Cabal sandbox",
-        "command": "sublime_haskell_switch_cabal_sandbox"
-    },
-    {
         "caption": "SublimeHaskell: Reinspect all",
         "command": "sublime_haskell_reinspect_all"
     },
