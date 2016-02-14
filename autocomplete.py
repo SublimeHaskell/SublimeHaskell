@@ -1724,7 +1724,6 @@ class HsDevAgent(threading.Thread):
             if start_server:
                 start_server_()
             self.hsdev.connect_async(autoconnect = True, on_reconnect = reconnect_)
-            self.hsdev_back.connect_async()
             if not self.hsdev.wait():
                 log('hsdev agent: unable to connect to hsdev server', log_error)
 
@@ -1756,11 +1755,7 @@ class HsDevAgent(threading.Thread):
             self.start_hsdev()
 
         while True:
-            pong = self.hsdev.ping()
-            if pong is None: # Was not connected
-                log('hsdev ping: no connection', log_warning)
-                self.start_hsdev(start_server = False)
-            elif not pong:
+            if not self.hsdev.ping():
                 log('hsdev ping: no pong', log_warning)
 
             scan_paths = []
