@@ -6,9 +6,9 @@ import threading
 import time
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import attach_sandbox, get_cabal_project_dir_and_name_of_view, get_setting, get_setting_async, is_haskell_source, LockedObject, log, log_trace
+    from sublime_haskell_common import get_cabal_project_dir_and_name_of_view, get_setting, get_setting_async, is_haskell_source, LockedObject, log, log_trace
 else:
-    from SublimeHaskell.sublime_haskell_common import attach_sandbox, get_cabal_project_dir_and_name_of_view, get_setting, get_setting_async, is_haskell_source, LockedObject, log, log_trace
+    from SublimeHaskell.sublime_haskell_common import get_cabal_project_dir_and_name_of_view, get_setting, get_setting_async, is_haskell_source, LockedObject, log, log_trace
 
 class SublimeHaskellAutobuild(sublime_plugin.EventListener):
     def __init__(self):
