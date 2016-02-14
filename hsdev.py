@@ -103,17 +103,6 @@ def hsinspect(module = None, file = None, cabal = None, ghc_opts = []):
 def print_status(s):
     print(s['status'])
 
-class StatusToMessage(object):
-    def __init__(messager):
-        self.messager = messager
-
-    def on_status(self, s):
-        (task_name, info) = s['task'].values()[0]
-        cur = s['progress']['current']
-        total = s['progress']['total']
-        s.change_message('{0} {1}: {2}'.format(task_name, info, s['status']))
-        s.percentage_message(cur, total)
-
 def parse_database(s):
     if not s:
         return None
@@ -389,7 +378,7 @@ def hsdev_command(async = False, timeout = None, is_list = False):
                 def on_response(r):
                     on_resp(result)
 
-                opts_.update({'split-result': None})
+                opts_.update({'split-result': None}) # FIXME: Is this option still used?
                 r = self.call(
                     name_,
                     opts_,
@@ -514,7 +503,7 @@ class HsDev(object):
 
     # Util
 
-    def check_version(self, minimal = [0, 0, 0, 0], maximal = None):
+    def check_version(minimal = [0, 0, 0, 0], maximal = None):
         (exit_code, out, err) = call_and_wait(['hsdev', 'version'])
         if exit_code == 0:
             m = re.match('(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)\.(?P<build>\d+)', out)
@@ -541,7 +530,7 @@ class HsDev(object):
                 return True
         return False
 
-    def start_server(self, port = 4567, cache = None, log_file = None, log_config = None):
+    def start_server(port = 4567, cache = None, log_file = None, log_config = None):
         cmd = concat_args([
             (True, ["hsdev", "start"]),
             (port, ["--port", str(port)]),
@@ -555,7 +544,6 @@ class HsDev(object):
             except Exception as e:
                 return {'error': 'Invalid response', 'details': s}
 
-        log('Starting hsdev server command: {0}'.format(cmd), log_trace)
         log('Starting hsdev server', log_info)
 
         ret = call_and_wait_tool(cmd, 'hsdev', '', parse_response, None, None, check_enabled = False)
@@ -581,7 +569,7 @@ class HsDev(object):
 
     @connect_function
     @reconnect_function
-    def connect(self, tries = 10):
+    def connect(self, tries = 10, delay = 1.0):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         for n in range(0, tries):
@@ -598,15 +586,15 @@ class HsDev(object):
                 return True
             except Exception as e:
                 log('failed to connect to hsdev server', log_warning)
-                time.sleep(0.5)
+                time.sleep(delay)
 
         return False
 
     @reconnect_function
-    def connect_async(self, tries = 10):
+    def connect_async(self, tries = 10, delay = 1.0):
         thread = threading.Thread(
             target = self.connect,
-            kwargs = { 'tries' : tries, 'just_connect' : True })
+            kwargs = { 'tries' : tries, 'delay': delay, 'just_connect' : True })
         thread.start()
   
     def wait(self, timeout = None):
@@ -709,7 +697,6 @@ class HsDev(object):
             opts.update({'no-file': True})
             opts.update({'id': id, 'command': command})
             msg = json.dumps(opts, separators = (',', ':'))
-            log('json message: {0}'.format(msg), log_debug)
 
             self.hsdev_socket.sendall('{0}\n'.format(msg).encode())
             log(call_cmd, log_trace)

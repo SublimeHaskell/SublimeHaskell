@@ -1697,27 +1697,40 @@ class HsDevAgent(threading.Thread):
     def agent_connected(self):
         return self.hsdev.is_connected()
 
-    def start_hsdev(self):
-        if not hsdev.HsDev().check_version([0,1,6,0]):
-            output_error_async(sublime.active_window(), 'Please update hsdev to actual version (>= 0.1.6.0)')
+    def start_hsdev(self, start_server = True):
+        if not hsdev.HsDev.check_version([0,1,6,0]):
+            output_error_async(sublime.active_window(), 'Please update hsdev to actual version (>= 0.1.6.0), hsdev will be disabled for now')
             hsdev.hsdev_enable(False)
         else:
             def start_server_():
-                hsdev.HsDev().start_server(cache = HSDEV_CACHE_PATH, log_file = HSDEV_LOG, log_config = get_setting_async("hsdev_log_config"))
-            def link_server_():
+                hsdev.HsDev.start_server(cache = HSDEV_CACHE_PATH, log_file = HSDEV_LOG, log_config = get_setting_async("hsdev_log_config"))
+            def reconnect_():
+                log('hsdev agent: reconnecting to hsdev', log_trace)
+                self.stop_hsdev()
+                start_server_()
+            def connected_():
+                log('hsdev agent: connected to hsdev', log_trace)
+                # Link to server so that it will be stopped on connection close
                 self.hsdev.link()
+                # Connect back hsdev client
+                self.hsdev_back.connect_async()
+            def back_connected_():
                 self.start_inspect()
 
-            self.hsdev.on_connected = link_server_
+            self.hsdev.on_connected = connected_
+            self.hsdev_back.on_connected = back_connected_
 
-            start_server_()
-            self.hsdev.connect_async(autoconnect = True, on_reconnect = start_server_)
-            self.hsdev_back.connect_async(autoconnect = True)
+            self.stop_hsdev()
+            if start_server:
+                start_server_()
+            self.hsdev.connect_async(autoconnect = True, on_reconnect = reconnect_)
+            self.hsdev_back.connect_async()
             if not self.hsdev.wait():
-                log('Unable to connect to hsdev server', log_warning)
+                log('hsdev agent: unable to connect to hsdev server', log_error)
 
     def stop_hsdev(self):
         self.hsdev.close()
+        self.hsdev_back.close()
 
     def on_hsdev_enabled(self, key, value):
         if key == 'enable_hsdev':
@@ -1743,6 +1756,13 @@ class HsDevAgent(threading.Thread):
             self.start_hsdev()
 
         while True:
+            pong = self.hsdev.ping()
+            if pong is None: # Was not connected
+                log('hsdev ping: no connection', log_warning)
+                self.start_hsdev(start_server = False)
+            elif not pong:
+                log('hsdev ping: no pong', log_warning)
+
             scan_paths = []
             with self.dirty_paths as dirty_paths:
                 scan_paths = dirty_paths[:]
