@@ -546,7 +546,7 @@ class HsDev(object):
 
         log('Starting hsdev server', log_info)
 
-        ret = call_and_wait_tool(cmd, 'hsdev', '', parse_response, None, None, check_enabled = False)
+        ret = call_and_wait_tool(cmd, 'hsdev', '', None, None, None, check_enabled = False)
         if ret is not None:
             return ret
         return None
@@ -698,7 +698,11 @@ class HsDev(object):
             opts.update({'id': id, 'command': command})
             msg = json.dumps(opts, separators = (',', ':'))
 
-            self.hsdev_socket.sendall('{0}\n'.format(msg).encode())
+            # Seems, that first sendall doesn't throw error on closed socket
+            # So we just call it twice
+            # It's hackish, but I haven't found easy solution
+            self.hsdev_socket.sendall(msg.encode())
+            self.hsdev_socket.sendall('\n'.encode())
             log(call_cmd, log_trace)
 
             if wait:
