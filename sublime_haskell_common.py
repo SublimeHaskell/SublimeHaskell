@@ -491,7 +491,7 @@ def get_ghc_opts_args(filename = None, add_package_db = True, cabal = None):
     opts = get_ghc_opts(filename, add_package_db, cabal)
     args = []
     for opt in opts:
-        args.extend(["-g", opt])
+        args.extend(["-g", "\"" + opt + "\""])
     return args
 
 def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):

@@ -145,21 +145,21 @@ and `cabal install hasktags`.
 
 `CTags` expects the extended exuberant ctags format.
 
-#### Outside your project: hasktags
+#### Inside your project: hasktags
 
 * In your project, `hasktags --ctags --extendedctag .`
-* You can now jump to definitions inside your project (`Ctrl-R, Ctrl-R` is the default keybinding)
+* You can now jump to definitions inside your project (`Ctrl-T, Ctrl-T` is the default keybinding)
 
-#### Outside your project: codex
+#### Inside and outside your project: codex
 
 [codex](https://hackage.haskell.org/package/codex) allows you to use ctags to jump to definitions that are declared in your cabal dependencies.
 
 * `cabal install codex`
-* In your project, `codex update`
-* Change `~/.codex` to `tagsCmd: hasktags --ctags --extendedctag --output='$TAGS' '$SOURCES'`
+* Run `codex set format sublime`, that updates your `~/.codex` file to Sublime's Ctags plugin's format
+* Change `~/.codex` to `tagsFileName: .tags`
 * In your project, `codex cache clean && codex update`
-* In the Sublime CTags user settings, set `"tag_file": "codex.tags"`
 * You can now jump to the source code of definitions outside of your project.
+* The commands `CTags: Show Symbols` and `CTags: Rebuild Tags` currently don't work with `codex`
 
 
 If the ModuleInspector takes too much time
