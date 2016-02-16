@@ -1698,8 +1698,23 @@ class HsDevAgent(threading.Thread):
         return self.hsdev.is_connected()
 
     def start_hsdev(self, start_server = True):
-        if not hsdev.HsDev.check_version([0,1,6,0]):
-            output_error_async(sublime.active_window(), 'Please update hsdev to actual version (>= 0.1.6.0), hsdev will be disabled for now')
+        min_ver = [0,1,6,0]
+        max_ver = [0,1,7,0]
+
+        hsdev_ver = hsdev.hsdev_version()
+        if hsdev_ver is None:
+            output_error_async(sublime.active_window(), "\n".join([
+                "hsdev executable couldn't be found",
+                "check if it's installed and in PATH",
+                "",
+                "hsdev will be disabled, enable it by setting 'enable_hsdev' to true"]))
+            hsdev.hsdev_enable(False)
+        elif not hsdev.check_version(hsdev_ver, min_ver, max_ver):
+            output_error_async(sublime.active_window(), "\n".join([
+                "hsdev version is incorrect: {0}".format(hsdev.show_version(hsdev_ver)),
+                "required >= {0} and < {1}".format(hsdev.show_version(min_ver), hsdev.show_version(max_ver)),
+                "",
+                "hsdev will be disabled, enable it by setting 'enable_hsdev' to true"]))
             hsdev.hsdev_enable(False)
         else:
             def start_server_():
@@ -1755,7 +1770,7 @@ class HsDevAgent(threading.Thread):
             self.start_hsdev()
 
         while True:
-            if not self.hsdev.ping():
+            if hsdev.hsdev_enabled() and not self.hsdev.ping():
                 log('hsdev ping: no pong', log_warning)
 
             scan_paths = []

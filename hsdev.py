@@ -66,6 +66,33 @@ def use_hsdev(fn):
             return fn(*args, **kwargs)
     return wrapped
 
+def hsdev_version():
+    try:
+        (exit_code, out, err) = call_and_wait(['hsdev', 'version'])
+        if exit_code == 0:
+            m = re.match('(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)\.(?P<build>\d+)', out)
+            if m:
+                major = int(m.group('major'))
+                minor = int(m.group('minor'))
+                revision = int(m.group('revision'))
+                build = int(m.group('build'))
+                return [major, minor, revision, build]
+    except FileNotFoundError:
+        pass
+    return None
+
+def show_version(ver):
+    return '.'.join(map(lambda i: str(i), ver))
+
+def check_version(ver, minimal = [0, 0, 0, 0], maximal = None):
+    if ver is None:
+        return False
+    if ver < minimal:
+        return False
+    if maximal and ver >= maximal:
+        return False
+    return True
+
 def if_some(x, lst):
     return lst if x is not None else []
 
@@ -502,33 +529,6 @@ class HsDev(object):
             log('No reconnect function')
 
     # Util
-
-    def check_version(minimal = [0, 0, 0, 0], maximal = None):
-        (exit_code, out, err) = call_and_wait(['hsdev', 'version'])
-        if exit_code == 0:
-            m = re.match('(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)\.(?P<build>\d+)', out)
-            if m:
-                major = int(m.group('major'))
-                minor = int(m.group('minor'))
-                revision = int(m.group('revision'))
-                build = int(m.group('build'))
-                ver = [major, minor, revision, build]
-                # Check minimal version
-                for x, y in zip(ver, minimal):
-                    if x < y:
-                        return False
-                    elif x > y:
-                        break
-                # Check maximal version
-                if maximal is not None:
-                    for x, y in zip(ver, maximal):
-                        if x > y:
-                            return False
-                        elif x < y:
-                            break
-                # Checked
-                return True
-        return False
 
     def start_server(port = 4567, cache = None, log_file = None, log_config = None):
         cmd = concat_args([
