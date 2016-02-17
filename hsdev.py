@@ -704,8 +704,8 @@ class HsDev(object):
             # Seems, that first sendall doesn't throw error on closed socket
             # So we just call it twice
             # It's hackish, but I haven't found easy solution
-            self.hsdev_socket.sendall(msg.encode())
-            self.hsdev_socket.sendall('\n'.encode())
+            self.hsdev_socket.sendall(msg.encode('utf-8'))
+            self.hsdev_socket.sendall('\n'.encode('utf-8'))
             log(call_cmd, log_trace)
 
             if wait:
@@ -744,7 +744,7 @@ class HsDev(object):
 
     def get_response(self):
         while not '\n' in self.part:
-            self.part = self.part + self.socket.recv(65536).decode()
+            self.part = self.part + self.socket.recv(65536).decode('utf-8')
         (r, _, post) = self.part.partition('\n')
         self.part = post
         return r

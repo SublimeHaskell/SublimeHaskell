@@ -87,7 +87,7 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
                             self.view,
                             output_text,
                             get_cabal_project_dir_of_file(self.filename) or os.path.dirname(self.filename),
-                            show_panel = not self.fly_mode))
+                            show_panel = not self.fly_mode), 0)
                 sublime.set_timeout(lambda: mark_messages_in_views(output_messages), 0)
 
                 # autocomplete.hsdev_client.autofix_show(self.msgs, on_response = self.on_autofix)
