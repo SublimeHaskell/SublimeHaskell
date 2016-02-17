@@ -56,14 +56,17 @@ class FilePosition(object):
     def to_str(self):
         return '{0}:{1}'.format(self.line, self.column)
 
+    @staticmethod
     def from_point(view, p):
         (l, c) = view.rowcol(p)
         return FilePosition(int(l), int(c))
 
+    @staticmethod
     def from_type_pos(view, l, c):
         return FilePosition(int(l) - 1, ghc_column_to_sublime_column(view, int(l), int(c)))
 
     # From one-based line-column
+    @staticmethod
     def from_str(s):
         if not s:
             return None
@@ -116,9 +119,11 @@ class TypedRegion(object):
     def contains(self, r):
         return self.contains_region(r.region)
 
+    @staticmethod
     def contains_region(self, r):
         return self.region.contains(r)
 
+    @staticmethod
     def fromRegionType(r, view):
         return TypedRegion(view, r.region(view), r.typename)
 

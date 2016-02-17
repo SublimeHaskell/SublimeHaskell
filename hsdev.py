@@ -530,6 +530,7 @@ class HsDev(object):
 
     # Util
 
+    @staticmethod
     def start_server(port = 4567, cache = None, log_file = None, log_config = None):
         cmd = concat_args([
             (True, ["hsdev", "start"]),
@@ -553,12 +554,14 @@ class HsDev(object):
 
     # Static creators
 
+    @staticmethod
     def client(port = 4567, cache = None, autoconnect = False):
         start_server(port = port, cache = cache)
         h = HsDev(port = port)
         h.connect(autoconnect = autoconnect)
         return h
 
+    @staticmethod
     def client_async(port = 4567, cache = None, autoconnect = False):
         start_server(port = port, cache = cache)
         h = HsDev(port = port)
@@ -574,7 +577,7 @@ class HsDev(object):
 
         for n in range(0, tries):
             try:
-                log('connecting to hsdev server ({})...'.format(n), log_info)
+                log('connecting to hsdev server ({0})...'.format(n), log_info)
                 self.socket.connect(('127.0.0.1', self.port))
                 self.hsdev_socket = self.socket
                 self.hsdev_address = '127.0.0.1'
@@ -585,7 +588,7 @@ class HsDev(object):
                 call_callback(self.on_connected, name = 'HsDev.on_connected')
                 return True
             except Exception as e:
-                log('failed to connect to hsdev server', log_warning)
+                log('failed to connect to hsdev server ({0})', log_warning)
                 time.sleep(delay)
 
         return False

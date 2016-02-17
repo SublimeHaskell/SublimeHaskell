@@ -692,9 +692,11 @@ class StatusMessage(object):
             self.is_ok = is_ok
         self.is_process = False
 
+    @staticmethod
     def process(msg, timeout = 300, duration = 3, priority = 0):
         return StatusMessage(msg, duration = duration, timeout = timeout, priority = priority)
 
+    @staticmethod
     def status(msg, duration = 3, priority = 0, is_ok = None):
         return StatusMessage(msg, duration = duration, priority = priority, is_process = False, is_ok = is_ok)
 
