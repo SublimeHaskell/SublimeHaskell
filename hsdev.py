@@ -588,7 +588,7 @@ class HsDev(object):
                 call_callback(self.on_connected, name = 'HsDev.on_connected')
                 return True
             except Exception as e:
-                log('failed to connect to hsdev server ({0})', log_warning)
+                log('failed to connect to hsdev server ({0})'.format(n), log_warning)
                 time.sleep(delay)
 
         return False
