@@ -276,7 +276,7 @@
 		<key>infix_op</key>
 		<dict>
 			<key>match</key>
-			<string>(\([^\w\d \)]+\)|\(,+\))</string>
+			<string>(\([^\w \)]+\)|\(,+\))</string>
 			<key>name</key>
 			<string>keyword.operator.haskell</string>
 		</dict>
@@ -319,14 +319,14 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>(?&lt;!')\b[a-z][A-Za-z_'0-9]*</string>
+					<string>(?&lt;!')\b[a-z][\w']*</string>
 					<!-- ^ We have to prepend the negative lookbehind (?<!') to forbid single quotes before the word boundary. That is because in contrast to Python's re, Sublime's matching engine treats `my'str` as `my\b'\b'str`, thus detecting constants (constructors) in identifier names like `m'result`. Single quotes are the only such characters allowed in Haskell identifiers. -->
 					<key>name</key>
 					<string>entity.name.function.haskell</string>
 				</dict>
 				<dict>
 					<key>begin</key>
-					<string>(?&lt;!')\b([A-Z][A-Za-z_'0-9]*)\s*(\()</string>
+					<string>(?&lt;!')\b([A-Z][\w']*)\s*(\()</string>
 					<!-- ^ We have to prepend the negative lookbehind (?<!') to forbid single quotes before the word boundary. That is because in contrast to Python's re, Sublime's matching engine treats `my'str` as `my\b'\b'str`, thus detecting constants (constructors) in identifier names like `m'result`. Single quotes are the only such characters allowed in Haskell identifiers. -->
 					<key>beginCaptures</key>
 					<dict>
@@ -363,7 +363,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>(?&lt;!')\b[A-Z][A-Za-z_'0-9]*</string>
+					<string>(?&lt;!')\b[A-Z][\w']*</string>
 					<!-- ^ We have to prepend the negative lookbehind (?<!') to forbid single quotes before the word boundary. That is because in contrast to Python's re, Sublime's matching engine treats `my'str` as `my\b'\b'str`, thus detecting constants (constructors) in identifier names like `m'result`. Single quotes are the only such characters allowed in Haskell identifiers. -->
 					<key>name</key>
 					<string>storage.type.haskell entity.name.data.haskell</string>
@@ -399,7 +399,7 @@
 		<key>module_name</key>
 		<dict>
 			<key>match</key>
-			<string>([A-Z][A-Za-z_'0-9]*)(\.[A-Z][A-Za-z_'0-9]*)*</string>
+			<string>([A-Z][\w']*)(\.[A-Z][\w']*)*</string>
 			<key>name</key>
 			<string>storage.module.haskell</string>
 		</dict>
@@ -587,13 +587,13 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>(?&lt;!')\b[a-z][A-Za-z_'0-9]*\b</string>
+					<string>(?&lt;!')\b[a-z][\w']*\b</string>
 					<key>name</key>
 					<string>variable.generic.haskell</string>
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>(?&lt;!')\b[A-Z][A-Za-z_'0-9]*\b</string>
+					<string>(?&lt;!')\b[A-Z][\w']*\b</string>
 					<key>name</key>
 					<string>storage.type.haskell</string>
 				</dict>
@@ -674,7 +674,29 @@
 		<key>function_signature</key>
 		<dict>
 			<key>begin</key>
-			<string>^(\s*)(?!--)(?=([\w\d_\s,']*|\(.*\)|\[.*\])\s+((::)|∷))</string>
+			<!--
+			SublimeText2 workaround
+			If begin doesn't capture anything (using only lookaheads), then end tries match just from the beginning
+			And it cause infinite loop in case of function with no indentation (so there's nothing matched)
+			SublimeText3 works well in that case
+
+			We also can't match full name of function, because there're cases with several names:
+				* x, y, z :: Int
+				* [x, y, z] :: [Int]
+
+			Therefore we are just trying to much something: name, open bracket etc.
+			And we match other stuff within patterns
+			-->
+			<!-- <string>^(\s*)(?!--)(?=([\w\s,']*|\(.*\)|\[.*\])\s+((::)|∷))</string> -->
+			<string>^(\s*)(?!--)(?:(\(\W\)|[\w']+)|[\(\[])(?=[\w',\s\[\]\(\)]*((?:::)|∷))</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>entity.name.function.haskell</string>
+				</dict>
+			</dict>
 			<key>end</key>
 			<string>^(?!\1\s)|(?=})</string>
 			<key>name</key>
@@ -700,7 +722,7 @@
 					<array>
 						<dict>
 							<key>match</key>
-							<string>((?&lt;!')\b[a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))</string>
+							<string>((?&lt;!')\b[a-z_][\w']*|\(\W+\))</string>
 							<key>name</key>
 							<string>entity.name.function.haskell</string>
 						</dict>
@@ -715,7 +737,7 @@
 		<key>function_definition</key>
 		<dict>
 			<key>begin</key>
-			<string>^\s*(?&lt;!')\b([a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))\s+(?![^\w\d\s='"\(\[])(?=(([\w\d_\s\.,'"]*|\(.*\)|\[.*\])\s+)*=)</string>
+			<string>^\s*(?&lt;!')\b([a-z_][\w']*|\(\W+\))\s+(?![^\w\s='"\(\[])(?=(([\w\s\.,'"]*|\(.*\)|\[.*\])\s+)*=)</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>1</key>
@@ -747,9 +769,9 @@
 		<key>infix_function_definition</key>
 		<dict>
 			<key>begin</key>
-			<string>^\s*(?=(([a-zA-Z_0-9'\.'"]+|\(.*\)|\[.*\])\s+)+([^\w\d\s_'"`\(\)]+|`[a-z][a-zA-Z_0-9']*`).*=)</string>
+			<string>^\s*(?=(([\w'\.'"]+|\(.*\)|\[.*\])\s+)+([^\w\s'"`\(\)]+|`[a-z][\w']*`).*=)</string>
 			<key>end</key>
-			<string>([^\w\d\s_\.'"`]+|`[a-z][a-zA-Z_0-9']*`)</string>
+			<string>([^\w\s\.'"`]+|`[a-z][\w']*`)</string>
 			<key>endCaptures</key>
 			<dict>
 				<key>1</key>
@@ -771,7 +793,7 @@
 		<key>pattern_function_definition</key>
 		<dict>
 			<key>begin</key>
-			<string>^\s*(?=\(.*\)|\[.*\]|([A-Z][a-zA-Z_0-9']*(\s+([\w\d\s_,']*|\(.*\)|\[.*\]|\{.*\}))*)\s*=)</string>
+			<string>^\s*(?=\(.*\)|\[.*\]|([A-Z][\w']*(\s+([\w\s,']*|\(.*\)|\[.*\]|\{.*\}))*)\s*=)</string>
 			<key>end</key>
 			<string>(=)</string>
 			<key>endCaptures</key>
@@ -788,7 +810,7 @@
 			<array>
 				<dict>
 					<key>match</key>
-					<string>(?&lt;!')\b([a-z_][a-zA-Z0-9_']*)\b</string>
+					<string>(?&lt;!')\b([a-z_][\w']*)\b</string>
 					<key>captures</key>
 					<dict>
 						<key>1</key>
@@ -807,7 +829,7 @@
 		<key>foreign_function_signature</key>
 		<dict>
 			<key>begin</key>
-			<string>(\s*)([a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))\s*((::)|∷)</string>
+			<string>(\s*)([a-z_][\w']*|\(\W+\))\s*((::)|∷)</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>2</key>
@@ -836,7 +858,7 @@
 		<key>constructor_signature</key>
 		<dict>
 			<key>begin</key>
-			<string>^(\s*)([A-Z][a-zA-Z0-9_']*|\([^\w\d]+\))\s*((::)|∷)</string>
+			<string>^(\s*)([A-Z][\w']*|\(\W+\))\s*((::)|∷)</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>2</key>
@@ -933,7 +955,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>((?&lt;!')\b[a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))</string>
+					<string>((?&lt;!')\b[a-z_][\w']*|\(\W+\))</string>
 					<key>name</key>
 					<string>entity.name.function.haskell</string>
 				</dict>
@@ -949,7 +971,7 @@
 		<key>type_declaration</key>
 		<dict>
 			<key>begin</key>
-			<string>^(\s*)(type)\s+([A-Z][a-zA-Z_0-9']*)?</string>
+			<string>^(\s*)(type)\s+([A-Z][\w']*)?</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>2</key>
@@ -988,7 +1010,7 @@
 		<key>data_declaration</key>
 		<dict>
 			<key>begin</key>
-			<string>^(\s*)(data|newtype)\s+([A-Z][a-zA-Z_0-9']*)?</string>
+			<string>^(\s*)(data|newtype)\s+([A-Z][\w']*)?</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>2</key>
@@ -1026,7 +1048,7 @@
 						</dict>
 					</dict>
 					<key>end</key>
-					<string>(?&lt;!')\b([A-Z][a-zA-Z_0-9']*)</string>
+					<string>(?&lt;!')\b([A-Z][\w']*)</string>
 					<key>endCaptures</key>
 					<dict>
 						<key>1</key>
@@ -1191,7 +1213,7 @@
 		<key>quasi_quote</key>
 		<dict>
 			<key>begin</key>
-			<string>(\[)([a-z][\w\d_]*)?(\|)</string>
+			<string>(\[)([a-z][\w]*)?(\|)</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>1</key>
@@ -1229,7 +1251,7 @@
 			<array>
 		 		<dict>
 					<key>match</key>
-					<string>(?&lt;!')\b[A-Z][A-Za-z_'0-9]*</string>
+					<string>(?&lt;!')\b[A-Z][\w']*</string>
 					<key>name</key>
 					<string>constant.other.haskell entity.name.constructor.haskell</string>
 				</dict>
@@ -1247,7 +1269,7 @@
 			<array>
 				<dict>
 					<key>match</key>
-					<string>([A-Z][A-Za-z_'0-9]*\.)+</string>
+					<string>([A-Z][\w']*\.)+</string>
 					<key>name</key>
 					<string>storage.module.haskell entity.name.module.haskell</string>
 				</dict>
@@ -1298,7 +1320,7 @@
 					<key>comment</key>
 					<string>In case this regex seems unusual for an infix operator, note that Haskell allows any ordinary function application (elem 4 [1..10]) to be rewritten as an infix expression (4 `elem` [1..10]).</string>
 					<key>match</key>
-					<string>(`)([A-Z][A-Za-z_'0-9]*\.)*[a-z][A-Za-z_'0-9]*(`)</string>
+					<string>(`)([A-Z][\w']*\.)*[a-z][\w']*(`)</string>
 					<key>name</key>
 					<string>keyword.operator.function.infix.haskell</string>
 				</dict>
@@ -1329,7 +1351,7 @@
 					<array>
 						<dict>
 							<key>match</key>
-							<string>(?&lt;!')\b[a-z][a-zA-Z_0-9']+\s+(=)</string>
+							<string>(?&lt;!')\b[a-z][\w']+\s+(=)</string>
 							<key>captures</key>
 							<dict>
 								<key>2</key>

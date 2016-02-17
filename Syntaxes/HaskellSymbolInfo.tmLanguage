@@ -177,7 +177,29 @@
 		<key>function_signature</key>
 		<dict>
 			<key>begin</key>
-			<string>^(\s*)(?!--)(?=([\w\d_\s,']*|\(.*\)|\[.*\])\s+((::)|∷))</string>
+			<!--
+			SublimeText2 workaround
+			If begin doesn't capture anything (using only lookaheads), then end tries match just from the beginning
+			And it cause infinite loop in case of function with no indentation (so there's nothing matched)
+			SublimeText3 works well in that case
+
+			We also can't match full name of function, because there're cases with several names:
+				* x, y, z :: Int
+				* [x, y, z] :: [Int]
+
+			Therefore we are just trying to much something: name, open bracket etc.
+			And we match other stuff within patterns
+			-->
+			<!-- <string>^(\s*)(?!--)(?=([\w\s,']*|\(.*\)|\[.*\])\s+((::)|∷))</string> -->
+			<string>^(\s*)(?!--)(?:(\(\W\)|[\w']+)|[\(\[])(?=[\w',\s\[\]\(\)]*((?:::)|∷))</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>entity.name.function.haskell</string>
+				</dict>
+			</dict>
 			<key>end</key>
 			<string>^(?!\1\s)|(?=})</string>
 			<key>name</key>
@@ -203,7 +225,7 @@
 					<array>
 						<dict>
 							<key>match</key>
-							<string>((?&lt;!')\b[a-z_][a-zA-Z0-9_']*|\([^\w\d]+\))</string>
+							<string>((?&lt;!')\b[a-z_][\w']*|\(\W+\))</string>
 							<key>name</key>
 							<string>entity.name.function.haskell</string>
 						</dict>
@@ -218,7 +240,7 @@
 		<key>constructor_signature</key>
 		<dict>
 			<key>begin</key>
-			<string>^(\s*)([A-Z][a-zA-Z0-9_']*|\([^\w\d]+\))\s*((::)|∷)</string>
+			<string>^(\s*)([A-Z][\w']*|\(\W+\))\s*((::)|∷)</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>2</key>
