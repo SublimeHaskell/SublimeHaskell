@@ -1,5 +1,8 @@
+# -*- coding: UTF-8 -*-
+
 import threading
 import sublime
+import os.path
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
@@ -9,74 +12,181 @@ else:
     from SublimeHaskell.haskell_docs import haskell_docs
     from functools import reduce
 
+class Position(object):
+    def __init__(self, line, column):
+        self.line = line
+        self.column = column
+
+    def __str__(self):
+        return self.to_string()
+
+    def to_string(self):
+        if self.column is None:
+            return str(self.line)
+        return ':'.join([str(self.line), str(self.column)])
+
+    def to_zero_based(self):
+        return Position(self.line - 1, self.column - 1)
+
+    def from_zero_based(self):
+        return Position(self.line + 1, self.column + 1)
+
 class Location(object):
     """
     Location in file at line
     """
-    def __init__(self, filename, line, column, project = None):
-        if not project:
+    def __init__(self, filename, project = None):
+        if not project and filename:
             project = get_cabal_project_dir_of_file(filename)
         self.project = project
         self.filename = filename
-        self.line = line
-        self.column = column
 
-    def position(self):
-        """ Returns filename:line:column """
-        return ':'.join([self.filename, str(self.line), str(self.column)])
+    def __str__(self):
+        return self.to_string()
+
+    def to_string(self):
+        return self.filename
+
+    def is_null(self):
+        return self.project is None and self.filename is None
+
+    def get_id(self):
+        return self.filename
+
+def source_location(loc, pos):
+    """ Returns filename:line:column """
+    if not pos:
+        return str(loc)
+    return ':'.join([str(loc), str(pos)])
+
+class Package(object):
+    def __init__(self, name, version = None):
+        self.name = name
+        self.version = version
+
+    def package_id(self):
+        return '{0}-{1}'.format(self.name, self.version) if self.version is not None else self.name
+
+def parse_package(package_id):
+    if package_id is None:
+        return None
+    m = re.match('([\w\-]+)\-([\d\.]+)', package_id)
+    if m:
+        (name, version) = m.groups()
+        return Package(name, version)
+    m = re.match('([\w\-]+)', package_id)
+    if m:
+        (name, ) = m.groups()
+        return Package(name)
+    return None
+
+class InstalledLocation(object):
+    """
+    Module location in cabal
+    """
+    def __init__(self, package, cabal = None):
+        if not cabal:
+            cabal = 'cabal'
+        self.package = package
+        self.cabal = cabal
+
+    def __str__(self):
+        return self.to_string()
+
+    def to_string(self):
+        return '{0} in {1}'.format(self.package.package_id(), self.cabal)
+
+    def is_null(self):
+        return self.package is None
+
+    def get_id(self):
+        return '{0}:{1}'.format(self.cabal, self.package.package_id())
+
+    def is_cabal(self):
+        return self.cabal == 'cabal'
+
+    def sandbox(self):
+        return None if self.is_cabal() else self.cabal
+
+class OtherLocation(object):
+    """
+    Other module location
+    """
+    def __init__(self, source):
+        self.source = source
+
+    def __str__(self):
+        return self.to_string()
+
+    def to_string(self):
+        return (self.source or "")
+
+    def is_null(self):
+        return self.source is None
+
+    def get_id(self):
+        return '[{0}]'.format(self.source)
+
+def location_package_name(loc):
+    if type(loc) == InstalledLocation and loc.package:
+        return loc.package.name
+    return None
+
+def location_project(loc):
+    if type(loc) == Location and loc.project:
+        return loc.project
+    return None
+
+def location_cabal(loc):
+    if type(loc) == InstalledLocation:
+        return loc.cabal
+    return None
 
 class Symbol(object):
     """
     Haskell symbol: module, function, data, class etc.
     """
-    def __init__(self, symbol_type, name, docs = None, location = None, module = None):
+    def __init__(self, symbol_type, name):
         self.what = symbol_type
         self.name = name
-        self.module = module
-        self.docs = docs
-        self.location = location
 
         self.tags = {}
-
-    def update_location(self, module_loc):
-        """
-        JSON contains only line + column
-        This function used to merge module location, which contains all other info with line + column
-        """
-        self.location = module_loc
-
-    def full_name(self):
-        return self.module.name + '.' + self.name
 
 class Import(object):
     """
     Haskell import of module
     """
-    def __init__(self, module_name, is_qualified = False, import_as = None):
+    def __init__(self, module_name, is_qualified = False, import_as = None, position = None, location = None):
         self.module = module_name
         self.is_qualified = is_qualified
         self.import_as = import_as
+        self.position = position
+        self.location = location
 
     def dump(self):
         return self.__dict__
 
 def module_location(filename):
-    return Location(filename, 1, 1)
+    return Location(filename)
 
 class Module(Symbol):
     """
     Haskell module symbol
     """
-    def __init__(self, module_name, exports = [], imports = {}, declarations = {}, location = None, cabal = None, last_inspection_time = 0):
-        super(Module, self).__init__('module', module_name, None, location)
+    def __init__(self, module_name, exports = None, imports = [], declarations = {}, location = None, cabal = None, last_inspection_time = 0):
+        super(Module, self).__init__('module', module_name)
+        self.location = location
         # List of strings
-        self.exports = exports
+        if exports is not None:
+            self.exports = exports[:]
         # Dictionary from module name to Import object
-        self.imports = imports.copy()
+        self.imports = imports[:]
+        for i in self.imports:
+            i.location = self.location
         # Dictionary from name to Symbol
         self.declarations = declarations.copy()
         for d in self.declarations.values():
-            d.update_location(self.location)
+            d.location = self.location
 
         for decl in self.declarations.values():
             decl.module = self
@@ -90,7 +200,7 @@ class Module(Symbol):
     def add_declaration(self, new_declaration):
         if not new_declaration.module:
             new_declaration.module = self
-        new_declaration.update_location(self.location)
+        new_declaration.location = self.location
         if new_declaration.module != self:
             raise RuntimeError("Adding declaration to other module")
         self.declarations[new_declaration.name] = new_declaration
@@ -100,113 +210,184 @@ class Module(Symbol):
         Unalias module import if any
         Returns list of unaliased modules
         """
-        return [i.module for i in self.imports.items() if i.import_as == module_alias]
+        return [i.module for i in self.imports if i.import_as == module_alias]
+
+    def get_location_id(self):
+        if type(self.location) == InstalledLocation:
+            return '{0}:{1}'.format(self.location.get_id(), self.name)
+        return self.location.get_id()
+
+    def by_source(self):
+        return type(self.location) == Location
+
+    def by_cabal(self):
+        return type(self.location) == InstalledLocation
+
+    def by_hayoo(self):
+        return type(self.location) == OtherLocation
 
 class Declaration(Symbol):
-    def __init__(self, name, decl_type = 'declaration', docs = None, location = None, module = None):
-        super(Declaration, self).__init__(decl_type, name, docs, location, module)
+    def __init__(self, name, decl_type = 'declaration', docs = None, imported = [], defined = None, position = None, module = None):
+        super(Declaration, self).__init__(decl_type, name)
+        self.docs = docs
+        self.imported = imported[:]
+        self.defined = defined
+        self.position = position
+        self.module = module
+
+    def defined_module(self):
+        return self.defined or self.module
+
+    def by_source(self):
+        return type(self.defined_module().location) == Location
+
+    def by_cabal(self):
+        return type(self.defined_module().location) == InstalledLocation
+
+    def by_hayoo(self):
+        return type(self.defined_module().location) == OtherLocation
+
+    def has_source_location(self):
+        return self.by_source() and self.position is not None
+
+    def get_source_location(self):
+        if self.has_source_location():
+            return source_location(self.defined_module().location, self.position)
+        return None
+
+    def make_qualified(self):
+        self.name = self.qualified_name()
+
+    def module_name(self):
+        if self.imported:
+            return self.imported[0].module
+        return self.module.name
+
+    def imported_names(self):
+        if self.imported:
+            return sorted(list(set([i.module for i in self.imported])))
+        # if self.module:
+        #     return [self.module.name]
+        return []
+
+    def imported_from_name(self):
+        inames = self.imported_names()
+        if inames:
+            return self.imported_names()[0]
+        return ''
 
     def suggest(self):
         """ Returns suggestion for this declaration """
-        return (self.name, self.name)
+        return ('{0}\t{1}'.format(self.name, self.imported_from_name()), self.name)
 
     def brief(self):
         return self.name
 
     def qualified_name(self):
-        return '.'.join([self.module.name, self.name])
+        return '.'.join([self.module_name(), self.name])
 
     def detailed(self):
         """ Detailed info for use in Symbol Info command """
-        info = [
-            self.brief(),
-            '',
-            self.module.name]
+        info = [self.brief()]
+
+        if self.imported_names():
+            info.extend(['', 'Imported from {0}'.format(', '.join(self.imported_names()))])
 
         if self.docs:
             info.extend(['', self.docs])
 
-        if self.location:
-            info.append('')
-            if self.location.project:
-                info.append('Defined in {0} at {1}'.format(self.location.project, self.location.position()))
-            else:
-                info.append('Defined at {0}'.format(self.location.position()))
-                
-        if self.module and self.module.cabal:
-            info.append('')
-            info.append('Installed in {0}'.format(self.module.cabal))
+        info.append('')
+
+        if self.by_source():
+            if self.defined_module().location.project:
+                info.append('Project: {0}'.format(self.defined_module().location.project))
+        elif self.by_cabal():
+            info.append('Installed in: {0}'.format(self.defined_module().location.cabal))
+            info.append('Package: {0}'.format(self.defined_module().location.package.package_id()))
+
+        if self.has_source_location():
+            info.append('Defined at: {0}'.format(self.get_source_location()))
+        else:
+            info.append('Defined in: {0}'.format(self.defined_module().name))
 
         return '\n'.join(info)
+
+def wrap_operator(name):
+    if re.match(r"[\w']+", name):
+        return name
+    return "({0})".format(name)
 
 class Function(Declaration):
     """
     Haskell function declaration
     """
-    def __init__(self, name, function_type, docs = None, location = None, module = None):
-        super(Function, self).__init__(name, 'function', docs, location, module)
+    def __init__(self, name, function_type, docs = None, imported = [], defined = None, position = None, module = None):
+        super(Function, self).__init__(name, 'function', docs, imported, defined, position, module)
         self.type = function_type
 
     def suggest(self):
-        return (u'{0}\t{1}'.format(self.name, self.type), self.name)
+        return (u'{0} :: {1}\t{2}'.format(wrap_operator(self.name), self.type, self.imported_from_name()), self.name)
 
     def brief(self):
-        return u'{0} :: {1}'.format(self.name, self.type if self.type else u'?')
+        return u'{0} :: {1}'.format(wrap_operator(self.name), self.type if self.type else u'?')
 
 class TypeBase(Declaration):
     """
     Haskell type, data or class
     """
-    def __init__(self, name, decl_type, context, args, definition = None, docs = None, location = None, module = None):
-        super(TypeBase, self).__init__(name, decl_type, docs, location, module)
+    def __init__(self, name, decl_type, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
+        super(TypeBase, self).__init__(name, decl_type, docs, imported, defined, position, module)
         self.context = context
         self.args = args
         self.definition = definition
 
     def suggest(self):
-        return (u'{0}\t{1}'.format(self.name, ' '.join(self.args)), self.name)
+        return (u'{0} {1}\t{2}'.format(self.name, ' '.join(self.args), self.imported_from_name()), self.name)
 
     def brief(self):
+        if self.definition:
+            return self.definition
+
         brief_parts = [self.what]
         if self.context:
             if len(self.context) == 1:
                 brief_parts.append(u'{0} =>'.format(self.context[0]))
             else:
                 brief_parts.append(u'({0}) =>'.format(', '.join(self.context)))
+
         brief_parts.append(self.name)
         if self.args:
             brief_parts.append(u' '.join(self.args))
-        if self.definition:
-            brief_parts.append(u' = {0}'.format(self.definition))
+
         return u' '.join(brief_parts)
 
 class Type(TypeBase):
     """
     Haskell type synonym
     """
-    def __init__(self, name, context, args, definition = None, docs = None, location = None, module = None):
-        super(Type, self).__init__(name, 'type', context, args, definition, docs, location, module)
+    def __init__(self, name, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
+        super(Type, self).__init__(name, 'type', context, args, definition, docs, imported, defined, position, module)
 
 class Newtype(TypeBase):
     """
     Haskell newtype synonym
     """
-    def __init__(self, name, context, args, definition = None, docs = None, location = None, module = None):
-        super(Newtype, self).__init__(name, 'newtype', context, args, definition, docs, location, module)
+    def __init__(self, name, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
+        super(Newtype, self).__init__(name, 'newtype', context, args, definition, docs, imported, defined, position, module)
 
 class Data(TypeBase):
     """
     Haskell data declaration
     """
-    def __init__(self, name, context, args, definition = None, docs = None, location = None, module = None):
-        super(Data, self).__init__(name, 'data', context, args, definition, docs, location, module)
+    def __init__(self, name, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
+        super(Data, self).__init__(name, 'data', context, args, definition, docs, imported, defined, position, module)
 
 class Class(TypeBase):
     """
     Haskell class declaration
     """
-    def __init__(self, name, context, args, docs = None, location = None, module = None):
-        super(Class, self).__init__(name, 'class', context, args, None, docs, location, module)
+    def __init__(self, name, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
+        super(Class, self).__init__(name, 'class', context, args, definition, docs, imported, defined, position, module)
 
 def update_with(l, r, default_value, f):
     """
@@ -236,134 +417,6 @@ def same_declaration(l, r):
     nowhere = (not l.module) and (not r.module)
     return l.name == r.name and (same_mod or nowhere)
 
-class Database(object):
-    """
-    Database contains storages and indexes to allow fast access to module and symbol info in several storages
-    Every info must be added to storages through methods of this class
-    """
-    def __init__(self):
-        # Info is stored in several ways:
-
-        # Dictionary from 'cabal' or cabal-dev path to modules dictionary, where
-        # modules dictionary is dictionary from module name to Module
-        # Every module is unique in such dictionary
-        self.cabal_modules = LockedObject({})
-
-        # Dictionary from filename to Module defined in this file
-        self.files = LockedObject({})
-
-        # Indexes: dictionary from module name to list of Modules
-        self.modules = LockedObject({})
-
-        # Indexes: dictionary from symbol name to list of Symbols to support Go To Definition
-        self.symbols = LockedObject({})
-
-    def get_cabal_modules(self, cabal = None):
-        if not cabal:
-            cabal = current_cabal()
-        with self.cabal_modules as cabal_modules:
-            if cabal not in cabal_modules:
-                cabal_modules[cabal] = {}
-        return LockedObject(self.cabal_modules.object[cabal], self.cabal_modules.object_lock)
-
-    def get_project_modules(self, project_name):
-        with self.files as files:
-            return dict((f, m) for f, m in files.items() if m.location.project == project_name)
-
-    def add_indexes_for_module(self, new_module):
-        def append_return(l, r):
-            l.append(r)
-            return l
-
-        with self.modules as modules:
-            if new_module.name not in modules:
-                modules[new_module.name] = []
-            modules[new_module.name].append(new_module)
-
-        with self.symbols as decl_symbols:
-            update_with(decl_symbols, new_module.declarations, [], append_return)
-
-    def remove_indexes_for_module(self, old_module):
-        def remove_return(l, r):
-            return [x for x in l if not same_declaration(x, r)]
-
-        with self.modules as modules:
-            if old_module.name in modules:
-                modules[old_module.name] = [m for m in modules[old_module.name] if not same_module(old_module, m)]
-
-        with self.symbols as decl_symbols:
-            update_with(decl_symbols, old_module.declarations, [], remove_return)
-
-    def add_indexes_for_declaration(self, new_declaration):
-        with self.symbols as decl_symbols:
-            if new_declaration.name not in decl_symbols:
-                decl_symbols[new_declaration.name] = []
-            decl_symbols[new_declaration.name].append(new_declaration)
-
-    def remove_indexes_for_declaration(self, old_declaration):
-        with self.symbols as decl_symbols:
-            if old_declaration.name in decl_symbols:
-                decl_symbols[old_declaration.name] = [d for d in decl_symbols[old_declaration.name] if not same_declaration(d, old_declaration)]
-
-    def add_module(self, new_module, cabal = None):
-        """
-        Adds module and updates indexes
-        """
-        if not cabal:
-            if new_module.cabal:
-                cabal = new_module.cabal
-            else:
-                cabal = current_cabal()
-                new_module.cabal = cabal
-
-        with self.cabal_modules as cabal_modules:
-            if cabal not in cabal_modules:
-                cabal_modules[cabal] = {}
-            if new_module.name in cabal_modules[cabal]:
-                old_module = cabal_modules[cabal][new_module.name]
-                self.remove_indexes_for_module(old_module)
-                del cabal_modules[cabal][new_module.name]
-            if new_module.name not in cabal_modules[cabal]:
-                cabal_modules[cabal][new_module.name] = new_module
-                self.add_indexes_for_module(new_module)
-
-    def add_file(self, filename, file_module):
-        """
-        Adds module defined in file and updates indexes
-        """
-        with self.files as files:
-            if filename in files:
-                old_module = files[filename]
-                self.remove_indexes_for_module(old_module)
-                del files[filename]
-            if filename not in files:
-                files[filename] = file_module
-                self.add_indexes_for_module(file_module)
-
-    def add_declaration(self, new_declaration, module):
-        """
-        Adds declaration to module
-        """
-        def add_decl_to_module():
-            if new_declaration.name in module.declarations:
-                self.remove_indexes_for_declaration(module.declarations[new_declaration.name])
-            module.add_declaration(new_declaration)
-            self.add_indexes_for_declaration(new_declaration)
-
-        if module.location:
-            with self.files as files:
-                if module.location.filename not in files:
-                    raise RuntimeError("Can't add declaration: no file {0}".format(module.location.filename))
-                add_decl_to_module()
-        elif module.cabal:
-            if module.name not in self.cabal_modules.object[module.cabal]:
-                raise RuntimeError("Can't add declaration: no module {0}".format(module.name))
-            add_decl_to_module()
-        else:
-            raise RuntimeError("Can't add declaration: no module {0}".format(module.name))
-
-
-
 def is_within_project(module, project):
     """
     Returns whether module defined within project specified
@@ -375,11 +428,8 @@ def is_within_project(module, project):
 def is_within_cabal(module, cabal = None):
     """
     Returns whether module loaded from cabal specified
-    If cabal is None, used current cabal
     """
-    if not cabal:
-        cabal = current_cabal()
-    return module.cabal == cabal
+    return cabal is not None and module.cabal == cabal
 
 def is_by_sources(module):
     """
@@ -390,100 +440,59 @@ def is_by_sources(module):
 def flatten(lsts):
     return reduce(lambda l, r: list(l) + list(r), lsts)
 
-def get_source_modules(modules, filename = None):
-    """
-    For list of modules with same name returns modules, which is defined by sources
-    Prefer module in same project as filename if specified
-    """
-    project = get_cabal_project_dir_of_file(filename) if filename else None
 
-    candidates = flatten([
-        filter(lambda m: is_within_project(m, project), modules),
-        filter(is_by_sources, modules)])
+class CabalPackage(object):
+    def __init__(self, name, synopsis = None, version = None, installed = [], homepage = None, license = None):
+        self.name = name
+        self.synopsis = synopsis
+        self.default_version = version
+        self.installed_versions = installed[:]
+        self.homepage = homepage
+        self.license = license
 
-    if candidates:
-        return candidates[0]
-    return None
+    def brief(self):
+        return self.name
 
-def get_visible_module(modules, filename = None, cabal = None):
-    """
-    For list of modules with same name returns module, which is
-    1. Defined in same project as filename
-    2. Defined in cabal
-    3. None
-    """
-    project = get_cabal_project_dir_of_file(filename) if filename else None
+    def detailed(self):
+        info = []
+        info.append(self.brief())
+        info.append('')
+        if self.synopsis:
+            info.append(self.synopsis)
+            info.append('')
+        if self.default_version:
+            info.append('Last version: ' + self.default_version)
+        if self.installed_versions:
+            info.append('Installed versions: ' + ", ".join(self.installed_versions))
+        if self.homepage:
+            info.append('Homepage: ' + self.homepage)
+        if self.license:
+            info.append('License: ' + self.license)
 
-    candidates = flatten([
-        filter(lambda m: is_within_project(m, project), modules),
-        filter(lambda m: is_within_cabal(m, cabal), modules)])
+        return '\n'.join(info)
 
-    if candidates:
-        return candidates[0]
-    return None
+class Corrector(object):
+    def __init__(self, start, end, contents):
+        self.start = start
+        self.end = end
+        self.contents = contents
 
-def get_preferred_module(modules, filename = None, cabal = None):
-    """
-    For list of modules with same name returns module, which is
-    1. Defined in same project as filename
-    2. Defined in cabal
-    3. Defined by sources
-    4. Other modules
-    Returns None if modules is empty
-    """
-    if filename:
-        project = get_cabal_project_dir_of_file(filename)
+    def to_region(self, view):
+        return sublime.Region(view.text_point(self.start.line, self.start.column), view.text_point(self.end.line, self.end.column))
 
-    candidates = flatten([
-        filter(lambda m: is_within_project(m, project), modules),
-        filter(lambda m: is_within_cabal(m, cabal), modules),
-        filter(is_by_sources, modules),
-        modules])
+class Correction(object):
+    def __init__(self, file, level, message, corrector):
+        self.file = file
+        self.level = level
+        self.message = message
+        self.corrector = corrector
 
-    if candidates:
-        return candidates[0]
-    return None
+    def to_region(self, view):
+        return self.corrector.to_region(view)
 
-def declarations_modules(decls, select_module = None):
-    """
-    Reduce list of declarations to dictionary (module_name => select_module(list of modules))
-    """
-    def add_module_to_dict(d, decl):
-        if decl.module.name not in d:
-            d[decl.module.name] = []
-        d[decl.module.name].append(decl.module)
-        return d
-
-    if not select_module:
-        select_module = lambda l: l
-
-    result = reduce(add_module_to_dict, decls, {})
-    return dict((k, select_module(ms)) for k, ms in result.items() if select_module(ms) is not None)
-
-def is_imported_module(in_module, m, qualified_name = None):
-    """
-    Returns whether 'm' is imported from 'in_module'
-    If 'qualified_name' specified, 'm' must be 'qualified_name' or imported as 'qualified_name'
-    """
-    if qualified_name:
-        if m.name in in_module.imports:
-            cur_import = in_module.imports[m.name]
-            return cur_import.module == qualified_name or cur_import.import_as == qualified_name
-        return False
-    else:
-        if m.name in in_module.imports:
-            return (not in_module.imports[m.name].is_qualified)
-        # Return True also on Prelude
-        return m.name == 'Prelude'
-
-def is_this_module(this_module, m):
-    """
-    Returns whether 'm' is the same as 'this_module'
-    """
-    # Same source
-    if this_module.location and m.location and this_module.location.filename == m.location.filename:
-        return True
-    # Same name and cabal
-    if this_module.cabal and m.cabal and this_module.cabal == m.cabal and this_module.name == m.name:
-        return True
-    return False
+def mark_corrections(views, corrs):
+    for view in views:
+        if view.file_name() is None:
+            continue
+        corrs_ = [corr for corr in corrs if os.path.samefile(corr.file, view.file_name())]
+        view.add_regions('autofix', [corr.to_region(view) for corr in corrs_], 'entity.name.function', 'dot', 0)

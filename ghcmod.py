@@ -1,19 +1,25 @@
+# -*- coding: UTF-8 -*-
+
 import os
 import re
 import sublime
 import sublime_plugin
+import threading
 from threading import Thread
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import log, is_haskell_source, get_haskell_command_window_view_file_project, call_ghcmod_and_wait, get_setting_async
-    from parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages
+    from sublime_haskell_common import *
+    import autocomplete
+    from parseoutput import OutputPoint, OutputMessage, parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages, write_output
     from ghci import parse_info
     import symbols
 else:
-    from SublimeHaskell.sublime_haskell_common import log, is_haskell_source, get_haskell_command_window_view_file_project, call_ghcmod_and_wait, get_setting_async
-    from SublimeHaskell.parseoutput import parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages
+    from SublimeHaskell.sublime_haskell_common import *
+    import SublimeHaskell.autocomplete as autocomplete
+    from SublimeHaskell.parseoutput import OutputPoint, OutputMessage, parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages, write_output
     from SublimeHaskell.ghci import parse_info
     import SublimeHaskell.symbols as symbols
+
 
 
 def lint_as_hints(msgs):
@@ -22,7 +28,126 @@ def lint_as_hints(msgs):
             m[1].level = 'hint'
 
 
-class SublimeHaskellGhcModCheck(sublime_plugin.WindowCommand):
+
+def hsdev_check():
+    return (autocomplete.hsdev_client.check, lambda file: [file], lambda ms: ms, { 'ghc': get_setting_async('ghc_opts') })
+def hsdev_lint():
+    return (autocomplete.hsdev_client.lint, lambda file: [file], lambda ms: ms, {})
+# def hsdev_check_lint():
+#     return (autocomplete.hsdev_client.ghcmod_check_lint, lambda file: [file], lambda ms: ms, { 'ghc': get_setting_async('ghc_opts') })
+
+def messages_as_hints(cmd):
+    (fn, arg, msg, kwargs) = cmd
+    return (fn, arg, lambda ms: [dict(m, level = 'hint') for m in ms], kwargs)
+
+class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
+    def run(self, edit):
+        pass
+
+    def run_chain(self, cmds, msg, fly_mode = False):
+        self.messages = []
+        self.msgs = []
+        self.corrections = []
+        self.fly_mode = fly_mode
+        self.filename = self.view.file_name()
+        if not self.filename:
+            return
+        self.contents = {}
+        if self.view.is_dirty():
+            self.contents[self.filename] = self.view.substr(sublime.Region(0, self.view.size()))
+        if not self.fly_mode:
+            hide_output(self.view)
+        if not cmds:
+            return
+        else:
+            self.status_msg = status_message_process(msg + ': ' + self.filename)
+            self.status_msg.start()
+            self.go_chain(cmds)
+
+    def go_chain(self, cmds):
+        try:
+            if not cmds:
+                self.status_msg.stop()
+                output_messages = [OutputMessage(
+                    m['source']['file'],
+                    OutputPoint(
+                        int(m['region']['from']['line']) - 1,
+                        int(m['region']['from']['column']) - 1),
+                    OutputPoint(
+                        int(m['region']['to']['line']) - 1,
+                        int(m['region']['to']['column']) - 1),
+                    m['level'].capitalize() + ': ' + m['note']['message'].replace('\n', '\n  '),
+                    m['level']) for m in self.messages]
+
+                set_global_error_messages(output_messages)
+                output_text = format_output_messages(output_messages)
+                if output_text:
+                    if get_setting_async('show_output_window'):
+                        sublime.set_timeout(lambda: write_output(
+                            self.view,
+                            output_text,
+                            get_cabal_project_dir_of_file(self.filename) or os.path.dirname(self.filename),
+                            show_panel = not self.fly_mode), 0)
+                sublime.set_timeout(lambda: mark_messages_in_views(output_messages), 0)
+
+                # autocomplete.hsdev_client.autofix_show(self.msgs, on_response = self.on_autofix)
+            else:
+                cmd, tail_cmds = cmds[0], cmds[1:]
+                (fn, modify_args, modify_msgs, kwargs) = cmd
+
+                def on_resp(msgs):
+                    self.messages.extend(modify_msgs(msgs))
+                    self.msgs.extend(msgs)
+                    self.go_chain(tail_cmds)
+
+                def on_err(err):
+                    self.status_msg.fail()
+                    self.go_chain([])
+
+                fn(modify_args(self.filename), contents = self.contents, wait = False, on_response = on_resp, on_error = on_err, **kwargs)
+        except Exception as e:
+            log('hsdev ghc-mod chain fails with: {0}'.format(e), log_error)
+            self.status_msg.stop()
+
+    def on_autofix(self, corrs):
+        self.corrections = corrs
+        sublime.set_timeout(lambda: symbols.mark_corrections([v for w in sublime.windows() for v in w.views()], self.corrections), 0)
+
+    def is_enabled(self):
+        return is_haskell_source(None)
+
+
+
+def ghcmod_command(cmdname):
+    def wrap(fn):
+        def wrapper(self, *args, **kwargs):
+            if autocomplete.hsdev_agent_connected():
+                log('Invoking ghc-mod command \'{0}\' via hsdev'.format(cmdname), log_trace)
+                return fn(self, *args, **kwargs)
+            else:
+                log('Invoking ghc-mod command \'{0}\' via ghc-mod'.format(cmdname), log_trace)
+                self.view.window().run_command('sublime_haskell_ghc_mod_{0}'.format(cmdname))
+        return wrapper
+    return wrap
+
+class SublimeHaskellCheck(SublimeHaskellGhcModChain):
+    @ghcmod_command('check')
+    def run(self, edit, fly = False):
+        self.run_chain([hsdev_check()], 'Checking', fly_mode = fly)
+
+class SublimeHaskellLint(SublimeHaskellGhcModChain):
+    @ghcmod_command('lint')
+    def run(self, edit, fly = False):
+        self.run_chain([hsdev_lint()], 'Linting', fly_mode = fly)
+
+class SublimeHaskellCheckAndLint(SublimeHaskellGhcModChain):
+    @ghcmod_command('check_and_lint')
+    def run(self, edit, fly = False):
+        self.run_chain([hsdev_check(), messages_as_hints(hsdev_lint())], 'Checking and Linting', fly_mode = fly)
+
+
+
+class SublimeHaskellGhcModCheck(SublimeHaskellWindowCommand):
     def run(self):
         run_ghcmod(['check'], 'Checking')
 
@@ -30,7 +155,7 @@ class SublimeHaskellGhcModCheck(sublime_plugin.WindowCommand):
         return is_haskell_source(None)
 
 
-class SublimeHaskellGhcModLint(sublime_plugin.WindowCommand):
+class SublimeHaskellGhcModLint(SublimeHaskellWindowCommand):
     def run(self):
         run_ghcmod(['lint', '-h', '-u'], 'Linting', lint_as_hints)
 
@@ -38,7 +163,7 @@ class SublimeHaskellGhcModLint(sublime_plugin.WindowCommand):
         return is_haskell_source(None)
 
 
-class SublimeHaskellGhcModCheckAndLint(sublime_plugin.WindowCommand):
+class SublimeHaskellGhcModCheckAndLint(SublimeHaskellWindowCommand):
     def run(self):
         run_ghcmods([['check'], ['lint', '-h', '-u']], 'Checking and Linting', lint_as_hints)
 
@@ -66,26 +191,12 @@ def run_ghcmods(cmds, msg, alter_messages_cb=None):
         if alter_messages_cb:
             alter_messages_cb(msgs)
 
-        def compare(l, r):
-            # sort by file equality to file_name
-            res = cmp(l[1].filename != file_shown_in_view, r[1].filename != file_shown_in_view)
-            if res == 0:
-                # then by file
-                res = cmp(l[1].filename, r[1].filename)
-                if res == 0:
-                    # then by line
-                    res = cmp(l[1].line, r[1].line)
-                    if res == 0:
-                        # then by column
-                        res = cmp(l[1].column, r[1].column)
-            return res
-
         def sort_key(a):
             return (
                 a[1].filename != file_shown_in_view,
                 a[1].filename,
-                a[1].line,
-                a[1].column
+                a[1].start.line,
+                a[1].start.column
             )
 
         msgs.sort(key=sort_key)
@@ -103,7 +214,6 @@ def run_ghcmods_thread(view, filename, msg, cmds_with_args, alter_messages_cb):
         target=wait_ghcmod_and_parse,
         args=(view, filename, msg, cmds_with_args, alter_messages_cb))
     thread.start()
-
 
 def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb):
     sublime.set_timeout(lambda: hide_output(view), 0)
@@ -127,11 +237,11 @@ def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb
 
         if not success:
             all_cmds_outputs.append(out)
-            log(u"ghc-mod %s didn't exit with success on '%s'" % (u' '.join(cmd), filename))
+            log(u"ghc-mod %s didn't exit with success on '%s'" % (u' '.join(cmd), filename), log_error)
 
         all_cmds_successful &= success
 
-        parsed = parse_output_messages(file_dir, out)
+        parsed = parse_output_messages(view, file_dir, out)
         for p in parsed:
             parsed_messages.append((cmd, p))
 

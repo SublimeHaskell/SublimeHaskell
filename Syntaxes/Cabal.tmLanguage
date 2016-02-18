@@ -13,6 +13,66 @@
 	<key>patterns</key>
 	<array>
 		<dict>
+			<key>begin</key>
+			<string>^(\s*)(exposed-modules):$</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>constant.other.cabal</string>
+				</dict>
+			</dict>
+			<key>end</key>
+			<string>^(?!\1\s)</string>
+			<key>name</key>
+			<string>exposed.modules.cabal</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>include</key>
+					<string>#module_name</string>
+				</dict>
+			</array>
+		</dict>
+		<dict>
+			<key>begin</key>
+			<string>^(\s*)(build-depends):$</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>constant.other.cabal</string>
+				</dict>
+			</dict>
+			<key>end</key>
+			<string>^(?!\1\s)</string>
+			<key>name</key>
+			<string>exposed.modules.cabal</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>match</key>
+					<string>([&lt;&gt;=]+)|([&amp;|]+)</string>
+					<key>name</key>
+					<string>keyword.operator.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>((\d+|\*)\.)*(\d+|\*)</string>
+					<key>name</key>
+					<string>constant.numeric.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>([\w\-]+)</string>
+					<key>name</key>
+					<string>support.function.haskell</string>
+				</dict>
+			</array>
+		</dict>
+		<dict>
 			<key>captures</key>
 			<dict>
 				<key>1</key>
@@ -63,6 +123,16 @@
 			<string>comment.cabal</string>
 		</dict>
 	</array>
+	<key>repository</key>
+	<dict>
+		<key>module_name</key>
+		<dict>
+			<key>match</key>
+			<string>([A-Z][A-Za-z_'0-9]*)(\.[A-Z][A-Za-z_'0-9]*)*</string>
+			<key>name</key>
+			<string>storage.module.haskell</string>
+		</dict>
+	</dict>
 	<key>scopeName</key>
 	<string>source.cabal</string>
 	<key>uuid</key>

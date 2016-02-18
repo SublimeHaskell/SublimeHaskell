@@ -10,7 +10,7 @@
 	<array>
 		<dict>
 			<key>begin</key>
-			<string>^([\w\s\.\*]+)([\|&gt;])</string>
+			<string>^([\w\s\.\*]+)([\|&gt;])\s*(:[tik])?</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>1</key>
@@ -22,6 +22,11 @@
 				<dict>
 					<key>name</key>
 					<string>keyword.operator.prompt.ghci</string>
+				</dict>
+				<key>3</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.other.command.ghci</string>
 				</dict>
 			</dict>
 			<key>end</key>
@@ -40,11 +45,15 @@
 				</dict>
 				<dict>
 					<key>include</key>
-					<string>#command</string>
+					<string>#commands</string>
 				</dict>
 				<dict>
 					<key>include</key>
 					<string>#import_statement</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#expression_stuff</string>
 				</dict>
 			</array>
 		</dict>
@@ -122,37 +131,20 @@
 			<string>keyword.command.ghci</string>
 		</dict>
 		<dict>
-			<key>captures</key>
-			<dict>
-				<key>1</key>
-				<dict>
-					<key>name</key>
-					<string>punctuation.definition.entity.haskell</string>
-				</dict>
-				<key>2</key>
-				<dict>
-					<key>name</key>
-					<string>punctuation.definition.entity.haskell</string>
-				</dict>
-			</dict>
-			<key>comment</key>
-			<string>In case this regex seems unusual for an infix operator, note that Haskell allows any ordinary function application (elem 4 [1..10]) to be rewritten as an infix expression (4 `elem` [1..10]).</string>
-			<key>match</key>
-			<string>(`)[a-zA-Z_']*?(`)</string>
-			<key>name</key>
-			<string>keyword.operator.function.infix.haskell</string>
+			<key>include</key>
+			<string>#messages</string>
 		</dict>
 		<dict>
-			<key>match</key>
-			<string>\(\)</string>
-			<key>name</key>
-			<string>constant.language.unit.haskell</string>
+			<key>include</key>
+			<string>#type_declarations</string>
 		</dict>
 		<dict>
-			<key>match</key>
-			<string>\[\]</string>
-			<key>name</key>
-			<string>constant.language.empty-list.haskell</string>
+			<key>include</key>
+			<string>#function_declarations</string>
+		</dict>
+		<dict>
+			<key>include</key>
+			<string>#expression_stuff</string>
 		</dict>
 		<dict>
 			<key>begin</key>
@@ -187,306 +179,23 @@
 					<array>
 						<dict>
 							<key>include</key>
-							<string>#function_signature</string>
+							<string>#type_declarations</string>
 						</dict>
 						<dict>
 							<key>include</key>
-							<string>#type_declaration</string>
+							<string>#function_declarations</string>
+						</dict>
+						<dict>
+							<key>include</key>
+							<string>#expression_stuff</string>
 						</dict>
 					</array>
 				</dict>
 			</array>
 		</dict>
 		<dict>
-			<key>begin</key>
-			<string>\b(instance)\b</string>
-			<key>beginCaptures</key>
-			<dict>
-				<key>1</key>
-				<dict>
-					<key>name</key>
-					<string>keyword.other.haskell</string>
-				</dict>
-			</dict>
-			<key>end</key>
-			<string>\b(where)\b|$</string>
-			<key>endCaptures</key>
-			<dict>
-				<key>1</key>
-				<dict>
-					<key>name</key>
-					<string>keyword.other.haskell</string>
-				</dict>
-			</dict>
-			<key>name</key>
-			<string>meta.declaration.instance.haskell</string>
-			<key>patterns</key>
-			<array>
-				<dict>
-					<key>include</key>
-					<string>#type_signature</string>
-				</dict>
-			</array>
-		</dict>
-		<dict>
-			<key>begin</key>
-			<string>(deriving)\s*\(</string>
-			<key>beginCaptures</key>
-			<dict>
-				<key>1</key>
-				<dict>
-					<key>name</key>
-					<string>keyword.other.haskell</string>
-				</dict>
-			</dict>
-			<key>end</key>
-			<string>\)</string>
-			<key>name</key>
-			<string>meta.deriving.haskell</string>
-			<key>patterns</key>
-			<array>
-				<dict>
-					<key>match</key>
-					<string>\b[A-Z][a-zA-Z_']*</string>
-					<key>name</key>
-					<string>entity.other.inherited-class.haskell</string>
-				</dict>
-			</array>
-		</dict>
-		<dict>
-			<key>match</key>
-			<string>\b(deriving|where|case|of|let|in|default)\b</string>
-			<key>name</key>
-			<string>keyword.other.haskell</string>
-		</dict>
-		<dict>
-			<key>match</key>
-			<string>\binfix[lr]?\b</string>
-			<key>name</key>
-			<string>keyword.operator.haskell</string>
-		</dict>
-		<dict>
-			<key>match</key>
-			<string>\b(do|if|then|else)\b</string>
-			<key>name</key>
-			<string>keyword.control.haskell</string>
-		</dict>
-		<dict>
-			<key>comment</key>
-			<string>Floats are always decimal</string>
-			<key>match</key>
-			<string>\b([0-9]+\.[0-9]+([eE][+-]?[0-9]+)?|[0-9]+[eE][+-]?[0-9]+)\b</string>
-			<key>name</key>
-			<string>constant.numeric.float.haskell</string>
-		</dict>
-		<dict>
-			<key>match</key>
-			<string>\b([0-9]+|0([xX][0-9a-fA-F]+|[oO][0-7]+))\b</string>
-			<key>name</key>
-			<string>constant.numeric.haskell</string>
-		</dict>
-		<dict>
-			<key>captures</key>
-			<dict>
-				<key>1</key>
-				<dict>
-					<key>name</key>
-					<string>punctuation.definition.preprocessor.c</string>
-				</dict>
-			</dict>
-			<key>comment</key>
-			<string>In addition to Haskell's "native" syntax, GHC permits the C preprocessor to be run on a source file.</string>
-			<key>match</key>
-			<string>^\s*(#)\s*\w+</string>
-			<key>name</key>
-			<string>meta.preprocessor.c</string>
-		</dict>
-		<dict>
 			<key>include</key>
 			<string>#pragma</string>
-		</dict>
-		<dict>
-			<key>begin</key>
-			<string>"</string>
-			<key>beginCaptures</key>
-			<dict>
-				<key>0</key>
-				<dict>
-					<key>name</key>
-					<string>punctuation.definition.string.begin.haskell</string>
-				</dict>
-			</dict>
-			<key>end</key>
-			<string>($|")</string>
-			<key>endCaptures</key>
-			<dict>
-				<key>0</key>
-				<dict>
-					<key>name</key>
-					<string>punctuation.definition.string.end.haskell</string>
-				</dict>
-			</dict>
-			<key>name</key>
-			<string>string.quoted.double.haskell</string>
-			<key>patterns</key>
-			<array>
-				<dict>
-					<key>match</key>
-					<string>\\(NUL|SOH|STX|ETX|EOT|ENQ|ACK|BEL|BS|HT|LF|VT|FF|CR|SO|SI|DLE|DC1|DC2|DC3|DC4|NAK|SYN|ETB|CAN|EM|SUB|ESC|FS|GS|RS|US|SP|DEL|[abfnrtv\\\"'\&amp;])</string>
-					<key>name</key>
-					<string>constant.character.escape.haskell</string>
-				</dict>
-				<dict>
-					<key>match</key>
-					<string>\\o[0-7]+|\\x[0-9A-Fa-f]+|\\[0-9]+</string>
-					<key>name</key>
-					<string>constant.character.escape.octal.haskell</string>
-				</dict>
-				<dict>
-					<key>match</key>
-					<string>\^[A-Z@\[\]\\\^_]</string>
-					<key>name</key>
-					<string>constant.character.escape.control.haskell</string>
-				</dict>
-			</array>
-		</dict>
-		<dict>
-			<key>captures</key>
-			<dict>
-				<key>1</key>
-				<dict>
-					<key>name</key>
-					<string>punctuation.definition.string.begin.haskell</string>
-				</dict>
-				<key>2</key>
-				<dict>
-					<key>name</key>
-					<string>constant.character.escape.haskell</string>
-				</dict>
-				<key>3</key>
-				<dict>
-					<key>name</key>
-					<string>constant.character.escape.octal.haskell</string>
-				</dict>
-				<key>4</key>
-				<dict>
-					<key>name</key>
-					<string>constant.character.escape.hexadecimal.haskell</string>
-				</dict>
-				<key>5</key>
-				<dict>
-					<key>name</key>
-					<string>constant.character.escape.control.haskell</string>
-				</dict>
-				<key>6</key>
-				<dict>
-					<key>name</key>
-					<string>punctuation.definition.string.end.haskell</string>
-				</dict>
-			</dict>
-			<key>match</key>
-			<string>(?x)
-			(')
-			(?:
-				[\ -\[\]-~]								# Basic Char
-			  | (\\(?:NUL|SOH|STX|ETX|EOT|ENQ|ACK|BEL|BS|HT|LF|VT|FF|CR|SO|SI|DLE
-					|DC1|DC2|DC3|DC4|NAK|SYN|ETB|CAN|EM|SUB|ESC|FS|GS|RS
-					|US|SP|DEL|[abfnrtv\\\"'\&amp;]))		# Escapes
-			  | (\\o[0-7]+)								# Octal Escapes
-			  | (\\x[0-9A-Fa-f]+)						# Hexadecimal Escapes
-			  | (\^[A-Z@\[\]\\\^_])						# Control Chars
-			)
-			(')
-			</string>
-			<key>name</key>
-			<string>string.quoted.single.haskell</string>
-		</dict>
-		<dict>
-			<key>begin</key>
-			<string>\b([a-z_][a-zA-Z0-9_']*|\([|!%$+\-.,=&lt;/&gt;]+\))\s*(::)</string>
-			<key>beginCaptures</key>
-			<dict>
-				<key>1</key>
-				<dict>
-					<key>name</key>
-					<string>entity.name.function.haskell</string>
-				</dict>
-				<key>2</key>
-				<dict>
-					<key>name</key>
-					<string>keyword.other.double-colon.haskell</string>
-				</dict>
-			</dict>
-			<key>end</key>
-			<string>$\n?</string>
-			<key>name</key>
-			<string>meta.function.type-declaration.haskell</string>
-			<key>patterns</key>
-			<array>
-				<dict>
-					<key>include</key>
-					<string>#type_signature</string>
-				</dict>
-			</array>
-		</dict>
-		<dict>
-			<key>begin</key>
-			<string>data\s([A-Z][\w\d'_]+).*=</string>
-			<key>beginCaptures</key>
-			<dict>
-				<key>1</key>
-				<dict>
-					<key>name</key>
-					<string>constant.other.ghci</string>
-				</dict>
-			</dict>
-			<key>end</key>
-			<string>$\n?</string>
-			<key>name</key>
-			<string>data.definition.ghci</string>
-			<key>patterns</key>
-			<array>
-				<dict>
-					<key>match</key>
-					<string>\b[A-Z][\w\d'_]+\b</string>
-					<key>name</key>
-					<string>constant.other.constructor.ghci</string>
-				</dict>
-			</array>
-		</dict>
-		<dict>
-			<key>match</key>
-			<string>\b(Just|Nothing|Left|Right|True|False|LT|EQ|GT|\(\)|\[\])\b</string>
-			<key>name</key>
-			<string>support.constant.haskell</string>
-		</dict>
-		<dict>
-			<key>include</key>
-			<string>#comments</string>
-		</dict>
-		<dict>
-			<key>match</key>
-			<string>\b(abs|acos|acosh|all|and|any|appendFile|applyM|asTypeOf|asin|asinh|atan|atan2|atanh|break|catch|ceiling|compare|concat|concatMap|const|cos|cosh|curry|cycle|decodeFloat|div|divMod|drop|dropWhile|elem|encodeFloat|enumFrom|enumFromThen|enumFromThenTo|enumFromTo|error|even|exp|exponent|fail|filter|flip|floatDigits|floatRadix|floatRange|floor|fmap|foldl|foldl1|foldr|foldr1|fromEnum|fromInteger|fromIntegral|fromRational|fst|gcd|getChar|getContents|getLine|head|id|init|interact|ioError|isDenormalized|isIEEE|isInfinite|isNaN|isNegativeZero|iterate|last|lcm|length|lex|lines|log|logBase|lookup|map|mapM|mapM_|max|maxBound|maximum|maybe|min|minBound|minimum|mod|negate|not|notElem|null|odd|or|otherwise|pi|pred|print|product|properFraction|putChar|putStr|putStrLn|quot|quotRem|read|readFile|readIO|readList|readLn|readParen|reads|readsPrec|realToFrac|recip|rem|repeat|replicate|return|reverse|round|scaleFloat|scanl|scanl1|scanr|scanr1|seq|sequence|sequence_|show|showChar|showList|showParen|showString|shows|showsPrec|significand|signum|sin|sinh|snd|span|splitAt|sqrt|subtract|succ|sum|tail|take|takeWhile|tan|tanh|toEnum|toInteger|toRational|truncate|uncurry|undefined|unlines|until|unwords|unzip|unzip3|userError|words|writeFile|zip|zip3|zipWith|zipWith3)\b</string>
-			<key>name</key>
-			<string>support.function.prelude.haskell</string>
-		</dict>
-		<dict>
-			<key>include</key>
-			<string>#infix_op</string>
-		</dict>
-		<dict>
-			<key>comment</key>
-			<string>In case this regex seems overly general, note that Haskell permits the definition of new operators which can be nearly any string of punctuation characters, such as $%^&amp;*.</string>
-			<key>match</key>
-			<string>[|!%$?~+:\-.=&lt;/&gt;\\]+</string>
-			<key>name</key>
-			<string>keyword.operator.haskell</string>
-		</dict>
-		<dict>
-			<key>match</key>
-			<string>,</string>
-			<key>name</key>
-			<string>punctuation.separator.comma.haskell</string>
 		</dict>
 	</array>
 	<key>repository</key>
@@ -502,11 +211,12 @@
 				<key>0</key>
 				<dict>
 					<key>name</key>
-					<string>punctuation.definition.comment.haskell</string>
+					<string>punctuation.comment.haskell</string>
 				</dict>
 			</dict>
 			<key>end</key>
-			<string>-\}</string>
+			<string>(?&lt;!#)-\}</string>
+			<!-- ^ Using `(?&lt;!#)-\}` instead of `-\}` so that pragmas don't close block comments. `(?<!#)-}` is a negative lookbehind saying: match `-}` but not when there's a `#` in front of it. -->
 			<key>name</key>
 			<string>comment.block.haskell</string>
 			<key>patterns</key>
@@ -514,6 +224,10 @@
 				<dict>
 					<key>include</key>
 					<string>#block_comment</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#comments</string>
 				</dict>
 			</array>
 		</dict>
@@ -527,13 +241,31 @@
 						<key>1</key>
 						<dict>
 							<key>name</key>
-							<string>punctuation.definition.comment.haskell</string>
+							<string>punctuation.comment.haskell</string>
 						</dict>
 					</dict>
 					<key>match</key>
-					<string>(--).*$\n?</string>
+					<string>(---*(?!([!#\$%&amp;\*\+\./&lt;=&gt;\?@\\\^\|\-~:]|[^[^\p{S}\p{P}]_"'\(\),;\[\]`\{}]))).*$\n?</string> 
+					<!-- ^ See https://www.haskell.org/onlinereport/haskell2010/haskellch10.html -->
+					<!-- The difficulty is to forbid things that create valid operators. -->
+					<!-- OK, now the explanation: -->
+					<!-- First, we match "dashes": -- plus any number of further dashes. -->
+					<!-- We now have to match "any⟨symbol⟩": match any characters that's not "symbol". -->
+					<!--   symbol → ascSymbol | uniSymbol⟨special | _ | " | '⟩ -->
+					<!-- we forbid those two with a negative lookahead: -->
+					<!-- - first forbid the "ascSymbol" symbols !#$%&*+./<=>?@\^|-~: -->
+					<!--   using [!#\$%&amp;\*\+\./&lt;=&gt;\?@\\\^\|\-~:] -->
+					<!-- - then we forbid "uniSymbol⟨special | _ | " | '⟩": all unicode symbols apart from a few. -->
+					<!--   Sublime's regex engine does not allow "Character Class Subtraction", so instead we have to use "double-negative" (http://stackoverflow.com/a/3469155/263061): class-chars can be expressed as [^[^class]chars] -->
+					<!--   Here, class is [\p{S}\p{P}] ("uniSymbol": "any Unicode symbol or punctuation") -->
+					<!--   and chars is _"'\(\),;\[]`\{} (the _"' defined in "symbol", and "special") -->
+					<!--   So using the "double-negative", we get: -->
+					<!--     [^[^\p{S}\p{P}]_"'\(\),;\[\]`\{}] -->
+					<!-- Done. Now we just eat everything until the end of the line. -->
+					<!-- Other relevant info: -->
+					<!-- Chars that have to be escaped in Sublime's regex engine: \^$.|?*+()[]{- -->
 					<key>name</key>
-					<string>comment.line.double-dash.haskell</string>
+					<string>comment.line.haskell</string>
 				</dict>
 				<dict>
 					<key>include</key>
@@ -544,31 +276,97 @@
 		<key>infix_op</key>
 		<dict>
 			<key>match</key>
-			<string>(\([|!%$+:\-.=&lt;/&gt;]+\)|\(,+\))</string>
+			<string>(\([^\w \)]+\)|\(,+\))</string>
 			<key>name</key>
-			<string>entity.name.function.infix.haskell</string>
+			<string>keyword.operator.haskell</string>
 		</dict>
 		<key>module_exports</key>
 		<dict>
 			<key>begin</key>
-			<string>\(</string>
+			<string>(\()</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>storage.module.haskell</string>
+				</dict>
+			</dict>
 			<key>end</key>
-			<string>\)</string>
+			<string>(\))</string>
+			<key>endCaptures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>storage.module.haskell</string>
+				</dict>
+			</dict>
 			<key>name</key>
 			<string>meta.declaration.exports.haskell</string>
 			<key>patterns</key>
 			<array>
 				<dict>
+					<!-- tmLanguage cannot capture multiline regexes, that's why we can't simply add a `\\$\s*\\` alternative to `constant.character.escape.haskell` to capture the `\[newline][whitespace]\` Haskell uses for multi-line strings. We have to use begin/end if we want multi-line matches. -->
+					<key>begin</key>
+					<string>\\\s*$</string>
+					<!-- ^ We use `\s*` because Haskell multiline strings do allow whitespace behind the `\` that "ends" the line, even before the line actually ends. -->
+					<key>end</key>
+					<string>\\</string>
+					<key>name</key>
+					<string>constant.character.escape.multilinestring.haskell</string>
+					<!-- We do not currently attempt to detect characters in between the `\`, so `\\n   a   \` will have the `a` counted towards this scope. -->
+				</dict>
+				<dict>
 					<key>match</key>
-					<string>\b[a-z][a-zA-Z_'0-9]*</string>
+					<string>(?&lt;!')\b[a-z][\w']*</string>
+					<!-- ^ We have to prepend the negative lookbehind (?<!') to forbid single quotes before the word boundary. That is because in contrast to Python's re, Sublime's matching engine treats `my'str` as `my\b'\b'str`, thus detecting constants (constructors) in identifier names like `m'result`. Single quotes are the only such characters allowed in Haskell identifiers. -->
 					<key>name</key>
 					<string>entity.name.function.haskell</string>
 				</dict>
 				<dict>
-					<key>match</key>
-					<string>\b[A-Z][A-Za-z_'0-9]*</string>
+					<key>begin</key>
+					<string>(?&lt;!')\b([A-Z][\w']*)\s*(\()</string>
+					<!-- ^ We have to prepend the negative lookbehind (?<!') to forbid single quotes before the word boundary. That is because in contrast to Python's re, Sublime's matching engine treats `my'str` as `my\b'\b'str`, thus detecting constants (constructors) in identifier names like `m'result`. Single quotes are the only such characters allowed in Haskell identifiers. -->
+					<key>beginCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>storage.type.haskell entity.name.data.haskell</string>
+						</dict>
+						<key>2</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
+					<key>end</key>
+					<string>(\))</string>
+					<key>endCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
 					<key>name</key>
-					<string>storage.type.haskell</string>
+					<string>meta.declaration.export.data.haskell</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>include</key>
+							<string>#expression_stuff</string>
+						</dict>
+					</array>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>(?&lt;!')\b[A-Z][\w']*</string>
+					<!-- ^ We have to prepend the negative lookbehind (?<!') to forbid single quotes before the word boundary. That is because in contrast to Python's re, Sublime's matching engine treats `my'str` as `my\b'\b'str`, thus detecting constants (constructors) in identifier names like `m'result`. Single quotes are the only such characters allowed in Haskell identifiers. -->
+					<key>name</key>
+					<string>storage.type.haskell entity.name.data.haskell</string>
 				</dict>
 				<dict>
 					<key>match</key>
@@ -588,182 +386,9 @@
 					<key>name</key>
 					<string>meta.other.unknown.haskell</string>
 				</dict>
-			</array>
-		</dict>
-		<key>module_name</key>
-		<dict>
-			<key>match</key>
-			<string>[A-Z][A-Za-z._']*</string>
-			<key>name</key>
-			<string>constant.other.module.haskell</string>
-		</dict>
-		<key>pragma</key>
-		<dict>
-			<key>begin</key>
-			<string>\{-#</string>
-			<key>end</key>
-			<string>#-\}</string>
-			<key>name</key>
-			<string>meta.preprocessor.haskell</string>
-			<key>patterns</key>
-			<array>
-				<dict>
-					<key>match</key>
-					<string>\b(LANGUAGE|UNPACK|INLINE)\b</string>
-					<key>name</key>
-					<string>keyword.other.preprocessor.haskell</string>
-				</dict>
-			</array>
-		</dict>
-		<key>function_signature</key>
-		<dict>
-			<key>begin</key>
-			<string>\b([a-z_][a-zA-Z0-9_']*|\([|!%$+\-.,=&lt;/&gt;]+\))\s*(::)</string>
-			<key>beginCaptures</key>
-			<dict>
-				<key>1</key>
-				<dict>
-					<key>name</key>
-					<string>entity.name.function.haskell</string>
-				</dict>
-				<key>2</key>
-				<dict>
-					<key>name</key>
-					<string>keyword.other.double-colon.haskell</string>
-				</dict>
-			</dict>
-			<key>end</key>
-			<string>$\n?</string>
-			<key>name</key>
-			<string>meta.function.type-declaration.haskell</string>
-			<key>patterns</key>
-			<array>
 				<dict>
 					<key>include</key>
-					<string>#type_signature</string>
-				</dict>
-			</array>
-		</dict>
-		<key>type_declaration</key>
-		<dict>
-			<key>begin</key>
-			<string>\b(newtype|type|data|class)\b</string>
-			<key>beginCaptures</key>
-			<dict>
-				<key>1</key>
-				<dict>
-					<key>name</key>
-					<string>keyword.other.ghci</string>
-				</dict>
-			</dict>
-			<key>end</key>
-			<string>\b(where)\b|$</string>
-			<key>endCaptures</key>
-			<dict>
-				<key>1</key>
-				<dict>
-					<key>name</key>
-					<string>keyword.other.ghci</string>
-				</dict>
-			</dict>
-			<key>name</key>
-			<string>meta.declaration.ghci</string>
-			<key>patterns</key>
-			<array>
-				<dict>
-					<key>captures</key>
-					<dict>
-						<key>1</key>
-						<dict>
-							<key>name</key>
-							<string>constant.other.ghci</string>
-						</dict>
-						<key>2</key>
-						<dict>
-							<key>name</key>
-							<string>variable.other.ghci</string>
-						</dict>
-					</dict>
-					<key>match</key>
-					<string>([A-Z][\w'_]*)(\s\w+)*</string>
-					<key>name</key>
-					<string>meta.declaration.arguments.ghci</string>
-				</dict>
-				<dict>
-					<key>match</key>
-					<string>(=&gt;?)|[\|,]</string>
-					<key>name</key>
-					<string>keyword.operator.ghci</string>
-				</dict>
-			</array>
-		</dict>
-		<key>type_signature</key>
-		<dict>
-			<key>patterns</key>
-			<array>
-				<dict>
-					<key>captures</key>
-					<dict>
-						<key>1</key>
-						<dict>
-							<key>name</key>
-							<string>entity.other.inherited-class.haskell</string>
-						</dict>
-						<key>2</key>
-						<dict>
-							<key>name</key>
-							<string>variable.other.generic-type.haskell</string>
-						</dict>
-						<key>3</key>
-						<dict>
-							<key>name</key>
-							<string>keyword.other.big-arrow.haskell</string>
-						</dict>
-					</dict>
-					<key>match</key>
-					<string>\(\s*([A-Z][A-Za-z]*)\s+([a-z][A-Za-z_']*)\)\s*(=&gt;)</string>
-					<key>name</key>
-					<string>meta.class-constraint.haskell</string>
-				</dict>
-				<dict>
-					<key>include</key>
-					<string>#pragma</string>
-				</dict>
-				<dict>
-					<key>match</key>
-					<string>-&gt;</string>
-					<key>name</key>
-					<string>keyword.other.arrow.haskell</string>
-				</dict>
-				<dict>
-					<key>match</key>
-					<string>=&gt;</string>
-					<key>name</key>
-					<string>keyword.other.big-arrow.haskell</string>
-				</dict>
-				<dict>
-					<key>match</key>
-					<string>\b(Int(eger)?|Maybe|Either|Bool|Float|Double|Char|String|Ordering|ShowS|ReadS|FilePath|IO(Error)?)\b</string>
-					<key>name</key>
-					<string>support.type.prelude.haskell</string>
-				</dict>
-				<dict>
-					<key>match</key>
-					<string>\b[a-z][a-zA-Z0-9_']*\b</string>
-					<key>name</key>
-					<string>variable.other.generic-type.haskell</string>
-				</dict>
-				<dict>
-					<key>match</key>
-					<string>\b[A-Z][a-zA-Z0-9_']*\b</string>
-					<key>name</key>
-					<string>storage.type.haskell</string>
-				</dict>
-				<dict>
-					<key>match</key>
-					<string>\(\)</string>
-					<key>name</key>
-					<string>support.constant.unit.haskell</string>
+					<string>#module_exports</string>
 				</dict>
 				<dict>
 					<key>include</key>
@@ -771,22 +396,1063 @@
 				</dict>
 			</array>
 		</dict>
-		<key>command</key>
+		<key>module_name</key>
+		<dict>
+			<key>match</key>
+			<string>([A-Z][\w']*)(\.[A-Z][\w']*)*</string>
+			<key>name</key>
+			<string>storage.module.haskell</string>
+		</dict>
+		<key>pragma</key>
 		<dict>
 			<key>begin</key>
-			<string>(:([\{\}\!\?]|\w+)?)\s+</string>
+			<string>(\{-#)\s+([A-Z_]+)\b</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>1</key>
 				<dict>
 					<key>name</key>
-					<string>support.function.command.ghci</string>
+					<string>punctuation.pragma.haskell</string>
+				</dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.preprocessor.haskell pragma.name.haskell</string>
 				</dict>
 			</dict>
 			<key>end</key>
-			<string>$\n?</string>
+			<string>#-\}</string>
 			<key>name</key>
-			<string>command.other.ghci</string>
+			<string>pragma.haskell</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>match</key>
+					<string>\b([A-Z][a-z]*)+\b</string>
+					<key>name</key>
+					<string>keyword.other.preprocessor.haskell pragma.support.language.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>(-+[a-z]+)+</string>
+					<key>name</key>
+					<string>keyword.other.preprocessor.haskell pragma.support.flag.haskell</string>
+				</dict>
+			</array>
+		</dict>
+		<key>common_keywords</key>
+		<dict>
+			<key>match</key>
+			<string>\b(where|case|of|let|in|default|do|mdo|if|then|else)\b</string>
+			<key>name</key>
+			<string>keyword.other.haskell</string>
+		</dict>
+		<key>literals</key>
+		<dict>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>comment</key>
+					<string>Floats are always decimal</string>
+					<key>match</key>
+					<string>\b([0-9]+\.[0-9]+([eE][+-]?[0-9]+)?|[0-9]+[eE][+-]?[0-9]+)\b</string>
+					<key>name</key>
+					<string>constant.numeric.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>\b([0-9]+|0([xX][0-9a-fA-F]+|[oO][0-7]+))\b</string>
+					<key>name</key>
+					<string>constant.numeric.haskell</string>
+				</dict>
+				<dict>
+					<key>begin</key>
+					<string>"</string>
+		<!-- 			<key>beginCaptures</key>
+					<dict>
+						<key>0</key>
+						<dict>
+							<key>name</key>
+							<string>punctuation.definition.string.begin.haskell</string>
+						</dict>
+					</dict>
+		 -->			<key>end</key>
+					<string>"</string>
+		<!-- 			<key>endCaptures</key>
+					<dict>
+						<key>0</key>
+						<dict>
+							<key>name</key>
+							<string>punctuation.definition.string.end.haskell</string>
+						</dict>
+					</dict>
+		 -->			<key>name</key>
+					<string>string.quoted.double.haskell</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>match</key>
+							<string>\\(NUL|SOH|STX|ETX|EOT|ENQ|ACK|BEL|BS|HT|LF|VT|FF|CR|SO|SI|DLE|DC1|DC2|DC3|DC4|NAK|SYN|ETB|CAN|EM|SUB|ESC|FS|GS|RS|US|SP|DEL|[abfnrtv\\\"'\&amp;])</string>
+							<key>name</key>
+							<string>constant.character.escape.haskell</string>
+						</dict>
+						<dict>
+							<key>match</key>
+							<string>\\o[0-7]+|\\x[0-9A-Fa-f]+|\\[0-9]+</string>
+							<key>name</key>
+							<string>constant.character.escape.octal.haskell</string>
+						</dict>
+						<dict>
+							<key>match</key>
+							<string>\^[A-Z@\[\]\\\^_]</string>
+							<key>name</key>
+							<string>constant.character.escape.control.haskell</string>
+						</dict>
+					</array>
+				</dict>
+				<dict>
+					<key>captures</key>
+					<dict>
+		<!-- 				<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>punctuation.definition.string.begin.haskell</string>
+						</dict>
+		 -->				<key>2</key>
+						<dict>
+							<key>name</key>
+							<string>constant.character.escape.haskell</string>
+						</dict>
+						<key>3</key>
+						<dict>
+							<key>name</key>
+							<string>constant.character.escape.octal.haskell</string>
+						</dict>
+						<key>4</key>
+						<dict>
+							<key>name</key>
+							<string>constant.character.escape.hexadecimal.haskell</string>
+						</dict>
+						<key>5</key>
+						<dict>
+							<key>name</key>
+							<string>constant.character.escape.control.haskell</string>
+						</dict>
+		<!-- 				<key>6</key>
+						<dict>
+							<key>name</key>
+							<string>punctuation.definition.string.end.haskell</string>
+						</dict>
+		 -->			</dict>
+					<key>match</key>
+					<string>(?x)
+					(')
+					(?:
+						[\ -\[\]-~]								# Basic Char
+					  | (\\(?:NUL|SOH|STX|ETX|EOT|ENQ|ACK|BEL|BS|HT|LF|VT|FF|CR|SO|SI|DLE
+							|DC1|DC2|DC3|DC4|NAK|SYN|ETB|CAN|EM|SUB|ESC|FS|GS|RS
+							|US|SP|DEL|[abfnrtv\\\"'\&amp;]))		# Escapes
+					  | (\\o[0-7]+)								# Octal Escapes
+					  | (\\x[0-9A-Fa-f]+)						# Hexadecimal Escapes
+					  | (\^[A-Z@\[\]\\\^_])						# Control Chars
+					)
+					(')
+					</string>
+					<key>name</key>
+					<string>string.quoted.single.haskell</string>
+				</dict>
+			</array>
+		</dict>
+		<key>type</key>
+		<dict>
+			<key>patterns</key>
+			<array>
+ 				<dict>
+					<key>match</key>
+					<string>-&gt;|→</string>
+					<key>name</key>
+					<string>keyword.operator.arrow.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>=&gt;|⇒</string>
+					<key>name</key>
+					<string>keyword.operator.big-arrow.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>\b(Int(eger)?|Maybe|Either|Bool|Float|Double|Char|String|Ordering|ShowS|ReadS|FilePath|IO(Error)?)\b</string>
+					<key>name</key>
+					<string>storage.type.haskell support.type.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>(?&lt;!')\b[a-z][\w']*\b</string>
+					<key>name</key>
+					<string>variable.generic.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>(?&lt;!')\b[A-Z][\w']*\b</string>
+					<key>name</key>
+					<string>storage.type.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>\(\)</string>
+					<key>name</key>
+					<string>storage.type.haskell</string>
+				</dict>
+				<dict>
+					<key>begin</key>
+					<string>(\()</string>
+					<key>beginCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
+					<key>end</key>
+					<string>(\))</string>
+					<key>endCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
+					<key>name</key>
+					<string>meta.type_signature.brace.haskell</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>include</key>
+							<string>#type</string>
+						</dict>
+					</array>
+				</dict>
+				<dict>
+					<key>begin</key>
+					<string>(\[)</string>
+					<key>beginCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
+					<key>end</key>
+					<string>(\])</string>
+					<key>endCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
+					<key>name</key>
+					<string>meta.type_signature.list.haskell</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>include</key>
+							<string>#type</string>
+						</dict>
+					</array>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#comments</string>
+				</dict>
+			</array>
+		</dict>
+		<key>function_signature</key>
+		<dict>
+			<key>begin</key>
+			<!--
+			SublimeText2 workaround
+			If begin doesn't capture anything (using only lookaheads), then end tries match just from the beginning
+			And it cause infinite loop in case of function with no indentation (so there's nothing matched)
+			SublimeText3 works well in that case
+
+			We also can't match full name of function, because there're cases with several names:
+				* x, y, z :: Int
+				* [x, y, z] :: [Int]
+
+			Therefore we are just trying to much something: name, open bracket etc.
+			And we match other stuff within patterns
+			-->
+			<!-- <string>^(\s*)(?!--)(?=([\w\s,']*|\(.*\)|\[.*\])\s+((::)|∷))</string> -->
+			<string>^(\s*)(?!--)(?:(\(\W\)|[\w']+)|[\(\[])(?=[\w',\s\[\]\(\)]*((?:::)|∷))</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>entity.name.function.haskell</string>
+				</dict>
+			</dict>
+			<key>end</key>
+			<string>^(?!\1\s)|(?=})</string>
+			<key>name</key>
+			<string>meta.declaration.function.haskell</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>begin</key>
+					<string>(?=.*((::)|∷))</string>
+					<key>end</key>
+					<string>((::)|∷)</string>
+					<key>endCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.other.double-colon.haskell</string>
+						</dict>
+					</dict>
+					<key>name</key>
+					<string>meta.declaration.function.names.haskell</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>match</key>
+							<string>((?&lt;!')\b[a-z_][\w']*|\(\W+\))</string>
+							<key>name</key>
+							<string>entity.name.function.haskell</string>
+						</dict>
+					</array>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#type</string>
+				</dict>
+			</array>
+		</dict>
+		<key>function_definition</key>
+		<dict>
+			<key>begin</key>
+			<string>^\s*(?&lt;!')\b([a-z_][\w']*|\(\W+\))\s+(?![^\w\s='"\(\[])(?=(([\w\s\.,'"]*|\(.*\)|\[.*\])\s+)*=)</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>entity.name.function.haskell</string>
+				</dict>
+			</dict>
+			<key>end</key>
+			<string>(=)</string>
+			<key>endCaptures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.operator.haskell</string>
+				</dict>
+			</dict>
+			<key>name</key>
+			<string>meta.definition.function.haskell</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>include</key>
+					<string>#expression_stuff</string>
+				</dict>
+			</array>
+		</dict>
+		<key>infix_function_definition</key>
+		<dict>
+			<key>begin</key>
+			<string>^\s*(?=(([\w'\.'"]+|\(.*\)|\[.*\])\s+)+([^\w\s'"`\(\)]+|`[a-z][\w']*`).*=)</string>
+			<key>end</key>
+			<string>([^\w\s\.'"`]+|`[a-z][\w']*`)</string>
+			<key>endCaptures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>entity.name.function.haskell</string>
+				</dict>
+			</dict>
+			<key>name</key>
+			<string>meta.definition.function.haskell</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>include</key>
+					<string>#expression_stuff</string>
+				</dict>
+			</array>
+		</dict>
+		<key>pattern_function_definition</key>
+		<dict>
+			<key>begin</key>
+			<string>^\s*(?=\(.*\)|\[.*\]|([A-Z][\w']*(\s+([\w\s,']*|\(.*\)|\[.*\]|\{.*\}))*)\s*=)</string>
+			<key>end</key>
+			<string>(=)</string>
+			<key>endCaptures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.operator.haskell</string>
+				</dict>
+			</dict>
+			<key>name</key>
+			<string>meta.definition.function.haskell</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>match</key>
+					<string>(?&lt;!')\b([a-z_][\w']*)\b</string>
+					<key>captures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>entity.name.function.haskell</string>
+						</dict>
+					</dict>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#expression_stuff</string>
+				</dict>
+			</array>
+		</dict>
+		<key>foreign_function_signature</key>
+		<dict>
+			<key>begin</key>
+			<string>(\s*)([a-z_][\w']*|\(\W+\))\s*((::)|∷)</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>entity.name.function.haskell</string>
+				</dict>
+				<key>3</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.other.double-colon.haskell</string>
+				</dict>
+			</dict>
+			<key>end</key>
+			<string>^(?!\s)</string>
+			<key>name</key>
+			<string>meta.declaration.function.haskell</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>include</key>
+					<string>#type</string>
+				</dict>
+			</array>
+		</dict>
+		<key>constructor_signature</key>
+		<dict>
+			<key>begin</key>
+			<string>^(\s+)([A-Z][\w']*|\(\W+\))\s*((::)|∷)</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>constant.other.haskell entity.name.constructor.haskell</string>
+				</dict>
+				<key>3</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.other.double-colon.haskell</string>
+				</dict>
+			</dict>
+			<key>end</key>
+			<string>^(?!\1\s)</string>
+			<key>name</key>
+			<string>meta.declaration.function.haskell</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>include</key>
+					<string>#type</string>
+				</dict>
+			</array>
+		</dict>
+		<key>record_declaration</key>
+		<dict>
+			<key>begin</key>
+			<string>(\{)(?!-)</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.operator.haskell punctuation.record.haskell</string>
+				</dict>
+			</dict>
+			<key>end</key>
+			<string>(?&lt;!-)(\})</string>
+			<key>endCaptures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.operator.haskell punctuation.record.haskell</string>
+				</dict>
+			</dict>
+			<key>name</key>
+			<string>meta.declaration.record.haskell</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>include</key>
+					<string>#field_signature</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#comments</string>
+				</dict>
+			</array>
+		</dict>
+		<key>field_signature</key>
+		<dict>
+			<key>begin</key>
+			<string>(?=.*?((::)|∷))</string>
+			<key>end</key>
+			<string>(?=[,}])</string>
+			<key>name</key>
+			<string>meta.declaration.field.haskell</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>begin</key>
+					<string>((::)|∷)</string>
+					<key>beginCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.other.double-colon.haskell</string>
+						</dict>
+					</dict>
+					<key>end</key>
+					<string>(?=[,}])</string>
+					<key>name</key>
+					<string>meta.declaration.field.signature.haskell</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>include</key>
+							<string>#type</string>
+						</dict>
+					</array>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>((?&lt;!')\b[a-z_][\w']*|\(\W+\))</string>
+					<key>name</key>
+					<string>entity.name.function.haskell</string>
+				</dict>
+			</array>
+		</dict>
+		<key>deriving</key>
+		<dict>
+			<key>match</key>
+			<string>\b(deriving)\b</string>
+			<key>name</key>
+			<string>keyword.other.haskell keyword.declaration.data.haskell</string>
+		</dict>
+		<key>type_declaration</key>
+		<dict>
+			<key>begin</key>
+			<string>^(\s*)(type)\s+([A-Z][\w']*)?</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.declaration.data.haskell</string>
+				</dict>
+				<key>3</key>
+				<dict>
+					<key>name</key>
+					<string>constant.other.haskell entity.name.type.haskell</string>
+				</dict>
+			</dict>
+			<key>end</key>
+			<string>^(?!\1\s)</string>
+			<key>name</key>
+			<string>meta.declaration.type.haskell</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>include</key>
+					<string>#comments</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>=</string>
+					<key>name</key>
+					<string>keyword.operator.haskell</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#type</string>
+				</dict>
+			</array>
+		</dict>
+		<key>data_declaration</key>
+		<dict>
+			<key>begin</key>
+			<string>^(\s*)(data|newtype)\s+([A-Z][\w']*)?</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.declaration.data.haskell</string>
+				</dict>
+				<key>3</key>
+				<dict>
+					<key>name</key>
+					<string>constant.other.haskell entity.name.type.haskell</string>
+				</dict>
+			</dict>
+			<key>end</key>
+			<string>^(?!\1\s)</string>
+			<key>name</key>
+			<string>meta.declaration.data.haskell</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>match</key>
+					<string>where</string>
+					<key>name</key>
+					<string>keyword.declaration.data.haskell</string>
+				</dict>
+				<dict>
+					<key>begin</key>
+					<string>([=\|])</string>
+					<key>beginCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+					</dict>
+					<key>end</key>
+					<string>(?&lt;!')\b([A-Z][\w']*)</string>
+					<key>endCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>constant.other.haskell entity.name.constructor.haskell</string>
+						</dict>
+					</dict>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>include</key>
+							<string>#comments</string>
+						</dict>
+					</array>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#deriving</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#constructor_signature</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#record_declaration</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#comments</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#type</string>
+				</dict>
+			</array>
+		</dict>
+		<key>class_declaration</key>
+		<dict>
+			<key>begin</key>
+			<string>^(\s*)(class)\b</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.declaration.class.haskell</string>
+				</dict>
+			</dict>
+			<key>end</key>
+			<string>\b(where)\b|(^(?!\1\s))</string>
+			<key>endCaptures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.declaration.class.haskell</string>
+				</dict>
+			</dict>
+			<key>name</key>
+			<string>meta.declaration.class.haskell</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>include</key>
+					<string>#type</string>
+				</dict>
+			</array>
+		</dict>
+		<key>instance_declaration</key>
+		<dict>
+			<key>begin</key>
+			<string>^(\s*)(instance)\b</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.declaration.instance.haskell</string>
+				</dict>
+			</dict>
+			<key>end</key>
+			<string>\b(where)\b|(^(?!\1\s))</string>
+			<key>endCaptures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.declaration.instance.haskell</string>
+				</dict>
+			</dict>
+			<key>name</key>
+			<string>meta.declaration.instance.haskell</string>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>include</key>
+					<string>#type</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#comments</string>
+				</dict>
+			</array>
+		</dict>
+		<key>fixity_declaration</key>
+		<dict>
+			<key>match</key>
+			<string>\binfix[lr]?\b</string>
+			<key>name</key>
+			<string>keyword.declaration.fixity.haskell</string>
+		</dict>
+		<key>function_declarations</key>
+		<dict>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>include</key>
+					<string>#function_signature</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#function_definition</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#infix_function_definition</string>
+				</dict>
+<!-- 				<dict>
+					<key>include</key>
+					<string>#pattern_function_definition</string>
+				</dict>
+ -->				<dict>
+					<key>include</key>
+					<string>#fixity_declaration</string>
+				</dict>
+			</array>
+		</dict>
+		<key>type_declarations</key>
+		<dict>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>include</key>
+					<string>#data_declaration</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#type_declaration</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#class_declaration</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#instance_declaration</string>
+				</dict>
+			</array>
+		</dict>
+		<key>quasi_quote</key>
+		<dict>
+			<key>begin</key>
+			<string>(\[)([a-z][\w]*)?(\|)</string>
+			<key>beginCaptures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>punctuation.quasi-quoter.haskell keyword.operator.haskell</string>
+				</dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>entity.name.function.haskell</string>
+				</dict>
+				<key>3</key>
+				<dict>
+					<key>name</key>
+					<string>punctuation.quasi-quoter.haskell keyword.operator.haskell</string>
+				</dict>
+			</dict>
+			<key>end</key>
+			<string>(\|\])</string>
+			<key>endCaptures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>punctuation.quasi-quoter.haskell keyword.operator.haskell</string>
+				</dict>
+			</dict>
+			<key>name</key>
+			<string>string.quoted.quasi.haskell</string>
+		</dict>
+		<key>ctor_names</key>
+		<dict>
+			<key>patterns</key>
+			<array>
+		 		<dict>
+					<key>match</key>
+					<string>(?&lt;!')\b[A-Z][\w']*</string>
+					<key>name</key>
+					<string>constant.other.haskell entity.name.constructor.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>\(\)</string>
+					<key>name</key>
+					<string>constant.other.haskell entity.name.constructor.haskell</string>
+				</dict>
+			</array>
+		</dict>
+		<key>expression_stuff</key>
+		<dict>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>match</key>
+					<string>([A-Z][\w']*\.)+</string>
+					<key>name</key>
+					<string>storage.module.haskell entity.name.module.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>\b(abs|acos|acosh|all|and|any|appendFile|asTypeOf|asin|asinh|atan|atan2|atanh|break|ceiling|compare|concat|concatMap|const|cos|cosh|curry|cycle|decodeFloat|div|divMod|drop|dropWhile|either|elem|encodeFloat|enumFrom|enumFromThen|enumFromThenTo|enumFromTo|even|exp|exponent|fail|filter|flip|floatDigits|floatRadix|floatRange|floor|fmap|foldl|foldl1|foldr|foldr1|fromEnum|fromInteger|fromIntegral|fromRational|fst|gcd|getChar|getContents|getLine|head|id|init|interact|ioError|isDenormalized|isIEEE|isInfinite|isNaN|isNegativeZero|iterate|last|lcm|length|lex|lines|log|logBase|lookup|map|mapM|mapM_|max|maxBound|maximum|maybe|min|minBound|minimum|mod|negate|not|notElem|null|odd|or|otherwise|pi|pred|print|product|properFraction|putChar|putStr|putStrLn|quot|quotRem|read|readFile|readIO|readList|readLn|readParen|reads|readsPrec|realToFrac|recip|rem|repeat|replicate|return|reverse|round|scaleFloat|scanl|scanl1|scanr|scanr1|seq|sequence|sequence_|show|showChar|showList|showParen|showString|shows|showsPrec|significand|signum|sin|sinh|snd|span|splitAt|sqrt|subtract|succ|sum|tail|take|takeWhile|tan|tanh|toEnum|toInteger|toRational|truncate|uncurry|unlines|until|unwords|unzip|unzip3|userError|words|writeFile|zip|zip3|zipWith|zipWith3)\b</string>
+					<key>name</key>
+					<string>support.function.prelude.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>\b(error|undefined)\b</string>
+					<key>name</key>
+					<string>support.function.prelude.haskell invalid.haskell</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#infix_op</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>List</string>
+					<key>match</key>
+					<string>\[|\]</string>
+					<key>name</key>
+					<string>keyword.operator.haskell punctuation.list.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>,</string>
+					<key>name</key>
+					<string>punctuation.separator.comma.haskell</string>
+				</dict>
+				<dict>
+					<key>captures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>punctuation.definition.entity.haskell</string>
+						</dict>
+						<key>3</key>
+						<dict>
+							<key>name</key>
+							<string>punctuation.definition.entity.haskell</string>
+						</dict>
+					</dict>
+					<key>comment</key>
+					<string>In case this regex seems unusual for an infix operator, note that Haskell allows any ordinary function application (elem 4 [1..10]) to be rewritten as an infix expression (4 `elem` [1..10]).</string>
+					<key>match</key>
+					<string>(`)([A-Z][\w']*\.)*[a-z][\w']*(`)</string>
+					<key>name</key>
+					<string>keyword.operator.function.infix.haskell</string>
+				</dict>
+				<dict>
+					<key>begin</key>
+					<string>(\{)(?!-)</string>
+					<key>beginCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell punctuation.record.haskell</string>
+						</dict>
+					</dict>
+					<key>end</key>
+					<string>(?&lt;!-)(\})</string>
+					<key>endCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell punctuation.record.haskell</string>
+						</dict>
+					</dict>
+					<key>name</key>
+					<string>record.expression.haskell</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>match</key>
+							<string>(?&lt;!')\b[a-z][\w']+\s+(=)</string>
+							<key>captures</key>
+							<dict>
+								<key>2</key>
+								<dict>
+									<key>name</key>
+									<string>keyword.operator.haskell</string>
+								</dict>
+							</dict>
+						</dict>
+						<dict>
+							<key>include</key>
+							<string>#expression_stuff</string>
+						</dict>
+					</array>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>\(\)</string>
+					<key>name</key>
+					<string>constant.other.haskell entity.name.constructor.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
+					<string>\[\]</string>
+					<key>name</key>
+					<string>constant.other.haskell entity.name.constructor.haskell</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#comments</string>
+				</dict>
+				<dict>
+					<key>comment</key>
+					<string>In case this regex seems overly general, note that Haskell permits the definition of new operators which can be nearly any string of punctuation characters, such as $%^&amp;*.</string>
+					<key>match</key>
+					<string>[@|!%$?~+:.\-*=&lt;/&gt;\\∘→⇒⇔←⇐≤≥≡⋮\[\]]+</string>
+					<key>name</key>
+					<string>keyword.operator.haskell</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#common_keywords</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#literals</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#quasi_quote</string>
+				</dict>
+				<dict>
+					<key>include</key>
+					<string>#ctor_names</string>
+				</dict>
+			</array>
+		</dict>
+		<key>commands</key>
+		<dict>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>begin</key>
+					<string>(:browse)\s+</string>
+					<key>beginCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.other.haskell</string>
+						</dict>
+					</dict>
+					<key>end</key>
+					<string>$\n?</string>
+					<key>name</key>
+					<string>command.other.ghci</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>include</key>
+							<string>#module_name</string>
+						</dict>
+					</array>
+				</dict>
+				<dict>
+					<key>begin</key>
+					<string>(:([\{\}\!\?]|\w+)?)\s+</string>
+					<key>beginCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.other.haskell</string>
+						</dict>
+					</dict>
+					<key>end</key>
+					<string>$\n?</string>
+					<key>name</key>
+					<string>command.other.ghci</string>
+				</dict>
+			</array>
 		</dict>
 		<key>import_statement</key>
 		<dict>
@@ -797,7 +1463,7 @@
 				<key>1</key>
 				<dict>
 					<key>name</key>
-					<string>keyword.other.haskell</string>
+					<string>keyword.other.haskell keyword.import.haskell</string>
 				</dict>
 			</dict>
 			<key>end</key>
@@ -810,7 +1476,7 @@
 					<key>match</key>
 					<string>(qualified|as|hiding)</string>
 					<key>name</key>
-					<string>keyword.other.haskell</string>
+					<string>keyword.other.haskell keyword.import.haskell</string>
 				</dict>
 				<dict>
 					<key>include</key>
@@ -819,6 +1485,61 @@
 				<dict>
 					<key>include</key>
 					<string>#module_exports</string>
+				</dict>
+			</array>
+		</dict>
+		<key>messages</key>
+		<dict>
+			<key>patterns</key>
+			<array>
+				<dict>
+					<key>begin</key>
+					<string>^(Loading|GHCi)\b</string>
+					<key>end</key>
+					<string>$</string>
+					<key>name</key>
+					<string>comment.message.ghci</string>
+				</dict>
+				<dict>
+					<key>begin</key>
+					<string>^(Ok, modules loaded)\b</string>
+					<key>end</key>
+					<string>$</string>
+					<key>name</key>
+					<string>comment.message.ghci</string>
+					<key>patterns</key>
+					<array>
+						<dict>
+							<key>include</key>
+							<string>#module_name</string>
+						</dict>
+					</array>
+				</dict>
+				<dict>
+					<key>begin</key>
+					<string>\[(\d+) of (\d+)\] Compiling (\w+)</string>
+					<key>beginCaptures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>constant.numeric.haskell</string>
+						</dict>
+						<key>2</key>
+						<dict>
+							<key>name</key>
+							<string>constant.numeric.haskell</string>
+						</dict>
+						<key>3</key>
+						<dict>
+							<key>name</key>
+							<string>storage.module.haskell</string>
+						</dict>
+					</dict>
+					<key>end</key>
+					<string>$</string>
+					<key>name</key>
+					<string>comment.message.ghci</string>
 				</dict>
 			</array>
 		</dict>

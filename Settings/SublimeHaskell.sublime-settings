@@ -11,7 +11,7 @@
 	"auto_complete_language_pragmas": true,
 
 	// Enable auto build on save
-	"enable_auto_build": true,
+	"enable_auto_build": false,
 
 	// Enable auto run tests on save, has effect only if auto build enabled (enable_auto_build)
 	"auto_run_tests": true,
@@ -56,16 +56,7 @@
 	// Example: /home/user/.cabal/bin
 	"add_to_PATH": [],
 
-	// Use cabal-dev
-	"use_cabal_dev": false,
-
-	// Sandbox for cabal-dev
-	"cabal_dev_sandbox": "",
-
-	// Cabal-dev sandboxes
-	"cabal_dev_sandbox_list": [],
-
-	// Inhibit default Sublime word completions
+// Inhibit default Sublime word completions
 	"inhibit_completions": false,
 
 	// Auto autocompletion popup on '.' in import list
@@ -74,9 +65,21 @@
 	// Additional ghc options for use in ghc-mod and ModuleInspector, for example "-package ghc"
 	"ghc_opts": [],
 
+	// Enable hsdev
+	"enable_hsdev": true,
+
+	// lint & check on the fly
+	"lint_check_fly": false,
+
+	// idle time in seconds before lint & check on the fly
+	"lint_check_fly_idle": 5,
+
 	// Enables hdevtools (it must be installed, cabal install hdevtools)
 	// See the add_to_PATH settings to specify a custom location.
 	"enable_hdevtools": true,
+
+	// Use unicode symbols info 'symbol info panel'
+	"unicode_symbol_info": false,
 
 	// hdevtools socket name or default
 	"hdevtools_socket": "",
@@ -99,5 +102,11 @@
 	// Examples:
 	// 		"cache_path": "../../Local/SublimeHaskell"
 	// 		"cache_path": "%TEMP%\\SublimeHaskell"
-	"cache_path": "."
+	"cache_path": ".",
+
+	// Additional ghc options for repl
+	"ghci_opts": [],
+
+	// Log level, 0 — no log, 1 — errors, 2 — warnings, 3 — info messages, 4 — debug, 5 — trace
+	"log": 3
 }

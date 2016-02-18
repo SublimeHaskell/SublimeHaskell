@@ -1,0 +1,41 @@
+comment.haskell (-- blah)
+punctuation.comment.haskell (--, {-, -})
+
+pragma.haskell ({-# ... #-})
+punctuation.pragma.haskell ({-#, #-})
+pragma.name.haskell (LANGUAGE, OPTIONS_GHC)
+pragma.support.flag.haskell (-fno-warn-orphans)
+pragma.support.language.haskell (UnicodeSyntax, LambdaCase)
+
+punctuation.pragma.preprocessor.haskell (#)
+pragma.preprocessor.haskell (#if #endif)
+
+keyword.module.haskell (module)
+keyword.import.haskell (import, qualified, as, hiding)
+
+entity.name.class.haskell (Monad, Monoid)
+entity.name.data.haskell (Either, Maybe)
+entity.name.function.haskell (foldr, map)
+entity.name.function.infix.haskell ((+), (-))
+entity.name.module.haskell (Prelude, Data.Maybe)
+
+constant.numeric.haskell (1, 1.2)
+string.quoted.double.haskell ("foo")
+string.quoted.single.haskell ('f')
+
+keyword.declaration.data.haskell (data, deriving?)
+keyword.declaration.class.haskell (class)
+keyword.declaration.instance.haskell (instance)
+keyword.declaration.foreign.haskell (foreign, import, export)
+keyword.declaration.fixity.haskell (infixr, infixl)
+
+keyword.operator.haskell (→, ⇒, ->, +, -)
+punctuation.infix-call.haskell (`foo`)
+punctuation.list.haskell ([])
+
+keyword.other.haskell (let, where, case, default)
+
+punctuation.quasi-quoter.haskell ([|, |])
+string.quoted.quasi.haskell ([expr| foo |]) ?
+
+variable.generic.haskell (a, b)

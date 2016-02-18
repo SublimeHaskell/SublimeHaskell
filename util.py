@@ -1,3 +1,5 @@
+# -*- coding: UTF-8 -*-
+
 import sublime
 
 if int(sublime.version()) < 3000:
@@ -6,14 +8,12 @@ if int(sublime.version()) < 3000:
     import haskell_docs
     import hdevtools
     import sublime_haskell_common as common
-    import symbols
 else:
     import SublimeHaskell.ghci as ghci
     import SublimeHaskell.ghcmod as ghcmod
     import SublimeHaskell.haskell_docs as haskell_docs
     import SublimeHaskell.hdevtools as hdevtools
     import SublimeHaskell.sublime_haskell_common as common
-    import SublimeHaskell.symbols as symbols
 
 def symbol_info(filename, module_name, symbol_name, cabal = None, no_ghci = False):
     result = None

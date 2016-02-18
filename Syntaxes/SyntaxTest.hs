@@ -11,7 +11,7 @@ import Data.List (sort, nub) -- import comment (PASS)
 --Normal comment missing space (PASS)
 
 data Type = Type Int deriving
-	(Eq, Show) -- deriving on next line (FAIL)
+	(Eq, Show) -- deriving on next line (PASS)
 
 a = "asdf"
 b = 2
@@ -21,7 +21,7 @@ class Myclass a
   where
 
 myFunction1
-   :: Int -- Type signature on next line (FAIL)
+   :: Int -- Type signature on next line (PASS)
    -> String
 myFunction1 = undefined
 

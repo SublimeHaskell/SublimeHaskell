@@ -1,3 +1,5 @@
+# -*- coding: UTF-8 -*-
+
 import os
 import re
 import sublime
@@ -8,11 +10,9 @@ import threading
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     from ghci import parse_info
-    import symbols
 else:
     from SublimeHaskell.sublime_haskell_common import *
     from SublimeHaskell.ghci import parse_info
-    import SublimeHaskell.symbols as symbols
 
 
 def show_hdevtools_error_and_disable():
@@ -34,9 +34,6 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
     Calls hdevtools with the given arguments.
     Shows a sublime error message if hdevtools is not available.
     """
-    if not hdevtools_enabled():
-        return None
-
     ghc_opts_args = get_ghc_opts_args(filename, cabal = cabal)
     hdevtools_socket = get_setting_async('hdevtools_socket')
     source_dir = get_source_dir(filename)
@@ -59,7 +56,7 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
         return None
 
     except Exception as e:
-        log('calling to hdevtools fails with {0}'.format(e))
+        log('calling to hdevtools fails with {0}'.format(e), log_error)
         return None
 
 def admin(cmds, wait = False, **popen_kwargs):

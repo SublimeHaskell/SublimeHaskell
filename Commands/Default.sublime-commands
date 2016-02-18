@@ -18,8 +18,20 @@
         "command": "sublime_haskell_show_type"
     },
     {
+        "caption": "SublimeHaskell: Show types",
+        "command": "sublime_haskell_show_types"
+    },
+    {
+        "caption": "SublimeHaskell: Show/hide all types",
+        "command": "sublime_haskell_toggle_all_types"
+    },
+    {
         "caption": "SublimeHaskell: Insert type",
         "command": "sublime_haskell_insert_type"
+    },
+    {
+        "caption": "SublimeHaskell: Expand selection to Expression",
+        "command": "sublime_haskell_expand_selection_expression"
     },
     {
         "caption": "SublimeHaskell: Show symbol info",
@@ -63,39 +75,71 @@
     },
     {
         "caption": "SublimeHaskell: Check",
-        "command": "sublime_haskell_ghc_mod_check"
+        "command": "sublime_haskell_check"
     },
     {
         "caption": "SublimeHaskell: Lint",
-        "command": "sublime_haskell_ghc_mod_lint"
+        "command": "sublime_haskell_lint"
     },
     {
         "caption": "SublimeHaskell: Check & Lint",
-        "command": "sublime_haskell_ghc_mod_check_and_lint"
+        "command": "sublime_haskell_check_and_lint"
     },
     {
         "caption": "SublimeHaskell: Stylish",
         "command": "sublime_haskell_stylish"
     },
     {
-        "caption": "SublimeHaskell: Go to Any Declaration",
-        "command": "sublime_haskell_go_to_any_declaration"
-    },
-    {
-        "caption": "SublimeHaskell: Go to Declaration",
+        "caption": "SublimeHaskell: Go to declaration",
         "command": "sublime_haskell_go_to_declaration"
     },
     {
-        "caption": "SublimeHaskell: Browse Declarations",
+        "caption": "SublimeHaskell: Go to module",
+        "command": "sublime_haskell_go_to_module"
+    },
+    {
+        "caption": "SublimeHaskell: Eval selection",
+        "command": "sublime_haskell_eval_selection"
+    },
+    {
+        "caption": "SublimeHaskell: Apply to selection",
+        "command": "sublime_haskell_apply_to_selection"
+    },
+    {
+        "caption": "SublimeHaskell: Apply to selection list",
+        "command": "sublime_haskell_apply_to_selection_list"
+    },
+    {
+        "caption": "SublimeHaskell: Browse declarations",
         "command": "sublime_haskell_browse_declarations"
     },
     {
-        "caption": "SublimeHaskell: Switch Cabal/Cabal-Dev",
-        "command": "sublime_haskell_switch_cabal_dev"
+        "caption": "SublimeHaskell: Find declarations",
+        "command": "sublime_haskell_find_declarations"
     },
+    {
+        "caption": "SublimeHaskell: Hayoo",
+        "command": "sublime_haskell_hayoo"
+    },
+    {
+        "caption": "SublimeHaskell: Search declarations everywhere",
+        "command": "sublime_haskell_search"
+    },
+    {
+        "caption": "SublimeHaskell: Insert import for symbol",
+        "command": "sublime_haskell_insert_import_for_symbol"
+    },
+    // {
+    //     "caption": "SublimeHaskell: Clear imports",
+    //     "command": "sublime_haskell_clear_imports"
+    // },
     {
         "caption": "SublimeHaskell: Reinspect all",
         "command": "sublime_haskell_reinspect_all"
+    },
+    {
+        "caption": "SublimeHaskell: Scan docs and infer types",
+        "command": "sublime_haskell_infer_docs"
     },
     {
         "caption": "SublimeHaskell: Go to next error",
@@ -109,5 +153,13 @@
         "caption": "SublimeHaskell: Show error panel",
         "command": "show_panel",
         "args": { "panel": "output.haskell_error_checker" }
+    },
+    {
+        "caption": "Cabal: List",
+        "command": "sublime_haskell_cabal_list"
+    },
+    {
+        "caption": "SublimeHaskell: Auto fix",
+        "command": "sublime_haskell_auto_fix"
     }
 ]

@@ -1,0 +1,37 @@
+[
+    {
+        "keys": ["up"],
+        "context": [ { "key": "haskell_autofix" } ],
+        "command": "sublime_haskell_auto_fix_previous"
+    },
+    {
+        "keys": ["down"],
+        "context": [ { "key": "haskell_autofix" } ],
+        "command": "sublime_haskell_auto_fix_next"
+    },
+    {
+        "keys": ["enter"],
+        "context": [ { "key": "haskell_autofix" } ],
+        "command": "sublime_haskell_auto_fix_fix"
+    },
+    {
+        "keys": ["alt+enter"],
+        "context": [ { "key": "haskell_autofix" } ],
+        "command": "sublime_haskell_auto_fix_all"
+    },
+    {
+        "keys": ["ctrl+z"],
+        "context": [ { "key": "haskell_autofix" } ],
+        "command": "sublime_haskell_auto_fix_undo"
+    },
+    {
+        "keys": ["ctrl+y"],
+        "context": [ { "key": "haskell_autofix" } ],
+        "command": "sublime_haskell_auto_fix_redo"
+    },
+    {
+        "keys": ["escape"],
+        "context": [ { "key": "haskell_autofix" } ],
+        "command": "sublime_haskell_auto_fix_stop"
+    }
+]

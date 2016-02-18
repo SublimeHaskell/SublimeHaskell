@@ -1,0 +1,18 @@
+[
+    {
+        "caption": "SublimeHaskell Repl: GHCi",
+        "command": "sublime_haskell_repl_ghci"
+    },
+    {
+        "caption": "SublimeHaskell Repl: GHCi current file",
+        "command": "sublime_haskell_repl_ghci_current_file"
+    },
+    {
+        "caption": "SublimeHaskell Repl: Cabal Repl",
+        "command": "sublime_haskell_repl_cabal"
+    },
+    {
+        "caption": "SublimeHaskell Repl: Load",
+        "command": "sublime_haskell_repl_load"
+    }
+]
