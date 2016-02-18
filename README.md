@@ -23,6 +23,7 @@ Binaries:
 
 There are also [special theme](Themes/Hasky%20\(Dark\).gif) with enhanced haskell entities coloring<br>
 Note different coloring for types and constructors (in import list, data declaration etc.), special coloring of generic variables in types, pragmas and module imports
+
 ![compare](Themes/Hasky%20\(Dark\).small.gif)
 
 Installation
