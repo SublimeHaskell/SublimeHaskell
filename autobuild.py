@@ -65,7 +65,7 @@ class FlyCheckLint(threading.Thread):
         while True:
             self.event.wait()
             self.event.clear()
-            time.sleep(5)
+            time.sleep(get_setting_async('lint_check_fly_idle', 5))
             view_ = None
             with self.view as v:
                 if v:

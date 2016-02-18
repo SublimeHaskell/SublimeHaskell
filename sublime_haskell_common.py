@@ -71,6 +71,7 @@ def preload_settings():
     get_setting('inspect_modules')
     get_setting('snippet_replace')
     get_setting('lint_check_fly')
+    get_setting('lint_check_fly_idle')
     get_setting('ghc_opts')
     get_setting('log')
 

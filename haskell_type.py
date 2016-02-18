@@ -119,7 +119,6 @@ class TypedRegion(object):
     def contains(self, r):
         return self.contains_region(r.region)
 
-    @staticmethod
     def contains_region(self, r):
         return self.region.contains(r)
 
