@@ -82,7 +82,7 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
                 set_global_error_messages(output_messages)
                 output_text = format_output_messages(output_messages)
                 if output_text:
-                    if get_setting_async('show_output_window'):
+                    if get_setting_async('show_error_window'):
                         sublime.set_timeout(lambda: write_output(
                             self.view,
                             output_text,

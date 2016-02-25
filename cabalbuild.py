@@ -228,7 +228,7 @@ class SublimeHaskellConfigureCommand(SublimeHaskellBaseCommand):
 
 class SublimeHaskellBuildCommand(SublimeHaskellBaseCommand):
     def run(self):
-        self.build('build_then_warnings')
+        self.build('build')
 
 
 class SublimeHaskellTypecheckCommand(SublimeHaskellBaseCommand):
