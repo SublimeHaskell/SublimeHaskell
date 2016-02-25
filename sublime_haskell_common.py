@@ -591,9 +591,17 @@ def output_panel(window, text = '', panel_name = 'sublime_haskell_output_panel',
     return output_view
 
 def hide_panel(window, panel_name = 'sublime_haskell_output_panel'):
+    if not window:
+        window = sublime.active_window()
+    if not window:
+        return
     window.run_command('hide_panel', { 'panel': ('output.' + panel_name) })
 
 def show_panel(window, panel_name = 'sublime_haskell_output_panel'):
+    if not window:
+        window = sublime.active_window()
+    if not window:
+        return
     window.run_command('show_panel', { 'panel': ('output.' + panel_name) })
 
 def output_error(window, text):
