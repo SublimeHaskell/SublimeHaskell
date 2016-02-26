@@ -707,7 +707,7 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
             decls = self.sorted_decls_name(hsdev_client.symbol(project = current_project))
             self.declarations = [[decl.brief(), decl.module.name, decl.get_source_location()] for decl in decls]
         else:
-            decls = self.sorted_decls_pos(hsdev_client.symbol(file = self.current_filename))
+            decls = self.sorted_decls_pos(hsdev_client.symbol(file = self.current_filename, locals = True))
             self.declarations = [[(decl.position.column * ' ') + decl.brief()] for decl in decls]
         self.decls = decls[:]
 
