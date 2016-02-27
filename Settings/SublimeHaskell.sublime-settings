@@ -48,8 +48,11 @@
 	// (https://github.com/haskell/cabal/issues/1176, cabal 1.16).
 	"auto_build_mode": "normal-then-warnings",
 
-	// Show output window on build/check/lint:
+	// Show output window on clean/configure/build/install:
 	"show_output_window": true,
+
+	// Show error window on build/check/lint:
+	"show_error_window": true,
 
 	// Extra directories to be added to the front of the PATH environment variable.
 	// Specify this for using custom ghc, cabal, and ghc-mod

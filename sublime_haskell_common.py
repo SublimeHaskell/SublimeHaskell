@@ -62,6 +62,7 @@ def preload_settings():
     # Now we can use get_setting_async for 'add_to_PATH' safely
     get_setting('add_to_PATH')
     get_setting('enable_auto_build')
+    get_setting('show_error_window')
     get_setting('show_output_window')
     get_setting('enable_ghc_mod')
     get_setting('enable_hdevtools')
@@ -135,8 +136,8 @@ def encode_bytes(s):
         return None
     return s.encode('utf-8')
 
-def call_and_wait(command, split_lines = False, **popen_kwargs):
-    return call_and_wait_with_input(command, '', split_lines, **popen_kwargs)
+def call_and_wait(command, wait = True, **popen_kwargs):
+    return call_and_wait_with_input(command, '', wait, **popen_kwargs)
 
 def call_no_wait(command, **popen_kwargs):
     """Run the specified command with no block"""
@@ -180,15 +181,18 @@ def call_and_wait_tool(command, tool_name, input = '', on_result = None, filenam
 
     try:
         if on_line:
-            for l in call_and_wait_with_input(command, input, split_lines = True, cwd = source_dir, **popen_kwargs):
+            p = call_and_wait_with_input(command, input, wait = False, cwd = source_dir, **popen_kwargs)
+            for l in p.stdout:
                 on_line(mk_result(crlf2lf(decode_bytes(l))))
-            return None
+            exit_code = p.wait()
+            if exit_code != 0:
+                raise Exception('{0} exited with exit code {1} and stderr: {2}'.format(tool_name, exit_code, p.stderr.read()))
         else:
             exit_code, out, err = call_and_wait_with_input(command, input, cwd = source_dir, **popen_kwargs)
             out = crlf2lf(out)
 
             if exit_code != 0:
-                raise Exception('{0} exited with status {1} and stderr: {2}'.format(tool_name, exit_code, err))
+                raise Exception('{0} exited with exit code {1} and stderr: {2}'.format(tool_name, exit_code, err))
 
             return mk_result(out)
 
@@ -206,7 +210,7 @@ def call_and_wait_tool(command, tool_name, input = '', on_result = None, filenam
 
     return None
 
-def call_and_wait_with_input(command, input_string, split_lines = False, **popen_kwargs):
+def call_and_wait_with_input(command, input_string, wait = True, **popen_kwargs):
     """Run the specified command, block until it completes, and return
     the exit code, stdout, and stderr.
     Extends os.environment['PATH'] with the 'add_to_PATH' setting.
@@ -227,14 +231,14 @@ def call_and_wait_with_input(command, input_string, split_lines = False, **popen
         env=extended_env,
         **popen_kwargs)
 
-    if split_lines:
-        process.stdin.write(encode_bytes(input_string))
-        process.stdin.close()
-        return process.stdout
-    else:
+    if wait:
         stdout, stderr = process.communicate(encode_bytes(input_string))
         exit_code = process.wait()
         return (exit_code, crlf2lf(decode_bytes(stdout)), crlf2lf(decode_bytes(stderr)))
+    else:
+        process.stdin.write(encode_bytes(input_string))
+        process.stdin.close()
+        return process
 
 log_error = 1
 log_warning = 2
@@ -587,9 +591,17 @@ def output_panel(window, text = '', panel_name = 'sublime_haskell_output_panel',
     return output_view
 
 def hide_panel(window, panel_name = 'sublime_haskell_output_panel'):
+    if not window:
+        window = sublime.active_window()
+    if not window:
+        return
     window.run_command('hide_panel', { 'panel': ('output.' + panel_name) })
 
 def show_panel(window, panel_name = 'sublime_haskell_output_panel'):
+    if not window:
+        window = sublime.active_window()
+    if not window:
+        return
     window.run_command('show_panel', { 'panel': ('output.' + panel_name) })
 
 def output_error(window, text):

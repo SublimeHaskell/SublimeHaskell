@@ -17,7 +17,7 @@ if int(sublime.version()) < 3000:
 else:
     from SublimeHaskell.sublime_haskell_common import *
 
-ERROR_PANEL_NAME = 'haskell_error_checker'
+ERROR_PANEL_NAME = 'haskell_error_panel'
 
 # This regex matches an unindented line, followed by zero or more
 # indented, non-empty lines.
@@ -146,12 +146,24 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
     sublime.set_timeout(lambda: hide_output(view), 0)
 
     # run and wait commands, fail on first fail
+    stdout = ''
+    stderr = ''
+    output_log = output_panel(view.window(), '', panel_name = 'sublime_haskell_build_log', show_panel = get_setting_async('show_output_window'))
     for cmd in cmds:
-        exit_code, stdout, stderr = call_and_wait(
-            cmd,
-            cwd=cabal_project_dir)
+        output_text(output_log, ' '.join(cmd) + '...\n')
+
+        cmd_p = call_and_wait(cmd, cwd = cabal_project_dir, wait = False)
+        lines = []
+        for cmd_line in cmd_p.stdout:
+            line = crlf2lf(decode_bytes(cmd_line))
+            lines.append(line)
+            output_text(output_log, line)
+        exit_code = cmd_p.wait()
         if exit_code != 0:
+            stdout = '\n'.join(lines)
+            stderr = crlf2lf(decode_bytes(cmd_p.stderr.read()))
             break
+    hide_panel(view.window(), panel_name = 'sublime_haskell_build_log')
 
     errmsg = stderr if stderr else stdout
 
@@ -179,7 +191,7 @@ def show_output_result_text(view, msg, text, exit_code, base_dir):
     show_status_message_process(msg, success)
     # Show panel if there is any text to show (without the part that we add)
     if text:
-        if get_setting_async('show_output_window'):
+        if get_setting_async('show_error_window'):
             sublime.set_timeout(lambda: write_output(view, output, base_dir), 0)
 
 
@@ -339,11 +351,11 @@ def write_output(view, text, cabal_project_dir, show_panel = True):
     error_view.settings().set("result_base_dir", cabal_project_dir)
 
 
-def hide_output(view):
-    view.window().run_command('hide_panel', {'panel': 'output.' + ERROR_PANEL_NAME})
+def hide_output(view, panel_name = ERROR_PANEL_NAME):
+    view.window().run_command('hide_panel', {'panel': 'output.' + panel_name})
 
-def show_output(view):
-    view.window().run_command('show_panel', {'panel': 'output.' + ERROR_PANEL_NAME})
+def show_output(view, panel_name = ERROR_PANEL_NAME):
+    view.window().run_command('show_panel', {'panel': 'output.' + panel_name})
 
 def tabs_offset(view, point):
     """
