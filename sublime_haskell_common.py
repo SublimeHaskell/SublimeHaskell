@@ -75,6 +75,7 @@ def preload_settings():
     get_setting('lint_check_fly_idle')
     get_setting('ghc_opts')
     get_setting('log')
+    get_setting('haskell_build_tool')
 
 # SublimeHaskell settings dictionary
 # used to retrieve it async from any thread
@@ -301,7 +302,13 @@ def get_cabal_in_dir(cabal_dir):
 
 def is_stack_project(project_dir):
     """Search for stack.yaml in parent directories"""
-    return find_file_in_parent_dir(project_dir, "stack.yaml") is not None
+    buildpref = get_setting_async("haskell_build_tool",default="cabal")
+    if buildpref == "cabal" :
+      return False
+    elif buildpref == "stack":
+      return find_file_in_parent_dir(project_dir, "stack.yaml") is not None
+    else:
+      retun False
 
 def find_file_in_parent_dir(subdirectory, filename_pattern):
     """Look for a file with the specified name in a parent directory of the
