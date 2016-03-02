@@ -1167,7 +1167,10 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
             if scope:
                 ms = hsdev_client.scope_modules(scope, input = module_name, search_type = 'exact')
             else:
-                ms = hsdev_client.scope_modules(self.current_file_name, input = module_name, search_type = 'exact')
+                if self.current_file_name:
+                    ms = hsdev_client.scope_modules(self.current_file_name, input = module_name, search_type = 'exact')
+                else:
+                    ms = hsdev_client.list_modules(module = module_name, cabal = True)
 
             if len(ms) == 0:
                 show_status_message('Module {0} not found'.format(module_name))
@@ -1188,7 +1191,11 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
                 self.candidates.extend([(m, [m.name, m.location.to_string()]) for m in ms])
 
         else:
-            self.candidates.extend([(m, [m.name, m.location.to_string()]) for m in hsdev_client.scope_modules(self.current_file_name)])
+            if self.current_file_name:
+                ms = hsdev_client.scope_modules(self.current_file_name)
+            else:
+                ms = hsdev_client.list_modules(cabal = True)
+            self.candidates.extend([(m, [m.name, m.location.to_string()]) for m in ms])
 
         if m:
             decls = list(m.declarations.values())
@@ -1689,6 +1696,7 @@ class HsDevAgent(threading.Thread):
         self.cabal_to_load = LockedObject([])
         self.dirty_files = LockedObject([])
         self.dirty_paths = LockedObject([])
+        self.hsdev_process = hsdev.HsDevProcess(cache = HSDEV_CACHE_PATH, log_file = HSDEV_LOG, log_config = get_setting_async('hsdev_log_config'))
         self.hsdev = hsdev.HsDev()
         self.hsdev_back = hsdev.HsDev()
 
@@ -1717,30 +1725,30 @@ class HsDevAgent(threading.Thread):
                 "hsdev will be disabled, enable it by setting 'enable_hsdev' to true"]))
             hsdev.hsdev_enable(False)
         else:
-            def start_server_():
-                hsdev.HsDev.start_server(cache = HSDEV_CACHE_PATH, log_file = HSDEV_LOG, log_config = get_setting_async("hsdev_log_config"))
-            def reconnect_():
-                log('hsdev agent: reconnecting to hsdev', log_trace)
-                self.stop_hsdev()
-                start_server_()
+            def start_():
+                log('hsdev process started', log_trace)
+                self.hsdev.connect_async()
+                self.hsdev_back.connect_async()
+            def exit_():
+                log('hsdev process exited', log_trace)
+                self.hsdev.close()
+                self.hsdev_back.close()
+
             def connected_():
                 log('hsdev agent: connected to hsdev', log_trace)
-                # Link to server so that it will be stopped on connection close
                 self.hsdev.link()
-                # Connect back hsdev client
-                self.hsdev_back.connect_async()
             def back_connected_():
+                log('hsdev agent: connected to hsdev', log_trace)
                 self.start_inspect()
 
             self.hsdev.on_connected = connected_
             self.hsdev_back.on_connected = back_connected_
 
-            self.stop_hsdev()
-            if start_server:
-                start_server_()
-            self.hsdev.connect_async(autoconnect = True, on_reconnect = reconnect_)
-            if not self.hsdev.wait():
-                log('hsdev agent: unable to connect to hsdev server', log_error)
+            self.hsdev_process.on_start = start_
+            self.hsdev_process.on_exit = exit_
+
+            self.hsdev_process.start()
+            self.hsdev_process.create()
 
     def stop_hsdev(self):
         self.hsdev.close()
@@ -1750,12 +1758,12 @@ class HsDevAgent(threading.Thread):
         if key == 'enable_hsdev':
             if value:
                 log("starting hsdev", log_info)
-                self.start_hsdev()
-                # self.hsdev.remove_all()
-                self.start_inspect()
+                self.hsdev_process.create()
             else:
                 log("stopping hsdev", log_info)
-                self.stop_hsdev()
+                self.hsdev_process.stop()
+                self.hsdev.close()
+                self.hsdev_back.close()
 
     def on_inspect_modules_changed(self, key, value):
         if key == 'inspect_modules':

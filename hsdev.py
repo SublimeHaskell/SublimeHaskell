@@ -531,6 +531,29 @@ class HsDev(object):
     # Util
 
     @staticmethod
+    def run_server(port = 4567, cache = None, log_file = None, log_config = None):
+        cmd = concat_args([
+            (True, ["hsdev", "run"]),
+            (port, ["--port", str(port)]),
+            (cache, ["--cache", cache]),
+            (log_file, ["--log", log_file]),
+            (log_config, ["--log-config", log_config])])
+
+        log('Starting hsdev server', log_info)
+        p = call_and_wait(cmd, wait = False)
+        if not p:
+            log('Failed creating hsdev process', log_error)
+            return None
+        while True:
+            output = crlf2lf(decode_bytes(p.stdout.readline()))
+            m = re.match(r'^.*?hsdev> Server started at port (?P<port>\d+)$', output)
+            if m:
+                log('hsdev server started at port {0}'.format(m.group('port')))
+                p.stdout.close()
+                p.stderr.close()
+                return p
+
+    @staticmethod
     def start_server(port = 4567, cache = None, log_file = None, log_config = None):
         cmd = concat_args([
             (True, ["hsdev", "start"]),
@@ -1018,3 +1041,43 @@ def wait_result(fn, *args, **kwargs):
 
     wait_receive.wait(tm)
     return x['result']
+
+class HsDevProcess(threading.Thread):
+    def __init__(self, port = 4567, cache = None, log_file = None, log_config = None):
+        super(HsDevProcess, self).__init__()
+        self.process = None
+        self.on_start = None
+        self.on_exit = None
+        self.stop_event = threading.Event()
+        self.create_event = threading.Event()
+        self.port = port
+        self.cache = cache
+        self.log_file = log_file
+        self.log_config = log_config
+
+    def run(self):
+        while True:
+            self.create_event.wait()
+            self.create_event.clear()
+            while not self.stop_event.is_set():
+                self.process = HsDev.run_server(port = self.port, cache = self.cache, log_file = self.log_file, log_config = self.log_config)
+                if not self.process:
+                    log('failed to create hsdev process', log_error)
+                    self.stop_event.set()
+                else:
+                    call_callback(self.on_start, name = 'HsDevProcess.on_start')
+                self.process.wait()
+                call_callback(self.on_exit, name = 'HsDevProcess.on_exit')
+            self.stop_event.clear()
+
+    def active(self):
+        return self.process.poll() is None
+
+    def inactive(self):
+        return self.process.poll() is not None
+
+    def create(self):
+        self.create_event.set()
+
+    def stop(self):
+        self.stop_event.set()
