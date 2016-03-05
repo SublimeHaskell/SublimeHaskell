@@ -1820,8 +1820,8 @@ class HsDevAgent(threading.Thread):
             for c in load_cabal:
                 run_async('inspect cabal {0}'.format(c), self.inspect_cabal, c)
 
-            if load_cabal or scan_paths or projects or files:
-                update_completions_async(files)
+            if files_to_reinspect:
+                update_completions_async(files_to_reinspect)
             self.reinspect_event.wait(AGENT_SLEEP_TIMEOUT)
             self.reinspect_event.clear()
 
