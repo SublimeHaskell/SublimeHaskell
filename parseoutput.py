@@ -159,13 +159,11 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
             lines.append(line)
             output_text(output_log, line)
         exit_code = cmd_p.wait()
-        if exit_code != 0:
-            stdout = '\n'.join(lines)
-            stderr = crlf2lf(decode_bytes(cmd_p.stderr.read()))
-            break
+        stdout = '\n'.join(lines)
+        stderr = crlf2lf(decode_bytes(cmd_p.stderr.read()))
     hide_panel(view.window(), panel_name = 'sublime_haskell_build_log')
 
-    errmsg = stderr if stderr else stdout
+    errmsg = stderr
 
     # Notify UI thread that commands are done
     sublime.set_timeout(on_done, 0)

@@ -137,7 +137,7 @@ def encode_bytes(s):
     return s.encode('utf-8')
 
 def call_and_wait(command, wait = True, **popen_kwargs):
-    return call_and_wait_with_input(command, '', wait, **popen_kwargs)
+    return call_and_wait_with_input(command, '', wait = wait, **popen_kwargs)
 
 def call_no_wait(command, **popen_kwargs):
     """Run the specified command with no block"""
