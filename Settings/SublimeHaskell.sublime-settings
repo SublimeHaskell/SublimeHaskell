@@ -13,6 +13,10 @@
 	// Enable auto build on save
 	"enable_auto_build": false,
 
+	// Haskell build tool: "cabal" to use only cabal and "stack" to use stack whenever
+	// there's stack.yaml in project root
+	"haskell_build_tool": "stack",
+
 	// Enable auto run tests on save, has effect only if auto build enabled (enable_auto_build)
 	"auto_run_tests": true,
 

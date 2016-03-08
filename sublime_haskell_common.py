@@ -62,6 +62,7 @@ def preload_settings():
     # Now we can use get_setting_async for 'add_to_PATH' safely
     get_setting('add_to_PATH')
     get_setting('enable_auto_build')
+    get_setting('haskell_build_tool')
     get_setting('show_error_window')
     get_setting('show_output_window')
     get_setting('enable_ghc_mod')

@@ -182,8 +182,9 @@ def run_build(view, project_name, project_dir, config):
     # Set project as building
     projects_being_built.add(project_name)
 
-    is_stack = is_stack_project(project_dir)
-    build_tool_name = 'stack' if is_stack else 'cabal'
+    build_tool_name = get_setting_async('haskell_build_tool', 'stack')
+    if build_tool_name == 'stack' and not is_stack_project(project_dir): # rollback to cabal
+        build_tool_name = 'cabal'
 
     tool = build_tool[build_tool_name]
 
