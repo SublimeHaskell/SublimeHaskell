@@ -784,10 +784,11 @@ class HsDev(object):
         return cmd('ping', {}, lambda r: r and ('message' in r) and (r['message'] == 'pong'))
 
     @async_command
-    def scan(self, sandboxes = [], projects = [], files = [], paths = [], ghc = [], contents = {}, docs = False, infer = False):
+    def scan(self, cabal = False, sandboxes = [], projects = [], files = [], paths = [], ghc = [], contents = {}, docs = False, infer = False):
         return cmd('scan', {
             'projects': projects,
-            'sandboxes': list(map(lambda s: 'cabal' if s == 'cabal' else {'sandbox': s}, sandboxes)),
+            'cabal': cabal,
+            'sandboxes': sandboxes,
             'files': files,
             'paths': paths,
             'contents': [{'file': f, 'contents': cts} for f, cts in contents.items()],
@@ -810,10 +811,11 @@ class HsDev(object):
             'modules': modules })
 
     @async_list_command
-    def remove(self, sandboxes = [], projects = [], files = [], packages = []):
+    def remove(self, cabal = False, sandboxes = [], projects = [], files = [], packages = []):
         return cmd('remove', {
             'projects': projects,
-            'sandboxes': list(map(lambda s: 'cabal' if s == 'cabal' else {'sandbox': s}, sandboxes)),
+            'cabal': cabal,
+            'sandboxes': sandboxes,
             'files': files,
             'packages': packages })
 

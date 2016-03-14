@@ -1706,8 +1706,8 @@ class HsDevAgent(threading.Thread):
         return self.hsdev.is_connected()
 
     def start_hsdev(self, start_server = True):
-        min_ver = [0,1,6,0]
-        max_ver = [0,1,7,0]
+        min_ver = [0,1,7,0]
+        max_ver = [0,1,8,0]
 
         hsdev_ver = hsdev.hsdev_version()
         if hsdev_ver is None:
@@ -1860,7 +1860,7 @@ class HsDevAgent(threading.Thread):
     def inspect_cabal(self, cabal = None):
         try:
             with status_message_process('Inspecting {0}'.format(cabal or 'cabal'), priority = 1) as s:
-                self.hsdev_back.scan(sandboxes = [cabal or 'cabal'], on_notify = hsdev_status(s), wait = True, docs = hdocs.hdocs_enabled())
+                self.hsdev_back.scan(cabal = (cabal == 'cabal'), sandboxes = [] if cabal == 'cabal' else [cabal], on_notify = hsdev_status(s), wait = True, docs = hdocs.hdocs_enabled())
         except Exception as e:
             log('loading standard modules info for {0} failed with {1}'.format(cabal or 'cabal', e), log_error)
 
