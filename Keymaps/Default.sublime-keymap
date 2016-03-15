@@ -58,7 +58,7 @@
     {
         "keys": ["ctrl+alt+e"],
         "command": "show_panel",
-        "args": { "panel": "output.haskell_error_checker" }
+        "args": { "panel": "output.haskell_error_panel" }
     },
     {
         "keys": ["ctrl+alt+o"],
