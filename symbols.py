@@ -80,33 +80,65 @@ def parse_package(package_id):
         return Package(name)
     return None
 
-class InstalledLocation(object):
-    """
-    Module location in cabal
-    """
-    def __init__(self, package, cabal = None):
-        if not cabal:
-            cabal = 'cabal'
-        self.package = package
-        self.cabal = cabal
+class PackageDb(object):
+    def __init__(self, global_db = False, user_db = False, package_db = None):
+        self.global_db = False
+        self.user_db = False
+        self.package_db = None
+        if global_db:
+            self.global_db = True
+            return
+        if user_db:
+            self.user_db = True
+            return
+        if package_db:
+            self.package_db = package_db
+            return
 
     def __str__(self):
         return self.to_string()
 
     def to_string(self):
-        return '{0} in {1}'.format(self.package.package_id(), self.cabal)
+        if self.global_db:
+            return 'global-db'
+        if self.user_db:
+            return 'user-db'
+        if self.package_db:
+            return self.package_db
+
+    @staticmethod
+    def from_string(s):
+        if s == 'global-db':
+            return PackageDb(global_db = True)
+        if s == 'user-db':
+            return PackageDb(user_db = True)
+        return PackageDb(package_db = s)
+
+class InstalledLocation(object):
+    """
+    Module location in cabal
+    """
+    def __init__(self, package, db = PackageDb(global_db = True)):
+        self.package = package
+        self.db = db
+
+    def __str__(self):
+        return self.to_string()
+
+    def to_string(self):
+        return '{0} in {1}'.format(self.package.package_id(), self.db.to_string())
 
     def is_null(self):
         return self.package is None
 
     def get_id(self):
-        return '{0}:{1}'.format(self.cabal, self.package.package_id())
+        return '{0}:{1}'.format(self.db.to_string(), self.package.package_id())
 
     def is_cabal(self):
-        return self.cabal == 'cabal'
+        return not self.db.package_db
 
     def sandbox(self):
-        return None if self.is_cabal() else self.cabal
+        return self.db.package_db
 
 class OtherLocation(object):
     """
@@ -173,7 +205,7 @@ class Module(Symbol):
     """
     Haskell module symbol
     """
-    def __init__(self, module_name, exports = None, imports = [], declarations = {}, location = None, cabal = None, last_inspection_time = 0):
+    def __init__(self, module_name, exports = None, imports = [], declarations = {}, location = None, last_inspection_time = 0):
         super(Module, self).__init__('module', module_name)
         self.location = location
         # List of strings
@@ -190,9 +222,6 @@ class Module(Symbol):
 
         for decl in self.declarations.values():
             decl.module = self
-
-        # Cabal path or 'cabal'
-        self.cabal = cabal
 
         # Time as from time.time()
         self.last_inspection_time = last_inspection_time
@@ -302,7 +331,7 @@ class Declaration(Symbol):
             if self.defined_module().location.project:
                 info.append('Project: {0}'.format(self.defined_module().location.project))
         elif self.by_cabal():
-            info.append('Installed in: {0}'.format(self.defined_module().location.cabal))
+            info.append('Installed in: {0}'.format(self.defined_module().location.db.to_string()))
             info.append('Package: {0}'.format(self.defined_module().location.package.package_id()))
 
         if self.has_source_location():

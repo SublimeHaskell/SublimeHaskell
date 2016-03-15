@@ -160,12 +160,15 @@ def get_value(dc, ks, defval = None):
     else:
         return dc.get(ks, defval)
 
-# 'cabal' or {'sandbox':path}
-def parse_sandbox(d, defval = None):
+# 'global-db', 'user-db' or {'package-db':path}
+def parse_package_db(d, defval = None):
     if type(d) == dict:
-        return get_value(d, 'sandbox', defval)
-    if d == 'cabal':
-        return 'cabal'
+        pdb = get_value(d, 'package-db')
+        return symbols.PackageDb(package_db = pdb) if pdb else defval
+    if d == 'global-db':
+        return symbols.PackageDb(global_db = True)
+    if d == 'user-db':
+        return symbols.PackageDb(user_db = True)
     return defval
 
 def parse_position(d):
@@ -185,7 +188,7 @@ def parse_location(d):
         return loc
     loc = symbols.InstalledLocation(
         symbols.parse_package(get_value(d, 'package')),
-        parse_sandbox(get_value(d, 'cabal')))
+        parse_package_db(get_value(d, 'db')))
     if not loc.is_null():
         return loc
     loc = symbols.OtherLocation(
@@ -193,13 +196,6 @@ def parse_location(d):
     if not loc.is_null():
         return loc
     return None
-
-def parse_cabal(d):
-    c = get_value(d, 'cabal')
-    if c == '<cabal>':
-        return 'cabal'
-    else:
-        return c
 
 def parse_import(d):
     if not d:
@@ -212,8 +208,7 @@ def parse_module_id(d):
     return symbols.Module(
         d['name'],
         [], [], {},
-        parse_location(d.get('location')),
-        parse_cabal(d.get('location')))
+        parse_location(d.get('location')))
 
 def parse_declaration(decl):
     try:
@@ -275,8 +270,7 @@ def parse_module(d):
         d.get('exports'),
         [parse_import(i) for i in d['imports']] if 'imports' in d else [],
         dict((decl['name'],parse_declaration(decl)) for decl in d['declarations']) if 'declarations' in d else {},
-        parse_location(d.get('location')),
-        parse_cabal(d.get('location')))
+        parse_location(d.get('location')))
 
 def parse_modules(ds):
     if ds is None:
@@ -340,6 +334,15 @@ def encode_position(p):
     return {
         'line': p.line,
         'column': p.column }
+
+def encode_package_db(db):
+    if db.user_db:
+        return 'user-db'
+    if db.global_db:
+        return 'global-db'
+    if db.package_db:
+        return {'package-db': db.package_db}
+    return None
 
 def reconnect_function(fn):
     def wrapped(self, *args, **kwargs):
@@ -820,7 +823,7 @@ class HsDev(object):
             'packages': packages })
 
     @list_command
-    def list_modules(self, project = None, file = None, module = None, deps = None, sandbox = None, cabal = False, package = None, source = False, standalone = False):
+    def list_modules(self, project = None, file = None, module = None, deps = None, sandbox = None, cabal = False, db = None, package = None, source = False, standalone = False):
         fs = []
         if project:
             fs.append({'project': project})
@@ -834,6 +837,8 @@ class HsDev(object):
             fs.append({'cabal':{'sandbox': sandbox}})
         if cabal:
             fs.append({'cabal':'cabal'})
+        if db:
+            fs.append({'db': encode_package_db(db)})
         if package:
             fs.append({'package': package})
         if source:
@@ -852,7 +857,7 @@ class HsDev(object):
         return cmd('projects', {})
 
     @list_command
-    def symbol(self, input = "", search_type = 'prefix', project = None, file = None, module = None, deps = None, sandbox = None, cabal = False, package = None, source = False, standalone = False, locals = False):
+    def symbol(self, input = "", search_type = 'prefix', project = None, file = None, module = None, deps = None, sandbox = None, cabal = False, db = None, package = None, source = False, standalone = False, locals = False):
         # search_type is one of: exact, prefix, infix, suffix, regex
         q = {'input': input, 'type': search_type}
 
@@ -869,6 +874,8 @@ class HsDev(object):
             fs.append({'cabal':{'sandbox': sandbox}})
         if cabal:
             fs.append({'cabal':'cabal'})
+        if db:
+            fs.append({'db': encode_package_db(db)})
         if package:
             fs.append({'package': package})
         if source:
@@ -879,7 +886,7 @@ class HsDev(object):
         return cmd('symbol', {'query': q, 'filters': fs, 'locals': locals}, parse_decls)
 
     @command
-    def module(self, input = "", search_type = 'prefix', project = None, file = None, module = None, deps = None, sandbox = None, cabal = False, package = None, source = False, standalone = False):
+    def module(self, input = "", search_type = 'prefix', project = None, file = None, module = None, deps = None, sandbox = None, cabal = False, db = None, package = None, source = False, standalone = False):
         q = {'input': input, 'type': search_type}
 
         fs = []
@@ -895,6 +902,8 @@ class HsDev(object):
             fs.append({'cabal':{'sandbox': sandbox}})
         if cabal:
             fs.append({'cabal':'cabal'})
+        if db:
+            fs.append({'db': encode_package_db(db)})
         if package:
             fs.append({'package': package})
         if source:

@@ -418,8 +418,7 @@ class AutoCompletion(object):
             input = module,
             search_type = 'exact',
             file = ms[0].location.file if ms and ms[0].by_source() else None,
-            sandbox = ms[0].location.sandbox() if ms and ms[0].by_cabal() else None,
-            cabal = ms[0].location.is_cabal() if ms and ms[0].by_cabal() else None,
+            db = ms[0].location.db if ms and ms[0].by_cabal() else None,
             package = ms[0].location.package.name if ms and ms[0].by_cabal() else None))
         if not m:
             return []
@@ -797,7 +796,7 @@ class SublimeHaskellGoToHackageModule(SublimeHaskellTextCommand):
                     ms = [m for m in hsdev_client.scope_modules(
                         scope, input = qsymbol.module, search_type = 'exact') if m.by_cabal()]
                 else:
-                    ms = [m for m in hsdev_client.list_modules(cabal = True) if m.name == qsymbol.module and m.by_cabal()]
+                    ms = [m for m in hsdev_client.list_modules(db = m.location.db) if m.name == qsymbol.module and m.by_cabal()]
             else: # symbol
                 scope = self.view.file_name()
                 if scope:
@@ -912,7 +911,7 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
     Show information about selected symbol
 
     """
-    def run(self, edit, filename = None, module_name = None, package_name = None, cabal = None, name = None, qname = None):
+    def run(self, edit, filename = None, module_name = None, package_name = None, db = None, name = None, qname = None):
         if qname:
             self.full_name = qname
             self.current_file_name = self.view.file_name()
@@ -921,13 +920,12 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
             if not self.candidates:
                 if filename:
                     self.candidates = hsdev_client.symbol(name, search_type = 'exact', file = filename)
-                elif module_name and package_name and cabal:
+                elif module_name and package_name and db:
                     self.candidates = hsdev_client.symbol(
                         name,
                         search_type = 'exact',
                         module = module_name,
-                        cabal = cabal == 'cabal',
-                        sandbox = None if cabal == 'cabal' else cabal,
+                        db = symbols.PackageDb.from_string(db) if db else None,
                         package = package_name)
         else:
             self.current_file_name = self.view.file_name()
@@ -1009,7 +1007,7 @@ def show_declaration_info(view, decl):
         info['filename'] = decl.defined_module().location.filename
     if decl.by_cabal() and decl.defined_module().location.package.name:
         info['package_name'] = decl.defined_module().location.package.name
-        info['cabal'] = decl.defined_module().location.cabal
+        info['db'] = decl.defined_module().location.db.to_string()
 
     sublime.set_timeout(lambda: view.run_command('sublime_haskell_symbol_info', info), 0)
 
@@ -1150,7 +1148,7 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
     """
     Browse module symbols
     """
-    def run(self, module_name = None, package_name = None, filename = None, cabal = None, scope = None):
+    def run(self, module_name = None, package_name = None, filename = None, db = None, scope = None):
         self.candidates = []
         self.current_file_name = self.window.active_view().file_name()
 
@@ -1170,7 +1168,7 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
                 if self.current_file_name:
                     ms = hsdev_client.scope_modules(self.current_file_name, input = module_name, search_type = 'exact')
                 else:
-                    ms = hsdev_client.list_modules(module = module_name, cabal = True)
+                    ms = hsdev_client.list_modules(module = module_name, db = symbols.PackageDb.from_string(db) if db else None)
 
             if len(ms) == 0:
                 show_status_message('Module {0} not found'.format(module_name))
@@ -1182,8 +1180,7 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
                     m = head_of(hsdev_client.module(
                         module_name,
                         search_type = 'exact',
-                        cabal = ms[0].location.is_cabal(),
-                        sandbox = ms[0].location.sandbox(),
+                        db = ms[0].location.db,
                         package = ms[0].location.package.name))
                 else:
                     m = head_of(hsdev_client.module(module_name, search_type = 'exact'))
@@ -1194,7 +1191,7 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
             if self.current_file_name:
                 ms = hsdev_client.scope_modules(self.current_file_name)
             else:
-                ms = hsdev_client.list_modules(cabal = True)
+                ms = hsdev_client.list_modules(db = symbols.PackageDb.from_string(db) if db else None)
             self.candidates.extend([(m, [m.name, m.location.to_string()]) for m in ms])
 
         if m:
@@ -1219,7 +1216,7 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
             info['filename'] = m.location.filename
         if m.by_cabal() and m.location.package.name:
             info['package_name'] = m.location.package.name
-            info['cabal'] = m.location.cabal
+            info['db'] = m.location.db.to_string()
 
         sublime.set_timeout(lambda: self.window.run_command('sublime_haskell_browse_module', info), 0)
 
@@ -1269,7 +1266,7 @@ class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
 
             candidates = hsdev_client.symbol(input = qsymbol.name, search_type = 'exact', source = True)
         else:
-            module_candidates = [m for m in hsdev_client.list_modules(source = True) if m.name == full_name]
+            module_candidates = [m for m in hsdev_client.list_modules(source = True, module = full_name) if m.name == full_name]
 
         if not candidates and not module_candidates:
             show_status_message('Declaration {0} not found'.format(qsymbol.name), False)
