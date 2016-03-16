@@ -261,35 +261,52 @@ message_levels = {
 # These next and previous commands were shamelessly copied
 # from the great SublimeClang plugin.
 
-def goto_error(view, filename, line):
+def goto_error(view, filename, line, column):
     global error_view
     if error_view:
         show_output(view)
-        error_region = error_view.find('{0}: line {1}, column \\d+:(\\n\\s+.*)*'.format(re.escape(filename), line), 0)
+        # error_region = error_view.find('{0}: line {1}, column \\d+:(\\n\\s+.*)*'.format(re.escape(filename), line), 0)
+        error_region = error_view.find('{0}: line {1}, column {2}:(\\n\\s+.*)*'.format(re.escape(filename), line, column), 0)
         error_view.add_regions("current_error", [error_region], 'string', 'dot', sublime.HIDDEN)
         error_view.show(error_region.a)
-    view.window().open_file("%s:%d" % (filename, line), sublime.ENCODED_POSITION)
+    view.window().open_file("{0}:{1}:{2}".format(filename, line, column), sublime.ENCODED_POSITION)
+
+def get_next_value(v, lst, cycle = True):
+    # Get next value from list
+    if v is None:
+        if len(lst) > 0:
+            return lst[0]
+        return None
+    for x in filter(lambda k: k > v, lst):
+        return x
+    if cycle and len(lst) > 0:
+        return lst[0]
+    return None
 
 class SublimeHaskellNextError(SublimeHaskellTextCommand):
     def run(self, edit):
         v = self.view
         fn = v.file_name()
         line, column = v.rowcol(v.sel()[0].a)
-        line += 1
-        gotoline = -1
+        # line += 1
+        gotoline = None
+        gotocolumn = None
         if fn in ERRORS:
-            for errLine in sorted(ERRORS[fn].keys()):
-                if errLine > line:
-                    gotoline = errLine
-                    break
-            # No next line: Wrap around if possible
-            if gotoline == -1 and len(ERRORS[fn]) > 0:
-                gotoline = sorted(ERRORS[fn].keys())[0]
-        if gotoline != -1:
-            goto_error(v, fn, gotoline)
-        else:
-            sublime.status_message("No more errors or warnings!")
-
+            if line in ERRORS[fn]: # on some line, check if there are another error on same linee
+                gotoline = line
+                gotocolumn = get_next_value(column, sorted([e.start.column for e in ERRORS[fn][gotoline]]), cycle = False)
+                if gotocolumn is not None: # next error on same line
+                    goto_error(v, fn, gotoline + 1, gotocolumn + 1)
+                    return
+            # no error on this line, find next (and cycle through)
+            gotoline = get_next_value(line, sorted(ERRORS[fn].keys()))
+            if gotoline is not None:
+                # go to first error on line
+                gotocolumn = get_next_value(None, sorted([e.start.column for e in ERRORS[fn][gotoline]]), cycle = False)
+                if gotocolumn is not None: # found some
+                    goto_error(v, fn, gotoline + 1, gotocolumn + 1)
+                    return
+            show_status_message('No more errors or warnings!', priority = 5)
 
 class SublimeHaskellPreviousError(SublimeHaskellTextCommand):
     def run(self, edit):
