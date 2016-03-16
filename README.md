@@ -83,9 +83,8 @@ Commands:
 ![BrowseModule](Commands/BrowseModule.gif)
 * `SublimeHaskell: Browse declarations` — get declarations in scope of current file
 * `SublimeHaskell: Show symbol info` — get help for symbol, `ctrl+k ctrl+i`
-![SymbolInfo](Commands/SymbolInfo.gif)
 * `SublimeHaskell: Toggle symbol info panel` — toggle continuout symbol info panel, which show info about symbol under cursor. Useful when reading code.
-![ToggleSymbolInfo](Commands/ToggleSymbolInfo.gif)
+![SymbolInfo](Commands/SymbolInfo.gif)
 * `SublimeHaskell: Go to module` — go to module, `ctrl+k ctrl+p`
 ![GoToModule](Commands/GoToModule.gif)
 * `SublimeHaskell: Go to declaration` — overrides default, `f12`
