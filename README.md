@@ -1,6 +1,8 @@
 README
 ======
 
+[![Join the chat at https://gitter.im/SublimeHaskell/SublimeHaskell](https://badges.gitter.im/SublimeHaskell/SublimeHaskell.svg)](https://gitter.im/SublimeHaskell/SublimeHaskell?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 [![Join the chat at https://gitter.im/SublimeHaskell/SublimeHaskell](https://badges.gitter.im/SublimeHaskell/SublimeHaskell.svg)](https://gitter.im/SublimeHaskell/SublimeHaskell?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) [![PayPal][paypal-donate-image]][paypal-donate-link]
 
 [paypal-donate-image]: https://www.paypalobjects.com/en_US/i/btn/btn_donate_SM.gif
