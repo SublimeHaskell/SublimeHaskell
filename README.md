@@ -69,7 +69,10 @@ In order to support stack projects correctly, `hsdev` and `stack` executables mu
 `hsdev` first searchs for `stack` near itself, so you can just place it in same path.
 
 
-Enhanced completion:
+Enhanced completion
+---
+
+Works in export list (showing symbols in scope), import list, expressions. Completes after module qualifier (several modules can be `import qualified as` with same qualifier). Takes into account module reexports for sources.
 ![Autocompletion](Commands/Autocompletion.gif)
 
 Commands:
