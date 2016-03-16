@@ -36,8 +36,6 @@ class Location(object):
     Location in file at line
     """
     def __init__(self, filename, project = None):
-        if not project and filename:
-            project = get_cabal_project_dir_of_file(filename)
         self.project = project
         self.filename = filename
 

@@ -751,13 +751,7 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
 
 class SublimeHaskellGoToModule(SublimeHaskellWindowCommand):
     def run(self):
-        self.view = self.window.active_view()
-        self.current_filename = self.view.file_name()
-        cur_module = head_of(hsdev_client.module(file = self.current_filename))
-        if cur_module and cur_module.by_source():
-            self.project = cur_module.location.project
-
-        self.modules = hsdev_client.list_modules(source = True, project = self.project, standalone = self.project is None)
+        self.modules = hsdev_client.list_modules(source = True)
         self.window.show_quick_panel([[m.name, m.location.to_string()] for m in self.modules], self.on_done, 0, 0, self.on_highlighted)
 
     def on_done(self, idx):
@@ -769,7 +763,7 @@ class SublimeHaskellGoToModule(SublimeHaskellWindowCommand):
         if idx == -1:
             return
 
-        # self.window.open_file(self.modules[idx].location.to_string(), sublime.TRANSIENT)
+        self.window.open_file(self.modules[idx].location.to_string(), sublime.TRANSIENT)
 
 
 class SublimeHaskellGoToHackagePackage(SublimeHaskellTextCommand):
