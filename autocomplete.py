@@ -752,7 +752,7 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
 class SublimeHaskellGoToModule(SublimeHaskellWindowCommand):
     def run(self):
         self.modules = hsdev_client.list_modules(source = True)
-        self.window.show_quick_panel([[m.name, m.location.to_string()] for m in self.modules], self.on_done, 0, 0, self.on_highlighted)
+        self.window.show_quick_panel([[m.name if m.name != 'Main' else 'Main in {0}'.format(m.location.to_string()), m.location.to_string()] for m in self.modules], self.on_done, 0, 0, self.on_highlighted)
 
     def on_done(self, idx):
         if idx == -1:
