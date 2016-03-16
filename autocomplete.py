@@ -1697,9 +1697,12 @@ def use_inspect_modules(fn):
 def hsdev_agent_connected():
     return hsdev_inspector.agent_connected()
 
-def update_completions_async(files):
-    for f in files:
-        run_async('drop completions', autocompletion.drop_completions_async, f)
+def update_completions_async(files = [], drop_all = False):
+    if drop_all:
+        run_async('drop all completions', autocompletion.drop_completions_async)
+    else:
+        for f in files:
+            run_async('drop completions', autocompletion.drop_completions_async, f)
     run_async('init completions', autocompletion.init_completions_async)
 
 class HsDevAgent(threading.Thread):
@@ -1834,7 +1837,7 @@ class HsDevAgent(threading.Thread):
                 run_async('inspect cabal {0}'.format(c), self.inspect_cabal, c)
 
             if files_to_reinspect:
-                update_completions_async(files_to_reinspect)
+                update_completions_async(drop_all = True)
             self.reinspect_event.wait(AGENT_SLEEP_TIMEOUT)
             self.reinspect_event.clear()
 
