@@ -31,6 +31,7 @@
     { "keys": ["ctrl+t", "s"], "context": [ { "key" : "haskell_source" } ], "command": "sublime_haskell_show_type" },
     { "keys": ["ctrl+t", "i"], "context": [ { "key" : "haskell_source" } ], "command": "sublime_haskell_insert_type" },
     { "keys": ["ctrl+k", "ctrl+i"], "context": [ { "key" : "haskell_source_or_repl" } ], "command": "sublime_haskell_symbol_info" },
+    { "keys": ["ctrl+shift+k", "ctrl+shift+i"], "context": [ { "key" : "haskell_source" } ], "command": "sublime_haskell_toggle_symbol_info" },
     { "keys": ["ctrl+k", "ctrl+p"], "context": [ { "key" : "haskell_source" } ], "command": "sublime_haskell_go_to_module" },
     {
         "command": "sublime_haskell_complete",

@@ -38,6 +38,10 @@
         "command": "sublime_haskell_symbol_info"
     },
     {
+        "caption": "SublimeHaskell: Toggle symbol info panel",
+        "command": "sublime_haskell_toggle_symbol_info"
+    },
+    {
         "caption": "SublimeHaskell: Browse module",
         "command": "sublime_haskell_browse_module"
     },

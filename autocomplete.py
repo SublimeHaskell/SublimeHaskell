@@ -911,7 +911,7 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
     Show information about selected symbol
 
     """
-    def run(self, edit, filename = None, module_name = None, package_name = None, db = None, name = None, qname = None):
+    def run(self, edit, filename = None, module_name = None, package_name = None, db = None, name = None, qname = None, no_browse = False):
         if qname:
             self.full_name = qname
             self.current_file_name = self.view.file_name()
@@ -935,9 +935,10 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
             ident = qsymbol.name
 
             if ident is None: # module
-                self.view.window().run_command('sublime_haskell_browse_module', {
-                    'module_name': module_word,
-                    'scope': self.current_file_name })
+                if not no_browse:
+                    self.view.window().run_command('sublime_haskell_browse_module', {
+                        'module_name': module_word,
+                        'scope': self.current_file_name })
                 return
 
             if not module_word and not ident:
@@ -963,7 +964,8 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
             self.show_symbol_info(self.candidates[0])
             return
 
-        self.view.window().show_quick_panel([[c.qualified_name(), c.defined_module().location.to_string()] for c in self.candidates], self.on_done)
+        if not no_browse:
+            self.view.window().show_quick_panel([[c.qualified_name(), c.defined_module().location.to_string()] for c in self.candidates], self.on_done)
 
     def on_done(self, idx):
         if idx == -1:
@@ -1024,6 +1026,20 @@ def show_declaration_info_panel(view, decl):
     if decl.by_cabal():
         v.settings().set('package', decl.defined_module().location.package.package_id())
         v.settings().set('module', decl.defined_module().name)
+
+toggle_symbol_info = False
+
+class SublimeHaskellToggleSymbolInfoCommand(SublimeHaskellWindowCommand):
+    def run(self):
+        global toggle_symbol_info
+        toggle_symbol_info = not toggle_symbol_info
+        show_status_message('continuous symbol info: {0}'.format('on' if toggle_symbol_info else 'off'))
+
+class SublimeHaskellContinuousSymbolInfo(sublime_plugin.EventListener):
+    def on_selection_modified(self, view):
+        if toggle_symbol_info:
+            if is_haskell_source(view) and view.file_name():
+                view.run_command('sublime_haskell_symbol_info', { 'no_browse': True })
 
 class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
     """
