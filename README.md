@@ -63,7 +63,7 @@ To show hidden error output, use command `Show error panel` (`ctrl-alt-e`)
 Stack support
 ---
 
-Build commands such as `Build`, `Clean`, `Install`, `Rebuild` uses `stack` if there are `stack.yaml` near `.cabal`. If you don't want to use `stack`, set `haskell_build_tool` setting to `cabal`.
+Build commands such as `Build`, `Clean`, `Install`, `Rebuild` uses `stack` if there is `stack.yaml` near `.cabal`. If you don't want to use `stack`, set `haskell_build_tool` setting to `cabal`.
 
 In order to support stack projects correctly, `hsdev` and `stack` executables must be build with same compiler, then `hsdev` will be able to `stack build --only-dependencies` and `stack build --only-configure` stack projects in order to get corresponding package-db.
 `hsdev` first searchs for `stack` near itself, so you can just place it in same path.
