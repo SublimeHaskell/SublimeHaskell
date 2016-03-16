@@ -56,7 +56,7 @@ You can jump between the errors and warnings with `alt+d alt+e` and `alt+shift+d
 To show hidden error output, use command `Show error panel` (`ctrl-alt-e`)
 
 Enhanced completion:
-![AutoCompletion](Commands/AutoCompletion.gif)
+![Autocompletion](Commands/Autocompletion.gif)
 
 Commands:
 ---
