@@ -55,32 +55,35 @@ To insert inferred type use `Insert type` (`ctrl-k ctrl-h ctrl-i`).
 You can jump between the errors and warnings with `alt+d alt+e` and `alt+shift+d alt+shift+e`.
 To show hidden error output, use command `Show error panel` (`ctrl-alt-e`)
 
+Enhanced completion:
+![AutoCompletion](Commands/AutoCompletion.gif)
+
 Commands:
 ---
 
-![InsertImport](Commands/InsertImport.gif)
 * `SublimeHaskell: Insert import for symbol` — add import for declaration
+![InsertImport](Commands/InsertImport.gif)
 * `SublimeHaskell: Find declarations` — find declarations in installed packages and in projects
 * `SublimeHaskell: Search declarations everywhere` — search declarations in hayoo too
-![BrowseModule](Commands/BrowseModule.gif)
 * `SublimeHaskell: Browse module` — get declarations for module
+![BrowseModule](Commands/BrowseModule.gif)
 * `SublimeHaskell: Browse declarations` — get declarations in scope of current file
-![SymbolInfo](Commands/SymbolInfo.gif)
 * `SublimeHaskell: Show symbol info` — get help for symbol, `ctrl+k ctrl+i`
-![ToggleSymbolInfo](Commands/ToggleSymbolInfo.gif)
+![SymbolInfo](Commands/SymbolInfo.gif)
 * `SublimeHaskell: Toggle symbol info panel` — toggle continuout symbol info panel, which show info about symbol under cursor. Useful when reading code.
-![GoToModule](Commands/GoToModule.gif)
+![ToggleSymbolInfo](Commands/ToggleSymbolInfo.gif)
 * `SublimeHaskell: Go to module` — go to module, `ctrl+k ctrl+p`
+![GoToModule](Commands/GoToModule.gif)
 * `SublimeHaskell: Go to declaration` — overrides default, `f12`
 * `Ctrl+R`, `Ctrl+Shift+R` — overrides default, goto symbol and goto symbol in project
 * `SublimeHaskell: Show type` — show type/types for current expression, `ctrl-k ctrl-h ctrl-t`
 * `SublimeHaskell: Expand selection to Expression` — expand selection to expression, `ctrl+shift+y`
-![Types](Commands/Types.gif)
 * `SublimeHaskell: Show/hide all types` — get all types and highlight while selection modifies, `ctrl+t, h`
+![Types](Commands/Types.gif)
 * `SublimeHaskell: Insert type` — insert type for selected expression, `ctrl-k ctrl-h ctrl-i`
 * `SublimeHaskell: Hayoo` — search in hayoo
-![AutoFix](Commands/AutoFix.gif)
 * `SublimeHaskell: Auto fix` — auto fix some of warnings and/or errors (for now redundant imports and hlint hints)
+![AutoFix](Commands/AutoFix.gif)
 * `SublimeHaskell: Stylish` — stylish source with `stylish-haskell`
 * `SublimeHaskell: Scan docs and infer types` — as long as scanning docs for sources and inferring types is long process, it's disabled by default, but this command can be used to scan docs and infer types for currently opened view
 * `SublimeHaskell: Check & Lint` — check/lint/check & lint opened file. Enable option `check_lint_fly` to [check & lint](Commands/FlyCheck.gif) on idle, rescanning actual source, so that [completions are updated](Commands/ScanContents.gif)
