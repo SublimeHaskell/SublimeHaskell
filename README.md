@@ -60,6 +60,15 @@ To insert inferred type use `Insert type` (`ctrl-k ctrl-h ctrl-i`).
 You can jump between the errors and warnings with `alt+d alt+e` and `alt+shift+d alt+shift+e`.
 To show hidden error output, use command `Show error panel` (`ctrl-alt-e`)
 
+Stack support
+---
+
+Build commands such as `Build`, `Clean`, `Install`, `Rebuild` uses `stack` if there are `stack.yaml` near `.cabal`. If you don't want to use `stack`, set `haskell_build_tool` setting to `cabal`.
+
+In order to support stack projects correctly, `hsdev` and `stack` executables must be build with same compiler, then `hsdev` will be able to `stack build --only-dependencies` and `stack build --only-configure` stack projects in order to get corresponding package-db.
+`hsdev` first searchs for `stack` near itself, so you can just place it in same path.
+
+
 Enhanced completion:
 ![Autocompletion](Commands/Autocompletion.gif)
 
