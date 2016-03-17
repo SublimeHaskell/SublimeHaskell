@@ -307,7 +307,7 @@ class Declaration(Symbol):
         """ Returns suggestion for this declaration """
         return ('{0}\t{1}'.format(self.name, self.imported_from_name()), self.name)
 
-    def brief(self):
+    def brief(self, short = False):
         return self.name
 
     def qualified_name(self):
@@ -355,7 +355,9 @@ class Function(Declaration):
     def suggest(self):
         return (u'{0} :: {1}\t{2}'.format(wrap_operator(self.name), self.type, self.imported_from_name()), self.name)
 
-    def brief(self):
+    def brief(self, short = False):
+        if short:
+            return u'{0}'.format(wrap_operator(self.name))
         return u'{0} :: {1}'.format(wrap_operator(self.name), self.type if self.type else u'?')
 
 class TypeBase(Declaration):
@@ -371,7 +373,13 @@ class TypeBase(Declaration):
     def suggest(self):
         return (u'{0} {1}\t{2}'.format(self.name, ' '.join(self.args), self.imported_from_name()), self.name)
 
-    def brief(self):
+    def brief(self, short = False):
+        if short:
+            brief_parts = [self.what, self.name]
+            if self.args:
+                brief_parts.extend(self.args)
+            return u' '.join(brief_parts)
+
         if self.definition:
             return self.definition
 
