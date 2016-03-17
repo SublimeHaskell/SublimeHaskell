@@ -387,7 +387,7 @@ class AutoCompletion(object):
                         # Search for declarations of qsymbol.module within current project
                         q_module = head_of(hsdev_client.scope_modules(file = current_file_name, input = qsymbol.module, search_type = 'exact'))
                         if q_module.by_source():
-                            proj_module = hsdev_client.resolve(file = q_module.location.file, exports = True)
+                            proj_module = hsdev_client.resolve(file = q_module.location.filename, exports = True)
                             if proj_module:
                                 suggestions = proj_module.declarations.values()
                         elif q_module.by_cabal():
@@ -417,7 +417,7 @@ class AutoCompletion(object):
         m = head_of(hsdev_client.module(
             input = module,
             search_type = 'exact',
-            file = ms[0].location.file if ms and ms[0].by_source() else None,
+            file = ms[0].location.filename if ms and ms[0].by_source() else None,
             db = ms[0].location.db if ms and ms[0].by_cabal() else None,
             package = ms[0].location.package.name if ms and ms[0].by_cabal() else None))
         if not m:
@@ -1191,7 +1191,7 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
                 return
             if len(ms) == 1:
                 if ms[0].by_source():
-                    m = head_of(hsdev_client.module(module_name, search_type = 'exact', file = ms[0].location.file))
+                    m = head_of(hsdev_client.module(module_name, search_type = 'exact', file = ms[0].location.filename))
                 elif ms[0].by_cabal():
                     m = head_of(hsdev_client.module(
                         module_name,
