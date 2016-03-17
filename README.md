@@ -14,10 +14,12 @@ Requirements
 ------------
 
 Necessary:
+
 * ghc and a recent Haskell Platform (>= 2012 should do fine)
 * cabal
 
 Not necessary, but useful
+
 * [hsdev](http://hackage.haskell.org/package/hsdev) cabal package (`cabal install hsdev`) for inspection, enhanced completion, goto, symbol info etc.
 * [SublimeREPL](https://github.com/wuub/SublimeREPL) package for repl commands
 * [stylish-haskell](https://github.com/jaspervdj/stylish-haskell) (for code prettification, `cabal install stylish-haskell`)
@@ -26,6 +28,7 @@ Not necessary, but useful
 * [hdevtools](https://github.com/bitc/hdevtools) (or [fork for windows](https://github.com/mvoidex/hdevtools)) (for type inference, `cabal install hdevtools`, not used if `hsdev` enabled)
 
 Binaries:
+
 * If your `cabal`, `ghc-mod`, `ghc` etc. are not installed in a system PATH, you have to adjust SublimeHaskell's `add_to_PATH` setting.
 
 There are also [special theme](Themes/Hasky%20\(Dark\).gif) with enhanced haskell entities coloring<br>
