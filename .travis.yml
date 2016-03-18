@@ -1,0 +1,27 @@
+# See https://github.com/hvr/multi-ghc-travis for more information
+
+language: c
+
+sudo: false
+
+matrix:
+  include:
+    - env: CABALVER=1.22 GHCVER=7.10.3
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3], sources: [hvr-ghc]}}
+
+before_install:
+ - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
+
+install:
+ - cabal --version
+ - travis_retry cabal update
+ - cabal sandbox init
+ - cabal install --only-dependencies
+
+script:
+ - cabal configure -v2
+ - cabal build
+
+notifications:
+  email:
+    - kolmodin@gmail.com

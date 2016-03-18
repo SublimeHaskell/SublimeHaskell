@@ -5,7 +5,7 @@ Requirements
 ------------
 
 Necessary:
-* A relatively recent ghc (7.4 or later)
+* A recent ghc (7.10.x)
 * cabal 1.18 or later
 
 Optional, but useful:

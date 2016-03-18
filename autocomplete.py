@@ -30,7 +30,7 @@ else:
 CHECK_MTIME = True
 
 TOOLS_CABAL_FILE_DIR = None
-TOOLS_BUILD_DIR = None
+TOOLS_DIR = None
 TOOLS_SANDBOX_DIR = None
 MODULE_INSPECTOR_EXE_PATH = None
 CABAL_INSPECTOR_EXE_PATH = None
@@ -950,8 +950,8 @@ class InspectorAgent(threading.Thread):
         with status_message(InspectorAgent.TOOLSMSG) as s:
 
             exit_code, out, err = call_and_wait(['cabal',
-                'build',
-                '--builddir='+TOOLS_BUILD_DIR],
+                'install',
+                '--prefix='+TOOLS_DIR],
                 cwd = TOOLS_CABAL_FILE_DIR)
 
             if exit_code != 0:
@@ -1329,7 +1329,7 @@ def start_inspector():
 
 def plugin_loaded():
     global TOOLS_CABAL_FILE_DIR
-    global TOOLS_BUILD_DIR
+    global TOOLS_DIR
     global TOOLS_SANDBOX_DIR
     global MODULE_INSPECTOR_EXE_PATH
     global CABAL_INSPECTOR_EXE_PATH
@@ -1340,10 +1340,10 @@ def plugin_loaded():
     cache_path = sublime_haskell_cache_path()
 
     TOOLS_CABAL_FILE_DIR  = package_path
-    TOOLS_BUILD_DIR = os.path.join(cache_path, 'tools/dist')
-    TOOLS_SANDBOX_DIR = os.path.join(cache_path, 'tools/cabal-sandbox')
-    MODULE_INSPECTOR_EXE_PATH = os.path.join(TOOLS_BUILD_DIR, 'build/ModuleInspector/ModuleInspector')
-    CABAL_INSPECTOR_EXE_PATH = os.path.join(TOOLS_BUILD_DIR, 'build/CabalInspector/CabalInspector')
+    TOOLS_DIR = os.path.join(cache_path, 'tools')
+    TOOLS_SANDBOX_DIR = os.path.join(TOOLS_DIR, 'cabal-sandbox')
+    MODULE_INSPECTOR_EXE_PATH = os.path.join(TOOLS_DIR, 'bin/ModuleInspector')
+    CABAL_INSPECTOR_EXE_PATH = os.path.join(TOOLS_DIR, 'bin/CabalInspector')
     INSPECTOR_ENABLED = get_setting('inspect_modules')
 
     if INSPECTOR_ENABLED:
