@@ -662,7 +662,7 @@ class StatusMessage(object):
     # is_process — whether to show dots in message
     # is_ok — whether to show ✔ (True) or ✘ (False)
     # Note, that is is_ok is not None, dots will not be shown (is_process is ignored)
-    def __init__(self, msg, duration = 1, timeout = 60, priority = 0, is_process = True, is_ok = None):
+    def __init__(self, msg, duration = 1, timeout = 300, priority = 0, is_process = True, is_ok = None):
         self.msg = msg
         self.duration = duration
         self.timeout = timeout
@@ -707,7 +707,7 @@ class StatusMessage(object):
         self.is_process = False
 
     @staticmethod
-    def process(msg, timeout = 60, duration = 1, priority = 0):
+    def process(msg, timeout = 300, duration = 1, priority = 0):
         return StatusMessage(msg, duration = duration, timeout = timeout, priority = priority)
 
     @staticmethod
@@ -791,7 +791,7 @@ def show_status_message(msg, is_ok = None, priority = 0):
     """
     status_message_manager.add(StatusMessage.status(msg, priority = priority, is_ok = is_ok))
 
-def show_status_message_process(msg, is_ok = None, timeout = 60, priority = 0):
+def show_status_message_process(msg, is_ok = None, timeout = 300, priority = 0):
     """
     Same as show_status_message, but shows permanently until called with is_ok not None
     There can be only one message process in time, message with highest priority is shown
@@ -867,7 +867,7 @@ class with_status_message(object):
 def status_message(msg, is_ok = True, priority = 0):
     return with_status_message(StatusMessage.status(msg, priority = priority), is_ok = is_ok)
 
-def status_message_process(msg, is_ok = True, timeout = 60, priority = 0):
+def status_message_process(msg, is_ok = True, timeout = 300, priority = 0):
     return with_status_message(StatusMessage.process(msg, timeout = timeout, priority = priority), is_ok = is_ok)
 
 def sublime_haskell_package_path():
