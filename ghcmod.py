@@ -60,7 +60,7 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
         if not cmds:
             return
         else:
-            self.status_msg = status_message_process(msg + ': ' + self.filename)
+            self.status_msg = status_message_process(msg + ': ' + self.filename, priority = 2)
             self.status_msg.start()
             self.go_chain(cmds)
 

@@ -93,8 +93,8 @@ def is_enabled_haskell_command(view = None, must_be_project=True, must_be_main=F
     if must_be_file and not file_shown_in_view:
         return False
 
-    syntax_file_for_view = view.settings().get('syntax').lower()
-    if 'haskell' not in syntax_file_for_view:
+    syntax_file_for_view = view.settings().get('syntax')
+    if not syntax_file_for_view or ('haskell' not in syntax_file_for_view.lower()):
         return False
 
     if not must_be_project:
@@ -804,53 +804,33 @@ def show_status_message_process(msg, is_ok = None, timeout = 300, priority = 0):
     else:
         status_message_manager.add(StatusMessage.process(msg, timeout = timeout, priority = priority))
 
-def is_cabal_source(view = None):
+def is_with_syntax(view = None, syntax = None):
+    if syntax is None:
+        return False
+
     window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
 
     if not window or not view:
         return False
 
-    syntax_file_for_view = view.settings().get('syntax').lower()
-    if not syntax_file_for_view.endswith("Cabal.tmLanguage".lower()):
+    syntax_file_for_view = view.settings().get('syntax')
+    if not syntax_file_for_view or not syntax_file_for_view.lower().endswith(syntax.lower()):
         return False
 
     return True
+
+
+def is_cabal_source(view = None):
+    return is_with_syntax(view, syntax = "Haskell.tmLanguage")
 
 def is_haskell_source(view = None):
-    window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
-
-    if not window or not view:
-        return False
-
-    syntax_file_for_view = view.settings().get('syntax').lower()
-    if not syntax_file_for_view.endswith("Haskell.tmLanguage".lower()):
-        return False
-
-    return True
+    return is_with_syntax(view, syntax = "Cabal.tmLanguage")
 
 def is_haskell_repl(view = None):
-    window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
-
-    if not window or not view:
-        return False
-
-    syntax_file_for_view = view.settings().get('syntax').lower()
-    if not syntax_file_for_view.endswith("HaskellRepl.tmLanguage".lower()):
-        return False
-
-    return True
-
+    return is_with_syntax(view, syntax = "HaskellRepl.tmLanguage")
+ 
 def is_haskell_symbol_info(view = None):
-    window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
-
-    if not window or not view:
-        return False
-
-    syntax_file_for_view = view.settings().get('syntax').lower()
-    if not syntax_file_for_view.endswith("HaskellSymbolInfo.tmLanguage".lower()):
-        return False
-
-    return True
+    return is_with_syntax(view, syntax = "HaskellSymbolInfo.tmLanguage")
 
 class with_status_message(object):
     def __init__(self, msg, is_ok):

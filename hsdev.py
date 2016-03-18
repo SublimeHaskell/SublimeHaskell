@@ -822,6 +822,10 @@ class HsDev(object):
             'files': files,
             'packages': packages })
 
+    @command
+    def remove_all(self):
+        return cmd('remove-all', {})
+
     @list_command
     def list_modules(self, project = None, file = None, module = None, deps = None, sandbox = None, cabal = False, db = None, package = None, source = False, standalone = False):
         fs = []

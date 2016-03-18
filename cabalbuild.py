@@ -177,7 +177,7 @@ def run_build(view, project_name, project_dir, config):
     # names are of course possible, but unlikely, so we let them wait)
     if project_name in projects_being_built:
         log("Not building '%s' because it is already being built" % project_name, log_warning)
-        sublime_status_message('Already building %s' % project_name)
+        show_status_message('Already building %s' % project_name, is_ok = False, priority = 5)
         return
     # Set project as building
     projects_being_built.add(project_name)

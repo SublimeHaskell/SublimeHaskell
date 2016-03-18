@@ -851,9 +851,10 @@ class SublimeHaskellGoToAnyDeclaration(SublimeHaskellWindowCommand):
 class SublimeHaskellReinspectAll(SublimeHaskellWindowCommand):
     def run(self):
         if hsdev_inspector.agent_connected():
+            log('reinspect all', log_trace)
             hsdev_inspector.start_inspect()
         else:
-            show_status_message("inspector not connected", is_ok=False)
+            show_status_message("inspector not connected", is_ok = False)
 
 class SublimeHaskellScanContents(SublimeHaskellTextCommand):
     """
@@ -1843,7 +1844,7 @@ class HsDevAgent(threading.Thread):
 
     @dirty
     def force_inspect(self):
-        pass
+        self.reinspect_event.set()
 
     @dirty
     def start_inspect(self):
@@ -2021,7 +2022,13 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
                 if window.project_file_name() is not None and window.project_file_name() != self.project_file_name:
                     self.project_file_name = window.project_file_name()
                     log('project switched to {0}, reinspecting'.format(self.project_file_name))
-                    window.run_command('sublime_haskell_reinspect_all')
+                    if hsdev_inspector.agent_connected():
+                        log('reinspect all', log_trace)
+                        hsdev_client.remove_all()
+                        hsdev_inspector.start_inspect()
+                        hsdev_inspector.force_inspect()
+                    else:
+                        show_status_message("inspector not connected", is_ok = False)
 
     def on_post_save(self, view):
         if is_inspected_source(view):
