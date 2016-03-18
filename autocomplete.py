@@ -1005,12 +1005,12 @@ def show_declaration_info(view, decl):
     info = {}
     info['name'] = decl.name
     info['qname'] = decl.qualified_name()
-    info['module_name'] = decl.defined_module().name
+    info['module_name'] = decl.module.name
     if decl.by_source():
         info['filename'] = decl.defined_module().location.filename
     if decl.by_cabal() and decl.defined_module().location.package.name:
-        info['package_name'] = decl.defined_module().location.package.name
-        info['db'] = decl.defined_module().location.db.to_string()
+        info['package_name'] = decl.module.location.package.name
+        info['db'] = decl.module.location.db.to_string()
 
     sublime.set_timeout(lambda: view.run_command('sublime_haskell_symbol_info', info), 0)
 
