@@ -173,10 +173,19 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
 
 def format_output_messages(messages):
     """Formats list of messages"""
+    summary = {'error': 0, 'warning': 0, 'hint': 0}
+    for m in messages:
+        summary[m.level] = summary[m.level] + 1
+    summary_line = 'Errors: {0}, Warnings: {1}, Hints: {2}'.format(
+        summary['error'],
+        summary['warning'],
+        summary['hint'])
     if PyV3:
-        return '\n'.join(str(x) for x in messages)
+        details = '\n'.join(str(x) for x in messages)
+        return '{0}\n\n{1}'.format(summary_line, details)
     else:
-        return u'\n'.join(unicode(x) for x in messages)
+        details = u'\n'.join(unicode(x) for x in messages)
+        return u'{0}\n\n{1}'.format(summary_line, details)
 
 def show_output_result_text(view, msg, text, exit_code, base_dir):
     """Shows text (formatted messages) in output with build result"""

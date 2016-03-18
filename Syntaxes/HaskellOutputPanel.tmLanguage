@@ -10,6 +10,45 @@
 	<array>
 		<dict>
 			<key>match</key>
+			<string>^(Errors): (\d+), (Warnings): (\d+), (Hints): (\d+)$</string>
+			<key>captures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.level.outputpanel</string>
+				</dict>
+				<key>3</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.level.outputpanel</string>
+				</dict>
+				<key>5</key>
+				<dict>
+					<key>name</key>
+					<string>keyword.level.outputpanel</string>
+				</dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>constant.numeric.outputpanel</string>
+				</dict>
+				<key>4</key>
+				<dict>
+					<key>name</key>
+					<string>constant.numeric.outputpanel</string>
+				</dict>
+				<key>6</key>
+				<dict>
+					<key>name</key>
+					<string>constant.numeric.outputpanel</string>
+				</dict>
+			</dict>
+			<key>name</key>
+			<string>location.outputpanel</string>
+		</dict>
+		<dict>
+			<key>match</key>
 			<string>^((\w:)?[^:]+):\sline\s(\d+),\scolumn\s(\d+):</string>
 			<key>captures</key>
 			<dict>
