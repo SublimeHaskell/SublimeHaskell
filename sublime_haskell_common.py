@@ -821,10 +821,10 @@ def is_with_syntax(view = None, syntax = None):
 
 
 def is_cabal_source(view = None):
-    return is_with_syntax(view, syntax = "Haskell.tmLanguage")
+    return is_with_syntax(view, syntax = "Cabal.tmLanguage")
 
 def is_haskell_source(view = None):
-    return is_with_syntax(view, syntax = "Cabal.tmLanguage")
+    return is_with_syntax(view, syntax = "Haskell.tmLanguage")
 
 def is_haskell_repl(view = None):
     return is_with_syntax(view, syntax = "HaskellRepl.tmLanguage")
