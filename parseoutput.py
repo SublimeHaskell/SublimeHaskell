@@ -182,10 +182,10 @@ def format_output_messages(messages):
         summary['hint'])
     if PyV3:
         details = '\n'.join(str(x) for x in messages)
-        return '{0}\n\n{1}'.format(summary_line, details)
+        return '{0}\n\n{1}'.format(summary_line, details) if details else ''
     else:
         details = u'\n'.join(unicode(x) for x in messages)
-        return u'{0}\n\n{1}'.format(summary_line, details)
+        return u'{0}\n\n{1}'.format(summary_line, details) if details else u''
 
 def show_output_result_text(view, msg, text, exit_code, base_dir):
     """Shows text (formatted messages) in output with build result"""
