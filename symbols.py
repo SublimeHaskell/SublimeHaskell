@@ -6,10 +6,8 @@ import os.path
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
-    from haskell_docs import haskell_docs
 else:
     from SublimeHaskell.sublime_haskell_common import *
-    from SublimeHaskell.haskell_docs import haskell_docs
     from functools import reduce
 
 class Position(object):

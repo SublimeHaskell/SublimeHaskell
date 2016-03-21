@@ -110,7 +110,7 @@ class SublimeHaskellBaseCommand(SublimeHaskellWindowCommand):
 
 # Retrieve projects as dictionary that refers to this app instance
 def get_projects():
-    if autocomplete.hsdev_agent_connected():
+    if autocomplete.hsdev_connected():
         folders = sublime.active_window().folders()
         view_files = [v.file_name() for v in sublime.active_window().views() if (is_haskell_source(v) or is_cabal_source(v)) and v.file_name()]
 

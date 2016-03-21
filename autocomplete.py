@@ -22,7 +22,6 @@ if int(sublime.version()) < 3000:
     import symbols
     import hdocs
     from ghci import ghci_info
-    from haskell_docs import haskell_docs
     from hdevtools import start_hdevtools, stop_hdevtools
     from parseoutput import write_panel
     import hsdev
@@ -31,7 +30,6 @@ else:
     import SublimeHaskell.symbols as symbols
     import SublimeHaskell.hdocs as hdocs
     from SublimeHaskell.ghci import ghci_info
-    from SublimeHaskell.haskell_docs import haskell_docs
     from SublimeHaskell.hdevtools import start_hdevtools, stop_hdevtools
     from SublimeHaskell.parseoutput import write_panel
     import SublimeHaskell.hsdev as hsdev
@@ -264,6 +262,48 @@ class CompletionCache(object):
     def global_completions(self):
         return self.global_comps
 
+hsdev_inspector = None
+hsdev_client = None
+hsdev_client_back = None
+
+# Set reinspect event
+def dirty(fn):
+    def wrapped(self, *args, **kwargs):
+        if not hasattr(self, 'dirty_lock'):
+            self.dirty_lock = threading.Lock()
+        acquired = None
+        if python3():
+            acquired = self.dirty_lock.acquire(blocking = False)
+        else:
+            acquired = self.dirty_lock.acquire(False)
+        try:
+            return fn(self, *args, **kwargs)
+        finally:
+            if acquired:
+                self.dirty_lock.release()
+                self.reinspect_event.set()
+    return wrapped
+
+def use_inspect_modules(fn):
+    def wrapped(self, *args, **kwargs):
+        if get_setting_async('inspect_modules'):
+            return fn(self, *args, **kwargs)
+    return wrapped
+
+def hsdev_connected():
+    return hsdev_inspector.hsdev_connected()
+
+# Return default value if hsdev is not enabled/connected
+def use_hsdev(def_val = None):
+    def wrap(fn):
+        def wrapped(*args, **kwargs):
+            if hsdev.hsdev_enabled() and hsdev_connected():
+                return fn(*args, **kwargs)
+            else:
+                return def_val
+        return wrapped
+    return wrap
+
 # Autocompletion data
 class AutoCompletion(object):
     """Information for completion"""
@@ -289,7 +329,7 @@ class AutoCompletion(object):
     def mark_wide_completion(self, view):
         self.wide_completion = view
 
-    @hsdev.use_hsdev
+    @use_hsdev([])
     def get_completions_async(self, file_name = None):
         def log_result(r):
             log('completions: {0}'.format(len(r)), log_trace)
@@ -357,7 +397,7 @@ class AutoCompletion(object):
                 if filename:
                     self.get_completions_async(filename)
 
-    @hsdev.use_hsdev
+    @use_hsdev([])
     def get_completions(self, view, prefix, locations):
         "Get all the completions that apply to the current file."
 
@@ -404,7 +444,7 @@ class AutoCompletion(object):
                 else:
                     return self.keyword_completions + cache_.files.get(current_file_name, cache_.global_completions())
 
-    @hsdev.use_hsdev
+    @use_hsdev([])
     def completions_for_module(self, module, filename = None):
         """
         Returns completions for module
@@ -430,7 +470,7 @@ class AutoCompletion(object):
         """
         return self.completions_for_module(module_name, filename)
 
-    @hsdev.use_hsdev
+    @use_hsdev([])
     def get_import_completions(self, view, prefix, locations):
 
         self.current_filename = view.file_name()
@@ -484,7 +524,7 @@ class AutoCompletion(object):
 
         return []
 
-    @hsdev.use_hsdev
+    @use_hsdev([])
     def get_module_completions_for(self, qualified_prefix, modules = None, current_dir = None):
         def module_next_name(mname):
             """
@@ -498,7 +538,7 @@ class AutoCompletion(object):
         module_list = modules if modules else self.get_current_module_completions(current_dir = current_dir)
         return list(set((module_next_name(m) + '\tmodule', module_next_name(m)) for m in module_list if m.startswith(qualified_prefix)))
 
-    @hsdev.use_hsdev
+    @use_hsdev([])
     def get_current_module_completions(self, current_dir = None):
         """
         Get modules, that are in scope of file/project
@@ -850,7 +890,7 @@ class SublimeHaskellGoToAnyDeclaration(SublimeHaskellWindowCommand):
 
 class SublimeHaskellReinspectAll(SublimeHaskellWindowCommand):
     def run(self):
-        if hsdev_inspector.agent_connected():
+        if hsdev_inspector.hsdev_connected():
             log('reinspect all', log_trace)
             hsdev_inspector.start_inspect()
         else:
@@ -1666,38 +1706,6 @@ class hsdev_status(object):
             statuses.append('{0} ({1}/{2})'.format(m['name'], p['current'], p['total']) if p else m['name'])
         self.status_message.change_message('Inspecting {0}'.format(' / '.join(statuses)))
 
-
-
-hsdev_inspector = None
-hsdev_client = None
-hsdev_client_back = None
-
-def dirty(fn):
-    def wrapped(self, *args, **kwargs):
-        if not hasattr(self, 'dirty_lock'):
-            self.dirty_lock = threading.Lock()
-        acquired = None
-        if python3():
-            acquired = self.dirty_lock.acquire(blocking = False)
-        else:
-            acquired = self.dirty_lock.acquire(False)
-        try:
-            return fn(self, *args, **kwargs)
-        finally:
-            if acquired:
-                self.dirty_lock.release()
-                self.reinspect_event.set()
-    return wrapped
-
-def use_inspect_modules(fn):
-    def wrapped(self, *args, **kwargs):
-        if get_setting_async('inspect_modules'):
-            return fn(self, *args, **kwargs)
-    return wrapped
-
-def hsdev_agent_connected():
-    return hsdev_inspector.agent_connected()
-
 def update_completions_async(files = [], drop_all = False):
     if drop_all:
         run_async('drop all completions', autocompletion.drop_completions_async)
@@ -1719,7 +1727,7 @@ class HsDevAgent(threading.Thread):
 
         self.reinspect_event = threading.Event()
 
-    def agent_connected(self):
+    def hsdev_connected(self):
         return self.hsdev.is_connected()
 
     def start_hsdev(self, start_server = True):
@@ -1729,18 +1737,20 @@ class HsDevAgent(threading.Thread):
         hsdev_ver = hsdev.hsdev_version()
         if hsdev_ver is None:
             output_error_async(sublime.active_window(), "\n".join([
-                "hsdev executable couldn't be found",
-                "check if it's installed and in PATH",
+                "SublimeHaskell: hsdev executable couldn't be found!",
+                "It's used in most features of SublimeHaskell",
+                "Check if it's installed and in PATH",
+                "If it's not installed, run 'cabal install hsdev' to install hsdev",
+                "You may also want to adjust 'add_to_PATH' setting",
                 "",
-                "hsdev will be disabled, enable it by setting 'enable_hsdev' to true"]))
-            hsdev.hsdev_enable(False)
+                "To supress this message and disable hsdev set 'enable_hsdev' to false"]))
         elif not hsdev.check_version(hsdev_ver, min_ver, max_ver):
             output_error_async(sublime.active_window(), "\n".join([
-                "hsdev version is incorrect: {0}".format(hsdev.show_version(hsdev_ver)),
-                "required >= {0} and < {1}".format(hsdev.show_version(min_ver), hsdev.show_version(max_ver)),
+                "SublimeHaskell: hsdev version is incorrect: {0}".format(hsdev.show_version(hsdev_ver)),
+                "Required version: >= {0} and < {1}".format(hsdev.show_version(min_ver), hsdev.show_version(max_ver)),
+                "Update it by running 'cabal update' and 'cabal install hsdev'",
                 "",
-                "hsdev will be disabled, enable it by setting 'enable_hsdev' to true"]))
-            hsdev.hsdev_enable(False)
+                "To supress this message and disable hsdev set 'enable_hsdev' to false"]))
         else:
             def start_():
                 log('hsdev process started', log_trace)
@@ -1873,7 +1883,7 @@ class HsDevAgent(threading.Thread):
         with self.cabal_to_load as cabal_to_load:
             cabal_to_load.append(cabal_name or 'cabal')
 
-    @hsdev.use_hsdev
+    @use_hsdev()
     def inspect_cabal(self, cabal = None):
         try:
             with status_message_process('Inspecting {0}'.format(cabal or 'cabal'), priority = 1) as s:
@@ -1881,7 +1891,7 @@ class HsDevAgent(threading.Thread):
         except Exception as e:
             log('loading standard modules info for {0} failed with {1}'.format(cabal or 'cabal', e), log_error)
 
-    @hsdev.use_hsdev
+    @use_hsdev()
     @use_inspect_modules
     def inspect(self, paths, projects, files):
         if paths or projects or files:
@@ -1891,7 +1901,7 @@ class HsDevAgent(threading.Thread):
             except Exception as e:
                 log('Inspection failed: {0}'.format(e), log_error)
 
-    @hsdev.use_hsdev
+    @use_hsdev()
     @use_inspect_modules
     def inspect_path(self, path):
         try:
@@ -1900,7 +1910,7 @@ class HsDevAgent(threading.Thread):
         except Exception as e:
             log('Inspecting path {0} failed: {1}'.format(path, e), log_error)
 
-    @hsdev.use_hsdev
+    @use_hsdev()
     @use_inspect_modules
     def inspect_project(self, cabal_dir):
         (project_name, cabal_file) = get_cabal_in_dir(cabal_dir)
@@ -1911,7 +1921,7 @@ class HsDevAgent(threading.Thread):
         except Exception as e:
             log('Inspecting project {0} failed: {1}'.format(cabal_dir, e), log_error)
 
-    @hsdev.use_hsdev
+    @use_hsdev()
     @use_inspect_modules
     def inspect_files(self, filenames):
         try:
@@ -2022,7 +2032,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
                 if window.project_file_name() is not None and window.project_file_name() != self.project_file_name:
                     self.project_file_name = window.project_file_name()
                     log('project switched to {0}, reinspecting'.format(self.project_file_name))
-                    if hsdev_inspector.agent_connected():
+                    if hsdev_inspector.hsdev_connected():
                         log('reinspect all', log_trace)
                         hsdev_client.remove_all()
                         hsdev_inspector.start_inspect()

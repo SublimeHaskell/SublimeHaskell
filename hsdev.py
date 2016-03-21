@@ -60,12 +60,6 @@ def hsdev_enabled():
 def hsdev_enable(enable = True):
     set_setting_async('enable_hsdev', enable)
 
-def use_hsdev(fn):
-    def wrapped(*args, **kwargs):
-        if hsdev_enabled():
-            return fn(*args, **kwargs)
-    return wrapped
-
 def hsdev_version():
     try:
         (exit_code, out, err) = call_and_wait(['hsdev', 'version'])

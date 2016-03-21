@@ -121,7 +121,7 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
 def ghcmod_command(cmdname):
     def wrap(fn):
         def wrapper(self, *args, **kwargs):
-            if autocomplete.hsdev_agent_connected():
+            if autocomplete.hsdev_connected():
                 log('Invoking ghc-mod command \'{0}\' via hsdev'.format(cmdname), log_trace)
                 return fn(self, *args, **kwargs)
             else:
