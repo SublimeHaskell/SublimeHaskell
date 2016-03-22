@@ -72,8 +72,8 @@ Stack support
 
 Build commands such as `Build`, `Clean`, `Install`, `Rebuild` uses `stack` if there is `stack.yaml` near `.cabal`. If you don't want to use `stack`, set `haskell_build_tool` setting to `cabal`.
 
-In order to support stack projects correctly, `hsdev` and `stack` executables must be build with same compiler, then `hsdev` will be able to `stack build --only-dependencies` and `stack build --only-configure` stack projects in order to get corresponding package-db.
-`hsdev` first searchs for `stack` near itself, so you can just place it in same path.
+`hsdev` uses `stack` to build dependencies and to get corresponding package-dbs. As long as `hsdev` doesn't pass `--compiler` and `--arch` flags to `stack`, the last uses default compiler instead of `hsdev`-compatible one. It's known issue and will be fixed (https://github.com/mvoidex/hsdev/issues/26, https://github.com/mvoidex/hsdev/issues/27); the workaround is to have `stack` and `hsdev` built with same compiler, or you can just install `hsdev` with `stack`.
+If you have several `stack` executables, note, that `hsdev` first searchs for `stack` near itself, so you can place them in same path.
 
 
 Enhanced completion
