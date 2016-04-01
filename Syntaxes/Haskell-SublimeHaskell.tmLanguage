@@ -741,9 +741,9 @@
 		<key>infix_function_definition</key>
 		<dict>
 			<key>begin</key>
-			<string>^\s*(?=(([\w'\.'"]+|\(.*\)|\[.*\])\s+)+([^\w\s'"`\(\)]+|`[a-z][\w']*`).*=)</string>
+			<string>^\s*(?=(([\w'\.'"]+|(?:\w+@)?\(.*\)|\[.*\])\s+)+([^"'_,\(\);\[\]`\{\}\:\w\s]+|`[a-z][\w']*`)((\s*[\w'\.'"]+|\s*(?:\w+@)?\(.*\)|\s*\[.*\]))+\s*=)</string>
 			<key>end</key>
-			<string>([^\w\s\.'"`]+|`[a-z][\w']*`)</string>
+			<string>( [^"'_,\(\);\[\]`\{\}\:\w\s]+|`[a-z][\w']*`)</string>
 			<key>endCaptures</key>
 			<dict>
 				<key>1</key>
