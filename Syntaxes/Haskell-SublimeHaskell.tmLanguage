@@ -709,7 +709,7 @@
 		<key>function_definition</key>
 		<dict>
 			<key>begin</key>
-			<string>^\s*(?&lt;!')\b([a-z_][\w']*|\(\W+\))\s+(?![^\w\s='"\(\[])(?=(([\w\s\.,'"]*|\(.*\)|\[.*\])\s+)*=)</string>
+			<string>^\s*(?&lt;!')\b([a-z_][\w']*|\(\W+\))\s+(?![^\w\s='"\(\[])(?=((([\w\.,'"_]+|(?:\w+\@)?\(.*\)|\[.*\])\s+)*=))</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>1</key>
