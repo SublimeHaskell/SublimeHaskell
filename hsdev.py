@@ -458,7 +458,6 @@ def call_callback(fn, *args, **kwargs):
         log("callback '{0}' throws exception: {1}".format(name or '<unnamed>', e))
 
 
-
 class HsDevCallbacks(object):
     def __init__(self, id, command, on_response = None, on_notify = None, on_error = None):
         self.id = id
@@ -481,13 +480,11 @@ class HsDevCallbacks(object):
     def call_notify(self, n):
         call_callback(self.on_notify, n)
 
-    def call_error(self, e, ds = None):
+    def call_error(self, e, ds):
         self.log_time()
-        if ds is not None:
-            log('{0} returns error: {1}, details: {2}'.format(self.command, e, ds), log_error)
-        else:
-            log('{0} returns error: {1}'.format(self.command, e), log_error)
-        call_callback(self.on_error, e)
+        log('{0} returns error: {1}, {2}'.format(self.command, e, ', '.join(['{}: {}'.format(k, v) for k, v in e.items()])), log_error)
+        call_callback(self.on_error, e, ds)
+
 
 class HsDev(object):
     def __init__(self, port = 4567):
@@ -700,6 +697,7 @@ class HsDev(object):
             wait_receive = threading.Event() if wait else None
 
             x = {}
+
             def on_response_(r):
                 x['result'] = r
                 call_callback(on_response, r)
@@ -751,7 +749,8 @@ class HsDev(object):
                         if 'notify' in resp:
                             callbacks.call_notify(resp['notify'])
                         if 'error' in resp:
-                            callbacks.call_error(resp['error'], resp.get('details'))
+                            err = resp.pop("error")
+                            callbacks.call_error(err, resp)
                             with self.map as m:
                                 m.pop(resp['id'])
                         if 'result' in resp:

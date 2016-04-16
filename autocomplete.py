@@ -1731,8 +1731,8 @@ class HsDevAgent(threading.Thread):
         return self.hsdev.is_connected()
 
     def start_hsdev(self, start_server = True):
-        min_ver = [0,1,7,0]
-        max_ver = [0,1,8,0]
+        min_ver = [0,1,8,0]
+        max_ver = [0,1,9,0]
 
         hsdev_ver = hsdev.hsdev_version()
         if hsdev_ver is None:
@@ -1849,6 +1849,7 @@ class HsDevAgent(threading.Thread):
 
             if files_to_reinspect:
                 update_completions_async(drop_all = True)
+                self.hsdev_back.docs(files = files_to_reinspect)
             self.reinspect_event.wait(AGENT_SLEEP_TIMEOUT)
             self.reinspect_event.clear()
 
