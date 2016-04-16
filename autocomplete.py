@@ -1732,7 +1732,7 @@ class HsDevAgent(threading.Thread):
 
     def start_hsdev(self, start_server = True):
         min_ver = [0,1,7,0]
-        max_ver = [0,1,8,0]
+        max_ver = [0,1,9,0]
 
         hsdev_ver = hsdev.hsdev_version()
         if hsdev_ver is None:
