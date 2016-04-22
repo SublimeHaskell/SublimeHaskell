@@ -33,7 +33,7 @@ Binaries:
 
 * If your `cabal`, `ghc-mod`, `ghc` etc. are not installed in a system PATH, you have to adjust SublimeHaskell's `add_to_PATH` setting.
 
-There are also [special theme](Themes/Hasky%20\(Dark\).gif) with enhanced haskell entities coloring<br>
+There are also [special theme](Themes/Hasky%20\(Dark\).gif) with enhanced haskell entities and marks (errors, warnings and hints) coloring<br>
 Note different coloring for types and constructors (in import list, data declaration etc.), special coloring of generic variables in types, pragmas and module imports
 
 ![compare](Themes/Hasky%20\(Dark\).small.gif)
@@ -204,3 +204,12 @@ and `cabal install hasktags`.
 * In your project, `codex cache clean && codex update`
 * You can now jump to the source code of definitions outside of your project.
 * The commands `CTags: Show Symbols` and `CTags: Rebuild Tags` currently don't work with `codex`
+
+Credits
+---
+
+Icons from [FlatIcon](http://www.flaticon.com).
+
+Error icon by [Eleonor Wang](http://www.flaticon.com/authors/eleonor-wang)
+Warning icon by [Freepik](http://www.freepik.com)
+Hint icon by [Gregor Cresnar](http://www.flaticon.com/authors/gregor-cresnar)

@@ -253,16 +253,16 @@ def mark_messages_in_views(errors):
 
 message_levels = {
     'hint': {
-        'style': 'comment.warning',
-        'icon': 'light_x_bright'
+        'style': 'sublimehaskell.mark.hint',
+        'icon': 'haskell-hint.png'
     },
     'warning': {
-        'style': 'comment.warning',
-        'icon': 'grey_x_light_shadow'
+        'style': 'sublimehaskell.mark.warning',
+        'icon': 'haskell-warning.png'
     },
     'error': {
-        'style': 'invalid',
-        'icon': 'grey_x'
+        'style': 'sublimehaskell.mark.error',
+        'icon': 'haskell-error.png'
     }
 }
 
@@ -342,6 +342,12 @@ class SublimeHaskellPreviousError(SublimeHaskellTextCommand):
 def region_key(name):
     return 'subhs-{0}s'.format(name)
 
+def get_icon(png):
+    return "/".join([
+        "Packages",
+        os.path.basename(os.path.dirname(__file__)),
+        "Icons",
+        png])
 
 def mark_messages_in_view(messages, view):
     # Regions by level
@@ -358,7 +364,7 @@ def mark_messages_in_view(messages, view):
             region_key(nm),
             regions[nm],
             lev['style'],
-            lev['icon'],
+            get_icon(lev['icon']),
             sublime.DRAW_OUTLINED)
 
 

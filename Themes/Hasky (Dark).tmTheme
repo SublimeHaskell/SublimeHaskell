@@ -59,6 +59,40 @@ Find more themes at : https://github.com/daylerees/colour-schemes
 				<string>stippled_underline</string>
 			</dict>
 		</dict>
+		<!-- Errors -->
+		<dict>
+			<key>name</key>
+			<string>Mark error</string>
+			<key>scope</key>
+			<string>sublimehaskell.mark.error</string>
+			<key>settings</key>
+			<dict>
+				<key>foreground</key>
+				<string>#d80027</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>name</key>
+			<string>Mark warning</string>
+			<key>scope</key>
+			<string>sublimehaskell.mark.warning</string>
+			<key>settings</key>
+			<dict>
+				<key>foreground</key>
+				<string>#ffda44</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>name</key>
+			<string>Mark hint</string>
+			<key>scope</key>
+			<string>sublimehaskell.mark.hint</string>
+			<key>settings</key>
+			<dict>
+				<key>foreground</key>
+				<string>#91dc5a</string>
+			</dict>
+		</dict>
 		<!-- Haskell -->
 		<dict>
 			<key>name</key>
