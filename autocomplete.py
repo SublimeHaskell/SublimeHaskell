@@ -332,8 +332,8 @@ class AutoCompletion(object):
     @use_hsdev([])
     def get_completions_async(self, file_name = None):
         def log_result(r):
-            log('completions: {0}'.format(len(r)), log_trace)
-            return r
+            log('completions: {0}'.format(len(r or [])), log_trace)
+            return (r or [])
         none_comps = []
         update_cabal = False
         update_sources = False
@@ -612,7 +612,7 @@ class SublimeHaskellBrowseDeclarations(SublimeHaskellTextCommand):
         self.status_msg.stop()
         self.view.window().show_quick_panel([[decl.brief(), decl.docs.splitlines()[0] if decl.docs else ''] for decl in self.decls], self.on_done)
 
-    def on_err(self, e):
+    def on_err(self, e, ds):
         self.status_msg.fail()
         self.status_msg.stop()
         show_status_message('Browse declarations: {0}'.format(e))
@@ -670,7 +670,7 @@ class SublimeHaskellHayoo(SublimeHaskellWindowCommand):
             return
         show_declaration_info(self.window.active_view(), self.decls[idx])
 
-    def on_err(self, e):
+    def on_err(self, e, ds):
         self.status_msg.fail()
         self.status_msg.stop()
         show_status_message("Hayoo '{0}': {1}".format(self.input, e))
@@ -707,7 +707,7 @@ class SublimeHaskellSearch(SublimeHaskellWindowCommand):
             return
         show_declaration_info(self.window.active_view(), self.decls[idx])
 
-    def on_err(self, e):
+    def on_err(self, e, ds):
         self.status_msg.fail()
         self.status_msg.stop()
         show_status_message("Search '{0}': {1}".format(self.input, e))
@@ -909,7 +909,7 @@ class SublimeHaskellScanContents(SublimeHaskellTextCommand):
             self.status_msg.stop()
             update_completions_async([self.current_file_name])
 
-        def on_err(r):
+        def on_err(r, ds):
             self.status_msg.fail()
             self.status_msg.stop()
 
@@ -1591,7 +1591,7 @@ class SublimeHaskellAutoFix(SublimeHaskellWindowCommand):
                     return
                 sublime.set_timeout(self.on_got_messages, 0)
 
-            def on_err(err):
+            def on_err(err, ds):
                 self.status_msg.fail()
                 self.status_msg.stop()
                 show_status_message('Check & Lint: {0}'.format(err), False)

@@ -457,6 +457,8 @@ def call_callback(fn, *args, **kwargs):
     except Exception as e:
         log("callback '{0}' throws exception: {1}".format(name or '<unnamed>', e))
 
+def format_error_details(ds):
+    return ', '.join(['{}: {}'.format(k, v) for k, v in ds.items()])
 
 class HsDevCallbacks(object):
     def __init__(self, id, command, on_response = None, on_notify = None, on_error = None):
@@ -482,7 +484,7 @@ class HsDevCallbacks(object):
 
     def call_error(self, e, ds):
         self.log_time()
-        log('{0} returns error: {1}, {2}'.format(self.command, e, ', '.join(['{}: {}'.format(k, v) for k, v in e.items()])), log_error)
+        log('{0} returns error: {1}, {2}'.format(self.command, e, format_error_details(ds)), log_error)
         call_callback(self.on_error, e, ds)
 
 
@@ -704,8 +706,8 @@ class HsDev(object):
                 if wait_receive:
                     wait_receive.set()
 
-            def on_error_(e):
-                call_callback(on_error, e)
+            def on_error_(e, ds):
+                call_callback(on_error, e, ds)
                 if wait_receive:
                     wait_receive.set()
 
@@ -1034,10 +1036,10 @@ def wait_result(fn, *args, **kwargs):
         if on_resp:
             on_resp(r)
         wait_receive.set()
-    def wait_error(e):
-        log('hsdev call fails with: {0}'.format(e))
+    def wait_error(e, ds):
+        log('hsdev call fails with: {0}, {1}'.format(e, format_error_details(ds)))
         if on_err:
-            on_err(e)
+            on_err(e, ds)
         wait_receive.set()
 
     tm = kwargs.pop('timeout', 0.1)

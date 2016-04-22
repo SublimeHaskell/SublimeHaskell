@@ -100,7 +100,7 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
                     self.msgs.extend(msgs)
                     self.go_chain(tail_cmds)
 
-                def on_err(err):
+                def on_err(err, ds):
                     self.status_msg.fail()
                     self.go_chain([])
 
