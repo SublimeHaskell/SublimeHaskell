@@ -3,6 +3,7 @@
 import sublime
 import sublime_plugin
 import re
+from functools import total_ordering
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import is_enabled_haskell_command, get_setting_async, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, log, log_trace, as_sandboxes, get_ghc_opts, is_haskell_source, show_panel, hide_panel, head_of
@@ -41,6 +42,7 @@ def parse_ghc_mod_type_line(l):
     match = GHCMOD_TYPE_LINE_RE.match(l)
     return match and match.groupdict()
 
+@total_ordering
 class FilePosition(object):
     """
     Zero-based sublime file position
@@ -49,6 +51,15 @@ class FilePosition(object):
     def __init__(self, line, column):
         self.line = line
         self.column = column
+
+    def __eq__(self, other):
+        return self.line == other.line and self.column == other.column
+
+    def __lt__(self, other):
+        if self.line == other.line:
+            return self.column < other.column
+        else:
+            return self.line < other.line
 
     def point(self, view):
         return view.text_point(self.line, self.column)
@@ -148,17 +159,12 @@ def haskell_type(view, filename, module_name, line, column, cabal = None):
 
     if hsdev.hsdev_enabled():
         # Convert from hsdev one-based locations to sublime zero-based positions
-        def to_file_pos(r):
-            return FilePosition(int(r['line']) - 1, int(r['column']) - 1)
-        def to_region_type(r):
-            return RegionType(
-                r['type'],
-                to_file_pos(r['region']['from']),
-                to_file_pos(r['region']['to']))
-        ts = autocomplete.hsdev_client.ghcmod_type(filename, line + 1, column + 1, ghc = get_ghc_opts(filename))
-        if ts:
-            return [to_region_type(r) for r in ts]
-        return None
+        ts = haskell_types(filename, cabal = cabal)
+        pt = FilePosition(line, column).point(view)
+        types = sorted(
+            list(filter(lambda t: t.region(view).contains(pt), ts)),
+            key = lambda t: t.region(view).size())
+        return types
     column = sublime_column_to_ghc_column(view, line, column)
     line = line + 1
     if hdevtools_enabled():
@@ -184,7 +190,7 @@ def haskell_type_view(view, selection = None):
 
     return haskell_type(view, filename, module_name, line, column)
 
-def haskell_types(filename, on_result, cabal = None):
+def haskell_types(filename, on_result = None, cabal = None):
     result = None
     if hsdev.hsdev_enabled():
         def to_file_pos(r):
@@ -196,7 +202,10 @@ def haskell_types(filename, on_result, cabal = None):
                 to_file_pos(r['region']['to']))
         def on_resp(rs):
             on_result([to_region_type(r) for r in rs])
-        autocomplete.hsdev_client.types(files = [filename], ghc = get_ghc_opts(filename), wait = False, on_response = on_resp)
+        res = autocomplete.hsdev_client.types(files = [filename], ghc = get_ghc_opts(filename), wait = on_result is None, on_response = on_resp if on_result is not None else None)
+        if res is not None:
+            return [to_region_type(r) for r in res]
+
 
 class SublimeHaskellShowType(SublimeHaskellTextCommand):
     def run(self, edit, filename = None, line = None, column = None):

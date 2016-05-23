@@ -183,7 +183,7 @@ def get_qualified_symbol_at_region(view, region):
 def get_ghcmod_language_pragmas():
 
     if get_setting_async('enable_hsdev'):
-        return hsdev_client.ghcmod_lang()
+        return hsdev_client.langs()
     elif get_setting_async('enable_ghc_mod'):
         return call_ghcmod_and_wait(['lang']).splitlines()
 
@@ -192,7 +192,7 @@ def get_ghcmod_language_pragmas():
 def get_ghcmod_flags_pragmas():
 
     if get_setting_async('enable_hsdev'):
-        return hsdev_client.ghcmod_flags()
+        return hsdev_client.flags()
     elif get_setting_async('enable_ghc_mod'):
         return call_ghcmod_and_wait(['flag']).splitlines()
 
@@ -1731,8 +1731,8 @@ class HsDevAgent(threading.Thread):
         return self.hsdev.is_connected()
 
     def start_hsdev(self, start_server = True):
-        min_ver = [0,1,8,0]
-        max_ver = [0,1,9,0]
+        min_ver = [0,2,0,0]
+        max_ver = [0,2,1,0]
 
         hsdev_ver = hsdev.hsdev_version()
         if hsdev_ver is None:

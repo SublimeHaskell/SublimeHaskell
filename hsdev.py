@@ -982,31 +982,12 @@ class HsDev(object):
             'ghc-opts': ghc})
 
     @command
-    def ghcmod_lang(self):
-        return cmd('ghc-mod lang')
+    def langs(self):
+        return cmd('langs')
 
     @command
-    def ghcmod_flags(self):
-        return cmd('ghc-mod flags')
-
-    @list_command
-    def ghcmod_type(self, file, line, column = 1, ghc = []):
-        return cmd('ghc-mod type', {
-            'position': {'line': int(line),'column': int(column)},
-            'file': file,
-            'ghc-opts': ghc })
-
-    @list_command
-    def ghcmod_check(self, files, ghc = []):
-        return cmd('ghc-mod check', {'files': files, 'ghc-opts': ghc})
-
-    @list_command
-    def ghcmod_lint(self, files, hlint = []):
-        return cmd('ghc-mod lint', {'files': files, 'hlint-opts': hlint})
-
-    @list_command
-    def ghcmod_check_lint(self, files, ghc = [], hlint = []):
-        return cmd('ghc-mod check-lint', {'files': files, 'ghc-opts': ghc, 'hlint-opts': hlint})
+    def flags(self):
+        return cmd('flags')
 
     @list_command
     def autofix_show(self, messages):
