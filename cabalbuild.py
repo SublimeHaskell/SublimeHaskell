@@ -249,7 +249,7 @@ class SublimeHaskellInstallCommand(SublimeHaskellBaseCommand):
 class SublimeHaskellTestCommand(SublimeHaskellBaseCommand):
     def run(self):
         def has_tests(name, info):
-            return len(info['tests']) > 0
+            return len(info['description']['tests']) > 0
 
         self.build('test', filter_project = has_tests)
 
