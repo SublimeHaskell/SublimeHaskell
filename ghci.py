@@ -22,7 +22,7 @@ def parse_info(name, contents):
 
     if name[0].isupper():
         # data, class, type or newtype
-        matched = re.search(dataRegex, contents, re.MULTILINE) or re.search(classRegex, contents, re.MULTILINE)
+        matched = re.search(dataRegex, contents, re.DOTALL) or re.search(classRegex, contents, re.DOTALL)
         if matched:
             what = matched.group('what')
             args = matched.group('args').strip().split(' ') if matched.group('args') else []
@@ -44,7 +44,7 @@ def parse_info(name, contents):
 
     else:
         # function
-        matched = re.search(functionRegex, contents, re.MULTILINE)
+        matched = re.search(functionRegex, contents, re.DOTALL)
         if matched:
             return symbols.Function(name, matched.group('type'))
 
