@@ -1,9 +1,7 @@
 # -*- coding: UTF-8 -*-
 
 import re
-import os
 import sublime
-import sublime_plugin
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
@@ -11,6 +9,7 @@ if int(sublime.version()) < 3000:
 else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.symbols as symbols
+
 
 def parse_info(name, contents):
     """
@@ -49,6 +48,7 @@ def parse_info(name, contents):
             return symbols.Function(name, matched.group('type'))
 
     return None
+
 
 def ghci_info(module, name, cabal = None):
     """

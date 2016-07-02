@@ -1,12 +1,7 @@
 # -*- coding: UTF-8 -*-
 
-import os
-import os.path
-import sys
 import socket
 import sublime
-import sublime_plugin
-import subprocess
 import threading
 import json
 import time
@@ -20,12 +15,14 @@ else:
     import SublimeHaskell.symbols as symbols
     from SublimeHaskell.sublime_haskell_common import *
 
+
 def concat_args(args):
     def cat(x, y):
         (px, ex) = x
         (py, ey) = y
         return (px or py, (ex if px else []) + (ey if py else []))
     return reduce(cat, args, (True, []))[1]
+
 
 def concat_opts(opts):
     def cat(x, y):
@@ -35,6 +32,7 @@ def concat_opts(opts):
         v.update((ey if py else {}).copy())
         return (px or py, v)
     return reduce(cat, opts, (True, {}))[1]
+
 
 # {'x': ['1','2'], 'y': None} ⇒ ['--x', '1', '--x', '2', '--y']
 def flatten_opts(opts):
@@ -54,11 +52,14 @@ def flatten_opts(opts):
 
     return r
 
+
 def hsdev_enabled():
     return get_setting_async('enable_hsdev') == True
 
+
 def hsdev_enable(enable = True):
     set_setting_async('enable_hsdev', enable)
+
 
 def hsdev_version():
     try:
@@ -75,8 +76,10 @@ def hsdev_version():
         pass
     return None
 
+
 def show_version(ver):
     return '.'.join(map(lambda i: str(i), ver))
+
 
 def check_version(ver, minimal = [0, 0, 0, 0], maximal = None):
     if ver is None:
@@ -87,17 +90,20 @@ def check_version(ver, minimal = [0, 0, 0, 0], maximal = None):
         return False
     return True
 
+
 def if_some(x, lst):
     return lst if x is not None else []
+
 
 def cabal_path(cabal):
     if not cabal:
         return []
     return ["--cabal"] if cabal == 'cabal' else ["--sandbox={0}".format(cabal)]
 
+
 def hsinspect(module = None, file = None, cabal = None, ghc_opts = []):
     cmd = ['hsinspect']
-    on_result = lambda s: s
+    on_result = None
     if module:
         cmd.extend([module])
         on_result = parse_module
@@ -118,11 +124,13 @@ def hsinspect(module = None, file = None, cabal = None, ghc_opts = []):
         if 'error' in r:
             log('hsinspect returns error: {0}'.format(r['error']), log_error)
         else:
-            return on_result(r)
+            return on_result(r) if on_result else r
     return None
+
 
 def print_status(s):
     print(s['status'])
+
 
 def parse_database(s):
     if not s:
@@ -131,15 +139,18 @@ def parse_database(s):
         return (s['projects'], [parse_module(m) for m in s['modules']])
     return None
 
+
 def parse_decls(s):
     if s is None:
         return None
     return [parse_module_declaration(decl) for decl in s]
 
+
 def parse_modules_brief(s):
     if s is None:
         return None
     return [parse_module_id(m) for m in s]
+
 
 def get_value(dc, ks, defval = None):
     if dc is None:
@@ -154,6 +165,7 @@ def get_value(dc, ks, defval = None):
     else:
         return dc.get(ks, defval)
 
+
 # 'global-db', 'user-db' or {'package-db':path}
 def parse_package_db(d, defval = None):
     if type(d) == dict:
@@ -165,6 +177,7 @@ def parse_package_db(d, defval = None):
         return symbols.PackageDb(user_db = True)
     return defval
 
+
 def parse_position(d):
     if not d:
         return None
@@ -173,6 +186,7 @@ def parse_position(d):
     if line is not None and column is not None:
         return symbols.Position(line, column)
     return None
+
 
 def parse_location(d):
     loc = symbols.Location(
@@ -191,10 +205,12 @@ def parse_location(d):
         return loc
     return None
 
+
 def parse_import(d):
     if not d:
         return None
     return symbols.Import(d['name'], d['qualified'], d.get('as'), parse_position(d.get('pos')))
+
 
 def parse_module_id(d):
     if d is None:
@@ -203,6 +219,7 @@ def parse_module_id(d):
         d['name'],
         [], [], {},
         parse_location(d.get('location')))
+
 
 def parse_declaration(decl):
     try:
@@ -233,10 +250,12 @@ def parse_declaration(decl):
         log('Error pasring declaration: {0}'.format(e), log_error)
         return None
 
+
 def parse_declarations(decls):
     if decls is None:
         return None
     return [parse_declaration(d) for d in decls]
+
 
 def parse_module_declaration(d, parse_module_info = True):
     try:
@@ -244,7 +263,7 @@ def parse_module_declaration(d, parse_module_info = True):
         if 'module-id' in d and parse_module_info:
             m = parse_module_id(d['module-id'])
 
-        loc = parse_location(d['module-id'].get('location'))
+        # loc = parse_location(d['module-id'].get('location'))
         decl = parse_declaration(d['declaration'])
 
         if not decl:
@@ -256,6 +275,7 @@ def parse_module_declaration(d, parse_module_info = True):
     except:
         return None
 
+
 def parse_module(d):
     if d is None:
         return None
@@ -263,13 +283,15 @@ def parse_module(d):
         d['name'],
         d.get('exports'),
         [parse_import(i) for i in d['imports']] if 'imports' in d else [],
-        dict((decl['name'],parse_declaration(decl)) for decl in d['declarations']) if 'declarations' in d else {},
+        dict((decl['name'], parse_declaration(decl)) for decl in d['declarations']) if 'declarations' in d else {},
         parse_location(d.get('location')))
+
 
 def parse_modules(ds):
     if ds is None:
         return None
     return [parse_module(d) for d in ds]
+
 
 def parse_cabal_package(d):
     if d is None:
@@ -282,10 +304,12 @@ def parse_cabal_package(d):
         d.get('homepage'),
         d.get('license'))
 
+
 def parse_corrections(d):
     if d is None:
         return None
     return [parse_correction(c) for c in d]
+
 
 def parse_correction(d):
     return symbols.Correction(
@@ -294,40 +318,46 @@ def parse_correction(d):
         d['note']['message'],
         parse_corrector(d['note']['corrector']))
 
+
 def parse_corrector(d):
     return symbols.Corrector(
         parse_position(d['region']['from']),
         parse_position(d['region']['to']),
         d['contents'])
 
+
 def encode_corrections(cs):
     return [encode_correction(c) for c in cs]
+
 
 def encode_correction(c):
     return {
         'source': {
             'project': None,
-            'file': c.file },
+            'file': c.file},
         'level': c.level,
         'note': {
             'corrector': encode_corrector(c.corrector),
-            'message': c.message },
+            'message': c.message},
         'region': {
             'from': encode_position(c.corrector.start.from_zero_based()),
-            'to': encode_position(c.corrector.end.from_zero_based()) }
+            'to': encode_position(c.corrector.end.from_zero_based())}
         }
+
 
 def encode_corrector(c):
     return {
         'region': {
             'from': encode_position(c.start),
-            'to': encode_position(c.end) },
-        'contents': c.contents }
+            'to': encode_position(c.end)},
+        'contents': c.contents}
+
 
 def encode_position(p):
     return {
         'line': p.line,
-        'column': p.column }
+        'column': p.column}
+
 
 def encode_package_db(db):
     if db.user_db:
@@ -338,11 +368,13 @@ def encode_package_db(db):
         return {'package-db': db.package_db}
     return None
 
+
 def reconnect_function(fn):
     def wrapped(self, *args, **kwargs):
         autoconnect_ = kwargs.pop('autoconnect', False)
         on_reconnect_ = kwargs.pop('on_reconnect', None)
         just_connect_ = kwargs.pop('just_connect', False)
+
         def run_fn():
             if not just_connect_:
                 self.autoconnect = autoconnect_
@@ -352,6 +384,7 @@ def reconnect_function(fn):
             self.set_reconnect_function(run_fn)
         return run_fn()
     return wrapped
+
 
 class begin_connecting(object):
     def __init__(self, agent):
@@ -368,6 +401,7 @@ class begin_connecting(object):
             if self.agent.is_connecting():
                 self.agent.set_unconnected()
 
+
 def connect_function(fn):
     def wrapped(self, *args, **kwargs):
         if self.is_unconnected():
@@ -376,6 +410,7 @@ def connect_function(fn):
         else:
             log('hsdev already connected', log_warning)
     return wrapped
+
 
 def hsdev_command(async = False, timeout = None, is_list = False):
     def wrap_function(fn):
@@ -392,6 +427,7 @@ def hsdev_command(async = False, timeout = None, is_list = False):
 
             if is_list and split_res:
                 result = []
+
                 def on_notify(n):
                     if 'result-part' in n:
                         rp = on_result_([n['result-part']])[0]
@@ -399,10 +435,11 @@ def hsdev_command(async = False, timeout = None, is_list = False):
                         result.append(rp)
                     else:
                         call_callback(on_not, n)
+
                 def on_response(r):
                     on_resp(result)
 
-                opts_.update({'split-result': None}) # FIXME: Is this option still used?
+                opts_.update({'split-result': None})  # FIXME: Is this option still used?
                 r = self.call(
                     name_,
                     opts_,
@@ -432,20 +469,26 @@ def hsdev_command(async = False, timeout = None, is_list = False):
         return wrapped
     return wrap_function
 
+
 def command(fn):
     return hsdev_command(async = False, timeout = 1)(fn)
+
 
 def async_command(fn):
     return hsdev_command(async = True)(fn)
 
+
 def list_command(fn):
     return hsdev_command(async = False, timeout = 1, is_list = True)(fn)
+
 
 def async_list_command(fn):
     return hsdev_command(async = True, is_list = True)(fn)
 
+
 def cmd(name_, opts_ = {}, on_result = lambda r: r):
     return (name_, opts_, on_result)
+
 
 def call_callback(fn, *args, **kwargs):
     name = kwargs.get('name')
@@ -457,8 +500,10 @@ def call_callback(fn, *args, **kwargs):
     except Exception as e:
         log("callback '{0}' throws exception: {1}".format(name or '<unnamed>', e))
 
+
 def format_error_details(ds):
     return ', '.join(['{}: {}'.format(k, v) for k, v in ds.items()])
+
 
 class HsDevCallbacks(object):
     def __init__(self, id, command, on_response = None, on_notify = None, on_error = None):
@@ -561,7 +606,7 @@ class HsDev(object):
         def parse_response(s):
             try:
                 return {} if s.isspace() else json.loads(s)
-            except Exception as e:
+            except Exception:
                 return {'error': 'Invalid response', 'details': s}
 
         log('Starting hsdev server', log_info)
@@ -606,7 +651,7 @@ class HsDev(object):
                 log('connected to hsdev server', log_info)
                 call_callback(self.on_connected, name = 'HsDev.on_connected')
                 return True
-            except Exception as e:
+            except Exception:
                 log('failed to connect to hsdev server ({0})'.format(n), log_warning)
                 time.sleep(delay)
 
@@ -616,9 +661,9 @@ class HsDev(object):
     def connect_async(self, tries = 10, delay = 1.0):
         thread = threading.Thread(
             target = self.connect,
-            kwargs = { 'tries' : tries, 'delay': delay, 'just_connect' : True })
+            kwargs = {'tries': tries, 'delay': delay, 'just_connect': True})
         thread.start()
-  
+
     def wait(self, timeout = None):
         return self.connected.wait(timeout)
 
@@ -764,7 +809,7 @@ class HsDev(object):
                 return
 
     def get_response(self):
-        while not '\n' in self.part:
+        while '\n' not in self.part:
             self.part = self.part + self.socket.recv(65536).decode('utf-8')
         (r, _, post) = self.part.partition('\n')
         self.part = post
@@ -775,7 +820,7 @@ class HsDev(object):
     @command
     def link(self, hold = False, **kwargs):
         return cmd('link', {
-            'hold': hold })
+            'hold': hold})
 
     @command
     def ping(self):
@@ -792,21 +837,21 @@ class HsDev(object):
             'contents': [{'file': f, 'contents': cts} for f, cts in contents.items()],
             'ghc-opts': ghc,
             'docs': docs,
-            'infer': infer })
+            'infer': infer})
 
     @async_command
     def docs(self, projects = [], files = [], modules = []):
         return cmd('docs', {
             'projects': projects,
             'files': files,
-            'modules': modules })
+            'modules': modules})
 
     @async_command
     def infer(self, projects = [], files = [], modules = []):
         return cmd('infer', {
             'projects': projects,
             'files': files,
-            'modules': modules })
+            'modules': modules})
 
     @async_list_command
     def remove(self, cabal = False, sandboxes = [], projects = [], files = [], packages = []):
@@ -815,7 +860,7 @@ class HsDev(object):
             'cabal': cabal,
             'sandboxes': sandboxes,
             'files': files,
-            'packages': packages })
+            'packages': packages})
 
     @command
     def remove_all(self):
@@ -833,9 +878,9 @@ class HsDev(object):
         if deps:
             fs.append({'deps': deps})
         if sandbox:
-            fs.append({'cabal':{'sandbox': sandbox}})
+            fs.append({'cabal': {'sandbox': sandbox}})
         if cabal:
-            fs.append({'cabal':'cabal'})
+            fs.append({'cabal': 'cabal'})
         if db:
             fs.append({'db': encode_package_db(db)})
         if package:
@@ -870,9 +915,9 @@ class HsDev(object):
         if deps:
             fs.append({'deps': deps})
         if sandbox:
-            fs.append({'cabal':{'sandbox': sandbox}})
+            fs.append({'cabal': {'sandbox': sandbox}})
         if cabal:
-            fs.append({'cabal':'cabal'})
+            fs.append({'cabal': 'cabal'})
         if db:
             fs.append({'db': encode_package_db(db)})
         if package:
@@ -898,9 +943,9 @@ class HsDev(object):
         if deps:
             fs.append({'deps': deps})
         if sandbox:
-            fs.append({'cabal':{'sandbox': sandbox}})
+            fs.append({'cabal': {'sandbox': sandbox}})
         if cabal:
-            fs.append({'cabal':'cabal'})
+            fs.append({'cabal': 'cabal'})
         if db:
             fs.append({'db': encode_package_db(db)})
         if package:
@@ -1005,6 +1050,7 @@ class HsDev(object):
     def exit(self):
         return cmd('exit', {})
 
+
 def wait_result(fn, *args, **kwargs):
     wait_receive = threading.Event()
     x = {'result': None}
@@ -1017,6 +1063,7 @@ def wait_result(fn, *args, **kwargs):
         if on_resp:
             on_resp(r)
         wait_receive.set()
+
     def wait_error(e, ds):
         log('hsdev call fails with: {0}, {1}'.format(e, format_error_details(ds)))
         if on_err:
@@ -1032,6 +1079,7 @@ def wait_result(fn, *args, **kwargs):
 
     wait_receive.wait(tm)
     return x['result']
+
 
 class HsDevProcess(threading.Thread):
     def __init__(self, port = 4567, cache = None, log_file = None, log_config = None):

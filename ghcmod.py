@@ -3,8 +3,6 @@
 import os
 import re
 import sublime
-import sublime_plugin
-import threading
 from threading import Thread
 
 if int(sublime.version()) < 3000:
@@ -21,24 +19,26 @@ else:
     import SublimeHaskell.symbols as symbols
 
 
-
 def lint_as_hints(msgs):
     for m in msgs:
         if m[0] == 'lint':
             m[1].level = 'hint'
 
 
-
 def hsdev_check():
-    return (autocomplete.hsdev_client.check, lambda file: [file], lambda ms: ms, { 'ghc': get_setting_async('ghc_opts') })
+    return (autocomplete.hsdev_client.check, lambda file: [file], lambda ms: ms, {'ghc': get_setting_async('ghc_opts')})
+
+
 def hsdev_lint():
     return (autocomplete.hsdev_client.lint, lambda file: [file], lambda ms: ms, {})
 # def hsdev_check_lint():
 #     return (autocomplete.hsdev_client.ghcmod_check_lint, lambda file: [file], lambda ms: ms, { 'ghc': get_setting_async('ghc_opts') })
 
+
 def messages_as_hints(cmd):
     (fn, arg, msg, kwargs) = cmd
     return (fn, arg, lambda ms: [dict(m, level = 'hint') for m in ms], kwargs)
+
 
 class SublimeHaskellHsDevChain(SublimeHaskellTextCommand):
     def run(self, edit):
@@ -123,7 +123,6 @@ class SublimeHaskellHsDevChain(SublimeHaskellTextCommand):
         return is_haskell_source(None)
 
 
-
 def ghcmod_command(cmdname):
     def wrap(fn):
         def wrapper(self, *args, **kwargs):
@@ -138,21 +137,23 @@ def ghcmod_command(cmdname):
         return wrapper
     return wrap
 
+
 class SublimeHaskellCheck(SublimeHaskellHsDevChain):
     @ghcmod_command('check')
     def run(self, edit, fly = False):
         self.run_chain([hsdev_check()], 'Checking', fly_mode = fly)
+
 
 class SublimeHaskellLint(SublimeHaskellHsDevChain):
     @ghcmod_command('lint')
     def run(self, edit, fly = False):
         self.run_chain([hsdev_lint()], 'Linting', fly_mode = fly)
 
+
 class SublimeHaskellCheckAndLint(SublimeHaskellHsDevChain):
     @ghcmod_command('check_and_lint')
     def run(self, edit, fly = False):
         self.run_chain([hsdev_check(), messages_as_hints(hsdev_lint())], 'Checking and Linting', fly_mode = fly)
-
 
 
 class SublimeHaskellGhcModCheck(SublimeHaskellWindowCommand):
@@ -223,6 +224,7 @@ def run_ghcmods_thread(view, filename, msg, cmds_with_args, alter_messages_cb):
         args=(view, filename, msg, cmds_with_args, alter_messages_cb))
     thread.start()
 
+
 def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb):
     sublime.set_timeout(lambda: hide_output(view), 0)
 
@@ -270,6 +272,7 @@ def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb
 
     show_output_result_text(view, msg, output_text, exit_code, file_dir)
 
+
 def ghcmod_browse_module(module_name, cabal = None):
     """
     Returns symbols.Module with all declarations
@@ -313,6 +316,7 @@ def ghcmod_browse_module(module_name, cabal = None):
 
     return m
 
+
 def ghcmod_info(filename, module_name, symbol_name, cabal = None):
     """
     Uses ghc-mod info filename module_name symbol_name to get symbol info
@@ -322,11 +326,13 @@ def ghcmod_info(filename, module_name, symbol_name, cabal = None):
     # But in fact we use ghcmod_info only to retrieve type of symbol
     return parse_info(symbol_name, contents)
 
+
 def ghcmod_type(filename, module_name, line, column, cabal = None):
     """
     Uses ghc-mod type to infer type
     """
     return call_ghcmod_and_wait(['type', filename, module_name, str(line), str(column)], filename = filename, cabal = cabal)
+
 
 def ghcmod_enabled():
     return get_setting_async('enable_ghc_mod') == True

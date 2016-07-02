@@ -8,7 +8,6 @@ import sublime
 import sublime_plugin
 import threading
 import time
-import sys
 import webbrowser
 
 try:
@@ -21,7 +20,6 @@ if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     import symbols
     import hdocs
-    from ghci import ghci_info
     from hdevtools import start_hdevtools, stop_hdevtools
     from parseoutput import write_panel
     import hsdev
@@ -29,7 +27,6 @@ else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.symbols as symbols
     import SublimeHaskell.hdocs as hdocs
-    from SublimeHaskell.ghci import ghci_info
     from SublimeHaskell.hdevtools import start_hdevtools, stop_hdevtools
     from SublimeHaskell.parseoutput import write_panel
     import SublimeHaskell.hsdev as hsdev
@@ -69,12 +66,14 @@ IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']
 # Export module
 EXPORT_MODULE_RE = re.compile(r'\bmodule\s+[\w\d\.]*$')
 
+
 def is_scanned_source(view = None):
     window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
     if file_shown_in_view is None:
         return False
     m = head_of(hsdev_client.module(file = file_shown_in_view))
     return m is not None
+
 
 def is_in_project(view = None):
     window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
@@ -85,15 +84,18 @@ def is_in_project(view = None):
         return False
     return m.location.project is not None
 
+
 def get_line_contents(view, location):
     """
     Returns contents of line at the given location.
     """
     return view.substr(sublime.Region(view.line(location).a, location))
 
+
 def logged(v, fmt = '{0}'):
     log(fmt.format(v), log_trace)
     return v
+
 
 def get_line_contents_at_region(view, region):
     """
@@ -106,12 +108,14 @@ def get_line_contents_at_region(view, region):
     after = view.substr(sublime.Region(region.b, line_region.b))
     return (before, at, after)
 
+
 def get_line_contents_before_region(view, region):
     """
     Returns contents of line before the given region (including it).
     """
     (before, at, _) = get_line_contents_at_region(view, region)
     return before + at
+
 
 def get_qualified_name(s):
     """
@@ -122,6 +126,7 @@ def get_qualified_name(s):
     quals = s.split()[-1].split('.')
     filtered = map(lambda s: list(filter(lambda c: c.isalpha() or c.isdigit() or c == '_', s)), quals)
     return ('.'.join(filtered[0:len(filtered) - 1]), '.'.join(filtered))
+
 
 class QualifiedSymbol(object):
     def __init__(self, name = None, module = None, module_as = None, is_import_list = False, is_operator = False):
@@ -143,6 +148,7 @@ class QualifiedSymbol(object):
 
     def is_module(self):
         return self.name is None and self.module is not None
+
 
 def get_qualified_symbol(line):
     """
@@ -167,6 +173,7 @@ def get_qualified_symbol(line):
         name = next(i for i in [res.group('identifier'), res.group('operator')] if i is not None),
         is_operator = bool(res.group('operator')))
 
+
 def get_qualified_symbol_at_region(view, region):
     """
     Get module context of symbol and symbol itself for line before (and with) word on region
@@ -189,6 +196,7 @@ def get_ghcmod_language_pragmas():
 
     return []
 
+
 def get_ghcmod_flags_pragmas():
 
     if get_setting_async('enable_hsdev'):
@@ -197,6 +205,7 @@ def get_ghcmod_flags_pragmas():
         return call_ghcmod_and_wait(['flag']).splitlines()
 
     return []
+
 
 # Background worker
 class Worker(threading.Thread):
@@ -217,6 +226,7 @@ class Worker(threading.Thread):
 
 worker = None
 
+
 def run_async(name, fn, *args, **kwargs):
     global worker
     if not worker:
@@ -225,18 +235,21 @@ def run_async(name, fn, *args, **kwargs):
     worker.async(name, fn, *args, **kwargs)
 
 
-
 def sort_completions(comps):
     comps.sort(key = lambda k: k[0])
 
+
 def sorted_completions(comps):
-    return list(set(comps)) # unique + sort
+    return list(set(comps))  # unique + sort
+
 
 def make_completions(suggestions):
     return sorted_completions([s.suggest() for s in (suggestions or [])])
 
+
 def make_locations(comps):
     return sorted([[s.brief(), s.get_source_location()] for s in comps if s.has_source_location()], key = lambda k: k[0])
+
 
 class CompletionCache(object):
     def __init__(self):
@@ -266,6 +279,7 @@ hsdev_inspector = None
 hsdev_client = None
 hsdev_client_back = None
 
+
 # Set reinspect event
 def dirty(fn):
     def wrapped(self, *args, **kwargs):
@@ -284,14 +298,17 @@ def dirty(fn):
                 self.reinspect_event.set()
     return wrapped
 
+
 def use_inspect_modules(fn):
     def wrapped(self, *args, **kwargs):
         if get_setting_async('inspect_modules'):
             return fn(self, *args, **kwargs)
     return wrapped
 
+
 def hsdev_connected():
     return hsdev_inspector.hsdev_connected()
+
 
 # Return default value if hsdev is not enabled/connected
 def use_hsdev(def_val = None):
@@ -303,6 +320,7 @@ def use_hsdev(def_val = None):
                 return def_val
         return wrapped
     return wrap
+
 
 # Autocompletion data
 class AutoCompletion(object):
@@ -414,7 +432,7 @@ class AutoCompletion(object):
         suggestions = []
 
         wide = self.wide_completion == view
-        if wide: # Drop wide
+        if wide:  # Drop wide
             self.wide_completion = None
 
         if qsymbol.module:
@@ -564,7 +582,6 @@ class AutoCompletion(object):
 autocompletion = AutoCompletion()
 
 
-
 def can_complete_qualified_symbol(info):
     """
     Helper function, returns whether sublime_haskell_complete can run for (module, symbol, is_import_list)
@@ -576,6 +593,7 @@ def can_complete_qualified_symbol(info):
         return info.module in autocompletion.get_current_module_completions()
     else:
         return list(filter(lambda m: m.startswith(info.module), autocompletion.get_current_module_completions())) != []
+
 
 class SublimeHaskellComplete(SublimeHaskellTextCommand):
     """ Shows autocompletion popup """
@@ -593,7 +611,6 @@ class SublimeHaskellComplete(SublimeHaskellTextCommand):
         if self.wide:
             autocompletion.mark_wide_completion(self.view)
         self.view.run_command("auto_complete")
-
 
 
 class SublimeHaskellBrowseDeclarations(SublimeHaskellTextCommand):
@@ -623,7 +640,6 @@ class SublimeHaskellBrowseDeclarations(SublimeHaskellTextCommand):
         show_declaration_info(self.view, self.decls[idx])
 
 
-
 class SublimeHaskellFindDeclarations(SublimeHaskellWindowCommand):
     def run(self):
         self.window.show_input_panel("Search string", "", self.on_done, self.on_change, self.on_cancel)
@@ -646,7 +662,6 @@ class SublimeHaskellFindDeclarations(SublimeHaskellWindowCommand):
         if idx == -1:
             return
         show_declaration_info(self.window.active_view(), self.decls[idx])
-
 
 
 class SublimeHaskellHayoo(SublimeHaskellWindowCommand):
@@ -682,7 +697,6 @@ class SublimeHaskellHayoo(SublimeHaskellWindowCommand):
             show_status_message("Hayoo '{0}': not found".format(self.input))
             return
         self.window.show_quick_panel([[decl.module.name + ': ' + decl.brief(), str(decl.defined_module().location)] for decl in self.decls], self.on_select)
-
 
 
 class SublimeHaskellSearch(SublimeHaskellWindowCommand):
@@ -723,7 +737,6 @@ class SublimeHaskellSearch(SublimeHaskellWindowCommand):
             show_status_message("Search '{0}' not found".format(self.input))
             return
         self.window.show_quick_panel([[decl.module.name + ': ' + decl.brief(), str(decl.defined_module().location)] for decl in self.decls], self.on_select)
-
 
 
 # General goto command
@@ -785,8 +798,7 @@ class SublimeHaskellGoTo(SublimeHaskellWindowCommand):
         self.open(self.decls[idx], True)
 
     def open(self, decl, transient = False):
-        view = self.window.open_file(decl.get_source_location(), sublime.ENCODED_POSITION | sublime.TRANSIENT if transient else sublime.ENCODED_POSITION)
-
+        self.window.open_file(decl.get_source_location(), sublime.ENCODED_POSITION | sublime.TRANSIENT if transient else sublime.ENCODED_POSITION)
 
 
 class SublimeHaskellGoToModule(SublimeHaskellWindowCommand):
@@ -830,14 +842,14 @@ class SublimeHaskellGoToHackageModule(SublimeHaskellTextCommand):
             qsymbol = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
 
             ms = []
-            if qsymbol.is_module(): # module
+            if qsymbol.is_module():  # module
                 scope = self.view.file_name()
                 if scope:
                     ms = [m for m in hsdev_client.scope_modules(
                         scope, input = qsymbol.module, search_type = 'exact') if m.by_cabal()]
                 else:
                     ms = [m for m in hsdev_client.list_modules(db = m.location.db) if m.name == qsymbol.module and m.by_cabal()]
-            else: # symbol
+            else:  # symbol
                 scope = self.view.file_name()
                 if scope:
                     decls = hsdev_client.whois(
@@ -888,6 +900,7 @@ class SublimeHaskellGoToAnyDeclaration(SublimeHaskellWindowCommand):
             return
         self.window.open_file(self.cache_.source_locs[idx][1], sublime.ENCODED_POSITION)
 
+
 class SublimeHaskellReinspectAll(SublimeHaskellWindowCommand):
     def run(self):
         if hsdev_inspector.hsdev_connected():
@@ -895,6 +908,7 @@ class SublimeHaskellReinspectAll(SublimeHaskellWindowCommand):
             hsdev_inspector.start_inspect()
         else:
             show_status_message("inspector not connected", is_ok = False)
+
 
 class SublimeHaskellScanContents(SublimeHaskellTextCommand):
     """
@@ -915,6 +929,7 @@ class SublimeHaskellScanContents(SublimeHaskellTextCommand):
 
         hsdev_client.scan(contents = {self.current_file_name: self.view.substr(sublime.Region(0, self.view.size()))}, on_response = on_resp, on_error = on_err)
 
+
 class SublimeHaskellInferDocs(SublimeHaskellTextCommand):
     """
     Infer types and scan docs for current module
@@ -930,6 +945,7 @@ class SublimeHaskellInferDocs(SublimeHaskellTextCommand):
 
             def on_resp_(r):
                 self.status_msg.stop()
+
             def on_err_(e):
                 self.status_msg.fail()
                 self.status_msg.stop()
@@ -946,6 +962,7 @@ class SublimeHaskellInferDocs(SublimeHaskellTextCommand):
             run_infer()
 
         hsdev_client.docs(files = [self.current_file_name], on_response = on_resp, on_error = on_err)
+
 
 class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
     """
@@ -975,11 +992,11 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
             module_word = qsymbol.module
             ident = qsymbol.name
 
-            if ident is None: # module
+            if ident is None:  # module
                 if not no_browse:
                     self.view.window().run_command('sublime_haskell_browse_module', {
                         'module_name': module_word,
-                        'scope': self.current_file_name })
+                        'scope': self.current_file_name})
                 return
 
             if not module_word and not ident:
@@ -1014,7 +1031,7 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
         self.show_symbol_info(self.candidates[idx])
 
     def on_import_selected(self, idx):
-        if idx == 0: # Yes, select imported module
+        if idx == 0:  # Yes, select imported module
             sublime.set_timeout(
                 lambda: self.view.window().show_quick_panel(['{0}.{1}'.format(i[0], i[1]) for i in self.candidates], self.on_candidate_selected), 0)
 
@@ -1036,6 +1053,7 @@ class SublimeHaskellSymbolInfoCommand(SublimeHaskellTextCommand):
     def is_visible(self):
         return is_haskell_source(self.view) or is_haskell_repl(self.view)
 
+
 # Show symbol info for declaration via calling command
 def show_declaration_info(view, decl):
     if decl.by_hayoo():
@@ -1054,6 +1072,7 @@ def show_declaration_info(view, decl):
 
     sublime.set_timeout(lambda: view.run_command('sublime_haskell_symbol_info', info), 0)
 
+
 def show_declaration_info_panel(view, decl):
     info = decl.detailed()
     if get_setting_async('unicode_symbol_info'):
@@ -1070,17 +1089,20 @@ def show_declaration_info_panel(view, decl):
 
 toggle_symbol_info = False
 
+
 class SublimeHaskellToggleSymbolInfoCommand(SublimeHaskellWindowCommand):
     def run(self):
         global toggle_symbol_info
         toggle_symbol_info = not toggle_symbol_info
         show_status_message('continuous symbol info: {0}'.format('on' if toggle_symbol_info else 'off'))
 
+
 class SublimeHaskellContinuousSymbolInfo(sublime_plugin.EventListener):
     def on_selection_modified(self, view):
         if toggle_symbol_info:
             if is_haskell_source(view) and view.file_name():
-                view.run_command('sublime_haskell_symbol_info', { 'no_browse': True })
+                view.run_command('sublime_haskell_symbol_info', {'no_browse': True})
+
 
 class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
     """
@@ -1121,7 +1143,7 @@ class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
     def add_import(self, module_name):
         self.module_name = module_name
         contents = self.view.substr(sublime.Region(0, self.view.size()))
-        contents_part = contents[0 : list(re.finditer('^import.*$', contents, re.MULTILINE))[-1].end()]
+        contents_part = contents[0: list(re.finditer('^import.*$', contents, re.MULTILINE))[-1].end()]
         call_and_wait_tool(['hsinspect'], 'hsinspect', contents_part, self.on_inspected, check_enabled = False)
 
     def on_inspected(self, result):
@@ -1158,7 +1180,7 @@ class SublimeHaskellInsertImportForSymbol(SublimeHaskellTextCommand):
             return
         self.view.run_command('sublime_haskell_insert_import_for_symbol', {
             'filename': self.current_file_name,
-            'module_name': self.candidates[idx].module.name })
+            'module_name': self.candidates[idx].module.name})
 
     def is_visible(self):
         return is_haskell_source(self.view)
@@ -1200,6 +1222,7 @@ class SublimeHaskellClearImports(SublimeHaskellTextCommand):
                 erased = erased + 1
             else:
                 self.view.replace(edit, self.view.line(pt), ni)
+
 
 class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
     """
@@ -1283,12 +1306,11 @@ class SublimeHaskellBrowseModule(SublimeHaskellWindowCommand):
         show_declaration_info(self.window.active_view(), self.candidates[idx])
 
 
-
 class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
     def run(self, edit):
         qsymbol = get_qualified_symbol_at_region(self.view, self.view.sel()[0])
 
-        if is_haskell_symbol_info(self.view): # Go to within symbol info window
+        if is_haskell_symbol_info(self.view):  # Go to within symbol info window
             loc = self.view.settings().get('location')
             if loc:
                 self.view.window().open_file(loc, sublime.ENCODED_POSITION)
@@ -1300,7 +1322,7 @@ class SublimeHaskellGoToDeclaration(SublimeHaskellTextCommand):
         full_name = qsymbol.full_name()
 
         current_file_name = self.view.file_name()
-        current_project = get_cabal_project_dir_of_file(current_file_name)
+        # current_project = get_cabal_project_dir_of_file(current_file_name)
 
         candidates = []
         module_candidates = []
@@ -1387,7 +1409,7 @@ def ghc_eval_x(rs):
         if type(i) == dict:
             return None
         try:
-            x = json.loads(i) # FIXME: Is it ok?
+            x = json.loads(i)  # FIXME: Is it ok?
             if type(x) == str:
                 return x
         except ValueError:
@@ -1395,9 +1417,11 @@ def ghc_eval_x(rs):
         return i
     return list(map(process, rs))
 
+
 def ghc_eval_merge_results(l, r):
     # Prefer result in 'l', but if there's 'fail' - use result from 'r'
     return [x or y for x, y in zip(l, r)]
+
 
 class SublimeHaskellEvalSelectionCommand(SublimeHaskellTextCommand):
     def run(self, edit):
@@ -1405,13 +1429,14 @@ class SublimeHaskellEvalSelectionCommand(SublimeHaskellTextCommand):
         self.results = ghc_eval_x(hsdev_client.ghc_eval(self.args))
 
         self.view.run_command('sublime_haskell_eval_replace', {
-            'results': self.results })
+            'results': self.results})
 
     def is_enabled(self):
         return True
 
     def is_visible(self):
         return True
+
 
 class SublimeHaskellApplyToSelectionCommand(SublimeHaskellTextCommand):
     def run(self, edit):
@@ -1430,10 +1455,11 @@ class SublimeHaskellApplyToSelectionCommand(SublimeHaskellTextCommand):
         self.string_results = ghc_eval_x(hsdev_client.ghc_eval(["({0}) ({1})".format(f, json.dumps(a)) for a in self.args]))
 
         self.view.run_command('sublime_haskell_eval_replace', {
-            'results': ghc_eval_merge_results(self.results, self.string_results) })
+            'results': ghc_eval_merge_results(self.results, self.string_results)})
 
     def on_cancel(self):
         pass
+
 
 class SublimeHaskellApplyToSelectionListCommand(SublimeHaskellTextCommand):
     def run(self, edit):
@@ -1456,7 +1482,7 @@ class SublimeHaskellApplyToSelectionListCommand(SublimeHaskellTextCommand):
             return
         else:
             result_list = json.loads(self.res[0])
-            self.view.run_command('sublime_haskell_eval_replace', { 'results': result_list })
+            self.view.run_command('sublime_haskell_eval_replace', {'results': result_list})
 
     def on_cancel(self):
         pass
@@ -1580,7 +1606,6 @@ class AutoFixState(object):
 autofix_state = AutoFixState()
 
 
-
 class SublimeHaskellAutoFix(SublimeHaskellWindowCommand):
     def run(self):
         if self.window.active_view().file_name():
@@ -1606,35 +1631,42 @@ class SublimeHaskellAutoFix(SublimeHaskellWindowCommand):
             autofix_state.set(self.window.active_view(), self.corrections)
             autofix_state.mark()
 
+
 class SublimeHaskellAutoFixTextBase(SublimeHaskellTextCommand):
     def is_enabled(self):
         return autofix_state.is_active() and autofix_state.view == self.view
 
+
 class SublimeHaskellAutoFixWindowBase(SublimeHaskellWindowCommand):
     def is_enabled(self):
         return autofix_state.is_active() and autofix_state.view == self.window.active_view()
+
 
 class SublimeHaskellAutoFixPrevious(SublimeHaskellAutoFixWindowBase):
     def run(self):
         if autofix_state.selected > 0:
             autofix_state.set_selected(autofix_state.selected - 1)
 
+
 class SublimeHaskellAutoFixNext(SublimeHaskellAutoFixWindowBase):
     def run(self):
         if autofix_state.selected + 1 < autofix_state.count():
             autofix_state.set_selected(autofix_state.selected + 1)
 
+
 class SublimeHaskellAutoFixAll(SublimeHaskellAutoFixWindowBase):
     def run(self):
         autofix_state.unmark()
-        self.window.active_view().run_command('sublime_haskell_auto_fix_fix_it', { 'all': True })
+        self.window.active_view().run_command('sublime_haskell_auto_fix_fix_it', {'all': True})
         autofix_state.clear()
+
 
 class SublimeHaskellAutoFixFix(SublimeHaskellAutoFixWindowBase):
     def run(self):
         autofix_state.unmark()
         self.window.active_view().run_command('sublime_haskell_auto_fix_fix_it')
         autofix_state.fix_current()
+
 
 class SublimeHaskellAutoFixFixIt(SublimeHaskellAutoFixTextBase):
     def run(self, edit, all = False):
@@ -1661,6 +1693,7 @@ class SublimeHaskellAutoFixFixIt(SublimeHaskellAutoFixTextBase):
             self.view.erase_regions('autofix_fix')
             self.view.set_read_only(True)
 
+
 class SublimeHaskellAutoFixUndo(SublimeHaskellAutoFixWindowBase):
     def run(self):
         autofix_state.unmark()
@@ -1671,6 +1704,7 @@ class SublimeHaskellAutoFixUndo(SublimeHaskellAutoFixWindowBase):
 
     def is_enabled(self):
         return super(SublimeHaskellAutoFixUndo, self).is_enabled() and autofix_state.has_undo()
+
 
 class SublimeHaskellAutoFixRedo(SublimeHaskellAutoFixWindowBase):
     def run(self):
@@ -1683,9 +1717,11 @@ class SublimeHaskellAutoFixRedo(SublimeHaskellAutoFixWindowBase):
     def is_enabled(self):
         return super(SublimeHaskellAutoFixRedo, self).is_enabled() and autofix_state.has_redo()
 
+
 class SublimeHaskellAutoFixStop(SublimeHaskellAutoFixWindowBase):
     def run(self):
         autofix_state.clear()
+
 
 class SublimeHaskellReplaceRegions(sublime_plugin.TextCommand):
     def run(self, edit, replaces):
@@ -1694,6 +1730,7 @@ class SublimeHaskellReplaceRegions(sublime_plugin.TextCommand):
             rs = self.view.get_regions('sublime_haskell_replace_regions')
             self.view.replace(edit, rs[i], text)
         self.view.erase_regions('sublime_haskell_replace_regions')
+
 
 class hsdev_status(object):
     def __init__(self, status_message):
@@ -1706,6 +1743,7 @@ class hsdev_status(object):
             statuses.append('{0} ({1}/{2})'.format(m['name'], p['current'], p['total']) if p else m['name'])
         self.status_message.change_message('Inspecting {0}'.format(' / '.join(statuses)))
 
+
 def update_completions_async(files = [], drop_all = False):
     if drop_all:
         run_async('drop all completions', autocompletion.drop_completions_async)
@@ -1713,6 +1751,7 @@ def update_completions_async(files = [], drop_all = False):
         for f in files:
             run_async('drop completions', autocompletion.drop_completions_async, f)
     run_async('init completions', autocompletion.init_completions_async)
+
 
 class HsDevAgent(threading.Thread):
     def __init__(self):
@@ -1731,8 +1770,8 @@ class HsDevAgent(threading.Thread):
         return self.hsdev.is_connected()
 
     def start_hsdev(self, start_server = True):
-        min_ver = [0,2,0,0]
-        max_ver = [0,2,1,0]
+        min_ver = [0, 2, 0, 0]
+        max_ver = [0, 2, 1, 0]
 
         hsdev_ver = hsdev.hsdev_version()
         if hsdev_ver is None:
@@ -1756,6 +1795,7 @@ class HsDevAgent(threading.Thread):
                 log('hsdev process started', log_trace)
                 self.hsdev.connect_async()
                 self.hsdev_back.connect_async()
+
             def exit_():
                 log('hsdev process exited', log_trace)
                 self.hsdev.close()
@@ -1764,6 +1804,7 @@ class HsDevAgent(threading.Thread):
             def connected_():
                 log('hsdev agent: connected to hsdev', log_trace)
                 self.hsdev.link()
+
             def back_connected_():
                 log('hsdev agent: connected to hsdev', log_trace)
                 self.start_inspect()
@@ -1931,6 +1972,7 @@ class HsDevAgent(threading.Thread):
         except Exception as e:
             log('Inspecting files failed: {0}'.format(e), log_error)
 
+
 def list_files_in_dir_recursively(base_dir):
     """Return a list of a all files in a directory, recursively.
     The files will be specified by full paths."""
@@ -1941,9 +1983,9 @@ def list_files_in_dir_recursively(base_dir):
     return files
 
 
-
 def is_inspected_source(view = None):
     return is_haskell_source(view) or is_cabal_source(view)
+
 
 class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
     def __init__(self):
@@ -1964,9 +2006,9 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             line_contents = get_line_contents(view, locations[0])
             export_module = EXPORT_MODULE_RE.search(line_contents)
             if export_module:
-                qsymbol = get_qualified_symbol_at_region(view, view.sel()[0])
+                # qsymbol = get_qualified_symbol_at_region(view, view.sel()[0])
                 # TODO: Implement
-
+                pass
 
         if not completions:
             completions = autocompletion.get_completions(view, prefix, locations)
@@ -1992,7 +2034,8 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         if filename:
             (cabal_dir, project_name) = get_cabal_project_dir_and_name_of_file(filename)
             if project_name:
-                view.set_status('sublime_haskell_cabal', '{0}: {1}'.format('cabal', project_name)) # TODO: Set some useful status instead of this
+                # TODO: Set some useful status instead of this
+                view.set_status('sublime_haskell_cabal', '{0}: {1}'.format('cabal', project_name))
 
     def on_activated_async(self, view):
         if is_haskell_source(view):
@@ -2069,7 +2112,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         elif key == "is_module_completion" or key == "is_import_completion":
             chars = {
                 "is_module_completion": '.',
-                "is_import_completion": '(' }
+                "is_import_completion": '('}
 
             region = view.sel()[0]
             if region.a != region.b:
@@ -2080,6 +2123,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             return can_complete_qualified_symbol(get_qualified_symbol(preline))
         else:
             return False
+
 
 def start_inspector():
     global hsdev_inspector
@@ -2096,11 +2140,12 @@ def start_inspector():
     hsdev_client_back = hsdev_inspector.hsdev_back
     hsdev_inspector.start()
 
+
 def plugin_loaded():
     global HSDEV_CACHE_PATH
     global HSDEV_LOG
 
-    package_path = sublime_haskell_package_path()
+    # package_path = sublime_haskell_package_path()
     cache_path = sublime_haskell_cache_path()
 
     HSDEV_CACHE_PATH = os.path.join(cache_path, 'hsdev')
@@ -2108,6 +2153,7 @@ def plugin_loaded():
 
     # TODO: How to stop_hdevtools() in Sublime Text 2?
     start_hdevtools()
+
 
 def plugin_unloaded():
     # Does this work properly on exit?

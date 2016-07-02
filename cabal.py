@@ -1,19 +1,16 @@
 # -*- coding: UTF-8 -*-
 
 import sublime
-import sublime_plugin
-import sys
 
 if int(sublime.version()) < 3000:
 	from sublime_haskell_common import *
-	import hsdev
 	from parseoutput import write_panel
 	from autocomplete import hsdev_client
 else:
 	from SublimeHaskell.sublime_haskell_common import *
-	import SublimeHaskell.hsdev as hsdev
 	from SublimeHaskell.parseoutput import write_panel
 	from SublimeHaskell.autocomplete import hsdev_client
+
 
 class SublimeHaskellCabalList(SublimeHaskellWindowCommand):
 	def run(self):

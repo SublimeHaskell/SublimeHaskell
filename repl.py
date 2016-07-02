@@ -9,7 +9,6 @@ has_sublime_repl = True
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     import autocomplete
-    import hsdev
     try:
         import sublimerepl
     except ImportError:
@@ -18,7 +17,6 @@ if int(sublime.version()) < 3000:
 else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.autocomplete as autocomplete
-    import SublimeHaskell.hsdev as hsdev
     try:
         import SublimeREPL.sublimerepl as sublimerepl
     except ImportError:
@@ -26,21 +24,24 @@ else:
         has_sublime_repl = False
 
 
-
 COMMAND_RE = re.compile(r'^.*:[a-z]*$')
 IMPORT_RE = re.compile(r'^.*\bimport\s+(qualified\s+)?(?P<module>[\w\d\.]*)$')
+
 
 def find_sublime_haskell_repl():
     repls = list(sublimerepl.manager.find_repl('sublime_haskell_repl')) if has_sublime_repl else []
     return repls
 
+
 def run_repl_command(repl, str):
     repl.write("{0}\n".format(str))
     repl.repl.write("{0}\n".format(str))
 
+
 def show_scope(repl):
     run_repl_command(":show modules")
     run_repl_command(":show imports")
+
 
 class Repl(object):
     def __init__(self, view, path = None, project_name = None):
@@ -52,6 +53,7 @@ class Repl(object):
 
     def is_project(self):
         return self.project_name is not None
+
 
 # external_id => view
 class Repls(object):
@@ -65,6 +67,7 @@ class Repls(object):
         return self.repls.get(id)
 
 repls = Repls()
+
 
 class SublimeHaskellAutocompleteRepl(sublime_plugin.EventListener):
     def __init__(self):
@@ -97,6 +100,7 @@ class SublimeHaskellAutocompleteRepl(sublime_plugin.EventListener):
             return (completions, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         return completions
 
+
 def repl_args(**kwargs):
     def_args = {
         "type": "sublime_haskell",
@@ -104,8 +108,8 @@ def repl_args(**kwargs):
         "cmd": ["ghci"],
         "cwd": "$file_path",
         "external_id": "sublime_haskell_repl",
-        "syntax": "Packages/SublimeHaskell/Syntaxes/HaskellRepl.tmLanguage" }
-        
+        "syntax": "Packages/SublimeHaskell/Syntaxes/HaskellRepl.tmLanguage"}
+
     # Drop this options until https://github.com/wuub/SublimeREPL/pull/395 is merged
     kwargs.pop('loaded')
     kwargs.pop('caption')
@@ -113,6 +117,7 @@ def repl_args(**kwargs):
     ret_args = def_args.copy()
     ret_args.update(kwargs)
     return ret_args
+
 
 class SublimeHaskellReplGhci(SublimeHaskellWindowCommand):
     def run(self):
@@ -124,6 +129,7 @@ class SublimeHaskellReplGhci(SublimeHaskellWindowCommand):
 
     def is_enabled(self):
         return has_sublime_repl
+
 
 class SublimeHaskellReplGhciCurrentFile(SublimeHaskellWindowCommand):
     def run(self):
@@ -141,13 +147,14 @@ class SublimeHaskellReplGhciCurrentFile(SublimeHaskellWindowCommand):
     def is_enabled(self):
         return has_sublime_repl and SublimeHaskellWindowCommand.is_enabled(self)
 
+
 class SublimeHaskellReplCabal(SublimeHaskellWindowCommand):
     def run(self):
         view = self.window.active_view()
         if not view:
             show_status_message("No file active", False)
         else:
-            project_dir, project_name =  get_cabal_project_dir_and_name_of_view(view)
+            project_dir, project_name = get_cabal_project_dir_and_name_of_view(view)
             if not project_dir:
                 show_status_message("Not in project", False)
             proj_info = autocomplete.hsdev_client.project(project_name)
@@ -174,6 +181,7 @@ class SublimeHaskellReplCabal(SublimeHaskellWindowCommand):
 
     def is_enabled(self):
         return has_sublime_repl and is_enabled_haskell_command(None, True)
+
 
 class SublimeHaskellReplLoad(SublimeHaskellWindowCommand):
     def run(self):

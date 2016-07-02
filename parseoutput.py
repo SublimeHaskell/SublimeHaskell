@@ -4,7 +4,6 @@ import os
 import os.path
 import re
 import sublime
-import sublime_plugin
 import time
 from sys import version
 from threading import Thread
@@ -48,6 +47,7 @@ def filename_of_path(p):
     # we have forward or backslashes on Windows.
     return re.match(r'(.*[/\\])?(.*)', p).groups()[1]
 
+
 class OutputPoint(object):
     def __init__(self, line, column):
         self.line = int(line)
@@ -64,6 +64,7 @@ class OutputPoint(object):
 
     def to_point_of_view(self, view):
         return view.text_point(self.line, self.column)
+
 
 class OutputMessage(object):
     "Describe an error or warning message produced by GHC."
@@ -97,16 +98,17 @@ class OutputMessage(object):
     def to_region_in_view(self, view):
         "Return the Region referred to by this error message."
         # Convert line and column count to zero-based indices:
-        if self.start == self.end: # trimmed full line
+        if self.start == self.end:  # trimmed full line
             return trim_region(view, view.line(self.start.to_point_of_view(view)))
         return sublime.Region(self.start.to_point_of_view(view), self.end.to_point_of_view(view))
-
 
 
 def clear_error_marks():
     global ERRORS
 
-    listdict = lambda: defaultdict(list)
+    def listdict():
+        return defaultdict(list)
+    # listdict = lambda: defaultdict(list)
     ERRORS = defaultdict(listdict)
 
 
@@ -146,7 +148,7 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
     sublime.set_timeout(lambda: hide_output(view), 0)
 
     # run and wait commands, fail on first fail
-    stdout = ''
+    # stdout = ''
     stderr = ''
     output_log = output_panel(view.window(), '', panel_name = 'sublime_haskell_build_log', show_panel = get_setting_async('show_output_window'))
     for cmd in cmds:
@@ -159,7 +161,7 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
             lines.append(line)
             output_text(output_log, line)
         exit_code = cmd_p.wait()
-        stdout = '\n'.join(lines)
+        # stdout = '\n'.join(lines)
         stderr = crlf2lf(decode_bytes(cmd_p.stderr.read()))
     hide_panel(view.window(), panel_name = 'sublime_haskell_build_log')
 
@@ -186,6 +188,7 @@ def format_output_messages(messages):
     else:
         details = u'\n'.join(unicode(x) for x in messages)
         return u'{0}\n\n{1}'.format(summary_line, details) if details else u''
+
 
 def show_output_result_text(view, msg, text, exit_code, base_dir):
     """Shows text (formatted messages) in output with build result"""
@@ -280,6 +283,7 @@ def goto_error(view, filename, line, column):
         error_view.show(error_region.a)
     view.window().open_file("{0}:{1}:{2}".format(filename, line, column), sublime.ENCODED_POSITION)
 
+
 def get_next_value(v, lst, cycle = True):
     # Get next value from list
     if v is None:
@@ -292,6 +296,7 @@ def get_next_value(v, lst, cycle = True):
         return lst[0]
     return None
 
+
 class SublimeHaskellNextError(SublimeHaskellTextCommand):
     def run(self, edit):
         v = self.view
@@ -301,10 +306,10 @@ class SublimeHaskellNextError(SublimeHaskellTextCommand):
         gotoline = None
         gotocolumn = None
         if fn in ERRORS:
-            if line in ERRORS[fn]: # on some line, check if there are another error on same linee
+            if line in ERRORS[fn]:  # on some line, check if there are another error on same linee
                 gotoline = line
                 gotocolumn = get_next_value(column, sorted([e.start.column for e in ERRORS[fn][gotoline]]), cycle = False)
-                if gotocolumn is not None: # next error on same line
+                if gotocolumn is not None:  # next error on same line
                     goto_error(v, fn, gotoline + 1, gotocolumn + 1)
                     return
             # no error on this line, find next (and cycle through)
@@ -312,10 +317,11 @@ class SublimeHaskellNextError(SublimeHaskellTextCommand):
             if gotoline is not None:
                 # go to first error on line
                 gotocolumn = get_next_value(None, sorted([e.start.column for e in ERRORS[fn][gotoline]]), cycle = False)
-                if gotocolumn is not None: # found some
+                if gotocolumn is not None:  # found some
                     goto_error(v, fn, gotoline + 1, gotocolumn + 1)
                     return
             show_status_message('No more errors or warnings!', priority = 5)
+
 
 class SublimeHaskellPreviousError(SublimeHaskellTextCommand):
     def run(self, edit):
@@ -338,9 +344,9 @@ class SublimeHaskellPreviousError(SublimeHaskellTextCommand):
             sublime.status_message("No more errors or warnings!")
 
 
-
 def region_key(name):
     return 'subhs-{0}s'.format(name)
+
 
 def get_icon(png):
     return "/".join([
@@ -348,6 +354,7 @@ def get_icon(png):
         os.path.basename(os.path.dirname(__file__)),
         "Icons",
         png])
+
 
 def mark_messages_in_view(messages, view):
     # Regions by level
@@ -373,6 +380,7 @@ def write_panel(window, text, panel_name = "sublime_haskell_panel", syntax = Non
     info_view.settings().set("result_file_regex", symbol_file_regex)
     return info_view
 
+
 def write_output(view, text, cabal_project_dir, show_panel = True):
     "Write text to Sublime's output panel."
     global error_view
@@ -384,8 +392,10 @@ def write_output(view, text, cabal_project_dir, show_panel = True):
 def hide_output(view, panel_name = ERROR_PANEL_NAME):
     view.window().run_command('hide_panel', {'panel': 'output.' + panel_name})
 
+
 def show_output(view, panel_name = ERROR_PANEL_NAME):
     view.window().run_command('show_panel', {'panel': 'output.' + panel_name})
+
 
 def tabs_offset(view, point):
     """
@@ -396,11 +406,13 @@ def tabs_offset(view, point):
     cur_line = view.substr(view.line(point))
     return len(list(filter(lambda ch: ch == '\t', cur_line))) * 7
 
+
 def sublime_column_to_ghc_column(view, line, column):
     """
     Convert sublime zero-based column to ghc-mod column (where tab is 8 length)
     """
     return column + tabs_offset(view, view.text_point(line, column)) + 1
+
 
 def ghc_column_to_sublime_column(view, line, column):
     """
@@ -415,6 +427,7 @@ def ghc_column_to_sublime_column(view, line, column):
         col += (8 if c == '\t' else 1)
         real_col += 1
     return real_col
+
 
 def parse_output_messages(view, base_dir, text):
     "Parse text into a list of OutputMessage objects."

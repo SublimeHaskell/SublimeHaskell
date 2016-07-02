@@ -3,20 +3,16 @@
 import os
 import os.path
 import sublime
-import sublime_plugin
-import copy
 from threading import Thread
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     from parseoutput import run_chain_build_thread
     import autocomplete
-    import hsdev
 else:
     from SublimeHaskell.sublime_haskell_common import *
     from SublimeHaskell.parseoutput import run_chain_build_thread
     import SublimeHaskell.autocomplete as autocomplete
-    import SublimeHaskell.hsdev as hsdev
 
 OUTPUT_PANEL_NAME = "haskell_run_output"
 
@@ -24,6 +20,7 @@ build_tool = {
     'cabal': {'command': 'cabal', 'name': 'cabal'},
     'stack': {'command': 'stack', 'name': 'stack'}
 }
+
 
 def same_steps(steps):
     return {'cabal': steps, 'stack': steps}
@@ -55,14 +52,14 @@ build_tool_config = {
         'message': 'Building',
         'steps': {
             'cabal': [['build'], ['build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
-            'stack': [['build']] # FIXME: What commands to use?
+            'stack': [['build']]  # FIXME: What commands to use?
         }
     },
     'typecheck_then_warnings': {
         'message': 'Checking',
         'steps': {
             'cabal': [['build', '--ghc-options=-c'], ['build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
-            'stack': [['build']] # FIXME: What command to use?
+            'stack': [['build']]  # FIXME: What command to use?
         }
     },
 
@@ -108,6 +105,7 @@ class SublimeHaskellBaseCommand(SublimeHaskellWindowCommand):
     def is_visible(self):
         return is_enabled_haskell_command(None, False)
 
+
 # Retrieve projects as dictionary that refers to this app instance
 def get_projects():
     if autocomplete.hsdev_connected():
@@ -135,7 +133,8 @@ def get_projects():
                 active_projects.append((proj_name, proj_dir))
                 src_files = [f for f in src_files if not f.startswith(proj_dir)]
 
-        return dict((name, { 'name': name, 'path': path }) for name, path in active_projects)
+        return dict((name, {'name': name, 'path': path}) for name, path in active_projects)
+
 
 # Select project from list
 # on_selected accepts name of project and directory of project
@@ -183,7 +182,7 @@ def run_build(view, project_name, project_dir, config):
     projects_being_built.add(project_name)
 
     build_tool_name = get_setting_async('haskell_build_tool', 'stack')
-    if build_tool_name == 'stack' and not is_stack_project(project_dir): # rollback to cabal
+    if build_tool_name == 'stack' and not is_stack_project(project_dir):  # rollback to cabal
         build_tool_name = 'cabal'
 
     tool = build_tool[build_tool_name]
@@ -246,6 +245,7 @@ class SublimeHaskellInstallCommand(SublimeHaskellBaseCommand):
     def run(self):
         self.build('install')
 
+
 class SublimeHaskellTestCommand(SublimeHaskellBaseCommand):
     def run(self):
         def has_tests(name, info):
@@ -253,13 +253,14 @@ class SublimeHaskellTestCommand(SublimeHaskellBaseCommand):
 
         self.build('test', filter_project = has_tests)
 
+
 # Auto build current project
 class SublimeHaskellBuildAutoCommand(SublimeHaskellBaseCommand):
     def run(self):
         current_project_dir, current_project_name = get_cabal_project_dir_and_name_of_view(self.window.active_view())
         if current_project_name and current_project_dir:
             build_mode = get_setting('auto_build_mode')
-            run_tests = get_setting('auto_run_tests')
+            # run_tests = get_setting('auto_run_tests')
 
             build_command = {
                'normal': 'build',
@@ -354,6 +355,7 @@ def write_output(window, text, base_dir, show_panel = True):
 def hide_output(window):
     window.run_command('hide_panel', {'panel': 'output.' + OUTPUT_PANEL_NAME})
 
+
 def run_build_commands_with(msg, cmds):
     """Run general build commands"""
     window, view, file_shown_in_view = get_haskell_command_window_view_file_project()
@@ -367,6 +369,7 @@ def run_build_commands_with(msg, cmds):
         return
 
     run_chain_build_thread(view, cabal_project_dir, msg(cabal_project_name), cmds)
+
 
 def run_build_command_with(msg, cmd):
     """Run one command"""

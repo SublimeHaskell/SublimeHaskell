@@ -1,6 +1,5 @@
 # -*- coding: UTF-8 -*-
 
-import threading
 import sublime
 import os.path
 
@@ -9,6 +8,7 @@ if int(sublime.version()) < 3000:
 else:
     from SublimeHaskell.sublime_haskell_common import *
     from functools import reduce
+
 
 class Position(object):
     def __init__(self, line, column):
@@ -28,6 +28,7 @@ class Position(object):
 
     def from_zero_based(self):
         return Position(self.line + 1, self.column + 1)
+
 
 class Location(object):
     """
@@ -49,11 +50,13 @@ class Location(object):
     def get_id(self):
         return self.filename
 
+
 def source_location(loc, pos):
     """ Returns filename:line:column """
     if not pos:
         return str(loc)
     return ':'.join([str(loc), str(pos)])
+
 
 class Package(object):
     def __init__(self, name, version = None):
@@ -62,6 +65,7 @@ class Package(object):
 
     def package_id(self):
         return '{0}-{1}'.format(self.name, self.version) if self.version is not None else self.name
+
 
 def parse_package(package_id):
     if package_id is None:
@@ -75,6 +79,7 @@ def parse_package(package_id):
         (name, ) = m.groups()
         return Package(name)
     return None
+
 
 class PackageDb(object):
     def __init__(self, global_db = False, user_db = False, package_db = None):
@@ -110,6 +115,7 @@ class PackageDb(object):
             return PackageDb(user_db = True)
         return PackageDb(package_db = s)
 
+
 class InstalledLocation(object):
     """
     Module location in cabal
@@ -136,6 +142,7 @@ class InstalledLocation(object):
     def sandbox(self):
         return self.db.package_db
 
+
 class OtherLocation(object):
     """
     Other module location
@@ -155,20 +162,24 @@ class OtherLocation(object):
     def get_id(self):
         return '[{0}]'.format(self.source)
 
+
 def location_package_name(loc):
     if type(loc) == InstalledLocation and loc.package:
         return loc.package.name
     return None
+
 
 def location_project(loc):
     if type(loc) == Location and loc.project:
         return loc.project
     return None
 
+
 def location_cabal(loc):
     if type(loc) == InstalledLocation:
         return loc.cabal
     return None
+
 
 class Symbol(object):
     """
@@ -179,6 +190,7 @@ class Symbol(object):
         self.name = name
 
         self.tags = {}
+
 
 class Import(object):
     """
@@ -194,8 +206,10 @@ class Import(object):
     def dump(self):
         return self.__dict__
 
+
 def module_location(filename):
     return Location(filename)
+
 
 class Module(Symbol):
     """
@@ -250,6 +264,7 @@ class Module(Symbol):
 
     def by_hayoo(self):
         return type(self.location) == OtherLocation
+
 
 class Declaration(Symbol):
     def __init__(self, name, decl_type = 'declaration', docs = None, imported = [], defined = None, position = None, module = None):
@@ -337,10 +352,12 @@ class Declaration(Symbol):
 
         return '\n'.join(info)
 
+
 def wrap_operator(name):
     if re.match(r"[\w']+", name):
         return name
     return "({0})".format(name)
+
 
 class Function(Declaration):
     """
@@ -357,6 +374,7 @@ class Function(Declaration):
         if short:
             return u'{0}'.format(wrap_operator(self.name))
         return u'{0} :: {1}'.format(wrap_operator(self.name), self.type if self.type else u'?')
+
 
 class TypeBase(Declaration):
     """
@@ -394,12 +412,14 @@ class TypeBase(Declaration):
 
         return u' '.join(brief_parts)
 
+
 class Type(TypeBase):
     """
     Haskell type synonym
     """
     def __init__(self, name, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
         super(Type, self).__init__(name, 'type', context, args, definition, docs, imported, defined, position, module)
+
 
 class Newtype(TypeBase):
     """
@@ -408,6 +428,7 @@ class Newtype(TypeBase):
     def __init__(self, name, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
         super(Newtype, self).__init__(name, 'newtype', context, args, definition, docs, imported, defined, position, module)
 
+
 class Data(TypeBase):
     """
     Haskell data declaration
@@ -415,12 +436,14 @@ class Data(TypeBase):
     def __init__(self, name, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
         super(Data, self).__init__(name, 'data', context, args, definition, docs, imported, defined, position, module)
 
+
 class Class(TypeBase):
     """
     Haskell class declaration
     """
     def __init__(self, name, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
         super(Class, self).__init__(name, 'class', context, args, definition, docs, imported, defined, position, module)
+
 
 def update_with(l, r, default_value, f):
     """
@@ -432,6 +455,7 @@ def update_with(l, r, default_value, f):
         l[k] = f(l[k], v)
     return l
 
+
 def same_module(l, r):
     """
     Returns true if l is same module as r, which is when module name is equal
@@ -442,6 +466,7 @@ def same_module(l, r):
     nowhere = (not l.cabal) and (not l.location) and (not r.cabal) and (not r.location)
     return l.name == r.name and (same_cabal or same_filename or nowhere)
 
+
 def same_declaration(l, r):
     """
     Returns true if l is same declaration as r
@@ -449,6 +474,7 @@ def same_declaration(l, r):
     same_mod = l.module and r.module and same_module(l.module, r.module)
     nowhere = (not l.module) and (not r.module)
     return l.name == r.name and (same_mod or nowhere)
+
 
 def is_within_project(module, project):
     """
@@ -458,17 +484,20 @@ def is_within_project(module, project):
         return module.location.project == project
     return False
 
+
 def is_within_cabal(module, cabal = None):
     """
     Returns whether module loaded from cabal specified
     """
     return cabal is not None and module.cabal == cabal
 
+
 def is_by_sources(module):
     """
     Returns whether module defined by sources
     """
     return module.location is not None
+
 
 def flatten(lsts):
     return reduce(lambda l, r: list(l) + list(r), lsts)
@@ -504,6 +533,7 @@ class CabalPackage(object):
 
         return '\n'.join(info)
 
+
 class Corrector(object):
     def __init__(self, start, end, contents):
         self.start = start
@@ -512,6 +542,7 @@ class Corrector(object):
 
     def to_region(self, view):
         return sublime.Region(view.text_point(self.start.line, self.start.column), view.text_point(self.end.line, self.end.column))
+
 
 class Correction(object):
     def __init__(self, file, level, message, corrector):
@@ -522,6 +553,7 @@ class Correction(object):
 
     def to_region(self, view):
         return self.corrector.to_region(view)
+
 
 def mark_corrections(views, corrs):
     for view in views:

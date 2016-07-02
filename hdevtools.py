@@ -1,10 +1,7 @@
 # -*- coding: UTF-8 -*-
 
-import os
 import re
 import sublime
-import sublime_plugin
-import subprocess
 import threading
 
 if int(sublime.version()) < 3000:
@@ -21,10 +18,10 @@ def show_hdevtools_error_and_disable():
     # output_error(sublime.active_window().
     sublime.set_timeout(lambda: sublime.error_message(
         "SublimeHaskell: hdevtools was not found!\n"
-        + "It's used for 'symbol info' and type inference\n"
-        + "Install it with 'cabal install hdevtools',\n"
-        + "or adjust the 'add_to_PATH' setting for a custom location.\n"
-        + "'enable_hdevtools' automatically set to False in the User settings."), 0)
+        "It's used for 'symbol info' and type inference\n"
+        "Install it with 'cabal install hdevtools',\n"
+        "or adjust the 'add_to_PATH' setting for a custom location.\n"
+        "'enable_hdevtools' automatically set to False in the User settings."), 0)
 
     set_setting_async('enable_hdevtools', False)
 
@@ -59,6 +56,7 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
         log('calling to hdevtools fails with {0}'.format(e), log_error)
         return None
 
+
 def admin(cmds, wait = False, **popen_kwargs):
     if not hdevtools_enabled():
         return None
@@ -91,6 +89,7 @@ def admin(cmds, wait = False, **popen_kwargs):
         log('calling to hdevtools fails with {0}'.format(e))
         return None
 
+
 def is_running():
     r = admin(['--status'], wait = True)
     if r and re.search(r'running', r):
@@ -98,9 +97,11 @@ def is_running():
     else:
         return False
 
+
 def start_server():
     if not is_running():
         admin(["--start-server"])
+
 
 def hdevtools_info(filename, symbol_name, cabal = None):
     """
@@ -109,11 +110,13 @@ def hdevtools_info(filename, symbol_name, cabal = None):
     contents = call_hdevtools_and_wait(['info', filename, symbol_name], filename = filename, cabal = cabal)
     return parse_info(symbol_name, contents) if contents else None
 
+
 def hdevtools_check(filename, cabal = None):
     """
     Uses hdevtools to check file
     """
     return call_hdevtools_and_wait(['check', filename], filename = filename, cabal = cabal)
+
 
 def hdevtools_type(filename, line, column, cabal = None):
     """
@@ -121,13 +124,16 @@ def hdevtools_type(filename, line, column, cabal = None):
     """
     return call_hdevtools_and_wait(['type', filename, str(line), str(column)], filename = filename, cabal = cabal)
 
+
 def start_hdevtools():
     thread = threading.Thread(
         target=start_server)
     thread.start()
 
+
 def stop_hdevtools():
     admin(["--stop-server"])
+
 
 def hdevtools_enabled():
     return get_setting_async('enable_hdevtools') == True
