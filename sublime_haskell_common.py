@@ -21,9 +21,6 @@ MAX_WAIT_FOR_WINDOW = 10
 # Panel for SublimeHaskell errors
 SUBLIME_ERROR_PANEL_NAME = 'haskell_sublime_load'
 
-# Used to detect hs-source-dirs for project
-CABAL_INSPECTOR_EXE_PATH = None
-
 
 def python3():
     return PyV3
@@ -903,18 +900,12 @@ def status_message_process(msg, is_ok = True, timeout = 300, priority = 0):
     return with_status_message(StatusMessage.process(msg, timeout = timeout, priority = priority), is_ok = is_ok)
 
 
-def sublime_haskell_package_path():
-    """Get the path to where this package is installed"""
-    return os.path.dirname(os.path.realpath(__file__))
-
-
 def sublime_haskell_cache_path():
     """Get the path where compiled tools and caches are stored"""
-    return os.path.join(sublime_haskell_package_path(), os.path.expandvars(get_setting('cache_path', '.')))
+    return os.path.join(sublime.cache_path(), 'SublimeHaskell')
 
 
 def plugin_loaded():
-    # package_path = sublime_haskell_package_path()
     cache_path = sublime_haskell_cache_path()
 
     global status_message_manager

@@ -2145,7 +2145,6 @@ def plugin_loaded():
     global HSDEV_CACHE_PATH
     global HSDEV_LOG
 
-    # package_path = sublime_haskell_package_path()
     cache_path = sublime_haskell_cache_path()
 
     HSDEV_CACHE_PATH = os.path.join(cache_path, 'hsdev')
