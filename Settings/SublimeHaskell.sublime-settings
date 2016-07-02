@@ -10,7 +10,7 @@
 	// Enable auto completion of LANGUAGE pragmas
 	"auto_complete_language_pragmas": true,
 
-	// Enable auto build on save
+	// Enable auto build project on save
 	"enable_auto_build": false,
 
 	// Haskell build tool: "cabal" to use only cabal and "stack" to use stack whenever

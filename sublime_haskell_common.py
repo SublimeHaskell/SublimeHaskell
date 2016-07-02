@@ -787,7 +787,7 @@ status_message_manager = None
 
 def show_status_message(msg, is_ok = None, priority = 0):
     """
-    Show status message with check mark (is_ok = true), ballot x (is_ok = false) or ... (is_ok = None)
+    Show status message with check mark (is_ok = true), ballot x (is_ok = false)
     """
     status_message_manager.add(StatusMessage.status(msg, priority = priority, is_ok = is_ok))
 

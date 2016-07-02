@@ -40,7 +40,7 @@ def messages_as_hints(cmd):
     (fn, arg, msg, kwargs) = cmd
     return (fn, arg, lambda ms: [dict(m, level = 'hint') for m in ms], kwargs)
 
-class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
+class SublimeHaskellHsDevChain(SublimeHaskellTextCommand):
     def run(self, edit):
         pass
 
@@ -62,7 +62,12 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
         else:
             self.status_msg = status_message_process(msg + ': ' + self.filename, priority = 2)
             self.status_msg.start()
-            self.go_chain(cmds)
+            if not autocomplete.hsdev_connected():
+                log('hsdev chain fails: hsdev not connected', log_error)
+                self.status_msg.fail()
+                self.status_msg.stop()
+            else:
+                self.go_chain(cmds)
 
     def go_chain(self, cmds):
         try:
@@ -106,7 +111,8 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
 
                 fn(modify_args(self.filename), contents = self.contents, wait = False, on_response = on_resp, on_error = on_err, **kwargs)
         except Exception as e:
-            log('hsdev ghc-mod chain fails with: {0}'.format(e), log_error)
+            log('hsdev chain fails with: {0}'.format(e), log_error)
+            self.status_msg.fail()
             self.status_msg.stop()
 
     def on_autofix(self, corrs):
@@ -121,26 +127,28 @@ class SublimeHaskellGhcModChain(SublimeHaskellTextCommand):
 def ghcmod_command(cmdname):
     def wrap(fn):
         def wrapper(self, *args, **kwargs):
-            if autocomplete.hsdev_connected():
-                log('Invoking ghc-mod command \'{0}\' via hsdev'.format(cmdname), log_trace)
+            if get_setting_async('enable_hsdev'):
+                log("Invoking '{0}' command via hsdev".format(cmdname), log_trace)
                 return fn(self, *args, **kwargs)
-            else:
-                log('Invoking ghc-mod command \'{0}\' via ghc-mod'.format(cmdname), log_trace)
+            elif get_setting_async('enable_ghc_mod'):
+                log("Invoking '{0}' command via ghc-mod".format(cmdname), log_trace)
                 self.view.window().run_command('sublime_haskell_ghc_mod_{0}'.format(cmdname))
+            else:
+                show_status_message('Check/Lint: both hsdev and ghc-mod are disabled', False)
         return wrapper
     return wrap
 
-class SublimeHaskellCheck(SublimeHaskellGhcModChain):
+class SublimeHaskellCheck(SublimeHaskellHsDevChain):
     @ghcmod_command('check')
     def run(self, edit, fly = False):
         self.run_chain([hsdev_check()], 'Checking', fly_mode = fly)
 
-class SublimeHaskellLint(SublimeHaskellGhcModChain):
+class SublimeHaskellLint(SublimeHaskellHsDevChain):
     @ghcmod_command('lint')
     def run(self, edit, fly = False):
         self.run_chain([hsdev_lint()], 'Linting', fly_mode = fly)
 
-class SublimeHaskellCheckAndLint(SublimeHaskellGhcModChain):
+class SublimeHaskellCheckAndLint(SublimeHaskellHsDevChain):
     @ghcmod_command('check_and_lint')
     def run(self, edit, fly = False):
         self.run_chain([hsdev_check(), messages_as_hints(hsdev_lint())], 'Checking and Linting', fly_mode = fly)
