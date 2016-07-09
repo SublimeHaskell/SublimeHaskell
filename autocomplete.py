@@ -1890,7 +1890,8 @@ class HsDevAgent(threading.Thread):
 
             if files_to_reinspect:
                 update_completions_async(drop_all = True)
-                self.hsdev_back.docs(files = files_to_reinspect)
+                if hdocs.hdocs_enabled():
+                    self.hsdev_back.docs(files = files_to_reinspect)
             self.reinspect_event.wait(AGENT_SLEEP_TIMEOUT)
             self.reinspect_event.clear()
 
