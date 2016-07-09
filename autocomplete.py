@@ -312,7 +312,7 @@ def hsdev_connected():
 def use_hsdev(def_val = None):
     def wrap(fn):
         def wrapped(*args, **kwargs):
-            if get_setting_async('hsdev_enabled') and hsdev_connected():
+            if get_setting_async('enable_hsdev') and hsdev_connected():
                 return fn(*args, **kwargs)
             else:
                 return def_val
