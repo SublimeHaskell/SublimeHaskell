@@ -58,12 +58,12 @@
     {
         "keys": ["ctrl+alt+e"],
         "command": "show_panel",
-        "args": { "panel": "output.haskell_error_panel" }
+        "args": { "panel": "output.sublime_haskell_output_panel" }
     },
     {
         "keys": ["ctrl+alt+o"],
         "command": "show_panel",
-        "args": { "panel": "output.sublime_haskell_build_log" }
+        "args": { "panel": "output.sublime_haskell_build_log_panel" }
     },
     {
         "keys": ["ctrl+alt+space"],

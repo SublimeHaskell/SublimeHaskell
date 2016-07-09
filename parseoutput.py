@@ -18,8 +18,6 @@ else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.symbols as symbols
 
-ERROR_PANEL_NAME = 'haskell_error_panel'
-
 # This regex matches an unindented line, followed by zero or more
 # indented, non-empty lines.
 # It also eats whitespace before the first line.
@@ -31,8 +29,9 @@ output_regex = re.compile(
 # Extract the filename, line, column, and description from an error message:
 result_file_regex = r'^(\S*?): line (\d+), column (\d+):$'
 
-# Extract the filename, line, column from symbol info
-symbol_file_regex = r'^Defined at: (.*):(\d+):(\d+)$'
+OUTPUT_PANEL_NAME = 'sublime_haskell_output_panel'
+
+BUILD_LOG_PANEL_NAME = 'sublime_haskell_build_log_panel'
 
 # Global list of errors. Used e.g. for jumping to the next one.
 # Properly assigned being a defaultdict in clear_error_marks().
@@ -152,7 +151,7 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
     # run and wait commands, fail on first fail
     # stdout = ''
     stderr = ''
-    output_log = output_panel(view.window(), '', panel_name = 'sublime_haskell_build_log', show_panel = get_setting_async('show_output_window'))
+    output_log = output_panel(view.window(), '', panel_name = BUILD_LOG_PANEL_NAME, show_panel = get_setting_async('show_output_window'))
     for cmd in cmds:
         output_text(output_log, ' '.join(cmd) + '...\n')
 
@@ -162,10 +161,11 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
             line = crlf2lf(decode_bytes(cmd_line))
             lines.append(line)
             output_text(output_log, line)
+            output_log.show(output_log.size())  # Scroll to the end
         exit_code = cmd_p.wait()
         # stdout = '\n'.join(lines)
         stderr = crlf2lf(decode_bytes(cmd_p.stderr.read()))
-    hide_panel(view.window(), panel_name = 'sublime_haskell_build_log')
+    hide_panel(view.window(), panel_name = BUILD_LOG_PANEL_NAME)
 
     errmsg = stderr
 
@@ -377,25 +377,19 @@ def mark_messages_in_view(messages, view):
             sublime.DRAW_OUTLINED)
 
 
-def write_panel(window, text, panel_name = "sublime_haskell_panel", syntax = None):
-    info_view = output_panel(window, text, panel_name = panel_name, syntax = syntax)
-    info_view.settings().set("result_file_regex", symbol_file_regex)
-    return info_view
-
-
 def write_output(view, text, cabal_project_dir, show_panel = True):
     "Write text to Sublime's output panel."
     global error_view
-    error_view = output_panel(view.window(), text, panel_name = ERROR_PANEL_NAME, syntax = 'HaskellOutputPanel', show_panel = show_panel)
+    error_view = output_panel(view.window(), text, panel_name = OUTPUT_PANEL_NAME, syntax = 'HaskellOutputPanel', show_panel = show_panel)
     error_view.settings().set("result_file_regex", result_file_regex)
     error_view.settings().set("result_base_dir", cabal_project_dir)
 
 
-def hide_output(view, panel_name = ERROR_PANEL_NAME):
+def hide_output(view, panel_name = OUTPUT_PANEL_NAME):
     view.window().run_command('hide_panel', {'panel': 'output.' + panel_name})
 
 
-def show_output(view, panel_name = ERROR_PANEL_NAME):
+def show_output(view, panel_name = OUTPUT_PANEL_NAME):
     view.window().run_command('show_panel', {'panel': 'output.' + panel_name})
 
 
@@ -505,23 +499,5 @@ def parse_info(name, contents):
         matched = re.search(functionRegex, contents, re.MULTILINE)
         if matched:
             return symbols.Function(name, matched.group('type'))
-
-    return None
-
-
-def ghci_info(module, name, cabal = None):
-    """
-    Returns info for name as symbol
-    """
-    ghci_cmd = [
-        ":m + " + module,
-        ":i " + module + "." + name,
-        ":q"]
-    ghc_opts = get_setting_async('ghc_opts')
-
-    (exit_code, stdout, stderr) = call_and_wait_with_input(ghci_append_package_db(['ghci'] + ghc_opts, cabal = cabal), "\n".join(ghci_cmd))
-    stdout = crlf2lf(stdout)
-    if exit_code == 0:
-        return parse_info(name, stdout)
 
     return None

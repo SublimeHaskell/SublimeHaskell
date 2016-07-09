@@ -4,12 +4,10 @@ import sublime
 
 if int(sublime.version()) < 3000:
 	from sublime_haskell_common import *
-	from parseoutput import write_panel
-	from autocomplete import hsdev_client
+	import hsdev
 else:
 	from SublimeHaskell.sublime_haskell_common import *
-	from SublimeHaskell.parseoutput import write_panel
-	from SublimeHaskell.autocomplete import hsdev_client
+	import SublimeHaskell.hsdev as hsdev
 
 
 class SublimeHaskellCabalList(SublimeHaskellWindowCommand):
@@ -17,7 +15,7 @@ class SublimeHaskellCabalList(SublimeHaskellWindowCommand):
 		self.window.show_input_panel("Cabal list", "", self.on_done, self.on_change, self.on_cancel)
 
 	def on_done(self, input):
-		self.packages = hsdev_client.cabal_list(input)
+		self.packages = hsdev.client.cabal_list(input)
 		if not self.packages:
 			show_status_message("Package {0} not found".format(input))
 			return
@@ -35,4 +33,4 @@ class SublimeHaskellCabalList(SublimeHaskellWindowCommand):
 			return
 		package = self.packages[idx]
 
-		write_panel(self.window, package.detailed(), 'sublime_haskell_cabal_package')
+		output_panel(self.window, package.detailed(), 'sublime_haskell_cabal_package')

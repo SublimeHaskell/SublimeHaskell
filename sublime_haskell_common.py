@@ -18,8 +18,18 @@ PyV3 = version[0] == "3"
 # This dirty hack is used in wait_for_window function
 MAX_WAIT_FOR_WINDOW = 10
 
+DEFAULT_PANEL_NAME = 'sublime_haskell_panel'
 # Panel for SublimeHaskell errors
-SUBLIME_ERROR_PANEL_NAME = 'haskell_sublime_load'
+ERROR_PANEL_NAME = 'sublime_haskell_error_panel'
+
+WORD_RE = re.compile(r'^(?P<word>[\w\d\'\.]*)(?P<tail>.*)')
+# Get symbol qualified prefix and its name
+SYMBOL_RE = re.compile(r'((?P<module>[A-Z][\w\d]*(\.[A-Z][\w\d\']*)*)\.)?((?P<identifier>(\w[\w\d\']*)?)|(?P<operator>[!#$%&*+\./<=>?@\\\^|\-~:]+))$')
+# Get import name
+IMPORT_MODULE_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']*(\.[A-Z][\w\d\']*)*)\b')
+# SYMBOL_RE = re.compile(r'((?P<module>\w+(\.\w+)*)\.)?(?P<identifier>((\w*)|([]*)))$')
+# Get symbol module scope and its name within import statement
+IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']*(\.[A-Z][\w\d\']*)*)(\s+as\s+(?P<as>[A-Z][\w\d\']*))?\s*\(.*?((?P<identifier>([a-z][\w\d\']*)?)|(\((?P<operator>[!#$%&*+\.\/<=>?@\\\^|\-~:]*)))$')
 
 
 def python3():
@@ -338,33 +348,14 @@ def find_file_in_parent_dir(subdirectory, filename_pattern):
             return None
 
 
-def are_paths_equal(path, other_path):
-    "Test whether filesystem paths are equal."
-    path = os.path.abspath(path)
-    other_path = os.path.abspath(other_path)
-    return path == other_path
-
-
-def is_cabal(cabal):
-    if cabal == 'cabal':
-        return True
-    if cabal is None:
-        return None
-    return False
-
-
-def as_sandboxes(cabal):
-    if cabal == 'cabal':
-        return []
-    if cabal is None:
-        return None
-    return [cabal]
-
-
-def sandbox_by_cabal_name(cabal):
-    if cabal == 'cabal':
-        return None
-    return cabal
+def list_files_in_dir_recursively(base_dir):
+    """Return a list of a all files in a directory, recursively.
+    The files will be specified by full paths."""
+    files = []
+    for dirname, dirnames, filenames in os.walk(base_dir):
+        for filename in filenames:
+            files.append(os.path.join(base_dir, dirname, filename))
+    return files
 
 
 def get_settings():
@@ -446,13 +437,6 @@ def ghci_package_db(cabal = None):
     if package_conf:
         return os.path.join(cabal, package_conf)
     return None
-
-
-def ghci_append_package_db(cmd, cabal = None):
-    package_conf = ghci_package_db(cabal)
-    if package_conf:
-        cmd.extend(['-package-db', package_conf])
-    return cmd
 
 
 def get_source_dir(filename):
@@ -609,11 +593,13 @@ class SublimeHaskellOutputText(sublime_plugin.TextCommand):
         self.view.set_read_only(True)
 
 
+# Output some text to view (panel), possibly clearing
 def output_text(view, text = None, clear = False):
     view.run_command('sublime_haskell_output_text', {'text': (text or ''), 'clear': 'yes' if clear else ''})
 
 
-def output_panel(window, text = '', panel_name = 'sublime_haskell_output_panel', syntax = None, show_panel = True):
+# Create new output panel
+def output_panel(window, text = '', panel_name = DEFAULT_PANEL_NAME, syntax = None, show_panel = True):
     if not window:
         return None
     output_view = window.get_output_panel(panel_name)
@@ -627,7 +613,7 @@ def output_panel(window, text = '', panel_name = 'sublime_haskell_output_panel',
     return output_view
 
 
-def hide_panel(window, panel_name = 'sublime_haskell_output_panel'):
+def hide_panel(window, panel_name = DEFAULT_PANEL_NAME):
     if not window:
         window = sublime.active_window()
     if not window:
@@ -635,7 +621,7 @@ def hide_panel(window, panel_name = 'sublime_haskell_output_panel'):
     window.run_command('hide_panel', {'panel': ('output.' + panel_name)})
 
 
-def show_panel(window, panel_name = 'sublime_haskell_output_panel'):
+def show_panel(window, panel_name = DEFAULT_PANEL_NAME):
     if not window:
         window = sublime.active_window()
     if not window:
@@ -644,7 +630,7 @@ def show_panel(window, panel_name = 'sublime_haskell_output_panel'):
 
 
 def output_error(window, text):
-    output_panel(window, text, panel_name = SUBLIME_ERROR_PANEL_NAME)
+    output_panel(window, text, panel_name = ERROR_PANEL_NAME)
 
 
 def output_error_async(window, text):
@@ -654,6 +640,102 @@ def output_error_async(window, text):
 class SublimeHaskellError(RuntimeError):
     def __init__(self, what):
         self.reason = what
+
+
+def get_line_contents(view, location):
+    """
+    Returns contents of line at the given location.
+    """
+    return view.substr(sublime.Region(view.line(location).a, location))
+
+
+def get_line_contents_at_region(view, region):
+    """
+    Returns (before, at, after)
+    """
+    line_region = view.line(region)
+
+    before = view.substr(sublime.Region(line_region.a, region.a))
+    at = view.substr(region)
+    after = view.substr(sublime.Region(region.b, line_region.b))
+    return (before, at, after)
+
+
+def get_line_contents_before_region(view, region):
+    """
+    Returns contents of line before the given region (including it).
+    """
+    (before, at, _) = get_line_contents_at_region(view, region)
+    return before + at
+
+
+def get_qualified_name(s):
+    """
+    'bla bla bla Data.List.fo' -> ('Data.List', 'Data.List.fo')
+    """
+    if len(s) == 0:
+        return ('', '')
+    quals = s.split()[-1].split('.')
+    filtered = map(lambda s: list(filter(lambda c: c.isalpha() or c.isdigit() or c == '_', s)), quals)
+    return ('.'.join(filtered[0:len(filtered) - 1]), '.'.join(filtered))
+
+
+class QualifiedSymbol(object):
+    def __init__(self, name = None, module = None, module_as = None, is_import_list = False, is_operator = False):
+        self.name = name
+        self.module = module
+        self.module_as = module_as
+        self.is_import_list = is_import_list
+        self.is_operator = is_operator
+
+    def qualified_name(self):
+        if self.name is None:
+            return self.module
+        return '{0}.{1}'.format(self.module_as or self.module, self.name) if self.module else self.name
+
+    def full_name(self):
+        if self.name is None:
+            return self.module
+        return '{0}.{1}'.format(self.module, self.name) if self.module else self.name
+
+    def is_module(self):
+        return self.name is None and self.module is not None
+
+
+def get_qualified_symbol(line):
+    """
+    Get module context of symbol and symbol itself
+    Returns (module, as, name, is_import_list, is_operator), where module (or one of) can be None
+    """
+    res = IMPORT_SYMBOL_RE.search(line)
+    if res:
+        return QualifiedSymbol(
+            name = next(i for i in [res.group('identifier'), res.group('operator')] if i is not None),
+            module = res.group('module'),
+            module_as = res.group('as'),
+            is_import_list = True,
+            is_operator = bool(res.group('operator')))
+    res = IMPORT_MODULE_RE.search(line)
+    if res:
+        return QualifiedSymbol(module = res.group('module'))
+    res = SYMBOL_RE.search(line)
+    # res always match
+    return QualifiedSymbol(
+        module = res.group('module'),
+        name = next(i for i in [res.group('identifier'), res.group('operator')] if i is not None),
+        is_operator = bool(res.group('operator')))
+
+
+def get_qualified_symbol_at_region(view, region):
+    """
+    Get module context of symbol and symbol itself for line before (and with) word on region
+    Returns (module, name), where module (or one of) can be None
+    """
+    (before, at, after) = get_line_contents_at_region(view, region)
+    res = WORD_RE.match(after)
+    if res:
+        at = at + res.group('word')
+    return get_qualified_symbol(before + at)
 
 
 def sublime_status_message(msg):
@@ -854,6 +936,10 @@ def is_cabal_source(view = None):
 
 def is_haskell_source(view = None):
     return is_with_syntax(view, syntax = "Haskell.tmLanguage")
+
+
+def is_inspected_source(view = None):
+    return is_haskell_source(view) or is_cabal_source(view)
 
 
 def is_haskell_repl(view = None):

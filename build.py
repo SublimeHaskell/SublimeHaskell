@@ -8,11 +8,11 @@ from threading import Thread
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     from parseoutput import run_chain_build_thread
-    import autocomplete
+    import hsdev
 else:
     from SublimeHaskell.sublime_haskell_common import *
     from SublimeHaskell.parseoutput import run_chain_build_thread
-    import SublimeHaskell.autocomplete as autocomplete
+    import SublimeHaskell.hsdev as hsdev
 
 OUTPUT_PANEL_NAME = "haskell_run_output"
 
@@ -108,7 +108,7 @@ class SublimeHaskellBaseCommand(SublimeHaskellWindowCommand):
 
 # Retrieve projects as dictionary that refers to this app instance
 def get_projects():
-    if autocomplete.hsdev_connected():
+    if hsdev.agent_connected():
         folders = sublime.active_window().folders()
         view_files = [v.file_name() for v in sublime.active_window().views() if (is_haskell_source(v) or is_cabal_source(v)) and v.file_name()]
 
@@ -120,9 +120,9 @@ def get_projects():
 
         return dict((info['name'], info) for info in filter(
             lambda p: any([childof(p['path'], f) for f in folders]) or any([childof(src, p['path']) for src in view_files]),
-            (autocomplete.hsdev_client.list_projects() or [])))
+            (hsdev.client.list_projects() or [])))
     else:
-        folder_files = [src for f in sublime.active_window().folders() for src in autocomplete.list_files_in_dir_recursively(f) if os.path.splitext(src)[1] in [".hs", ".cabal"]]
+        folder_files = [src for f in sublime.active_window().folders() for src in list_files_in_dir_recursively(f) if os.path.splitext(src)[1] in [".hs", ".cabal"]]
         view_files = [v.file_name() for v in sublime.active_window().views() if (is_haskell_source(v) or is_cabal_source(v)) and v.file_name()]
         src_files = list(map(lambda p: os.path.normcase(os.path.normpath(p)), folder_files + view_files))
         active_projects = []

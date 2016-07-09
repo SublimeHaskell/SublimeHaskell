@@ -7,12 +7,12 @@ from threading import Thread
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
-    import autocomplete
+    import hsdev
     from parseoutput import OutputPoint, OutputMessage, parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages, write_output, parse_info
     import symbols
 else:
     from SublimeHaskell.sublime_haskell_common import *
-    import SublimeHaskell.autocomplete as autocomplete
+    import SublimeHaskell.hsdev as hsdev
     from SublimeHaskell.parseoutput import OutputPoint, OutputMessage, parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages, write_output, parse_info
     import SublimeHaskell.symbols as symbols
 
@@ -24,13 +24,13 @@ def lint_as_hints(msgs):
 
 
 def hsdev_check():
-    return (autocomplete.hsdev_client.check, lambda file: [file], lambda ms: ms, {'ghc': get_setting_async('ghc_opts')})
+    return (hsdev.client.check, lambda file: [file], lambda ms: ms, {'ghc': get_setting_async('ghc_opts')})
 
 
 def hsdev_lint():
-    return (autocomplete.hsdev_client.lint, lambda file: [file], lambda ms: ms, {})
+    return (hsdev.client.lint, lambda file: [file], lambda ms: ms, {})
 # def hsdev_check_lint():
-#     return (autocomplete.hsdev_client.ghcmod_check_lint, lambda file: [file], lambda ms: ms, { 'ghc': get_setting_async('ghc_opts') })
+#     return (hsdev.client.ghcmod_check_lint, lambda file: [file], lambda ms: ms, { 'ghc': get_setting_async('ghc_opts') })
 
 
 def messages_as_hints(cmd):
@@ -60,7 +60,7 @@ class SublimeHaskellHsDevChain(SublimeHaskellTextCommand):
         else:
             self.status_msg = status_message_process(msg + ': ' + self.filename, priority = 2)
             self.status_msg.start()
-            if not autocomplete.hsdev_connected():
+            if not hsdev.agent_connected():
                 log('hsdev chain fails: hsdev not connected', log_error)
                 self.status_msg.fail()
                 self.status_msg.stop()
@@ -93,7 +93,7 @@ class SublimeHaskellHsDevChain(SublimeHaskellTextCommand):
                             show_panel = not self.fly_mode), 0)
                 sublime.set_timeout(lambda: mark_messages_in_views(output_messages), 0)
 
-                # autocomplete.hsdev_client.autofix_show(self.msgs, on_response = self.on_autofix)
+                # hsdev.client.autofix_show(self.msgs, on_response = self.on_autofix)
             else:
                 cmd, tail_cmds = cmds[0], cmds[1:]
                 (fn, modify_args, modify_msgs, kwargs) = cmd

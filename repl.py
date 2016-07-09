@@ -9,6 +9,7 @@ has_sublime_repl = True
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     import autocomplete
+    import hsdev
     try:
         import sublimerepl
     except ImportError:
@@ -17,6 +18,7 @@ if int(sublime.version()) < 3000:
 else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.autocomplete as autocomplete
+    import SublimeHaskell.hsdev as hsdev
     try:
         import SublimeREPL.sublimerepl as sublimerepl
     except ImportError:
@@ -157,7 +159,7 @@ class SublimeHaskellReplCabal(SublimeHaskellWindowCommand):
             project_dir, project_name = get_cabal_project_dir_and_name_of_view(view)
             if not project_dir:
                 show_status_message("Not in project", False)
-            proj_info = autocomplete.hsdev_client.project(project_name)
+            proj_info = hsdev.client.project(project_name)
             self.project_name = project_name
             self.project_dir = project_dir
             self.names = ['lib:{0}'.format(project_name)]
