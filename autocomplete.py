@@ -19,14 +19,12 @@ except ImportError:
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     import symbols
-    import hdocs
     from hdevtools import start_hdevtools, stop_hdevtools
     from parseoutput import write_panel
     import hsdev
 else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.symbols as symbols
-    import SublimeHaskell.hdocs as hdocs
     from SublimeHaskell.hdevtools import start_hdevtools, stop_hdevtools
     from SublimeHaskell.parseoutput import write_panel
     import SublimeHaskell.hsdev as hsdev
