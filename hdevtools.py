@@ -6,10 +6,10 @@ import threading
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
-    from ghci import parse_info
+    from parseoutput import parse_info
 else:
     from SublimeHaskell.sublime_haskell_common import *
-    from SublimeHaskell.ghci import parse_info
+    from SublimeHaskell.parseoutput import parse_info
 
 
 def show_hdevtools_error_and_disable():

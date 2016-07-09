@@ -10,7 +10,7 @@ if int(sublime.version()) < 3000:
     from autocomplete import get_qualified_symbol_at_region
     import autocomplete
     from hdevtools import hdevtools_type, hdevtools_enabled
-    from ghcmod import ghcmod_type, ghcmod_enabled
+    from check_lint import ghcmod_type, ghcmod_enabled
     from parseoutput import sublime_column_to_ghc_column, ghc_column_to_sublime_column
     import hsdev
 else:
@@ -18,7 +18,7 @@ else:
     from SublimeHaskell.autocomplete import get_qualified_symbol_at_region
     import SublimeHaskell.autocomplete as autocomplete
     from SublimeHaskell.hdevtools import hdevtools_type, hdevtools_enabled
-    from SublimeHaskell.ghcmod import ghcmod_type, ghcmod_enabled
+    from SublimeHaskell.check_lint import ghcmod_type, ghcmod_enabled
     from SublimeHaskell.parseoutput import sublime_column_to_ghc_column, ghc_column_to_sublime_column
     import SublimeHaskell.hsdev as hsdev
 
@@ -161,12 +161,12 @@ def parse_type_output(view, s):
     return result
 
 
-def haskell_type(view, filename, module_name, line, column, cabal = None):
+def get_type(view, filename, module_name, line, column, cabal = None):
     result = None
 
     if hsdev.hsdev_enabled():
         # Convert from hsdev one-based locations to sublime zero-based positions
-        ts = haskell_types(filename, cabal = cabal)
+        ts = get_types(filename, cabal = cabal)
         pt = FilePosition(line, column).point(view)
         types = sorted(
             list(filter(lambda t: t.region(view).contains(pt), ts)),
@@ -181,7 +181,7 @@ def haskell_type(view, filename, module_name, line, column, cabal = None):
     return parse_type_output(view, result) if result else None
 
 
-def haskell_type_view(view, selection = None):
+def get_type_view(view, selection = None):
     filename = view.file_name()
 
     if selection is None:
@@ -196,10 +196,10 @@ def haskell_type_view(view, selection = None):
     if m:
         module_name = m.name
 
-    return haskell_type(view, filename, module_name, line, column)
+    return get_type(view, filename, module_name, line, column)
 
 
-def haskell_types(filename, on_result = None, cabal = None):
+def get_types(filename, on_result = None, cabal = None):
     if hsdev.hsdev_enabled():
         def to_file_pos(r):
             return FilePosition(int(r['line']) - 1, int(r['column']) - 1)
@@ -236,7 +236,7 @@ class SublimeHaskellShowType(SublimeHaskellTextCommand):
         if m:
             module_name = m.name
 
-        return haskell_type(self.view, filename, module_name, line, column)
+        return get_type(self.view, filename, module_name, line, column)
 
     def get_best_type(self, types):
         if not types:
@@ -337,7 +337,7 @@ class SublimeHaskellShowAllTypes(SublimeHaskellTextCommand):
         if not self.filename:
             self.filename = self.view.file_name()
         if not file_types.has(self.filename):
-            haskell_types(self.filename, self.on_types)
+            get_types(self.filename, self.on_types)
         else:
             file_types.show(self.filename)
             self.on_types(file_types.get(self.filename))
@@ -405,7 +405,7 @@ class ExpandSelectionInfo(object):
     def __init__(self, view, selection = None):
         self.view = view
         self.selection = selection if selection is not None else view.sel()[0]
-        types = haskell_type_view(view, self.selection)
+        types = get_type_view(view, self.selection)
         self.regions = [TypedRegion.fromRegionType(t, view) for t in types] if types else None
         self.expanded_index = None
 
