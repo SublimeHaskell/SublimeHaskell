@@ -314,7 +314,7 @@ def hsdev_connected():
 def use_hsdev(def_val = None):
     def wrap(fn):
         def wrapped(*args, **kwargs):
-            if hsdev.hsdev_enabled() and hsdev_connected():
+            if get_setting_async('hsdev_enabled') and hsdev_connected():
                 return fn(*args, **kwargs)
             else:
                 return def_val
@@ -1842,11 +1842,11 @@ class HsDevAgent(threading.Thread):
         subscribe_setting('enable_hsdev', self.on_hsdev_enabled)
         subscribe_setting('inspect_modules', self.on_inspect_modules_changed)
 
-        if hsdev.hsdev_enabled():
+        if get_setting_async('enable_hsdev'):
             self.start_hsdev()
 
         while True:
-            if hsdev.hsdev_enabled() and not self.hsdev.ping():
+            if get_setting_async('enable_hsdev') and not self.hsdev.ping():
                 log('hsdev ping: no pong', log_warning)
 
             scan_paths = []
@@ -1890,7 +1890,7 @@ class HsDevAgent(threading.Thread):
 
             if files_to_reinspect:
                 update_completions_async(drop_all = True)
-                if hdocs.hdocs_enabled():
+                if get_setting_async('enable_hdocs'):
                     self.hsdev_back.docs(files = files_to_reinspect)
             self.reinspect_event.wait(AGENT_SLEEP_TIMEOUT)
             self.reinspect_event.clear()
@@ -1930,7 +1930,7 @@ class HsDevAgent(threading.Thread):
     def inspect_cabal(self, cabal = None):
         try:
             with status_message_process('Inspecting {0}'.format(cabal or 'cabal'), priority = 1) as s:
-                self.hsdev_back.scan(cabal = (cabal == 'cabal'), sandboxes = [] if cabal == 'cabal' else [cabal], on_notify = hsdev_status(s), wait = True, docs = hdocs.hdocs_enabled())
+                self.hsdev_back.scan(cabal = (cabal == 'cabal'), sandboxes = [] if cabal == 'cabal' else [cabal], on_notify = hsdev_status(s), wait = True, docs = get_setting_async('enable_hdocs'))
         except Exception as e:
             log('loading standard modules info for {0} failed with {1}'.format(cabal or 'cabal', e), log_error)
 
@@ -1940,7 +1940,7 @@ class HsDevAgent(threading.Thread):
         if paths or projects or files:
             try:
                 with status_message_process('Inspecting', priority = 1) as s:
-                    self.hsdev_back.scan(paths = paths, projects = projects, files = files, on_notify = hsdev_status(s), wait = True, ghc = get_setting_async('ghc_opts'), docs = hdocs.hdocs_enabled())
+                    self.hsdev_back.scan(paths = paths, projects = projects, files = files, on_notify = hsdev_status(s), wait = True, ghc = get_setting_async('ghc_opts'), docs = get_setting_async('enable_hdocs'))
             except Exception as e:
                 log('Inspection failed: {0}'.format(e), log_error)
 
@@ -1949,7 +1949,7 @@ class HsDevAgent(threading.Thread):
     def inspect_path(self, path):
         try:
             with status_message_process('Inspecting path {0}'.format(path), priority = 1) as s:
-                self.hsdev_back.scan(paths = [path], on_notify = hsdev_status(s), wait = True, ghc = get_setting_async('ghc_opts'), docs = hdocs.hdocs_enabled())
+                self.hsdev_back.scan(paths = [path], on_notify = hsdev_status(s), wait = True, ghc = get_setting_async('ghc_opts'), docs = get_setting_async('enable_hdocs'))
         except Exception as e:
             log('Inspecting path {0} failed: {1}'.format(path, e), log_error)
 
@@ -1960,7 +1960,7 @@ class HsDevAgent(threading.Thread):
 
         try:
             with status_message_process('Inspecting project {0}'.format(project_name), priority = 1) as s:
-                self.hsdev_back.scan(projects = [cabal_dir], on_notify = hsdev_status(s), wait = True, docs = hdocs.hdocs_enabled())
+                self.hsdev_back.scan(projects = [cabal_dir], on_notify = hsdev_status(s), wait = True, docs = get_setting_async('enable_hdocs'))
         except Exception as e:
             log('Inspecting project {0} failed: {1}'.format(cabal_dir, e), log_error)
 
@@ -1969,7 +1969,7 @@ class HsDevAgent(threading.Thread):
     def inspect_files(self, filenames):
         try:
             with status_message_process('Inspecting files', priority = 1) as s:
-                self.hsdev_back.scan(files = filenames, on_notify = hsdev_status(s), wait = True, ghc = get_setting_async('ghc_opts'), docs = hdocs.hdocs_enabled())
+                self.hsdev_back.scan(files = filenames, on_notify = hsdev_status(s), wait = True, ghc = get_setting_async('ghc_opts'), docs = get_setting_async('enable_hdocs'))
         except Exception as e:
             log('Inspecting files failed: {0}'.format(e), log_error)
 

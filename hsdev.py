@@ -53,14 +53,6 @@ def flatten_opts(opts):
     return r
 
 
-def hsdev_enabled():
-    return get_setting_async('enable_hsdev') == True
-
-
-def hsdev_enable(enable = True):
-    set_setting_async('enable_hsdev', enable)
-
-
 def hsdev_version():
     try:
         (exit_code, out, err) = call_and_wait(['hsdev', 'version'])

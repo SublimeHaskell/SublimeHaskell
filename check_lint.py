@@ -330,7 +330,3 @@ def ghcmod_type(filename, module_name, line, column, cabal = None):
     Uses ghc-mod type to infer type
     """
     return call_ghcmod_and_wait(['type', filename, module_name, str(line), str(column)], filename = filename, cabal = cabal)
-
-
-def ghcmod_enabled():
-    return get_setting_async('enable_ghc_mod') == True

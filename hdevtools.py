@@ -58,7 +58,7 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
 
 
 def admin(cmds, wait = False, **popen_kwargs):
-    if not hdevtools_enabled():
+    if not get_setting_async('enable_hdevtools'):
         return None
 
     hdevtools_socket = get_setting_async('hdevtools_socket')
@@ -133,7 +133,3 @@ def start_hdevtools():
 
 def stop_hdevtools():
     admin(["--stop-server"])
-
-
-def hdevtools_enabled():
-    return get_setting_async('enable_hdevtools') == True

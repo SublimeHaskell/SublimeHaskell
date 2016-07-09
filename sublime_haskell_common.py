@@ -176,10 +176,12 @@ def get_extended_env():
     return ext_env
 
 
-def call_and_wait_tool(command, tool_name, input = '', on_result = None, filename = None, on_line = None, check_enabled = True, **popen_kwargs):
-    tool_enabled = 'enable_{0}'.format(tool_name)
+def tool_enabled(feature):
+    return 'enable_{0}'.format(feature)
 
-    if check_enabled and get_setting_async(tool_enabled) != True:
+
+def call_and_wait_tool(command, tool_name, input = '', on_result = None, filename = None, on_line = None, check_enabled = True, **popen_kwargs):
+    if check_enabled and (not get_setting_async(tool_enabled(tool_name))):
         return None
     # extended_env = get_extended_env()
 
@@ -207,8 +209,8 @@ def call_and_wait_tool(command, tool_name, input = '', on_result = None, filenam
 
     except OSError as e:
         if e.errno == errno.ENOENT:
-            output_error_async(sublime.active_window(), "SublimeHaskell: {0} was not found!\n'{1}' is set to False".format(tool_name, tool_enabled))
-            set_setting_async(tool_enabled, False)
+            output_error_async(sublime.active_window(), "SublimeHaskell: {0} was not found!\n'{1}' is set to False".format(tool_name, tool_enabled(tool_name)))
+            set_setting_async(tool_enabled(tool_name), False)
         else:
             log('{0} fails with {1}, command: {2}'.format(tool_name, e, command), log_error)
 
@@ -412,7 +414,10 @@ def get_setting_async(key, default=None):
         if key not in settings:
             # Load it in main thread, but for now all we can do is result default
             return default
-        return settings[key]
+        res = settings[key]
+        if res is None:
+            return default
+        return res
 
 
 def set_setting(key, value):

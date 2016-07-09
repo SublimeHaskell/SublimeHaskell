@@ -30,7 +30,7 @@ def symbol_docs(module_name, symbol_name, cabal = None):
 
 
 def load_module_docs(module):
-    if not hdocs_enabled():
+    if not get_setting_async('enable_hdocs'):
         return False
 
     if module.location:
@@ -47,7 +47,3 @@ def load_module_docs(module):
         return True
 
     return False
-
-
-def hdocs_enabled():
-    return get_setting_async('enable_hdocs') == True

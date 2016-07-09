@@ -6,21 +6,19 @@ import re
 from functools import total_ordering
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import is_enabled_haskell_command, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, get_ghc_opts, is_haskell_source, show_panel, hide_panel, head_of
+    from sublime_haskell_common import is_enabled_haskell_command, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, get_ghc_opts, is_haskell_source, show_panel, hide_panel, head_of, get_setting_async
     from autocomplete import get_qualified_symbol_at_region
     import autocomplete
-    from hdevtools import hdevtools_type, hdevtools_enabled
-    from check_lint import ghcmod_type, ghcmod_enabled
+    from hdevtools import hdevtools_type
+    from check_lint import ghcmod_type
     from parseoutput import sublime_column_to_ghc_column, ghc_column_to_sublime_column
-    import hsdev
 else:
-    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, get_ghc_opts, is_haskell_source, show_panel, hide_panel, head_of
+    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, get_ghc_opts, is_haskell_source, show_panel, hide_panel, head_of, get_setting_async
     from SublimeHaskell.autocomplete import get_qualified_symbol_at_region
     import SublimeHaskell.autocomplete as autocomplete
-    from SublimeHaskell.hdevtools import hdevtools_type, hdevtools_enabled
-    from SublimeHaskell.check_lint import ghcmod_type, ghcmod_enabled
+    from SublimeHaskell.hdevtools import hdevtools_type
+    from SublimeHaskell.check_lint import ghcmod_type
     from SublimeHaskell.parseoutput import sublime_column_to_ghc_column, ghc_column_to_sublime_column
-    import SublimeHaskell.hsdev as hsdev
 
 # Used to find out the module name.
 MODULE_RE_STR = r'module\s+([^\s\(]*)'  # "module" followed by everything that is neither " " nor "("
@@ -164,7 +162,7 @@ def parse_type_output(view, s):
 def get_type(view, filename, module_name, line, column, cabal = None):
     result = None
 
-    if hsdev.hsdev_enabled():
+    if get_setting_async('enable_hsdev'):
         # Convert from hsdev one-based locations to sublime zero-based positions
         ts = get_types(filename, cabal = cabal)
         pt = FilePosition(line, column).point(view)
@@ -174,9 +172,9 @@ def get_type(view, filename, module_name, line, column, cabal = None):
         return types
     column = sublime_column_to_ghc_column(view, line, column)
     line = line + 1
-    if hdevtools_enabled():
+    if get_setting_async('enable_hdevtools'):
         result = hdevtools_type(filename, line, column, cabal = cabal)
-    if not result and module_name and ghcmod_enabled():
+    if not result and module_name and get_setting_async('enable_ghc_mod'):
         result = ghcmod_type(filename, module_name, line, column)
     return parse_type_output(view, result) if result else None
 
@@ -200,7 +198,7 @@ def get_type_view(view, selection = None):
 
 
 def get_types(filename, on_result = None, cabal = None):
-    if hsdev.hsdev_enabled():
+    if get_setting_async('enable_hsdev'):
         def to_file_pos(r):
             return FilePosition(int(r['line']) - 1, int(r['column']) - 1)
 
