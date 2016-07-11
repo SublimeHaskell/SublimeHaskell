@@ -29,7 +29,7 @@ MODULE_RE = re.compile(MODULE_RE_STR)
 GHCMOD_TYPE_LINE_RE = re.compile(r'(?P<startrow>\d+) (?P<startcol>\d+) (?P<endrow>\d+) (?P<endcol>\d+) "(?P<type>.*)"')
 
 # Name of the sublime panel in which type information is shown.
-TYPE_PANEL_NAME = 'sublime_haskell_show_types_panel'
+TYPES_PANEL_NAME = 'sublime_haskell_show_types_panel'
 
 
 def parse_ghc_mod_type_line(l):
