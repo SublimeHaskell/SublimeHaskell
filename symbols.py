@@ -268,6 +268,21 @@ class Module(Symbol):
         return type(self.location) == OtherLocation
 
 
+def escape_text(txt):
+    """
+    Escape text, replacing leading spaces to non-breaking ones and newlines to <br> tag
+    """
+    lines = []
+    for line in txt.splitlines():
+        m = re.match(r'^\s+', line)
+        if m:  # Replace leading spaces with non-breaking ones
+            lines.append(m.end() * '&nbsp;' + html.escape(line[m.end():], quote = False))
+        else:
+            lines.append(html.escape(line, quote = False))
+
+    return '<br>'.join(lines)
+
+
 class Declaration(Symbol):
     def __init__(self, name, decl_type = 'declaration', docs = None, imported = [], defined = None, position = None, module = None):
         super(Declaration, self).__init__(decl_type, name)
@@ -385,7 +400,7 @@ class Declaration(Symbol):
                 module_ref))
         parts.append(u'</p>')
         if self.docs:
-            parts.append(u'<p><span class="docs">{0}</span></p>'.format(html.escape(self.docs, quote = False)))
+            parts.append(u'<p><span class="docs">{0}</span></p>'.format(escape_text(self.docs)))
         # parts.append(u'<a href="info">...</a>')
         return u''.join(parts)
 

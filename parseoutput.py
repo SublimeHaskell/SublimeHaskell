@@ -119,7 +119,7 @@ def set_global_error_messages(messages):
     clear_error_marks()
 
     for m in messages:
-        ERRORS[m.filename][m.start.line].append(m)
+        ERRORS[os.path.normcase(m.filename)][m.start.line].append(m)
 
 
 def run_build_thread(view, cabal_project_dir, msg, cmd, on_done):

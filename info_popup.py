@@ -154,19 +154,11 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
 			self.view = view
 			self.current_file_name = self.view.file_name()
 			(line, column) = self.view.rowcol(point)
-			errs = parseoutput.ERRORS[self.current_file_name][line]
+			errs = parseoutput.ERRORS[os.path.normcase(self.current_file_name)][line]
 			if errs:
 				popup_parts = [styles.gen_style(self.view.settings().get('color_scheme'))]
 				for err in errs:
-					lines = []
-					for line in err.message.splitlines():
-						m = re.match(r'^\s+', line)
-						if m:  # Replace leading spaces with non-breaking ones
-							lines.append(m.end() * '&nbsp;' + html.escape(line[m.end():], quote = False))
-						else:
-							lines.append(html.escape(line, quote = False))
-
-					msg = '<br>'.join(lines)
+					msg = symbols.escape_text(err.message)
 					# Decorate first word with style
 					decors = {
 						'Error': 'error',

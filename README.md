@@ -80,6 +80,11 @@ Enhanced completion
 Works in export list (showing symbols in scope), import list, expressions. Completes after module qualifier (several modules can be `import qualified as` with same qualifier). Takes into account module reexports for sources.
 ![Autocompletion](Commands/Autocompletion.gif)
 
+Popup
+---
+Show popup with symbol info and with error/warning/hint details. Requires SublimeText 3 dev build > 3070.
+![Hover](Commands/Hover.gif)
+
 Commands:
 ---
 
