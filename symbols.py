@@ -1,5 +1,7 @@
 # -*- coding: UTF-8 -*-
 
+import html
+import re
 import sublime
 import os.path
 
@@ -321,6 +323,7 @@ class Declaration(Symbol):
         return ('{0}\t{1}'.format(self.name, self.imported_from_name()), self.name)
 
     def brief(self, short = False):
+        """ Brief information, just a name by default """
         return self.name
 
     def qualified_name(self):
@@ -328,35 +331,91 @@ class Declaration(Symbol):
 
     def detailed(self):
         """ Detailed info for use in Symbol Info command """
-        info = [self.brief()]
+        parts = [self.brief()]
 
         if self.imported_names():
-            info.extend(['', 'Imported from {0}'.format(', '.join(self.imported_names()))])
+            parts.extend(['', 'Imported from {0}'.format(', '.join(self.imported_names()))])
 
         if self.docs:
-            info.extend(['', self.docs])
+            parts.extend(['', self.docs])
 
-        info.append('')
+        parts.append('')
 
         if self.by_source():
             if self.defined_module().location.project:
-                info.append('Project: {0}'.format(self.defined_module().location.project))
+                parts.append('Project: {0}'.format(self.defined_module().location.project))
         elif self.by_cabal():
-            info.append('Installed in: {0}'.format(self.defined_module().location.db.to_string()))
-            info.append('Package: {0}'.format(self.defined_module().location.package.package_id()))
+            parts.append('Installed in: {0}'.format(self.defined_module().location.db.to_string()))
+            parts.append('Package: {0}'.format(self.defined_module().location.package.package_id()))
 
         if self.has_source_location():
-            info.append('Defined at: {0}'.format(self.get_source_location()))
+            parts.append('Defined at: {0}'.format(self.get_source_location()))
         else:
-            info.append('Defined in: {0}'.format(self.defined_module().name))
+            parts.append('Defined in: {0}'.format(self.defined_module().name))
 
-        return '\n'.join(info)
+        return '\n'.join(parts)
+
+    def popup_brief(self):
+        """ Brief info on popup with name, possibly with link if have source location """
+        info = u'<span class="function">{0}</span>'.format(html.escape(self.name, quote = False))
+        if self.has_source_location():
+            return u'<a href="{0}">{1}</a>'.format(html.escape(self.get_source_location()), info)
+        else:
+            return info
+
+    def popup(self):
+        """ Full info on popup with docs """
+        parts = [u'<p>']
+        parts.append(self.popup_brief())
+        if self.imported_names():
+            parts.append(u'<br>{0}<span class="comment">-- Imported from {1}</span>'.format(
+                4 * '&nbsp;',
+                html.escape(u', '.join(self.imported_names()), quote = False)))
+        if self.defined_module():
+            module_ref = html.escape(self.defined_module().name, quote = False)
+            if self.defined_module().by_source():
+                module_ref = u'<a href="{0}">{1}</a>'.format(self.defined_module().location.to_string(), module_ref)
+            elif self.defined_module().by_cabal():
+                hackage_url = 'http://hackage.haskell.org/package/{0}/docs/{1}.html'.format(
+                    self.defined_module().location.package.package_id(),
+                    self.defined_module().name.replace('.', '-'))
+                module_ref = u'<a href="{0}">{1}</a>'.format(html.escape(hackage_url), module_ref)
+            parts.append(u'<br>{0}<span class="comment">-- Defined in {1}</span>'.format(
+                4 * '&nbsp;',
+                module_ref))
+        parts.append(u'</p>')
+        if self.docs:
+            parts.append(u'<p><span class="docs">{0}</span></p>'.format(html.escape(self.docs, quote = False)))
+        # parts.append(u'<a href="info">...</a>')
+        return u''.join(parts)
 
 
 def wrap_operator(name):
     if re.match(r"[\w']+", name):
         return name
     return "({0})".format(name)
+
+
+def format_type(expr):
+    """
+    Format type expression for popup
+    Set span 'type' for types and 'tyvar' for type variables
+    """
+
+    if not expr:
+        return expr
+    m = re.search(r'([a-zA-Z]\w*)|(->|=>|::)', expr)
+    if m:
+        e = expr[m.start():m.end()]
+        expr_class = ''
+        if m.group(1):
+            expr_class = 'type' if e[0].isupper() else 'tyvar'
+        elif m.group(2):
+            expr_class = 'operator'
+        decorated = '<span class="{0}">{1}</span>'.format(expr_class, html.escape(e, quote = False))
+        return html.escape(expr[0:m.start()], quote = False) + decorated + format_type(expr[m.end():])
+    else:
+        return html.escape(expr, quote = False)
 
 
 class Function(Declaration):
@@ -374,6 +433,12 @@ class Function(Declaration):
         if short:
             return u'{0}'.format(wrap_operator(self.name))
         return u'{0} :: {1}'.format(wrap_operator(self.name), self.type if self.type else u'?')
+
+    def popup_brief(self):
+        info = u'<span class="function">{0}</span>'.format(html.escape(self.name, quote = False))
+        if self.has_source_location():
+            info = u'<a href="{0}">{1}</a>'.format(html.escape(self.get_source_location()), info)
+        return u'{0} <span class="operator">::</span> {1}'.format(info, format_type(self.type if self.type else u'?'))
 
 
 class TypeBase(Declaration):
@@ -411,6 +476,25 @@ class TypeBase(Declaration):
             brief_parts.append(u' '.join(self.args))
 
         return u' '.join(brief_parts)
+
+    def popup_brief(self):
+        parts = [u'<span class="keyword">{0}</span>'.format(html.escape(self.what, quote = False))]
+        if self.context:
+            ctx = self.context.split(', ')
+            if len(ctx) == 1:
+                parts.append(format_type(u'{0} =>'.format(ctx[0])))
+            else:
+                parts.append(format_type(u'({0}) =>'.format(', '.join(ctx))))
+
+        name_part = u'<span class="type">{0}</span>'.format(html.escape(self.name, quote = False))
+        if self.has_source_location():
+            name_part = u'<a href="{0}">{1}</a>'.format(html.escape(self.get_source_location()), name_part)
+        parts.append(name_part)
+
+        if self.args:
+            parts.append(format_type(u' '.join(self.args)))
+
+        return u' '.join(parts)
 
 
 class Type(TypeBase):

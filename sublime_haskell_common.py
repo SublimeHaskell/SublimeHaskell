@@ -738,6 +738,10 @@ def get_qualified_symbol_at_region(view, region):
     return get_qualified_symbol(before + at)
 
 
+def get_qualified_symbol_at_point(view, point):
+    return get_qualified_symbol_at_region(view, sublime.Region(point, point))
+
+
 def sublime_status_message(msg):
     """
     Pure msg with 'SublimeHaskell' prefix and set_timeout
