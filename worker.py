@@ -1,9 +1,15 @@
 import threading
+import sublime
 
 try:
     import queue
 except ImportError:
     import Queue as queue
+
+if int(sublime.version()) < 3000:
+    from sublime_haskell_common import log
+else:
+    from SublimeHaskell.sublime_haskell_common import log
 
 
 # Background worker

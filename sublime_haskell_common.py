@@ -655,9 +655,9 @@ def get_line_contents_at_region(view, region):
     """
     line_region = view.line(region)
 
-    before = view.substr(sublime.Region(line_region.a, region.a))
+    before = view.substr(sublime.Region(line_region.begin(), region.begin()))
     at = view.substr(region)
-    after = view.substr(sublime.Region(region.b, line_region.b))
+    after = view.substr(sublime.Region(region.end(), line_region.end()))
     return (before, at, after)
 
 
