@@ -27,7 +27,7 @@ output_regex = re.compile(
     re.MULTILINE)
 
 # Extract the filename, line, column, and description from an error message:
-result_file_regex = r'^(\S*?): line (\d+), column (\d+):$'
+result_file_regex = r'^\s{2}(\S*?): line (\d+), column (\d+):$'
 
 OUTPUT_PANEL_NAME = 'sublime_haskell_output_panel'
 
@@ -80,7 +80,7 @@ class OutputMessage(object):
         # must match result_file_regex
         # TODO: Columns must be recalculated, such that one tab is of tab_size length
         # We can do this for opened views, but how to do this for files, that are not open?
-        return u'{0}: line {1}, column {2}:\n  {3}'.format(
+        return u'  {0}: line {1}, column {2}:\n    {3}'.format(
             self.filename,
             self.start.line + 1,
             self.start.column + 1,
@@ -184,16 +184,30 @@ def format_output_messages(messages):
         summary['error'],
         summary['warning'],
         summary['hint'])
-    ordered = []
-    ordered.extend([m for m in messages if m.level == 'error'])
-    ordered.extend([m for m in messages if m.level == 'warning'])
-    ordered.extend([m for m in messages if m.level == 'hint'])
+
+    def messages_level(name, level):
+        if PyV3:
+            if not summary[level]:
+                return ''
+            count = '{0}: {1}'.format(name, summary[level])
+            msgs = '\n'.join(str(m) for m in messages if m.level == level)
+            return '{0}\n\n{1}'.format(count, msgs)
+        else:
+            if not summary[level]:
+                return u''
+            count = u'{0}: {1}'.format(name, summary[level])
+            msgs = u'\n'.join(unicode(m) for m in messages if m.level == level)
+            return u'{0}\n\n{1}'.format(count, msgs)
+
+    errors = messages_level('Errors', 'error')
+    warnings = messages_level('Warnings', 'warning')
+    hints = messages_level('Hints', 'hint')
+
+    parts = filter(lambda s: s, [summary_line, errors, warnings, hints])
     if PyV3:
-        details = '\n'.join(str(m) for m in ordered)
-        return '{0}\n\n{1}'.format(summary_line, details) if details else ''
+        return '\n\n'.join(parts)
     else:
-        details = u'\n'.join(unicode(m) for m in ordered)
-        return u'{0}\n\n{1}'.format(summary_line, details) if details else u''
+        return u'\n\n'.join(parts)
 
 
 def show_output_result_text(view, msg, text, exit_code, base_dir):
@@ -279,12 +293,26 @@ message_levels = {
 # These next and previous commands were shamelessly copied
 # from the great SublimeClang plugin.
 
-def goto_error(view, filename, line, column):
+
+def get_error_at(filename, line, column):
+    global ERRORS
+    if filename in ERRORS and line in ERRORS[filename]:
+        errs = [e for e in ERRORS[filename][line] if e.start.column == column]
+        if len(errs):
+            return errs[0]
+    return None
+
+
+def goto_error(view, error):
+    line = error.start.line + 1
+    column = error.start.column + 1
+    filename = error.filename
     global error_view
     if error_view:
         show_output(view)
         # error_region = error_view.find('{0}: line {1}, column \\d+:(\\n\\s+.*)*'.format(re.escape(filename), line), 0)
-        error_region = error_view.find('{0}: line {1}, column {2}:(\\n\\s+.*)*'.format(re.escape(filename), line, column), 0)
+        error_region = error_view.find(re.escape(str(error)), 0)
+        # error_region = error_view.find('\\s{{2}}{0}: line {1}, column {2}:(\\n\\s+.*)*'.format(re.escape(filename), line, column), 0)
         error_view.add_regions("current_error", [error_region], 'string', 'dot', sublime.HIDDEN)
         error_view.show(error_region.a)
     view.window().open_file("{0}:{1}:{2}".format(filename, line, column), sublime.ENCODED_POSITION)
@@ -303,10 +331,15 @@ def get_next_value(v, lst, cycle = True):
     return None
 
 
+def get_prev_value(v, lst, cycle = True):
+    # Get previous value from list
+    return get_next_value(v, reversed(lst), cycle)
+
+
 class SublimeHaskellNextError(SublimeHaskellTextCommand):
     def run(self, edit):
         v = self.view
-        fn = v.file_name()
+        fn = os.path.normcase(v.file_name())
         line, column = v.rowcol(v.sel()[0].a)
         # line += 1
         gotoline = None
@@ -316,7 +349,7 @@ class SublimeHaskellNextError(SublimeHaskellTextCommand):
                 gotoline = line
                 gotocolumn = get_next_value(column, sorted([e.start.column for e in ERRORS[fn][gotoline]]), cycle = False)
                 if gotocolumn is not None:  # next error on same line
-                    goto_error(v, fn, gotoline + 1, gotocolumn + 1)
+                    goto_error(v, get_error_at(fn, gotoline, gotocolumn))
                     return
             # no error on this line, find next (and cycle through)
             gotoline = get_next_value(line, sorted(ERRORS[fn].keys()))
@@ -324,30 +357,37 @@ class SublimeHaskellNextError(SublimeHaskellTextCommand):
                 # go to first error on line
                 gotocolumn = get_next_value(None, sorted([e.start.column for e in ERRORS[fn][gotoline]]), cycle = False)
                 if gotocolumn is not None:  # found some
-                    goto_error(v, fn, gotoline + 1, gotocolumn + 1)
+                    goto_error(v, get_error_at(fn, gotoline, gotocolumn))
                     return
             show_status_message('No more errors or warnings!', priority = 5)
+        else:
+            show_status_message('No errors or warnings in this file!', priority = 5)
 
 
 class SublimeHaskellPreviousError(SublimeHaskellTextCommand):
     def run(self, edit):
         v = self.view
-        fn = v.file_name()
+        fn = os.path.normcase(v.file_name())
         line, column = v.rowcol(v.sel()[0].a)
-        line += 1
-        gotoline = -1
+        # line += 1
+        gotoline = None
+        gotocolumn = None
         if fn in ERRORS:
-            for errLine in sorted(ERRORS[fn].keys(), key = lambda x: -x):
-                if errLine < line:
-                    gotoline = errLine
-                    break
-            # No previous line: Wrap around if possible
-            if gotoline == -1 and len(ERRORS[fn]) > 0:
-                gotoline = sorted(ERRORS[fn].keys())[-1]
-        if gotoline != -1:
-            goto_error(v, fn, gotoline)
+            if line in ERRORS[fn]:
+                gotoline = line
+                gotocolumn = get_prev_value(column, sorted([e.start.column for e in ERRORS[fn][gotoline]]), cycle = False)
+                if gotocolumn is not None:
+                    goto_error(v, get_error_at(fn, gotoline, gotocolumn))
+                    return
+            gotoline = get_prev_value(line, sorted(ERRORS[fn].keys()))
+            if gotoline is not None:
+                gotocolumn = get_prev_value(None, sorted([e.start.column for e in ERRORS[fn][gotoline]]), cycle = False)
+                if gotocolumn is not None:
+                    goto_error(v, get_error_at(fn, gotoline, gotocolumn))
+                    return
+            show_status_message('No more errors or warnings!', priority = 5)
         else:
-            sublime.status_message("No more errors or warnings!")
+            show_status_message('No errors or warnings in this file!', priority = 5)
 
 
 def region_key(name):

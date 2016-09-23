@@ -49,27 +49,26 @@
 		</dict>
 		<dict>
 			<key>match</key>
-			<string>^((\w:)?[^:]+):\sline\s(\d+),\scolumn\s(\d+):</string>
+			<string>^(Errors|Warnings|Hints): (\d+)$</string>
 			<key>captures</key>
 			<dict>
 				<key>1</key>
 				<dict>
 					<key>name</key>
-					<string>string.location.outputpanel</string>
+					<string>keyword.level.outputpanel</string>
 				</dict>
-				<key>3</key>
-				<dict>
-					<key>name</key>
-					<string>constant.numeric.outputpanel</string>
-				</dict>
-				<key>4</key>
+				<key>2</key>
 				<dict>
 					<key>name</key>
 					<string>constant.numeric.outputpanel</string>
 				</dict>
 			</dict>
 			<key>name</key>
-			<string>location.outputpanel</string>
+			<string>messages.outputpanel</string>
+		</dict>
+		<dict>
+			<key>include</key>
+			<string>#report</string>
 		</dict>
 		<dict>
 			<key>include</key>
@@ -86,10 +85,35 @@
 	</array>
 	<key>repository</key>
 	<dict>
+		<key>report</key>
+		<dict>
+			<key>match</key>
+			<string>^\s{2}((?:\w:)?[^:]+):\sline\s(\d+),\scolumn\s(\d+):</string>
+			<key>captures</key>
+			<dict>
+				<key>1</key>
+				<dict>
+					<key>name</key>
+					<string>string.location.outputpanel</string>
+				</dict>
+				<key>2</key>
+				<dict>
+					<key>name</key>
+					<string>constant.numeric.outputpanel</string>
+				</dict>
+				<key>3</key>
+				<dict>
+					<key>name</key>
+					<string>constant.numeric.outputpanel</string>
+				</dict>
+			</dict>
+			<key>name</key>
+			<string>location.outputpanel</string>
+		</dict>
 		<key>message</key>
 		<dict>
 			<key>match</key>
-			<string>^\s+(Hint|Warning|Error):</string>
+			<string>^\s{4}(Hint|Warning|Error):</string>
 			<key>captures</key>
 			<dict>
 				<key>1</key>
