@@ -184,11 +184,15 @@ def format_output_messages(messages):
         summary['error'],
         summary['warning'],
         summary['hint'])
+    ordered = []
+    ordered.extend([m for m in messages if m.level == 'error'])
+    ordered.extend([m for m in messages if m.level == 'warning'])
+    ordered.extend([m for m in messages if m.level == 'hint'])
     if PyV3:
-        details = '\n'.join(str(x) for x in messages)
+        details = '\n'.join(str(m) for m in ordered)
         return '{0}\n\n{1}'.format(summary_line, details) if details else ''
     else:
-        details = u'\n'.join(unicode(x) for x in messages)
+        details = u'\n'.join(unicode(m) for m in ordered)
         return u'{0}\n\n{1}'.format(summary_line, details) if details else u''
 
 

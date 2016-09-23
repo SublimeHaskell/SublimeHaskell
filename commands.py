@@ -19,6 +19,24 @@ else:
 symbol_file_regex = r'^Defined at: (.*):(\d+):(\d+)$'
 
 
+def is_scanned_source(view = None):
+    window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
+    if file_shown_in_view is None:
+        return False
+    m = head_of(hsdev.client.module(file = file_shown_in_view))
+    return m is not None
+
+
+def is_in_project(view = None):
+    window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
+    if file_shown_in_view is None:
+        return False
+    m = head_of(hsdev.client.module(file = file_shown_in_view))
+    if m is None:
+        return False
+    return m.location.project is not None
+
+
 def show_declaration_info_panel(view, decl):
     info = decl.detailed()
     if get_setting_async('unicode_symbol_info'):

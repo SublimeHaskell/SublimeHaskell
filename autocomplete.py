@@ -34,24 +34,6 @@ NO_SPECIAL_CHARS_RE = re.compile(r'^(\w|[\-\.])*$')
 EXPORT_MODULE_RE = re.compile(r'\bmodule\s+[\w\d\.]*$')
 
 
-def is_scanned_source(view = None):
-    window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
-    if file_shown_in_view is None:
-        return False
-    m = head_of(hsdev.client.module(file = file_shown_in_view))
-    return m is not None
-
-
-def is_in_project(view = None):
-    window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
-    if file_shown_in_view is None:
-        return False
-    m = head_of(hsdev.client.module(file = file_shown_in_view))
-    if m is None:
-        return False
-    return m.location.project is not None
-
-
 # Gets available LANGUAGE options and import modules from ghc-mod
 def get_language_pragmas():
 

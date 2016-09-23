@@ -159,6 +159,12 @@ def parse_type_output(view, s):
     return result
 
 
+def sorted_types(view, types, pt):
+    return sorted(
+        list(filter(lambda t: t.region(view).contains(pt), types)),
+        key = lambda t: t.region(view).size())
+
+
 def get_type(view, filename, module_name, line, column, cabal = None):
     result = None
 
@@ -166,10 +172,7 @@ def get_type(view, filename, module_name, line, column, cabal = None):
         # Convert from hsdev one-based locations to sublime zero-based positions
         ts = get_types(filename, cabal = cabal)
         pt = FilePosition(line, column).point(view)
-        types = sorted(
-            list(filter(lambda t: t.region(view).contains(pt), ts)),
-            key = lambda t: t.region(view).size())
-        return types
+        return sorted_types(view, ts, pt)
     column = sublime_column_to_ghc_column(view, line, column)
     line = line + 1
     if get_setting_async('enable_hdevtools'):
@@ -209,10 +212,14 @@ def get_types(filename, on_result = None, cabal = None):
                 to_file_pos(r['region']['to']))
 
         def on_resp(rs):
-            on_result([to_region_type(r) for r in rs])
+            ts = [to_region_type(r) for r in rs]
+            file_types.set(filename, ts)
+            on_result(ts)
         res = hsdev.client.types(files = [filename], ghc = get_ghc_opts(filename), wait = on_result is None, on_response = on_resp if on_result is not None else None)
         if res is not None:
-            return [to_region_type(r) for r in res]
+            ts = [to_region_type(r) for r in res]
+            file_types.set(filename, ts)
+            return ts
 
 
 class SublimeHaskellShowType(SublimeHaskellTextCommand):
@@ -403,7 +410,10 @@ class ExpandSelectionInfo(object):
     def __init__(self, view, selection = None):
         self.view = view
         self.selection = selection if selection is not None else view.sel()[0]
-        types = get_type_view(view, self.selection)
+        if file_types.has(self.view.file_name()):
+            types = sorted_types(self.view, file_types.get(self.view.file_name()), self.selection.b)
+        else:
+            types = get_type_view(self.view, self.selection)
         self.regions = [TypedRegion.fromRegionType(t, view) for t in types] if types else None
         self.expanded_index = None
 
