@@ -593,6 +593,19 @@ class SublimeHaskellOutputText(sublime_plugin.TextCommand):
         self.view.set_read_only(True)
 
 
+class SublimeHaskellReplaceText(sublime_plugin.TextCommand):
+    """
+    Helper command to replace region
+    """
+    def run(self, edit, text = None, begin = None, end = None):
+        if text is None or begin is None or end is None:
+            return
+        read_only = self.view.is_read_only()
+        self.view.set_read_only(False)
+        self.view.replace(edit, sublime.Region(begin, end), text)
+        self.view.set_read_only(read_only)
+
+
 # Output some text to view (panel), possibly clearing
 def output_text(view, text = None, clear = False):
     view.run_command('sublime_haskell_output_text', {'text': (text or ''), 'clear': 'yes' if clear else ''})

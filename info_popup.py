@@ -9,11 +9,13 @@ if int(sublime.version()) < 3000:
 	import symbols
 	import hsdev
 	import parseoutput
+	import types
 else:
 	from SublimeHaskell.sublime_haskell_common import *
 	import SublimeHaskell.symbols as symbols
 	import SublimeHaskell.hsdev as hsdev
 	import SublimeHaskell.parseoutput as parseoutput
+	import SublimeHaskell.types as types
 
 
 classes = {
@@ -105,9 +107,14 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
 		if not is_haskell_source(view):
 			return
 
+		self.view = view
+		self.current_file_name = self.view.file_name()
+		(line, column) = self.view.rowcol(point)
+		self.decl = None
+		self.typed_expr = None
+
 		if hover_zone == sublime.HOVER_TEXT:
-			self.view = view
-			self.current_file_name = self.view.file_name()
+			log('HOVER TEXT', log_debug)
 			qsymbol = get_qualified_symbol_at_point(self.view, point)
 			module_word = qsymbol.module
 			ident = qsymbol.name
@@ -120,16 +127,12 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
 				self.full_name = qsymbol.full_name()
 
 				# Try get type of hovered symbol
-				(line, column) = self.view.rowcol(point)
-				typed_expr = None
-				# typed_expr = head_of(list(filter(
-				# 	lambda t:
-				# 		(int(t['region']['from']['line']) - 1 == line) and
-				# 		(int(t['region']['to']['line']) - 1 == line) and
-				# 		(int(t['region']['from']['column']) - 1 <= column) and
-				# 		(int(t['region']['to']['column']) - 1 >= column) and
-				# 		(t['note']['expr'] == self.whois_name),
-				# 	hsdev.client.types(files = [self.current_file_name]) or [])))
+				self.point = point
+				self.typed_expr = None
+				if types.file_types.has(self.current_file_name):
+					self.typed_expr = self.get_type(types.file_types.get(self.current_file_name))
+				else:
+					types.get_types(self.current_file_name, self.on_types)
 
 				# Try whois
 				self.decl = head_of(hsdev.client.whois(self.whois_name, self.current_file_name))
@@ -137,24 +140,13 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
 				if not self.decl:
 					self.decl = head_of(hsdev.client.lookup(self.full_name, self.current_file_name))
 
-				if typed_expr or self.decl:
-					popup_parts = [styles.gen_style(self.view.settings().get('color_scheme'))]
-					if typed_expr:
-						popup_parts.append(u'<p><span class="function">{0}</span>{1}</p>'.format(
-							typed_expr['note']['expr'],
-							symbols.format_type(u' :: {0}'.format(typed_expr['note']['type']))))
-					if self.decl:
-						popup_parts.append(self.decl.popup())
-					popup_text = u''.join(popup_parts)
-					if get_setting_async('unicode_symbol_info'):
-						popup_text = popup_text.replace(html.escape('=>'), '\u21d2').replace(html.escape('->'), '\u2192').replace('::', '\u2237')
-					self.view.show_popup(popup_text, sublime.HIDE_ON_MOUSE_MOVE_AWAY, point, 600, 600, self.on_navigate, self.on_hide)
+				self.create_symbol_popup()
 
 		elif hover_zone == sublime.HOVER_GUTTER:
+			log('HOVER GUTTER', log_debug)
 			self.view = view
 			self.current_file_name = self.view.file_name()
-			(line, column) = self.view.rowcol(point)
-			errs = parseoutput.ERRORS[os.path.normcase(self.current_file_name)][line]
+			errs = filter(lambda e: e.region.start.line == line, parseoutput.errors_for_view(self.view))
 			if errs:
 				popup_parts = [styles.gen_style(self.view.settings().get('color_scheme'))]
 				for err in errs:
@@ -168,14 +160,59 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
 					for dec, dec_style in decors.items():
 						msg = msg.replace(dec, u'<span class="{0}">{1}</span>'.format(dec_style, dec))
 					popup_parts.append(u'<p>{0}</p>'.format(msg))
+					if err.correction is not None:
+						popup_parts.append(err.correction.popup())
 				popup_text = u''.join(popup_parts)
-				self.view.show_popup(popup_text, sublime.HIDE_ON_MOUSE_MOVE_AWAY, point, 600, 600, None, None)
+				self.view.show_popup(popup_text, sublime.HIDE_ON_MOUSE_MOVE_AWAY, point, 600, 600, self.on_navigate, self.on_hide)
+
+	def create_symbol_popup(self, update = False):
+		if self.typed_expr or self.decl:
+			popup_parts = [styles.gen_style(self.view.settings().get('color_scheme'))]
+			if self.typed_expr:
+				popup_parts.append(u'<p><span class="function">{0}</span>{1}</p>'.format(
+					self.typed_expr.substr(self.view),
+					symbols.format_type(u' :: {0}'.format(self.typed_expr.typename))))
+			if self.decl:
+				popup_parts.append(self.decl.popup())
+			popup_text = u''.join(popup_parts)
+			if get_setting_async('unicode_symbol_info'):
+				popup_text = popup_text.replace(html.escape('=>'), '\u21d2').replace(html.escape('->'), '\u2192').replace('::', '\u2237')
+			if update and self.is_popup_visible():
+				self.view.update_popup(popup_text)
+			else:
+				self.view.show_popup(popup_text, sublime.HIDE_ON_MOUSE_MOVE_AWAY, self.point, 600, 600, self.on_navigate, self.on_hide)
+
+	def get_type(self, types):
+		ts = [t for t in types if t.substr(self.view) == self.whois_name and t.region(self.view).contains(self.point)]
+		if len(ts):
+			return ts[0]
+		else:
+			return None
+
+	def on_types(self, types):
+		self.typed_expr = self.get_type(types)
+		if self.typed_expr:
+			self.create_symbol_popup(update = True)
 
 	def on_navigate(self, url):
 		if self.view.is_popup_visible():
 			self.view.hide_popup()
 			if url[0:4] == 'http':
 				webbrowser.open(url)
+			elif url[0:8] == 'autofix:':
+				rgn = symbols.Region.from_str(url[8:])
+				errs = parseoutput.errors_for_view(self.view)
+				for err in errs:
+					if err.correction is not None and err.correction.corrector.region == rgn:
+						parseoutput.ERRORS.remove(err)
+						errs.remove(err)
+						parseoutput.update_messages_in_view(self.view, errs)
+						r = err.correction.corrector.to_region(self.view)
+						sublime.set_timeout(lambda: self.view.run_command('sublime_haskell_replace_text', {
+							'text': err.correction.corrector.contents,
+							'begin': r.begin(),
+							'end': r.end() }), 0)
+						return
 			else:
 				self.view.window().open_file(url, sublime.ENCODED_POSITION | sublime.TRANSIENT)
 

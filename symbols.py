@@ -4,6 +4,7 @@ import html
 import re
 import sublime
 import os.path
+from functools import total_ordering
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
@@ -12,6 +13,7 @@ else:
     from functools import reduce
 
 
+@total_ordering
 class Position(object):
     def __init__(self, line, column):
         self.line = line
@@ -20,16 +22,105 @@ class Position(object):
     def __str__(self):
         return self.to_string()
 
+    def __unicode__(self):
+        return self.to_string()
+
     def to_string(self):
         if self.column is None:
             return str(self.line)
-        return ':'.join([str(self.line), str(self.column)])
+        return u':'.join([str(self.line), str(self.column)])
+
+    def __eq__(self, other):
+        return self.line == other.line and self.column == other.column
+
+    def __lt__(self, other):
+        if self.line == other.line:
+            return self.column < other.column
+        else:
+            return self.line < other.line
 
     def to_zero_based(self):
-        return Position(self.line - 1, self.column - 1)
+        self.line = self.line - 1
+        self.column = self.column - 1
+        return self
 
     def from_zero_based(self):
-        return Position(self.line + 1, self.column + 1)
+        self.line = self.line + 1
+        self.column = self.column + 1
+        return self
+
+    def to_point(self, view):
+        return view.text_point(self.line, self.column)
+
+    @staticmethod
+    def from_point(view, pt):
+        (l, c) = view.rowcol(pt)
+        return Position(int(l), int(c))
+
+    @staticmethod
+    def from_str(s):
+        ps = s.split(':')
+        if len(ps) == 1:
+            return Position(int(ps[0]), 0)
+        elif len(ps) == 2:
+            return Position(int(ps[0]), int(ps[1]))
+        return None
+
+
+@total_ordering
+class Region(object):
+    def __init__(self, start, end = None):
+        self.start = start
+        self.end = end
+        if self.end is None:
+            self.end = self.start
+
+    def __str__(self):
+        return self.to_string()
+
+    def __unicode__(self):
+        return self.to_string()
+
+    def to_string(self):
+        return u'-'.join([self.start.to_string(), self.end.to_string()])
+
+    def __eq__(self, other):
+        return self.start == other.start and self.end == other.end
+
+    def __lt__(self, other):
+        if self.start == other.start:
+            return self.end < other.end
+        else:
+            return self.start < other.start
+
+    def from_zero_based(self):
+        self.start.from_zero_based()
+        self.end.from_zero_based()
+        return self
+
+    def to_zero_based(self):
+        self.start.to_zero_based()
+        self.end.to_zero_based()
+        return self
+
+    def to_region(self, view):
+        return sublime.Region(self.start.to_point(view), self.end.to_point(view))
+
+    @staticmethod
+    def from_region(view, rgn):
+        return Region(Position.from_point(view, rgn.begin()), Position.from_point(view, rgn.end()))
+
+    @staticmethod
+    def from_str(s):
+        ps = s.split('-')
+        if len(ps) == 1:
+            return Region(Position.from_str(ps[0]))
+        elif len(ps) == 2:
+            return Region(Position.from_str(ps[0]), Position.from_str(ps[1]))
+        return None
+
+    def empty(self):
+        return self.start == self.end
 
 
 class Location(object):
@@ -634,24 +725,59 @@ class CabalPackage(object):
 
 
 class Corrector(object):
-    def __init__(self, start, end, contents):
-        self.start = start
-        self.end = end
+    def __init__(self, region, contents):
+        self.region = region
         self.contents = contents
 
+    def __eq__(self, other):
+        return self.region == other.region and self.contents == other.contents
+
     def to_region(self, view):
-        return sublime.Region(view.text_point(self.start.line, self.start.column), view.text_point(self.end.line, self.end.column))
+        return self.region.to_region(view)
+
+    def from_region(self, view, rgn):
+        self.region = Region.from_region(view, rgn)
+
+    def to_json(self):
+        return json.dumps({self.region.to_string():self.contents})
+
+    @staticmethod
+    def from_json(j):
+        d = json.loads(j)
+        its = list(d.items())
+        if len(its) == 1:
+            (rgn, cts) = its[0]
+            return Corrector(Region.from_str(rgn), cts)
+        return None
 
 
 class Correction(object):
-    def __init__(self, file, level, message, corrector):
+    def __init__(self, file, level, message, corrector, message_region = None):
         self.file = file
         self.level = level
         self.message = message
+        # source messages region, used to match corrector and outputmessage
+        self.message_region = message_region
         self.corrector = corrector
 
     def to_region(self, view):
         return self.corrector.to_region(view)
+
+    def from_region(self, view, rgn):
+        self.corrector.from_region(view, rgn)
+
+    def detailed(self):
+        if self.corrector.contents:
+            return u'\u2014 {0}\n  Why not:\n\n{1}'.format(self.message, self.corrector.contents)
+        return u'\u2014 {0}'.format(self.message)
+
+    def popup(self):
+        parts = [u'<span class="message">— {0} (<a href="{1}">{2}</a>)</span>'.format(html.escape(self.message), html.escape("autofix:" + self.corrector.region.to_string()), "autofix")]
+        if self.corrector.contents:
+            parts.append(u'<br>{0}<span class="{1}">{2}</span>'.format(2 * "&nbsp;", html.escape(self.level), html.escape("Why not: ")))
+            parts.append(u'<br><br>{0}<span class="code">{1}</span>'.format(4 * "&nbsp;", html.escape(self.corrector.contents)))
+        return u''.join(parts)
+
 
 
 def mark_corrections(views, corrs):
@@ -660,3 +786,27 @@ def mark_corrections(views, corrs):
             continue
         corrs_ = [corr for corr in corrs if os.path.samefile(corr.file, view.file_name())]
         view.add_regions('autofix', [corr.to_region(view) for corr in corrs_], 'entity.name.function', 'dot', 0)
+
+
+# This allow us track region positions even if file modifies
+def add_corrections_regions(views, corrs):
+    for view in views:
+        if view.file_name() is None:
+            continue
+        corrs_ = [corr for corr in corrs if os.path.samefile(corr.file, view.file_name())]
+        view.add_regions('autofix', [corr.to_region(view) for corr in corrs_], 'autofix', '', sublime.HIDDEN)
+
+
+# Restore actual region data from view regions
+def restore_corrections_regions(views, corrs):
+    for view in views:
+        if view.file_name() is None:
+            continue
+        corrs_ = [corr for corr in corrs if os.path.samefile(corr.file, view.file_name())]
+        rgns = view.get_regions('autofix')
+        if len(rgns) != len(corrs_):
+            # Something wrong
+            return
+
+        for rgn, corr in zip(rgns, corrs):
+            corr.corrector.from_region(view, rgn)

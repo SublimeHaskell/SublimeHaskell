@@ -8,12 +8,12 @@ from threading import Thread
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
     import hsdev
-    from parseoutput import OutputPoint, OutputMessage, parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages, write_output, parse_info
+    from parseoutput import OutputMessage, parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages, write_output, parse_info
     import symbols
 else:
     from SublimeHaskell.sublime_haskell_common import *
     import SublimeHaskell.hsdev as hsdev
-    from SublimeHaskell.parseoutput import OutputPoint, OutputMessage, parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages, write_output, parse_info
+    from SublimeHaskell.parseoutput import OutputMessage, parse_output_messages, show_output_result_text, format_output_messages, mark_messages_in_views, hide_output, set_global_error_messages, write_output, parse_info
     import SublimeHaskell.symbols as symbols
 
 
@@ -71,29 +71,7 @@ class SublimeHaskellHsDevChain(SublimeHaskellTextCommand):
         try:
             if not cmds:
                 self.status_msg.stop()
-                output_messages = [OutputMessage(
-                    m['source']['file'],
-                    OutputPoint(
-                        int(m['region']['from']['line']) - 1,
-                        int(m['region']['from']['column']) - 1),
-                    OutputPoint(
-                        int(m['region']['to']['line']) - 1,
-                        int(m['region']['to']['column']) - 1),
-                    m['level'].capitalize() + ': ' + m['note']['message'].replace('\n', '\n  '),
-                    m['level']) for m in self.messages]
-
-                set_global_error_messages(output_messages)
-                output_text = format_output_messages(output_messages)
-                if output_text:
-                    if get_setting_async('show_error_window'):
-                        sublime.set_timeout(lambda: write_output(
-                            self.view,
-                            output_text,
-                            get_cabal_project_dir_of_file(self.filename) or os.path.dirname(self.filename),
-                            show_panel = not self.fly_mode), 0)
-                sublime.set_timeout(lambda: mark_messages_in_views(output_messages), 0)
-
-                # hsdev.client.autofix_show(self.msgs, on_response = self.on_autofix)
+                hsdev.client.autofix_show(self.msgs, on_response = self.on_autofix)
             else:
                 cmd, tail_cmds = cmds[0], cmds[1:]
                 (fn, modify_args, modify_msgs, kwargs) = cmd
@@ -113,9 +91,36 @@ class SublimeHaskellHsDevChain(SublimeHaskellTextCommand):
             self.status_msg.fail()
             self.status_msg.stop()
 
-    def on_autofix(self, corrs):
-        self.corrections = corrs
-        sublime.set_timeout(lambda: symbols.mark_corrections([v for w in sublime.windows() for v in w.views()], self.corrections), 0)
+    def on_autofix(self, corrections):
+        output_messages = [OutputMessage(
+            m['source']['file'],
+            hsdev.parse_region(m['region']).to_zero_based(),
+            m['level'].capitalize() + ': ' + m['note']['message'].replace('\n', '\n  '),
+            m['level']) for m in self.messages]
+
+        self.corrections = corrections
+        for corr in self.corrections:
+            corr.message_region.to_zero_based()
+        log('CORRECTIONS: {0}'.format(self.corrections), log_trace)
+        self.corrections_dict = dict(((os.path.normpath(c.file), c.message_region.start.line, c.message_region.start.column), c) for c in self.corrections)
+        log('CORRECTIONS DICT: {0}'.format(self.corrections_dict), log_trace)
+
+        for omsg in output_messages:
+            okey = (os.path.normpath(omsg.filename), omsg.region.start.line, omsg.region.start.column)
+            log('MESSAGES: {0}'.format(okey), log_trace)
+            if okey in self.corrections_dict:
+                omsg.correction = self.corrections_dict[okey]
+
+        set_global_error_messages(output_messages)
+        output_text = format_output_messages(output_messages)
+        if output_text:
+            if get_setting_async('show_error_window'):
+                sublime.set_timeout(lambda: write_output(
+                    self.view,
+                    output_text,
+                    get_cabal_project_dir_of_file(self.filename) or os.path.dirname(self.filename),
+                    show_panel = not self.fly_mode), 0)
+        sublime.set_timeout(lambda: mark_messages_in_views(output_messages), 0)
 
     def is_enabled(self):
         return is_haskell_source(None)

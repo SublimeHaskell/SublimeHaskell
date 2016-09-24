@@ -33,10 +33,8 @@ OUTPUT_PANEL_NAME = 'sublime_haskell_output_panel'
 
 BUILD_LOG_PANEL_NAME = 'sublime_haskell_build_log_panel'
 
-# Global list of errors. Used e.g. for jumping to the next one.
-# Properly assigned being a defaultdict in clear_error_marks().
-# Structure: ERRORS[filename][m.start.line] = OutputMessage()
-ERRORS = {}
+# Global list of errors.
+ERRORS = []
 
 # Global ref to view with errors
 error_view = None
@@ -49,32 +47,14 @@ def filename_of_path(p):
     return re.match(r'(.*[/\\])?(.*)', p).groups()[1]
 
 
-class OutputPoint(object):
-    def __init__(self, line, column):
-        self.line = int(line)
-        self.column = int(column)
-
-    def __unicode__(self):
-        return u"{0}:{1}".format(self.line, self.column)
-
-    def __str__(self):
-        return self.__unicode__()
-
-    def __eq__(self, other):
-        return self.line == other.line and self.column == other.column
-
-    def to_point_of_view(self, view):
-        return view.text_point(self.line, self.column)
-
-
 class OutputMessage(object):
     "Describe an error or warning message produced by GHC."
-    def __init__(self, filename, start, end, message, level):
+    def __init__(self, filename, region, message, level, correction = None):
         self.filename = filename
-        self.start = start
-        self.end = end
+        self.region = region
         self.message = message.replace(os.linesep, "\n")
         self.level = level
+        self.correction = correction
 
     def __unicode__(self):
         # must match result_file_regex
@@ -82,8 +62,8 @@ class OutputMessage(object):
         # We can do this for opened views, but how to do this for files, that are not open?
         return u'  {0}: line {1}, column {2}:\n    {3}'.format(
             self.filename,
-            self.start.line + 1,
-            self.start.column + 1,
+            self.region.start.line + 1,
+            self.region.start.column + 1,
             self.message)
 
     def __str__(self):
@@ -92,34 +72,32 @@ class OutputMessage(object):
     def __repr__(self):
         return '<OutputMessage {0}:{1}-{2}: {3}>'.format(
             filename_of_path(self.filename),
-            self.start.__repr__(),
-            self.end.__repr__(),
+            self.region.start.__repr__(),
+            self.region.end.__repr__(),
             self.message[:10] + '..')
 
-    def to_region_in_view(self, view):
+    def to_region(self, view):
         "Return the Region referred to by this error message."
         # Convert line and column count to zero-based indices:
-        if self.start == self.end:  # trimmed full line
-            return trim_region(view, view.line(self.start.to_point_of_view(view)))
-        return sublime.Region(self.start.to_point_of_view(view), self.end.to_point_of_view(view))
+        if self.region.empty():
+            return trim_region(view, view.line(self.region.start.to_point(view)))
+        return self.region.to_region(view)
 
 
 def clear_error_marks():
     global ERRORS
-
-    def listdict():
-        return defaultdict(list)
-    # listdict = lambda: defaultdict(list)
-    ERRORS = defaultdict(listdict)
+    ERRORS = []
 
 
 def set_global_error_messages(messages):
     global ERRORS
-
     clear_error_marks()
+    ERRORS.extend(messages)
 
-    for m in messages:
-        ERRORS[os.path.normcase(m.filename)][m.start.line].append(m)
+
+def errors_for_file(file):
+    global ERRORS
+    return sorted([e for e in ERRORS if os.path.samefile(e.filename, file)], key = lambda e: e.region)
 
 
 def run_build_thread(view, cabal_project_dir, msg, cmd, on_done):
@@ -277,20 +255,75 @@ def mark_messages_in_views(errors):
     log('total time to mark {0} diagnostics: {1} seconds'.format(
         len(errors), end_time - begin_time), log_debug)
 
+
 message_levels = {
     'hint': {
         'style': 'sublimehaskell.mark.hint',
-        'icon': 'haskell-hint.png'
+        'icon': {
+            'normal': 'haskell-hint.png',
+            'fix': 'haskell-hint-fix.png' }
     },
     'warning': {
         'style': 'sublimehaskell.mark.warning',
-        'icon': 'haskell-warning.png'
+        'icon': {
+            'normal': 'haskell-warning.png',
+            'fix': 'haskell-warning-fix.png' }
     },
     'error': {
         'style': 'sublimehaskell.mark.error',
-        'icon': 'haskell-error.png'
+        'icon': {
+            'normal': 'haskell-error.png',
+            'fix': 'haskell-error-fix.png' }
     }
 }
+
+
+def error_regions_for_view(view):
+    rgns = []
+    for level in message_levels:
+        for is_fix in [False, True]:
+            rgns.extend(view.get_regions(region_key(level, is_fix)))
+    return sorted(rgns)
+
+
+def errors_for_view(view):
+    # get errors with restored regions
+    rgns = error_regions_for_view(view)
+    errs = errors_for_file(view.file_name())
+    if len(rgns) != len(errs):
+        return []
+    for rgn, err in zip(rgns, errs):
+        err.region = symbols.Region.from_region(view, rgn)
+
+    autofix_rgns = view.get_regions('autofix')
+    fix_errs = list(filter(lambda e: e.correction is not None, errs))
+    if len(autofix_rgns) == len(fix_errs):
+        for rgn, err in zip(autofix_rgns, fix_errs):
+            err.correction.from_region(view, rgn)
+
+    return errs
+
+
+def restore_messages_regions(view, errors):
+    for level in message_levels:
+        for is_fix in [False, True]:
+            rgns = view.get_regions(region_key(level, is_fix))
+            errs = [err for err in errors if os.path.samefile(err.filename, view.file_name()) and err.level == level and (err.correction is not None) == is_fix]
+            if len(rgns) != len(errs):
+                continue
+            for rgn, err in zip(rgns, errs):
+                err.region = symbols.Region.from_region(view, rgn)
+
+    rgns = view.get_regions('autofix')
+    errs = [err for err in errors if os.path.samefile(err.filename, view.file_name()) and err.correction is not None]
+    if len(rgns) != len(errs):
+        return
+    for rgn, err in zip(rgns, errs):
+        err.correction.from_region(view, rgn)
+
+
+def update_messages_in_view(view, errors):
+    mark_messages_in_view(errors, view)
 
 
 # These next and previous commands were shamelessly copied
@@ -299,16 +332,15 @@ message_levels = {
 
 def get_error_at(filename, line, column):
     global ERRORS
-    if filename in ERRORS and line in ERRORS[filename]:
-        errs = [e for e in ERRORS[filename][line] if e.start.column == column]
-        if len(errs):
-            return errs[0]
+    for err in ERRORS:
+        if err.filename == filename and err.region.start.line == line and err.region.start.column :
+            return err
     return None
 
 
 def goto_error(view, error):
-    line = error.start.line + 1
-    column = error.start.column + 1
+    line = error.region.start.line + 1
+    column = error.region.start.column + 1
     filename = error.filename
     global error_view
     if error_view:
@@ -342,59 +374,46 @@ def get_prev_value(v, lst, cycle = True):
 class SublimeHaskellNextError(SublimeHaskellTextCommand):
     def run(self, edit):
         v = self.view
-        fn = os.path.normcase(v.file_name())
-        line, column = v.rowcol(v.sel()[0].a)
-        # line += 1
-        gotoline = None
-        gotocolumn = None
-        if fn in ERRORS:
-            if line in ERRORS[fn]:  # on some line, check if there are another error on same linee
-                gotoline = line
-                gotocolumn = get_next_value(column, sorted([e.start.column for e in ERRORS[fn][gotoline]]), cycle = False)
-                if gotocolumn is not None:  # next error on same line
-                    goto_error(v, get_error_at(fn, gotoline, gotocolumn))
-                    return
-            # no error on this line, find next (and cycle through)
-            gotoline = get_next_value(line, sorted(ERRORS[fn].keys()))
-            if gotoline is not None:
-                # go to first error on line
-                gotocolumn = get_next_value(None, sorted([e.start.column for e in ERRORS[fn][gotoline]]), cycle = False)
-                if gotocolumn is not None:  # found some
-                    goto_error(v, get_error_at(fn, gotoline, gotocolumn))
-                    return
-            show_status_message('No more errors or warnings!', priority = 5)
-        else:
-            show_status_message('No errors or warnings in this file!', priority = 5)
+        rgns = []
+        for level in message_levels:
+            for is_fix in [False, True]:
+                rgns.extend(v.get_regions(region_key(level, is_fix)))
+        rgns.sort()
+        if not rgns:
+            show_status_message('No errors or warnings!', priority = 5)
+        next_rgn = get_next_value(v.sel()[0], rgns)
+        v.sel().clear()
+        v.sel().add(next_rgn)
+        rgn_idx = rgns.index(next_rgn)
+        errs = sorted(filter(lambda e: os.path.samefile(e.filename, v.file_name()), ERRORS), key = lambda e: e.region)
+        if len(errs) > rgn_idx:
+            goto_error(v, errs[rgn_idx])
 
 
 class SublimeHaskellPreviousError(SublimeHaskellTextCommand):
     def run(self, edit):
         v = self.view
-        fn = os.path.normcase(v.file_name())
-        line, column = v.rowcol(v.sel()[0].a)
-        # line += 1
-        gotoline = None
-        gotocolumn = None
-        if fn in ERRORS:
-            if line in ERRORS[fn]:
-                gotoline = line
-                gotocolumn = get_prev_value(column, sorted([e.start.column for e in ERRORS[fn][gotoline]]), cycle = False)
-                if gotocolumn is not None:
-                    goto_error(v, get_error_at(fn, gotoline, gotocolumn))
-                    return
-            gotoline = get_prev_value(line, sorted(ERRORS[fn].keys()))
-            if gotoline is not None:
-                gotocolumn = get_prev_value(None, sorted([e.start.column for e in ERRORS[fn][gotoline]]), cycle = False)
-                if gotocolumn is not None:
-                    goto_error(v, get_error_at(fn, gotoline, gotocolumn))
-                    return
-            show_status_message('No more errors or warnings!', priority = 5)
-        else:
-            show_status_message('No errors or warnings in this file!', priority = 5)
+        rgns = []
+        for level in message_levels:
+            for is_fix in [False, True]:
+                rgns.extend(v.get_regions(region_key(level, is_fix)))
+        rgns.sort()
+        if not rgns:
+            show_status_message("No errors or warnings!", priority = 5)
+        prev_rgn = get_prev_value(v.sel()[0], rgns)
+        v.sel().clear()
+        v.sel().add(prev_rgn)
+        rgn_idx = rgns.index(prev_rgn)
+        errs = sorted(filter(lambda e: os.path.samefile(e.filename, v.file_name()), ERRORS), key = lambda e: e.region)
+        if len(errs) > rgn_idx:
+            goto_error(v, errs[rgn_idx])
 
 
-def region_key(name):
-    return 'subhs-{0}s'.format(name)
+def region_key(name, is_fix = False):
+    if is_fix:
+        return 'output-{0}s-fix'.format(name)
+    else:
+        return 'output-{0}s'.format(name)
 
 
 def get_icon(png):
@@ -409,19 +428,26 @@ def mark_messages_in_view(messages, view):
     # Regions by level
     regions = {}
     for k in message_levels.keys():
-        regions[k] = []
+        regions[k] = {True: [], False: []}
 
     for m in messages:
-        regions[m.level].append(m.to_region_in_view(view))
+        regions[m.level][m.correction is not None].append(m.to_region(view))
 
     for nm, lev in message_levels.items():
-        view.erase_regions(region_key(nm))
-        view.add_regions(
-            region_key(nm),
-            regions[nm],
-            lev['style'],
-            get_icon(lev['icon']),
-            sublime.DRAW_OUTLINED)
+        for is_fix in [False, True]:
+            view.erase_regions(region_key(nm, is_fix))
+            view.add_regions(
+                region_key(nm, is_fix),
+                regions[nm][is_fix],
+                lev['style'],
+                get_icon(lev['icon']['fix' if is_fix else 'normal']),
+                sublime.DRAW_OUTLINED)
+
+    view.erase_regions('autofix')
+    autofix_rgns = []
+    for r in [m.correction.corrector.region for m in messages if m.correction is not None]:
+        autofix_rgns.append(r.to_region(view))
+    view.add_regions('autofix', autofix_rgns, 'autofix.region', '', sublime.HIDDEN)
 
 
 def write_output(view, text, cabal_project_dir, show_panel = True):
@@ -485,8 +511,9 @@ def parse_output_messages(view, base_dir, text):
         return OutputMessage(
             # Record the absolute, normalized path.
             os.path.normpath(os.path.join(base_dir, filename)),
-            OutputPoint(line, column),
-            OutputPoint(line, column),
+            symbols.Region(
+                symbols.Position(line, column),
+                symbols.Position(line, column)),
             messy_details.strip(),
             'warning' if 'warning' in messy_details.lower() else 'error')
 
@@ -497,8 +524,8 @@ def trim_region(view, region):
     "Return the specified Region, but without leading or trailing whitespace."
     text = view.substr(region)
     # Regions may be selected backwards, so b could be less than a.
-    a = min(region.a, region.b)
-    b = max(region.a, region.b)
+    a = region.begin()
+    b = region.end()
     # Figure out how much to move the endpoints to lose the space.
     # If the region is entirely whitespace, give up and return it unchanged.
     if text.isspace():

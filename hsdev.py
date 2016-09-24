@@ -182,6 +182,16 @@ def parse_position(d):
     return None
 
 
+def parse_region(d):
+    if not d:
+        return None
+    start = parse_position(d.get('from'))
+    end = parse_position(d.get('to'))
+    if start is not None and end is not None:
+        return symbols.Region(start, end)
+    return None
+
+
 def parse_location(d):
     loc = symbols.Location(
         get_value(d, 'file'),
@@ -310,13 +320,13 @@ def parse_correction(d):
         d['source']['file'],
         d['level'],
         d['note']['message'],
-        parse_corrector(d['note']['corrector']))
+        parse_corrector(d['note']['corrector']),
+        parse_region(d.get('region')))
 
 
 def parse_corrector(d):
     return symbols.Corrector(
-        parse_position(d['region']['from']),
-        parse_position(d['region']['to']),
+        parse_region(d['region']),
         d['contents'])
 
 

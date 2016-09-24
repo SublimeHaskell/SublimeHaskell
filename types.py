@@ -219,8 +219,9 @@ def get_types(filename, on_result = None, cabal = None):
         if file_types.has(filename):
             return file_types.get(filename)
 
-        res = hsdev.client.types(files = [filename], ghc = get_ghc_opts(filename), wait = on_result is None, on_response = on_resp if on_result is not None else None)
-        if res is not None:
+        wait = on_result is None
+        res = hsdev.client.types(files = [filename], ghc = get_ghc_opts(filename), wait = wait, on_response = on_resp if on_result is not None else None)
+        if res is not None and wait:
             ts = [to_region_type(r) for r in res]
             file_types.set(filename, ts, False)
             return ts
