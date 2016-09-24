@@ -7,9 +7,9 @@ except ImportError:
     import Queue as queue
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import log
+    from sublime_haskell_common import log, log_debug
 else:
-    from SublimeHaskell.sublime_haskell_common import log
+    from SublimeHaskell.sublime_haskell_common import log, log_debug
 
 
 # Background worker
@@ -34,7 +34,7 @@ worker = None
 
 def run_async(name, fn, *args, **kwargs):
     global worker
-    if not worker:
+    if not worker or not worker.is_alive():
         worker = Worker()
         worker.start()
     worker.async(name, fn, *args, **kwargs)
