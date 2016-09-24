@@ -49,37 +49,53 @@ class FlyCheckLint(threading.Thread):
     def __init__(self):
         super(FlyCheckLint, self).__init__()
         self.daemon = True
-        self.view = LockedObject([])
+        self.view = LockedObject({'view':None, 'mtime':None})
         self.event = threading.Event()
 
     def fly(self, view):
         with self.view as v:
-            v[:] = [view]
+            v['view'] = view
+            v['mtime'] = time.time()
         self.event.set()
 
     def nofly(self):
         with self.view as v:
-            v[:] = []
+            v['view'] = None
+            v['mtime'] = None
         self.event.set()
 
     def run(self):
         while True:
-            self.event.wait()
-            self.event.clear()
-            time.sleep(get_setting_async('lint_check_fly_idle', 5))
             view_ = None
+            mtime_ = None
+            delay = get_setting_async('lint_check_fly_idle', 5)
+
             with self.view as v:
-                if v:
-                    view_ = v[0]
-                v[:] = []
-            if view_ is None:
+                view_ = v['view']
+                mtime_ = v['mtime']
+
+            if not view_:  # Wait for signal
+                self.event.wait()
+                self.event.clear()
+                time.sleep(delay)
                 continue
-            auto_check_enabled = get_setting_async('enable_auto_check')
-            auto_lint_enabled = get_setting_async('enable_auto_lint')
-            sublime.set_timeout(lambda: view_.window().run_command('sublime_haskell_scan_contents'), 0)
-            if auto_check_enabled and auto_lint_enabled:
-                sublime.set_timeout(lambda: view_.window().run_command('sublime_haskell_check_and_lint', {'fly': True}), 0)
-            elif auto_check_enabled:
-                sublime.set_timeout(lambda: view_.window().run_command('sublime_haskell_check', {'fly': True}), 0)
-            elif auto_lint_enabled:
-                sublime.set_timeout(lambda: view_.window().run_command('sublime_haskell_lint', {'fly': True}), 0)
+            
+            if time.time() - mtime_ < delay:  # Was modified recently, sleep more
+                time.sleep(delay)
+                continue
+            else:
+                with self.view as v:
+                    v['view'] = None
+                    v['mtime'] = None
+
+                fly_view = view_
+
+                auto_check_enabled = get_setting_async('enable_auto_check')
+                auto_lint_enabled = get_setting_async('enable_auto_lint')
+                sublime.set_timeout(lambda: fly_view.window().run_command('sublime_haskell_scan_contents'), 0)
+                if auto_check_enabled and auto_lint_enabled:
+                    sublime.set_timeout(lambda: fly_view.window().run_command('sublime_haskell_check_and_lint', {'fly': True}), 0)
+                elif auto_check_enabled:
+                    sublime.set_timeout(lambda: fly_view.window().run_command('sublime_haskell_check', {'fly': True}), 0)
+                elif auto_lint_enabled:
+                    sublime.set_timeout(lambda: fly_view.window().run_command('sublime_haskell_lint', {'fly': True}), 0)

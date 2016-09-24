@@ -434,7 +434,7 @@ class SublimeHaskellScanContents(hsdev.HsDevTextCommand):
 
         def on_resp(r):
             self.status_msg.stop()
-            update_completions_async([self.current_file_name])
+            autocomplete.update_completions_async([self.current_file_name])
 
         def on_err(r, ds):
             self.status_msg.fail()
