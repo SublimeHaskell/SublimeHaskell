@@ -101,13 +101,10 @@ class SublimeHaskellHsDevChain(SublimeHaskellTextCommand):
         self.corrections = corrections
         for corr in self.corrections:
             corr.message_region.to_zero_based()
-        log('CORRECTIONS: {0}'.format(self.corrections), log_trace)
         self.corrections_dict = dict(((os.path.normpath(c.file), c.message_region.start.line, c.message_region.start.column), c) for c in self.corrections)
-        log('CORRECTIONS DICT: {0}'.format(self.corrections_dict), log_trace)
 
         for omsg in output_messages:
             okey = (os.path.normpath(omsg.filename), omsg.region.start.line, omsg.region.start.column)
-            log('MESSAGES: {0}'.format(okey), log_trace)
             if okey in self.corrections_dict:
                 omsg.correction = self.corrections_dict[okey]
 
