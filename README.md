@@ -218,3 +218,4 @@ Icons from [FlatIcon](http://www.flaticon.com).
 Error icon by [Eleonor Wang](http://www.flaticon.com/authors/eleonor-wang)<br>
 Warning icon by [Freepik](http://www.freepik.com)<br>
 Hint icon by [Gregor Cresnar](http://www.flaticon.com/authors/gregor-cresnar)
+Wrench icon by [Gregor Cresnar](http://www.flaticon.com/authors/gregor-cresnar)
