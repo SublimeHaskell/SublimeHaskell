@@ -469,10 +469,14 @@ class Declaration(Symbol):
         else:
             return info
 
-    def popup(self):
+    def popup(self, comments = []):
         """ Full info on popup with docs """
         parts = [u'<p>']
         parts.append(self.popup_brief())
+        for c in comments:
+            parts.append(u'<br>{0}<span class="comment">-- {1}</span>'.format(
+                4 * '&nbsp;',
+                c))
         if self.imported_names():
             parts.append(u'<br>{0}<span class="comment">-- Imported from {1}</span>'.format(
                 4 * '&nbsp;',

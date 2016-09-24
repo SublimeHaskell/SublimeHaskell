@@ -134,9 +134,11 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
 					types.get_types(self.current_file_name, self.on_types)
 
 				# Try whois
+				self.suggest_import = False
 				self.decl = head_of(hsdev.client.whois(self.whois_name, self.current_file_name))
 
 				if not self.decl:
+					self.suggest_import = True
 					self.decl = head_of(hsdev.client.lookup(self.full_name, self.current_file_name))
 
 				self.create_symbol_popup()
@@ -171,7 +173,7 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
 					self.typed_expr.substr(self.view),
 					symbols.format_type(u' :: {0}'.format(self.typed_expr.typename))))
 			if self.decl:
-				popup_parts.append(self.decl.popup())
+				popup_parts.append(self.decl.popup([u'<a href="import:{0}">Add import</a>'.format(html.escape(self.decl.name))] if self.suggest_import else []))
 			popup_text = u''.join(popup_parts)
 			if get_setting_async('unicode_symbol_info'):
 				popup_text = popup_text.replace(html.escape('=>'), '\u21d2').replace(html.escape('->'), '\u2192').replace('::', '\u2237')
@@ -211,6 +213,10 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
 							'begin': r.begin(),
 							'end': r.end() }), 0)
 						return
+			elif url[0:7] == "import:":
+				self.view.run_command('sublime_haskell_insert_import_for_symbol', {
+					'filename': self.view.file_name(),
+					'decl': self.decl.name })
 			else:
 				self.view.window().open_file(url, sublime.ENCODED_POSITION | sublime.TRANSIENT)
 
