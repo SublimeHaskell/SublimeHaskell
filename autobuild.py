@@ -31,8 +31,10 @@ class SublimeHaskellAutobuild(sublime_plugin.EventListener):
             view.window().run_command('sublime_haskell_build_auto')
         elif auto_check_enabled and auto_lint_enabled:
             view.window().run_command('sublime_haskell_check_and_lint')
+            view.window().run_command('sublime_haskell_get_types')
         elif auto_check_enabled:
             view.window().run_command('sublime_haskell_check')
+            view.window().run_command('sublime_haskell_get_types')
         elif auto_lint_enabled:
             view.window().run_command('sublime_haskell_lint')
 

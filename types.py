@@ -213,12 +213,16 @@ def get_types(filename, on_result = None, cabal = None):
 
         def on_resp(rs):
             ts = [to_region_type(r) for r in rs]
-            file_types.set(filename, ts)
+            file_types.set(filename, ts, False)
             on_result(ts)
+
+        if file_types.has(filename):
+            return file_types.get(filename)
+
         res = hsdev.client.types(files = [filename], ghc = get_ghc_opts(filename), wait = on_result is None, on_response = on_resp if on_result is not None else None)
         if res is not None:
             ts = [to_region_type(r) for r in res]
-            file_types.set(filename, ts)
+            file_types.set(filename, ts, False)
             return ts
 
 
@@ -289,9 +293,9 @@ class FileTypes(object):
         self.types = {}
         self.status = {}
 
-    def set(self, filename, types):
+    def set(self, filename, types, show = True):
         self.types[filename] = types
-        self.status[filename] = True
+        self.status[filename] = show
 
     def remove(self, filename):
         if self.has(filename):
@@ -336,6 +340,18 @@ class SublimeHaskellShowTypes(SublimeHaskellShowType):
         show_panel(self.view.window(), panel_name = TYPES_PANEL_NAME)
 
 
+class SublimeHaskellGetTypes(SublimeHaskellTextCommand):
+    def run(self, edit, filename = None):
+        self.filename = filename
+        if not self.filename:
+            self.filename = self.view.file_name()
+        if not file_types.has(self.filename):
+            get_types(self.filename, self.on_types)
+
+    def on_types(self, types):
+        pass
+
+
 class SublimeHaskellShowAllTypes(SublimeHaskellTextCommand):
     def run(self, edit, filename = None):
         self.filename = filename
@@ -344,11 +360,10 @@ class SublimeHaskellShowAllTypes(SublimeHaskellTextCommand):
         if not file_types.has(self.filename):
             get_types(self.filename, self.on_types)
         else:
-            file_types.show(self.filename)
             self.on_types(file_types.get(self.filename))
 
     def on_types(self, types):
-        file_types.set(self.filename, types)
+        file_types.show(self.filename)
         self.show_types(types)
 
     def show_types(self, types):

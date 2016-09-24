@@ -185,6 +185,9 @@ def format_output_messages(messages):
         summary['warning'],
         summary['hint'])
 
+    if all(map(lambda c: c == 0, summary.values())):
+        return '' if PyV3 else u''
+
     def messages_level(name, level):
         if PyV3:
             if not summary[level]:
