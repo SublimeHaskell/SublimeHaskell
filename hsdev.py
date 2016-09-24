@@ -690,7 +690,7 @@ class HsDev(object):
         # send error to callbacks
         with self.map as m:
             for on_msg in m.values():
-                on_msg.on_error('connection lost')
+                on_msg.on_error('connection lost', {})
             m.clear()
 
         self.id = 1

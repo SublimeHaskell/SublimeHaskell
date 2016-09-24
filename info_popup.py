@@ -114,7 +114,6 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
 		self.typed_expr = None
 
 		if hover_zone == sublime.HOVER_TEXT:
-			log('HOVER TEXT', log_debug)
 			qsymbol = get_qualified_symbol_at_point(self.view, point)
 			module_word = qsymbol.module
 			ident = qsymbol.name
@@ -143,7 +142,6 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
 				self.create_symbol_popup()
 
 		elif hover_zone == sublime.HOVER_GUTTER:
-			log('HOVER GUTTER', log_debug)
 			self.view = view
 			self.current_file_name = self.view.file_name()
 			errs = filter(lambda e: e.region.start.line == line, parseoutput.errors_for_view(self.view))
@@ -177,7 +175,7 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
 			popup_text = u''.join(popup_parts)
 			if get_setting_async('unicode_symbol_info'):
 				popup_text = popup_text.replace(html.escape('=>'), '\u21d2').replace(html.escape('->'), '\u2192').replace('::', '\u2237')
-			if update and self.is_popup_visible():
+			if update and self.view.is_popup_visible():
 				self.view.update_popup(popup_text)
 			else:
 				self.view.show_popup(popup_text, sublime.HIDE_ON_MOUSE_MOVE_AWAY, self.point, 600, 600, self.on_navigate, self.on_hide)
