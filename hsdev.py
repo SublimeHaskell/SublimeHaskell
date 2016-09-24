@@ -799,9 +799,8 @@ class HsDev(object):
             'projects': projects,
             'cabal': cabal,
             'sandboxes': sandboxes,
-            'files': files,
+            'files': [{'file': f, 'contents': None} for f in files] + [{'file': f, 'contents': cts} for f, cts in contents.items()],
             'paths': paths,
-            'contents': [{'file': f, 'contents': cts} for f, cts in contents.items()],
             'ghc-opts': ghc,
             'docs': docs,
             'infer': infer})
@@ -967,30 +966,26 @@ class HsDev(object):
     @list_command
     def lint(self, files = [], contents = {}, hlint = []):
         return cmd('lint', {
-            'files': files,
-            'contents': [{'file': f, 'contents': cts} for f, cts in contents.items()],
+            'files': [{'file': f, 'contents': None} for f in files] + [{'file': f, 'contents': cts} for f, cts in contents.items()],
             'hlint-opts': hlint})
 
     @list_command
     def check(self, files = [], contents = {}, ghc = []):
         return cmd('check', {
-            'files': files,
-            'contents': [{'file': f, 'contents': cts} for f, cts in contents.items()],
+            'files': [{'file': f, 'contents': None} for f in files] + [{'file': f, 'contents': cts} for f, cts in contents.items()],
             'ghc-opts': ghc})
 
     @list_command
     def check_lint(self, files = [], contents = {}, ghc = [], hlint = []):
         return cmd('check-lint', {
-            'files': files,
-            'contents': [{'file': f, 'contents': cts} for f, cts in contents.items()],
+            'files': [{'file': f, 'contents': None} for f in files] + [{'file': f, 'contents': cts} for f, cts in contents.items()],
             'ghc-opts': ghc,
             'hlint-opts': hlint})
 
     @list_command
     def types(self, files = [], contents = {}, ghc = []):
         return cmd('types', {
-            'files': files,
-            'contents': [{'file': f, 'contents': cts} for f, cts in contents.items()],
+            'files': [{'file': f, 'contents': None} for f in files] + [{'file': f, 'contents': cts} for f, cts in contents.items()],
             'ghc-opts': ghc})
 
     @command
@@ -1010,8 +1005,11 @@ class HsDev(object):
         return cmd('autofix fix', {'messages': messages, 'rest': rest, 'pure': pure}, parse_corrections)
 
     @list_command
-    def ghc_eval(self, exprs):
-        return cmd('ghc eval', {'exprs': exprs})
+    def ghc_eval(self, exprs, file = None, source = None):
+        f = None
+        if file is not None:
+            f = {'file': f, 'contents': source}
+        return cmd('ghc eval', {'exprs': exprs, 'file': f})
 
     @command
     def exit(self):
