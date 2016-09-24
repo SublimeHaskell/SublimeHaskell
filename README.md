@@ -85,6 +85,12 @@ Popup
 Show popup with symbol info and with error/warning/hint details. Requires SublimeText 3 dev build > 3070.
 ![Hover](Commands/Hover.gif)
 
+It also shows inferred type when possible
+![HoverTypes](Commands/HoverTypes.gif)
+
+And you can autofix warnings/hints on popup for warnings/hints
+![AutoFixHover](Commands/AutoFixHover.gif)
+
 Commands:
 ---
 
