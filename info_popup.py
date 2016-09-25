@@ -204,6 +204,10 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
 				errs = parseoutput.errors_for_view(self.view)
 				for err in errs:
 					if err.correction is not None and err.correction.corrector.region == rgn:
+						if err.region_key:
+							self.view.erase_regions(err.region_key)
+						if err.correction.region_key:
+							self.view.erase_regions(err.correction.region_key)
 						parseoutput.ERRORS.remove(err)
 						errs.remove(err)
 						parseoutput.update_messages_in_view(self.view, errs)

@@ -49,12 +49,13 @@ def filename_of_path(p):
 
 class OutputMessage(object):
     "Describe an error or warning message produced by GHC."
-    def __init__(self, filename, region, message, level, correction = None):
+    def __init__(self, filename, region, message, level, correction = None, region_key = None):
         self.filename = filename
         self.region = region
         self.message = message.replace(os.linesep, "\n")
         self.level = level
         self.correction = correction
+        self.region_key = region_key
 
     def __unicode__(self):
         # must match result_file_regex
@@ -93,11 +94,6 @@ def set_global_error_messages(messages):
     global ERRORS
     clear_error_marks()
     ERRORS.extend(messages)
-
-
-def errors_for_file(file):
-    global ERRORS
-    return sorted([e for e in ERRORS if os.path.samefile(e.filename, file)], key = lambda e: e.region)
 
 
 def run_build_thread(view, cabal_project_dir, msg, cmd, on_done):
@@ -278,48 +274,20 @@ message_levels = {
 }
 
 
-def error_regions_for_view(view):
-    rgns = []
-    for level in message_levels:
-        for is_fix in [False, True]:
-            rgns.extend(view.get_regions(region_key(level, is_fix)))
-    return sorted(rgns)
-
-
 def errors_for_view(view):
-    # get errors with restored regions
-    rgns = error_regions_for_view(view)
-    errs = errors_for_file(view.file_name())
-    if len(rgns) != len(errs):
-        return []
-    for rgn, err in zip(rgns, errs):
-        err.region = symbols.Region.from_region(view, rgn)
-
-    autofix_rgns = view.get_regions('autofix')
-    fix_errs = list(filter(lambda e: e.correction is not None, errs))
-    if len(autofix_rgns) == len(fix_errs):
-        for rgn, err in zip(autofix_rgns, fix_errs):
-            err.correction.from_region(view, rgn)
-
+    errs = []
+    for e in ERRORS:
+        if os.path.samefile(e.filename, view.file_name()):
+            errs.append(e)
+            if e.region_key:
+                rgns = view.get_regions(e.region_key)
+                if len(rgns):
+                    e.region = symbols.Region.from_region(view, rgns[0])
+            if e.correction is not None and e.correction.region_key:
+                rgns = view.get_regions(e.correction.region_key)
+                if len(rgns):
+                    e.correction.from_region(view, rgns[0])
     return errs
-
-
-def restore_messages_regions(view, errors):
-    for level in message_levels:
-        for is_fix in [False, True]:
-            rgns = view.get_regions(region_key(level, is_fix))
-            errs = [err for err in errors if os.path.samefile(err.filename, view.file_name()) and err.level == level and (err.correction is not None) == is_fix]
-            if len(rgns) != len(errs):
-                continue
-            for rgn, err in zip(rgns, errs):
-                err.region = symbols.Region.from_region(view, rgn)
-
-    rgns = view.get_regions('autofix')
-    errs = [err for err in errors if os.path.samefile(err.filename, view.file_name()) and err.correction is not None]
-    if len(rgns) != len(errs):
-        return
-    for rgn, err in zip(rgns, errs):
-        err.correction.from_region(view, rgn)
 
 
 def update_messages_in_view(view, errors):
@@ -425,29 +393,30 @@ def get_icon(png):
 
 
 def mark_messages_in_view(messages, view):
-    # Regions by level
-    regions = {}
-    for k in message_levels.keys():
-        regions[k] = {True: [], False: []}
-
     for m in messages:
-        regions[m.level][m.correction is not None].append(m.to_region(view))
+        if m.region_key:
+            view.erase_regions(m.region_key)
+            m.region_key = None
+        if m.correction is not None and m.correction.region_key:
+            view.erase_regions(m.correction.region_key)
+            m.correction.region_key = None
 
-    for nm, lev in message_levels.items():
-        for is_fix in [False, True]:
-            view.erase_regions(region_key(nm, is_fix))
+    for i, m in enumerate(messages):
+        m.region_key = '{0}-{1}'.format(region_key(m.level, m.correction is not None), str(i))
+        view.add_regions(
+            m.region_key,
+            [m.to_region(view)],
+            message_levels[m.level]['style'],
+            get_icon(message_levels[m.level]['icon']['fix' if m.correction is not None else 'normal']),
+            sublime.DRAW_OUTLINED)
+        if m.correction is not None:
+            m.correction.region_key = 'autofix-{0}'.format(str(i))
             view.add_regions(
-                region_key(nm, is_fix),
-                regions[nm][is_fix],
-                lev['style'],
-                get_icon(lev['icon']['fix' if is_fix else 'normal']),
-                sublime.DRAW_OUTLINED)
-
-    view.erase_regions('autofix')
-    autofix_rgns = []
-    for r in [m.correction.corrector.region for m in messages if m.correction is not None]:
-        autofix_rgns.append(r.to_region(view))
-    view.add_regions('autofix', autofix_rgns, 'autofix.region', '', sublime.HIDDEN)
+                m.correction.region_key,
+                [m.correction.corrector.region.to_region(view)],
+                'autofix.region',
+                '',
+                sublime.HIDDEN)
 
 
 def write_output(view, text, cabal_project_dir, show_panel = True):

@@ -756,13 +756,14 @@ class Corrector(object):
 
 
 class Correction(object):
-    def __init__(self, file, level, message, corrector, message_region = None):
+    def __init__(self, file, level, message, corrector, message_region = None, region_key = None):
         self.file = file
         self.level = level
         self.message = message
         # source messages region, used to match corrector and outputmessage
         self.message_region = message_region
         self.corrector = corrector
+        self.region_key = region_key
 
     def to_region(self, view):
         return self.corrector.to_region(view)
