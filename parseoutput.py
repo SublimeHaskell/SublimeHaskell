@@ -87,6 +87,13 @@ class OutputMessage(object):
 
 def clear_error_marks():
     global ERRORS
+    for e in ERRORS:
+        if e.region_key:
+            view.erase_regions(e.region_key)
+            e.region_key = None
+        if e.correction is not None and e.correction.region_key:
+            view.erase_regions(e.correction.region_key)
+            e.correction.region_key = None
     ERRORS = []
 
 
