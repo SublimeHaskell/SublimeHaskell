@@ -86,7 +86,7 @@
 	"enable_hdevtools": true,
 
 	// Use unicode symbols info 'symbol info panel'
-	"unicode_symbol_info": false,
+	"unicode_symbol_info": true,
 
 	// hdevtools socket name or default
 	"hdevtools_socket": "",

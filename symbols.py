@@ -374,6 +374,12 @@ def escape_text(txt):
     return '<br>'.join(lines)
 
 
+def unicode_operators(fn):
+    def wrapped(*args, **kwargs):
+        return use_unicode_operators(fn(*args, **kwargs))
+    return wrapped
+
+
 class Declaration(Symbol):
     def __init__(self, name, decl_type = 'declaration', docs = None, imported = [], defined = None, position = None, module = None):
         super(Declaration, self).__init__(decl_type, name)
@@ -435,6 +441,7 @@ class Declaration(Symbol):
     def qualified_name(self):
         return '.'.join([self.module_name(), self.name])
 
+    @unicode_operators
     def detailed(self):
         """ Detailed info for use in Symbol Info command """
         parts = [self.brief()]
@@ -461,6 +468,7 @@ class Declaration(Symbol):
 
         return '\n'.join(parts)
 
+    @unicode_operators
     def popup_brief(self):
         """ Brief info on popup with name, possibly with link if have source location """
         info = u'<span class="function">{0}</span>'.format(html.escape(self.name, quote = False))
@@ -469,6 +477,7 @@ class Declaration(Symbol):
         else:
             return info
 
+    @unicode_operators
     def popup(self, comments = []):
         """ Full info on popup with docs """
         parts = [u'<p>']
@@ -511,10 +520,9 @@ def format_type(expr):
     Format type expression for popup
     Set span 'type' for types and 'tyvar' for type variables
     """
-
     if not expr:
         return expr
-    m = re.search(r'([a-zA-Z]\w*)|(->|=>|::)', expr)
+    m = re.search(r'([a-zA-Z]\w*)|(->|=>|::|\u2192|\u21d2|\u2237)', expr)
     if m:
         e = expr[m.start():m.end()]
         expr_class = ''
@@ -536,14 +544,17 @@ class Function(Declaration):
         super(Function, self).__init__(name, 'function', docs, imported, defined, position, module)
         self.type = function_type
 
+    @unicode_operators
     def suggest(self):
         return (u'{0} :: {1}\t{2}'.format(wrap_operator(self.name), self.type, self.imported_from_name()), self.name)
 
+    @unicode_operators
     def brief(self, short = False):
         if short:
             return u'{0}'.format(wrap_operator(self.name))
         return u'{0} :: {1}'.format(wrap_operator(self.name), self.type if self.type else u'?')
 
+    @unicode_operators
     def popup_brief(self):
         info = u'<span class="function">{0}</span>'.format(html.escape(self.name, quote = False))
         if self.has_source_location():
@@ -561,9 +572,11 @@ class TypeBase(Declaration):
         self.args = args
         self.definition = definition
 
+    @unicode_operators
     def suggest(self):
         return (u'{0} {1}\t{2}'.format(self.name, ' '.join(self.args), self.imported_from_name()), self.name)
 
+    @unicode_operators
     def brief(self, short = False):
         if short:
             brief_parts = [self.what, self.name]
@@ -587,6 +600,7 @@ class TypeBase(Declaration):
 
         return u' '.join(brief_parts)
 
+    @unicode_operators
     def popup_brief(self):
         parts = [u'<span class="keyword">{0}</span>'.format(html.escape(self.what, quote = False))]
         if self.context:
@@ -771,11 +785,13 @@ class Correction(object):
     def from_region(self, view, rgn):
         self.corrector.from_region(view, rgn)
 
+    @unicode_operators
     def detailed(self):
         if self.corrector.contents:
             return u'\u2014 {0}\n  Why not:\n\n{1}'.format(self.message, self.corrector.contents)
         return u'\u2014 {0}'.format(self.message)
 
+    @unicode_operators
     def popup(self):
         parts = [u'<span class="message">— {0} (<a href="{1}">{2}</a>)</span>'.format(html.escape(self.message), html.escape("autofix:" + self.corrector.region.to_string()), "autofix")]
         if self.corrector.contents:

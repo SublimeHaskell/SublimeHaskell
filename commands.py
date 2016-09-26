@@ -39,8 +39,6 @@ def is_in_project(view = None):
 
 def show_declaration_info_panel(view, decl):
     info = decl.detailed()
-    if get_setting_async('unicode_symbol_info'):
-        info = info.replace('=>', '\u21d2').replace('->', '\u2192').replace('::', '\u2237')
     v = output_panel(view.window(), info, 'sublime_haskell_symbol_info_panel', syntax = 'HaskellSymbolInfo')
     v.settings().set('result_file_regex', symbol_file_regex)
     v.settings().erase('location')

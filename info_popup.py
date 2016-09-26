@@ -175,8 +175,6 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
 			if self.decl:
 				popup_parts.append(self.decl.popup([u'<a href="import:{0}">Add import</a>'.format(html.escape(self.decl.name))] if self.suggest_import else []))
 			popup_text = u''.join(popup_parts)
-			if get_setting_async('unicode_symbol_info'):
-				popup_text = popup_text.replace(html.escape('=>'), '\u21d2').replace(html.escape('->'), '\u2192').replace('::', '\u2237')
 			if update and self.view.is_popup_visible():
 				self.view.update_popup(popup_text)
 			else:

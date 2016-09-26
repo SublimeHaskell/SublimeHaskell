@@ -5,6 +5,7 @@ import fnmatch
 import os
 import re
 import json
+import html
 import sublime
 import sublime_plugin
 import subprocess
@@ -134,10 +135,9 @@ def get_haskell_command_window_view_file_project(view = None):
 
 
 def head_of(l):
-    if len(l) > 0:
-        return l[0]
-    else:
+    if l is None or not len(l):
         return None
+    return l[0]
 
 
 def decode_bytes(s):
@@ -576,6 +576,24 @@ def wait_for_window(on_appear, seconds_to_wait=MAX_WAIT_FOR_WINDOW):
     It's dirty hack, but I have no idea how to make it better
     """
     sublime.set_timeout(lambda: wait_for_window_callback(on_appear, seconds_to_wait), 0)
+
+
+def use_unicode_operators(s, force = False):
+    """
+    Set unicode symbols for some standard haskell operators
+    """
+    if not force or get_setting_async('unicode_symbol_info'):
+        return s
+
+    ops = {
+        '->': '\u2192',
+        '=>': '\u21d2',
+        '::': '\u2237' }
+    ops.update(dict((html.escape(o), v) for o, v in ops.items()))
+    r = s
+    for o, v in ops.items():
+        r = r.replace(o, v)
+    return r
 
 
 class SublimeHaskellOutputText(sublime_plugin.TextCommand):
