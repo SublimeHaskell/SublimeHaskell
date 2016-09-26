@@ -49,13 +49,12 @@ def filename_of_path(p):
 
 class OutputMessage(object):
     "Describe an error or warning message produced by GHC."
-    def __init__(self, filename, region, message, level, correction = None, region_key = None):
+    def __init__(self, filename, region, message, level, correction = None):
         self.filename = filename
         self.region = region
         self.message = message.replace(os.linesep, "\n")
         self.level = level
         self.correction = correction
-        self.region_key = region_key
 
     def __unicode__(self):
         # must match result_file_regex
@@ -84,16 +83,21 @@ class OutputMessage(object):
             return trim_region(view, view.line(self.region.start.to_point(view)))
         return self.region.to_region(view)
 
+    def update_region(self):
+        self.region.update()
+        if self.correction and self.correction.corrector:
+            self.correction.corrector.region.update()
+
+    def erase_from_view(self):
+        self.region.erase()
+        if self.correction and self.correction.corrector:
+            self.correction.corrector.region.erase()
+
 
 def clear_error_marks():
     global ERRORS
     for e in ERRORS:
-        if e.region_key:
-            view.erase_regions(e.region_key)
-            e.region_key = None
-        if e.correction is not None and e.correction.region_key:
-            view.erase_regions(e.correction.region_key)
-            e.correction.region_key = None
+        e.erase_from_view()
     ERRORS = []
 
 
@@ -285,16 +289,9 @@ def errors_for_view(view):
     errs = []
     for e in ERRORS:
         if os.path.samefile(e.filename, view.file_name()):
+            e.update_region()
             errs.append(e)
-            if e.region_key:
-                rgns = view.get_regions(e.region_key)
-                if len(rgns):
-                    e.region = symbols.Region.from_region(view, rgns[0])
-            if e.correction is not None and e.correction.region_key:
-                rgns = view.get_regions(e.correction.region_key)
-                if len(rgns):
-                    e.correction.from_region(view, rgns[0])
-    return errs
+    return sorted(errs, key = lambda e: e.region)
 
 
 def update_messages_in_view(view, errors):
@@ -328,60 +325,40 @@ def goto_error(view, error):
     view.window().open_file("{0}:{1}:{2}".format(filename, line, column), sublime.ENCODED_POSITION)
 
 
-def get_next_value(v, lst, cycle = True):
-    # Get next value from list
-    if v is None:
-        if len(lst) > 0:
-            return lst[0]
-        return None
-    for x in filter(lambda k: k > v, lst):
+def get_next_value(lst, p, cycle = True):
+    # Get first value satisfying `p`, if no such values and `cycle`, return first element
+    for x in filter(p, lst):
         return x
-    if cycle and len(lst) > 0:
+    if cycle and len(lst):
         return lst[0]
     return None
 
 
-def get_prev_value(v, lst, cycle = True):
-    # Get previous value from list
-    return get_next_value(v, reversed(lst), cycle)
+def get_prev_value(lst, p, cycle = True):
+    # Inverse of `get_next_value`, goes back and finds value satisfying `p`
+    return get_next_value(reversed(lst), p, cycle)
 
 
 class SublimeHaskellNextError(SublimeHaskellTextCommand):
     def run(self, edit):
-        v = self.view
-        rgns = []
-        for level in message_levels:
-            for is_fix in [False, True]:
-                rgns.extend(v.get_regions(region_key(level, is_fix)))
-        rgns.sort()
-        if not rgns:
+        errs = errors_for_view(self.view)
+        if not errs:
             show_status_message('No errors or warnings!', priority = 5)
-        next_rgn = get_next_value(v.sel()[0], rgns)
+        next_err = get_next_value(errs, lambda e: e.region > v.sel()[0])
         v.sel().clear()
-        v.sel().add(next_rgn)
-        rgn_idx = rgns.index(next_rgn)
-        errs = sorted(filter(lambda e: os.path.samefile(e.filename, v.file_name()), ERRORS), key = lambda e: e.region)
-        if len(errs) > rgn_idx:
-            goto_error(v, errs[rgn_idx])
+        v.sel().add(next_err.region.to_region(self.view))
+        goto_error(self.view, next_err)
 
 
 class SublimeHaskellPreviousError(SublimeHaskellTextCommand):
     def run(self, edit):
-        v = self.view
-        rgns = []
-        for level in message_levels:
-            for is_fix in [False, True]:
-                rgns.extend(v.get_regions(region_key(level, is_fix)))
-        rgns.sort()
-        if not rgns:
+        errs = errors_for_view(self.view)
+        if not errs:
             show_status_message("No errors or warnings!", priority = 5)
-        prev_rgn = get_prev_value(v.sel()[0], rgns)
+        prev_err = get_prev_value(errs, lambda e: e.region < v.sel()[0])
         v.sel().clear()
-        v.sel().add(prev_rgn)
-        rgn_idx = rgns.index(prev_rgn)
-        errs = sorted(filter(lambda e: os.path.samefile(e.filename, v.file_name()), ERRORS), key = lambda e: e.region)
-        if len(errs) > rgn_idx:
-            goto_error(v, errs[rgn_idx])
+        v.sel().add(prev_err.region.to_region(self.view))
+        goto_error(self.view, prev_err)
 
 
 def region_key(name, is_fix = False):
@@ -401,25 +378,20 @@ def get_icon(png):
 
 def mark_messages_in_view(messages, view):
     for m in messages:
-        if m.region_key:
-            view.erase_regions(m.region_key)
-            m.region_key = None
-        if m.correction is not None and m.correction.region_key:
-            view.erase_regions(m.correction.region_key)
-            m.correction.region_key = None
+        m.erase_from_view()
 
     for i, m in enumerate(messages):
-        m.region_key = '{0}-{1}'.format(region_key(m.level, m.correction is not None), str(i))
+        m.region.save(view, '{0}-{1}'.format(region_key(m.level, m.correction is not None), str(i)))
         view.add_regions(
-            m.region_key,
+            m.region.region_key,
             [m.to_region(view)],
             message_levels[m.level]['style'],
             get_icon(message_levels[m.level]['icon']['fix' if m.correction is not None else 'normal']),
             sublime.DRAW_OUTLINED)
-        if m.correction is not None:
-            m.correction.region_key = 'autofix-{0}'.format(str(i))
+        if m.correction and m.correction.corrector:
+            m.correction.corrector.region.save(view, 'autofix-{0}'.format(str(i)))
             view.add_regions(
-                m.correction.region_key,
+                m.correction.corrector.region.region_key,
                 [m.correction.corrector.region.to_region(view)],
                 'autofix.region',
                 '',

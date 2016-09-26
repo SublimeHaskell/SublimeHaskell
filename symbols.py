@@ -69,11 +69,13 @@ class Position(object):
 
 @total_ordering
 class Region(object):
-    def __init__(self, start, end = None):
+    def __init__(self, start, end = None, view = None, region_key = None):
         self.start = start
         self.end = end
         if self.end is None:
             self.end = self.start
+        self.view = view
+        self.region_key = region_key
 
     def __str__(self):
         return self.to_string()
@@ -103,12 +105,35 @@ class Region(object):
         self.end.to_zero_based()
         return self
 
-    def to_region(self, view):
+    def to_region(self, view = None):
+        if not view:
+            view = self.view
+        if not view:
+            raise RuntimeError('symbols.Region: view is None')
         return sublime.Region(self.start.to_point(view), self.end.to_point(view))
 
+    def update(self):
+        if self.saved():
+            rgns = self.view.get_regions(self.region_key)
+            if len(rgns):
+                self = Region.from_region(self.view, rgns[0], self.region_key)
+
+    def save(self, view, region_key):
+        self.view = view
+        self.region_key = region_key
+
+    def saved(self):
+        return self.view and self.region_key
+
+    def erase(self):
+        if self.saved():
+            self.view.erase_regions(self.region_key)
+            self.view = None
+            self.region_key = None
+
     @staticmethod
-    def from_region(view, rgn):
-        return Region(Position.from_point(view, rgn.begin()), Position.from_point(view, rgn.end()))
+    def from_region(view, rgn, region_key = None):
+        return Region(Position.from_point(view, rgn.begin()), Position.from_point(view, rgn.end()), view if region_key else None, region_key)
 
     @staticmethod
     def from_str(s):
@@ -770,14 +795,13 @@ class Corrector(object):
 
 
 class Correction(object):
-    def __init__(self, file, level, message, corrector, message_region = None, region_key = None):
+    def __init__(self, file, level, message, corrector, message_region = None):
         self.file = file
         self.level = level
         self.message = message
         # source messages region, used to match corrector and outputmessage
         self.message_region = message_region
         self.corrector = corrector
-        self.region_key = region_key
 
     def to_region(self, view):
         return self.corrector.to_region(view)
