@@ -582,7 +582,7 @@ def use_unicode_operators(s, force = False):
     """
     Set unicode symbols for some standard haskell operators
     """
-    if not force or get_setting_async('unicode_symbol_info'):
+    if not force and not get_setting_async('unicode_symbol_info'):
         return s
 
     ops = {
