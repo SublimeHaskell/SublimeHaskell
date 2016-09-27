@@ -492,7 +492,7 @@ class SublimeHaskellExpandSelectionExpression(SublimeHaskellShowType):
         self.view.sel().clear()
         self.view.sel().add_all([t.region for t in tr])
 
-        output_panel(self.view.window(), '\n'.join([t.typename for t in tr]), panel_name = 'sublime_haskell_expand_selection_expression', syntax = 'Haskell-SublimeHaskell')
+        output_panel(self.view.window(), '\n'.join([use_unicode_operators(t.typename) for t in tr]), panel_name = 'sublime_haskell_expand_selection_expression', syntax = 'Haskell-SublimeHaskell')
 
     def is_infos_valid(self, selections):
         return self.Infos and all([i.is_valid() for i in self.Infos]) and len(selections) == len(self.Infos) and all([i.is_actual(self.view, s) for i, s in zip(self.Infos, selections)])
