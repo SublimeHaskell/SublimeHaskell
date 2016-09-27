@@ -138,7 +138,7 @@ class SublimeHaskellBrowseDeclarations(hsdev.HsDevTextCommand):
     def on_resp(self, rs):
         self.decls = rs
         self.status_msg.stop()
-        self.view.window().show_quick_panel([[decl.brief(), decl.docs.splitlines()[0] if decl.docs else ''] for decl in self.decls], self.on_done)
+        self.view.window().show_quick_panel([[decl.brief(use_unicode = False), decl.docs.splitlines()[0] if decl.docs else ''] for decl in self.decls], self.on_done)
 
     def on_err(self, e, ds):
         self.status_msg.fail()
@@ -161,7 +161,7 @@ class SublimeHaskellFindDeclarations(hsdev.HsDevWindowCommand):
             show_status_message("Nothing found for: {0}".format(input))
             return
 
-        self.window.show_quick_panel([[decl.module.name + ': ' + decl.brief(), str(decl.defined_module().location)] for decl in self.decls], self.on_select)
+        self.window.show_quick_panel([[decl.module.name + ': ' + decl.brief(use_unicode = False), str(decl.defined_module().location)] for decl in self.decls], self.on_select)
 
     def on_change(self, input):
         pass
@@ -207,7 +207,7 @@ class SublimeHaskellHayoo(hsdev.HsDevWindowCommand):
         if not self.decls:
             show_status_message("Hayoo '{0}': not found".format(self.input))
             return
-        self.window.show_quick_panel([[decl.module.name + ': ' + decl.brief(), str(decl.defined_module().location)] for decl in self.decls], self.on_select)
+        self.window.show_quick_panel([[decl.module.name + ': ' + decl.brief(use_unicode = False), str(decl.defined_module().location)] for decl in self.decls], self.on_select)
 
 
 class SublimeHaskellSearch(hsdev.HsDevWindowCommand):
@@ -247,7 +247,7 @@ class SublimeHaskellSearch(hsdev.HsDevWindowCommand):
         if not self.decls:
             show_status_message("Search '{0}' not found".format(self.input))
             return
-        self.window.show_quick_panel([[decl.module.name + ': ' + decl.brief(), str(decl.defined_module().location)] for decl in self.decls], self.on_select)
+        self.window.show_quick_panel([[decl.module.name + ': ' + decl.brief(use_unicode = False), str(decl.defined_module().location)] for decl in self.decls], self.on_select)
 
 
 # General goto command
@@ -268,10 +268,10 @@ class SublimeHaskellGoTo(hsdev.HsDevWindowCommand):
                 return
 
             decls = self.sorted_decls_name(hsdev.client.symbol(project = current_project))
-            self.declarations = [[decl.brief(True), decl.module.name] for decl in decls]
+            self.declarations = [[decl.brief(True, use_unicode = False), decl.module.name] for decl in decls]
         else:
             decls = self.sorted_decls_pos(hsdev.client.symbol(file = self.current_filename, locals = True))
-            self.declarations = [[(decl.position.column * ' ') + decl.brief(True)] for decl in decls]
+            self.declarations = [[(decl.position.column * ' ') + decl.brief(True, use_unicode = False)] for decl in decls]
         self.decls = decls[:]
 
         if not decls:
@@ -755,7 +755,7 @@ class SublimeHaskellBrowseModule(hsdev.HsDevWindowCommand):
             decls = list(m.declarations.values())
             self.candidates = sorted(decls, key = lambda d: d.brief())
 
-            self.window.show_quick_panel([[decl.brief(), decl.docs.splitlines()[0] if decl.docs else ''] for decl in self.candidates], self.on_symbol_selected)
+            self.window.show_quick_panel([[decl.brief(use_unicode = False), decl.docs.splitlines()[0] if decl.docs else ''] for decl in self.candidates], self.on_symbol_selected)
             return
 
         self.candidates.sort(key = lambda c: c[1][0])
@@ -840,7 +840,7 @@ class SublimeHaskellGoToDeclaration(hsdev.HsDevTextCommand):
                 return
 
         # many candidates
-        self.select_candidates = [([c.brief(), c.get_source_location()], True) for c in candidates] + [([m.name, m.location.filename], False) for m in module_candidates]
+        self.select_candidates = [([c.brief(use_unicode = False), c.get_source_location()], True) for c in candidates] + [([m.name, m.location.filename], False) for m in module_candidates]
         self.view.window().show_quick_panel([c[0] for c in self.select_candidates], self.on_done, 0, 0, self.on_highlighted)
 
     def on_done(self, idx):

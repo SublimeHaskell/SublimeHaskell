@@ -400,8 +400,10 @@ def escape_text(txt):
 
 
 def unicode_operators(fn):
-    def wrapped(*args, **kwargs):
-        return use_unicode_operators(fn(*args, **kwargs))
+    def wrapped(*args, use_unicode = None, **kwargs):
+        if use_unicode is False:
+            return fn(*args, **kwargs)
+        return use_unicode_operators(fn(*args, **kwargs), force = use_unicode is True)
     return wrapped
 
 

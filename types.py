@@ -12,6 +12,7 @@ if int(sublime.version()) < 3000:
     from hdevtools import hdevtools_type
     from check_lint import ghcmod_type
     from parseoutput import sublime_column_to_ghc_column, ghc_column_to_sublime_column
+    from symbols import unicode_operators, use_unicode_operators
 else:
     from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, get_ghc_opts, is_haskell_source, show_panel, hide_panel, head_of, get_setting_async
     from SublimeHaskell.autocomplete import get_qualified_symbol_at_region
@@ -19,6 +20,7 @@ else:
     from SublimeHaskell.hdevtools import hdevtools_type
     from SublimeHaskell.check_lint import ghcmod_type
     from SublimeHaskell.parseoutput import sublime_column_to_ghc_column, ghc_column_to_sublime_column
+    from SublimeHaskell.symbols import unicode_operators, use_unicode_operators
 
 # Used to find out the module name.
 MODULE_RE_STR = r'module\s+([^\s\(]*)'  # "module" followed by everything that is neither " " nor "("
@@ -100,6 +102,7 @@ class RegionType(object):
     def substr(self, view):
         return view.substr(self.region(view))
 
+    @unicode_operators
     def show(self, view):
         expr = self.substr(view)
         fmt = '{0} :: {1}' if len(expr.splitlines()) == 1 else '{0}\n\t:: {1}'
@@ -122,6 +125,7 @@ class TypedRegion(object):
         self.region = region
         self.typename = typename
 
+    @unicode_operators
     def show(self, view):
         fmt = '{0} :: {1}' if len(self.expr.splitlines()) == 1 else '{0}\n\t:: {1}'
         return fmt.format(self.expr, self.typename)
@@ -336,7 +340,7 @@ class SublimeHaskellShowTypes(SublimeHaskellShowType):
         regions = []
         for t in self.types:
             output_text(self.output_view, '{0}\n'.format(t.show(self.view)), clear = False)
-            regions.append(sublime.Region(self.output_view.size() - 1 - len(t.typename), self.output_view.size() - 1))
+            regions.append(sublime.Region(self.output_view.size() - 1 - len(use_unicode_operators(t.typename)), self.output_view.size() - 1))
         self.output_view.add_regions('types', regions, 'comment', '', sublime.DRAW_OUTLINED)
         show_panel(self.view.window(), panel_name = TYPES_PANEL_NAME)
 
@@ -380,7 +384,7 @@ class SublimeHaskellShowAllTypes(SublimeHaskellTextCommand):
         regions = []
         for t in types:
             output_text(self.output_view, '{0}\n'.format(t.show(self.view)), clear = False)
-            regions.append(sublime.Region(self.output_view.size() - 1 - len(t.typename), self.output_view.size() - 1))
+            regions.append(sublime.Region(self.output_view.size() - 1 - len(use_unicode_operators(t.typename)), self.output_view.size() - 1))
         self.output_view.add_regions('types', regions, 'comment', '', sublime.DRAW_OUTLINED)
         show_panel(self.view.window(), panel_name = TYPES_PANEL_NAME)
 
