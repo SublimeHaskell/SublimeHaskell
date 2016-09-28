@@ -1146,7 +1146,7 @@ def use_hsdev(def_val = None):
 class HsDevAgent(threading.Thread):
     sleep_timeout = 60.0  # agent sleeping timeout
     min_ver = [0, 2, 0, 0]  # minimal hsdev version
-    max_ver = [0, 2, 1, 0]  # maximal hsdev version
+    max_ver = [0, 2, 2, 0]  # maximal hsdev version
 
     def __init__(self):
         super(HsDevAgent, self).__init__()
