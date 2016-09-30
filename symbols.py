@@ -571,9 +571,8 @@ class Function(Declaration):
         super(Function, self).__init__(name, 'function', docs, imported, defined, position, module)
         self.type = function_type
 
-    @unicode_operators
     def suggest(self):
-        return (u'{0} :: {1}\t{2}'.format(wrap_operator(self.name), self.type, self.imported_from_name()), self.name)
+        return (use_unicode_operators(u'{0} :: {1}\t{2}'.format(wrap_operator(self.name), self.type, self.imported_from_name())), self.name)
 
     @unicode_operators
     def brief(self, short = False):
@@ -599,9 +598,8 @@ class TypeBase(Declaration):
         self.args = args
         self.definition = definition
 
-    @unicode_operators
     def suggest(self):
-        return (u'{0} {1}\t{2}'.format(self.name, ' '.join(self.args), self.imported_from_name()), self.name)
+        return (use_unicode_operators(u'{0} {1}\t{2}'.format(self.name, ' '.join(self.args), self.imported_from_name())), self.name)
 
     @unicode_operators
     def brief(self, short = False):
