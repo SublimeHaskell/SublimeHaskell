@@ -82,7 +82,7 @@ Works in export list (showing symbols in scope), import list, expressions. Compl
 
 Popup
 ---
-Show popup with symbol info and with error/warning/hint details. Requires SublimeText 3 dev build > 3070.
+Show popup with symbol info and with error/warning/hint details. Requires SublimeText 3 dev build > 3116 (https://forum.sublimetext.com/t/dev-build-3116/21148).
 ![Hover](Commands/Hover.gif)
 
 It also shows inferred type when possible
