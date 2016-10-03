@@ -146,7 +146,7 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
 		elif hover_zone == sublime.HOVER_GUTTER:
 			self.view = view
 			self.current_file_name = self.view.file_name()
-			errs = filter(lambda e: e.region.start.line == line, parseoutput.errors_for_view(self.view))
+			errs = list(filter(lambda e: e.region.start.line == line, parseoutput.errors_for_view(self.view)))
 			if errs:
 				popup_parts = [styles.gen_style(self.view.settings().get('color_scheme'))]
 				for err in errs:

@@ -116,7 +116,9 @@ class Region(object):
         if self.saved():
             rgns = self.view.get_regions(self.region_key)
             if len(rgns):
-                self = Region.from_region(self.view, rgns[0], self.region_key)
+                r = Region.from_region(self.view, rgns[0], self.region_key)
+                self.start = r.start
+                self.end = r.end
 
     def save(self, view, region_key):
         self.view = view
