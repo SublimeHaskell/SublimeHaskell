@@ -110,13 +110,12 @@ class SublimeHaskellHsDevChain(SublimeHaskellTextCommand):
 
         set_global_error_messages(output_messages)
         output_text = format_output_messages(output_messages)
-        if output_text:
-            if get_setting_async('show_error_window'):
-                sublime.set_timeout(lambda: write_output(
-                    self.view,
-                    output_text,
-                    get_cabal_project_dir_of_file(self.filename) or os.path.dirname(self.filename),
-                    show_panel = not self.fly_mode), 0)
+        if get_setting_async('show_error_window'):
+            sublime.set_timeout(lambda: write_output(
+                self.view,
+                output_text,
+                get_cabal_project_dir_of_file(self.filename) or os.path.dirname(self.filename),
+                show_panel = not self.fly_mode and len(output_messages)), 0)
         sublime.set_timeout(lambda: mark_messages_in_views(output_messages), 0)
 
     def is_enabled(self):
