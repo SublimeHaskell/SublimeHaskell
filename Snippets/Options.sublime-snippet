@@ -1,0 +1,6 @@
+<snippet>
+	<content><![CDATA[{-# OPTIONS_GHC ${0:Extension} #-}]]></content>
+	<tabTrigger>opts</tabTrigger>
+	<scope>source.haskell</scope>
+	<description>GHC Options</description>
+</snippet>
