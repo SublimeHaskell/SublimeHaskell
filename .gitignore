@@ -14,9 +14,13 @@ cabal-dev
 #python's junk
 *.pyc
 
+#pycharm's junk
+.idea
+
 #util
 *.exe
 *.cache
 
 # logs
 *.log
+p
