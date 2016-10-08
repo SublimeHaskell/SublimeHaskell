@@ -93,6 +93,10 @@
         "caption": "SublimeHaskell: Stylish",
         "command": "sublime_haskell_stylish"
     },
+        {
+        "caption": "SublimeHaskell: Hindent",
+        "command": "sublime_haskell_hindent"
+    },
     {
         "caption": "SublimeHaskell: Go to declaration",
         "command": "sublime_haskell_go_to_declaration"

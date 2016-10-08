@@ -23,6 +23,7 @@ Not necessary, but useful:
 
 * [SublimeREPL](https://github.com/wuub/SublimeREPL) package for repl commands
 * [stylish-haskell](https://github.com/jaspervdj/stylish-haskell) (for code prettification, `cabal install stylish-haskell`)
+* [hindent](https://github.com/chrisdone/hindent/blob/master/README.md) (code formatting, `cabal install hindent`)
 
 Deprecated:
 
