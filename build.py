@@ -290,6 +290,13 @@ class SublimeHaskellBuildAutoCommand(SublimeHaskellBaseCommand):
             run_build(self.window.active_view(), current_project_name, current_project_dir, config)
 
 
+def project_dist_path(project_dir):
+    if is_stack_project(project_dir):
+        return stack_dist_path(project_dir)
+    else:
+        return os.path.join(project_dir, 'dist')
+
+
 class SublimeHaskellRunCommand(SublimeHaskellBaseCommand):
     def run(self):
         self.executables = []
@@ -300,7 +307,8 @@ class SublimeHaskellRunCommand(SublimeHaskellBaseCommand):
                 for e in info['description']['executables']:
                     ps.append((p + ": " + e['name'], {
                         'dir': info['path'],
-                        'name': info['name']
+                        'dist': project_dist_path(info['path']),
+                        'name': e['name']
                         }))
 
         # Nothing to run
@@ -322,7 +330,7 @@ class SublimeHaskellRunCommand(SublimeHaskellBaseCommand):
         selected = self.executables[idx]
         name = selected['name']
         base_dir = selected['dir']
-        bin_file = os.path.join(selected['dir'], 'dist', 'build', name, name)
+        bin_file = os.path.join(selected['dist'], 'build', name, name)
 
         hide_output(self.window)
 

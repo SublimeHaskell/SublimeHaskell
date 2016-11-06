@@ -328,6 +328,16 @@ def is_stack_project(project_dir):
     return find_file_in_parent_dir(project_dir, "stack.yaml") is not None
 
 
+# Get stack dist path
+def stack_dist_path(project_dir):
+    exit_code, out, err = call_and_wait(['stack', 'path'], cwd = project_dir)
+    if exit_code == 0:
+        ds = [d for d in out.splitlines() if d.startswith('dist-dir: ')]
+        if len(ds):
+            dist_dir = ds[0][10:]
+            return os.path.join(project_dir, dist_dir)
+
+
 def find_file_in_parent_dir(subdirectory, filename_pattern):
     """Look for a file with the specified name in a parent directory of the
     specified directory. If found, return the file's full path. Otherwise,
