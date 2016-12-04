@@ -559,6 +559,12 @@
 				</dict>
 				<dict>
 					<key>match</key>
+					<string>\b(Applicative|Bounded|Enum|Eq|Ord|Foldable|Fractional|Functor|Monoid|Num|Read|Real|RealFrac|Show)\b</string>
+					<key>name</key>
+					<string>storage.type.haskell support.class.haskell</string>
+				</dict>
+				<dict>
+					<key>match</key>
 					<string>(?&lt;!')\b[a-z][\w']*\b</string>
 					<key>name</key>
 					<string>variable.generic.haskell</string>
@@ -567,7 +573,7 @@
 					<key>match</key>
 					<string>(?&lt;!')\b[A-Z][\w']*\b</string>
 					<key>name</key>
-					<string>storage.type.haskell</string>
+					<string>variable.type.haskell</string>
 				</dict>
 				<dict>
 					<key>match</key>
@@ -994,7 +1000,7 @@
 				<key>3</key>
 				<dict>
 					<key>name</key>
-					<string>constant.other.haskell entity.name.type.haskell</string>
+					<string>entity.name.type.haskell</string>
 				</dict>
 			</dict>
 			<key>end</key>
@@ -1027,7 +1033,7 @@
 						<key>1</key>
 						<dict>
 							<key>name</key>
-							<string>constant.other.haskell entity.name.constructor.haskell</string>
+							<string>entity.name.function entity.name.constructor.haskell</string>
 						</dict>
 					</dict>
 					<key>patterns</key>
@@ -1248,7 +1254,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(abs|acos|acosh|all|and|any|appendFile|asTypeOf|asin|asinh|atan|atan2|atanh|break|ceiling|compare|concat|concatMap|const|cos|cosh|curry|cycle|decodeFloat|div|divMod|drop|dropWhile|either|elem|encodeFloat|enumFrom|enumFromThen|enumFromThenTo|enumFromTo|even|exp|exponent|fail|filter|flip|floatDigits|floatRadix|floatRange|floor|fmap|foldl|foldl1|foldr|foldr1|fromEnum|fromInteger|fromIntegral|fromRational|fst|gcd|getChar|getContents|getLine|head|id|init|interact|ioError|isDenormalized|isIEEE|isInfinite|isNaN|isNegativeZero|iterate|last|lcm|length|lex|lines|log|logBase|lookup|map|mapM|mapM_|max|maxBound|maximum|maybe|min|minBound|minimum|mod|negate|not|notElem|null|odd|or|otherwise|pi|pred|print|product|properFraction|putChar|putStr|putStrLn|quot|quotRem|read|readFile|readIO|readList|readLn|readParen|reads|readsPrec|realToFrac|recip|rem|repeat|replicate|return|reverse|round|scaleFloat|scanl|scanl1|scanr|scanr1|seq|sequence|sequence_|show|showChar|showList|showParen|showString|shows|showsPrec|significand|signum|sin|sinh|snd|span|splitAt|sqrt|subtract|succ|sum|tail|take|takeWhile|tan|tanh|toEnum|toInteger|toRational|truncate|uncurry|unlines|until|unwords|unzip|unzip3|userError|words|writeFile|zip|zip3|zipWith|zipWith3)\b</string>
+					<string>\b(False|True|Left|Right|Nothing|Just|LT|EQ|GT|abs|acos|acosh|all|and|any|appendFile|asTypeOf|asin|asinh|atan|atan2|atanh|break|ceiling|compare|concat|concatMap|const|cos|cosh|curry|cycle|decodeFloat|div|divMod|drop|dropWhile|either|elem|encodeFloat|enumFrom|enumFromThen|enumFromThenTo|enumFromTo|even|exp|exponent|fail|filter|flip|floatDigits|floatRadix|floatRange|floor|fmap|foldl|foldl1|foldr|foldr1|fromEnum|fromInteger|fromIntegral|fromRational|fst|gcd|getChar|getContents|getLine|head|id|init|interact|ioError|isDenormalized|isIEEE|isInfinite|isNaN|isNegativeZero|iterate|last|lcm|length|lex|lines|log|logBase|lookup|map|mapM|mapM_|max|maxBound|maximum|maybe|min|minBound|minimum|mod|negate|not|notElem|null|odd|or|otherwise|pi|pred|print|product|properFraction|putChar|putStr|putStrLn|quot|quotRem|read|readFile|readIO|readList|readLn|readParen|reads|readsPrec|realToFrac|recip|rem|repeat|replicate|return|reverse|round|scaleFloat|scanl|scanl1|scanr|scanr1|seq|sequence|sequence_|show|showChar|showList|showParen|showString|shows|showsPrec|significand|signum|sin|sinh|snd|span|splitAt|sqrt|subtract|succ|sum|tail|take|takeWhile|tan|tanh|toEnum|toInteger|toRational|truncate|uncurry|unlines|until|unwords|unzip|unzip3|userError|words|writeFile|zip|zip3|zipWith|zipWith3)\b</string>
 					<key>name</key>
 					<string>support.function.prelude.haskell</string>
 				</dict>
