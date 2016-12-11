@@ -241,7 +241,7 @@ Find more themes at : https://github.com/daylerees/colour-schemes
 			<key>name</key>
 			<string>Entity name data</string>
 			<key>scope</key>
-			<string>entity.name.data</string>
+			<string>entity.name.data, storage.data</string>
 			<key>settings</key>
 			<dict>
 				<key>foreground</key>

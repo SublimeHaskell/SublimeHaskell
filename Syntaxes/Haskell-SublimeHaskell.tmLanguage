@@ -294,7 +294,7 @@
 					<string>(?&lt;!')\b[a-z][\w']*</string>
 					<!-- ^ We have to prepend the negative lookbehind (?<!') to forbid single quotes before the word boundary. That is because in contrast to Python's re, Sublime's matching engine treats `my'str` as `my\b'\b'str`, thus detecting constants (constructors) in identifier names like `m'result`. Single quotes are the only such characters allowed in Haskell identifiers. -->
 					<key>name</key>
-					<string>entity.name.function.haskell</string>
+					<string>variable.function.haskell</string>
 				</dict>
 				<dict>
 					<key>begin</key>
@@ -305,7 +305,7 @@
 						<key>1</key>
 						<dict>
 							<key>name</key>
-							<string>storage.type.haskell entity.name.data.haskell</string>
+							<string>storage.type.haskell storage.data.haskell</string>
 						</dict>
 						<key>2</key>
 						<dict>
@@ -338,7 +338,7 @@
 					<string>(?&lt;!')\b[A-Z][\w']*</string>
 					<!-- ^ We have to prepend the negative lookbehind (?<!') to forbid single quotes before the word boundary. That is because in contrast to Python's re, Sublime's matching engine treats `my'str` as `my\b'\b'str`, thus detecting constants (constructors) in identifier names like `m'result`. Single quotes are the only such characters allowed in Haskell identifiers. -->
 					<key>name</key>
-					<string>storage.type.haskell entity.name.data.haskell</string>
+					<string>storage.type.haskell storage.data.haskell</string>
 				</dict>
 				<dict>
 					<key>match</key>
@@ -357,10 +357,6 @@
 					<string>\(.*?\)</string>
 					<key>name</key>
 					<string>meta.other.unknown.haskell</string>
-				</dict>
-				<dict>
-					<key>include</key>
-					<string>#module_exports</string>
 				</dict>
 				<dict>
 					<key>include</key>
@@ -415,7 +411,7 @@
 		<key>common_keywords</key>
 		<dict>
 			<key>match</key>
-			<string>\b(where|case|of|let|in|default|do|mdo|if|then|else)\b</string>
+			<string>\b(where|case|of|let|in|default|do|mdo|if|then|else|rec|proc)\b</string>
 			<key>name</key>
 			<string>keyword.other.haskell</string>
 		</dict>
@@ -843,7 +839,7 @@
 				<key>2</key>
 				<dict>
 					<key>name</key>
-					<string>constant.other.haskell entity.name.constructor.haskell</string>
+					<string>entity.name.function.haskell entity.name.constructor.haskell</string>
 				</dict>
 				<key>3</key>
 				<dict>
@@ -961,7 +957,7 @@
 				<key>3</key>
 				<dict>
 					<key>name</key>
-					<string>constant.other.haskell entity.name.type.haskell</string>
+					<string>entity.name.type.haskell</string>
 				</dict>
 			</dict>
 			<key>end</key>
@@ -1069,13 +1065,18 @@
 		<key>class_declaration</key>
 		<dict>
 			<key>begin</key>
-			<string>^(\s*)(class)\b</string>
+			<string>^(\s*)(class)(?:\s+([A-Z][\w']*))?\b</string>
 			<key>beginCaptures</key>
 			<dict>
 				<key>2</key>
 				<dict>
 					<key>name</key>
 					<string>keyword.declaration.class.haskell</string>
+				</dict>
+				<key>3</key>
+				<dict>
+					<key>name</key>
+					<string>entity.name.type.haskell</string>
 				</dict>
 			</dict>
 			<key>end</key>
@@ -1092,6 +1093,25 @@
 			<string>meta.declaration.class.haskell</string>
 			<key>patterns</key>
 			<array>
+				<dict>
+					<key>match</key>
+					<string>(=&gt;|⇒)\s+([A-Z][\w']*)</string>
+					<key>name</key>
+					<string>meta.declaration.class.name</string>
+					<key>captures</key>
+					<dict>
+						<key>1</key>
+						<dict>
+							<key>name</key>
+							<string>keyword.operator.haskell</string>
+						</dict>
+						<key>2</key>
+						<dict>
+							<key>name</key>
+							<string>entity.name.type.haskell</string>
+						</dict>
+					</dict>
+				</dict>
 				<dict>
 					<key>include</key>
 					<string>#type</string>
@@ -1366,7 +1386,7 @@
 					<key>comment</key>
 					<string>In case this regex seems overly general, note that Haskell permits the definition of new operators which can be nearly any string of punctuation characters, such as $%^&amp;*.</string>
 					<key>match</key>
-					<string>[@|!%$?~+:.\-*=&lt;/&gt;\\∘→⇒⇔←⇐≤≥≡⋮\[\]]+</string>
+					<string>[@|!%$?~+:.\-*=&lt;/&gt;\\∘→⇒⇔←⤙⇐≤≥≡⋮\[\]]+</string>
 					<key>name</key>
 					<string>keyword.operator.haskell</string>
 				</dict>

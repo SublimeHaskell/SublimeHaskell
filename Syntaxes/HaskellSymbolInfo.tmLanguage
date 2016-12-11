@@ -246,7 +246,7 @@
 				<key>2</key>
 				<dict>
 					<key>name</key>
-					<string>constant.other.haskell entity.name.constructor.haskell</string>
+					<string>entity.name.function.haskell entity.name.constructor.haskell</string>
 				</dict>
 				<key>3</key>
 				<dict>
