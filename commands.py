@@ -101,7 +101,7 @@ class SublimeHaskellContext(sublime_plugin.EventListener):
             word_region = view.word(region)
             preline = get_line_contents_before_region(view, word_region)
             preline += chars[key]
-            return can_complete_qualified_symbol(get_qualified_symbol(preline))
+            return autocomplete.can_complete_qualified_symbol(get_qualified_symbol(preline))
         else:
             return False
 
