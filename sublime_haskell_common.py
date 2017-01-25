@@ -3,9 +3,12 @@
 import errno
 import fnmatch
 import os
+import os.path
 import re
 import json
 import html
+import platform
+import string
 import sublime
 import sublime_plugin
 import subprocess
@@ -35,6 +38,15 @@ IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']
 
 def python3():
     return PyV3
+
+
+def isWinXX():
+    return platform.system() == "Windows"
+
+
+def exeExts():
+    return [''] if not isWinXX() else ['.exe', '.cmd', '.bat']
+
 
 
 # unicode function
@@ -176,14 +188,38 @@ def call_no_wait(command, **popen_kwargs):
 
 # Get extended environment from settings for Popen
 def get_extended_env():
+    def normalize_path(dir):
+        return os.path.normpath(os.path.expandvars(os.path.expanduser(dir)))
+
     ext_env = dict(os.environ)
     PATH = os.getenv('PATH') or ""
-    add_to_PATH = get_setting_async('add_to_PATH', [])
+    add_to_PATH = list(map(normalize_path, get_setting_async('add_to_PATH', [])))
     if not PyV3:
         # convert unicode strings to strings (for Python < 3) as env can contain only strings
         add_to_PATH = map(str, add_to_PATH)
     ext_env['PATH'] = os.pathsep.join(add_to_PATH + [PATH])
     return ext_env
+
+def which(args, env_path=os.environ['PATH']):
+    def is_exe(fpath):
+        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+
+    program = args[0]
+    fpath, fname = os.path.split(program)
+    if fpath:
+        if is_exe(program):
+            return args
+    else:
+        exts_to_try = exeExts()
+        for path in env_path.split(os.pathsep):
+            path = path.strip('"')
+            for ext in exts_to_try:
+                exe_file = os.path.join(path, program) + ext
+                if is_exe(exe_file):
+                    args[0] = exe_file
+                    return args
+
+    return None
 
 
 def tool_enabled(feature):
@@ -203,11 +239,14 @@ def call_and_wait_tool(command, tool_name, input = '', on_result = None, filenam
     try:
         if on_line:
             p = call_and_wait_with_input(command, input, wait = False, cwd = source_dir, **popen_kwargs)
-            for l in p.stdout:
-                on_line(mk_result(crlf2lf(decode_bytes(l))))
-            exit_code = p.wait()
-            if exit_code != 0:
-                raise Exception('{0} exited with exit code {1} and stderr: {2}'.format(tool_name, exit_code, p.stderr.read()))
+            if p is not None:
+                for l in p.stdout:
+                    on_line(mk_result(crlf2lf(decode_bytes(l))))
+                exit_code = p.wait()
+                if exit_code != 0:
+                    raise Exception('{0} exited with exit code {1} and stderr: {2}'.format(tool_name, exit_code, p.stderr.read()))
+            else:
+                raise Exception("{0} not found or installed ({1})".format(tool_name, command))
         else:
             exit_code, out, err = call_and_wait_with_input(command, input, cwd = source_dir, **popen_kwargs)
             out = crlf2lf(out)
@@ -245,22 +284,24 @@ def call_and_wait_with_input(command, input_string, wait = True, **popen_kwargs)
     # For the subprocess, extend the env PATH to include the 'add_to_PATH' setting.
     extended_env = get_extended_env()
 
-    process = subprocess.Popen(
-        command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        stdin=subprocess.PIPE,
-        env=extended_env,
-        **popen_kwargs)
+    normcmd = which(command, env_path=extended_env['PATH'])
+    if normcmd is not None:
+        process = subprocess.Popen(
+            normcmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.PIPE,
+            env=extended_env,
+            **popen_kwargs)
 
-    if wait:
-        stdout, stderr = process.communicate(encode_bytes(input_string))
-        exit_code = process.wait()
-        return (exit_code, crlf2lf(decode_bytes(stdout)), crlf2lf(decode_bytes(stderr)))
-    else:
-        process.stdin.write(encode_bytes(input_string))
-        process.stdin.close()
-        return process
+        if wait:
+            stdout, stderr = process.communicate(encode_bytes(input_string))
+            exit_code = process.wait()
+            return (exit_code, crlf2lf(decode_bytes(stdout)), crlf2lf(decode_bytes(stderr)))
+        else:
+            process.stdin.write(encode_bytes(input_string))
+            process.stdin.close()
+            return process
 
 log_error = 1
 log_warning = 2
