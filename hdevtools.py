@@ -12,6 +12,27 @@ else:
     from SublimeHaskell.parseoutput import parse_info
 
 
+class DescriptorDrain(threading.Thread):
+    """Continually running thread that drains a Python file, sending everything read to stdout (which in ST's case
+    is a logging object)"""
+
+    ### This really belongs in sublime_haskell_common. But, since that module gets loaded later than this one OR
+    ### it gets reloaded, you end up with the dreaded super() TypeError.
+    def __init__(self, label, fd):
+        super(DescriptorDrain, self).__init__(name = 'drain-' + label)
+        self.label = label
+        self.fd = fd
+        self.stop_me = threading.Event()
+
+    def run(self):
+        while not self.stop_me.is_set():
+            l = crlf2lf(decode_bytes(self.fd.readline())).rstrip()
+            print('<{0}> {1}'.format(self.label, l))
+
+    def stop(self):
+        self.stop_me.set()
+
+
 def show_hdevtools_error_and_disable():
     # Looks like we can't always get an active window here,
     # we use sublime.error_message() instead of
@@ -39,9 +60,9 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
         arg_list.append('--socket={0}'.format(hdevtools_socket))
 
     try:
-        exit_code, out, err = call_and_wait(['hdevtools'] + arg_list + ghc_opts_args, cwd = source_dir)
-
+        exit_code, out, err = ProcHelper.run_process(['hdevtools'] + arg_list + ghc_opts_args, cwd = source_dir)
         if exit_code != 0:
+            show_hdevtools_error_and_disable()
             raise Exception("hdevtools exited with status %d and stderr: %s" % (exit_code, err))
 
         return crlf2lf(out)
@@ -70,12 +91,12 @@ def admin(cmds, wait = False, **popen_kwargs):
 
     try:
         if wait:
-            (exit_code, stdout, stderr) = call_and_wait(command, **popen_kwargs)
-            if exit_code == 0:
-                return stdout
-            return ''
+            exit_code, stdout, stderr = ProcHelper.run_process(command, **popen_kwargs)
+            return stdout if exit_code == 0 else 'error running {0}: {1}'.format(command, stderr)
         else:
-            call_no_wait(command, **popen_kwargs)
+            p = ProcHelper(command, '', **popen_kwargs)
+            DescriptorDrain('hdevtools stdout', p.stdout).start()
+            DescriptorDrain('hdevtools stderr', p.stderr).start()
             return ''
 
     except OSError as e:
@@ -126,8 +147,7 @@ def hdevtools_type(filename, line, column, cabal = None):
 
 
 def start_hdevtools():
-    thread = threading.Thread(
-        target=start_server)
+    thread = threading.Thread(target=start_server)
     thread.start()
 
 

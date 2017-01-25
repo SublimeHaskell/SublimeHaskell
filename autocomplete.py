@@ -349,9 +349,11 @@ class AutoCompletion(object):
             if sbox and type(sbox) == dict and 'sandbox' in sbox:
                 sbox = sbox.get('sandbox')
             if sbox:
-                return set([m.name for m in hsdev.client.list_modules(sandbox = sbox)])
+                mods = hsdev.client.list_modules(sandbox = sbox) or []
+                return set([m.name for m in mods])
         else:
-            return set([m.name for m in hsdev.client.list_modules(cabal = True)])
+            mods = hsdev.client.list_modules(cabal = True) or []
+            return set([m.name for m in mods])
 
 autocompletion = AutoCompletion()
 

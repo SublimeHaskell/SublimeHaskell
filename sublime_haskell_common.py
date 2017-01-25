@@ -3,17 +3,20 @@
 import errno
 import fnmatch
 import os
+import os.path
 import re
 import json
 import html
+import platform
+import string
 import sublime
 import sublime_plugin
 import subprocess
 import threading
 import time
-from sys import version
+from sys import version_info, stdout, stderr
 
-PyV3 = version[0] == "3"
+PyV3 = version_info >= (3,)
 
 # Maximum seconds to wait for window to appear
 # This dirty hack is used in wait_for_window function
@@ -35,6 +38,27 @@ IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']
 
 def python3():
     return PyV3
+
+def isWinXX():
+    return platform.system() == "Windows"
+
+
+def exeExts():
+    return [''] if not isWinXX() else ['.exe', '.cmd', '.bat']
+
+
+# Logging primitives
+log_error = 1
+log_warning = 2
+log_info = 3
+log_debug = 4
+log_trace = 5
+
+
+def log(message, level = log_info):
+    log_level = get_setting_async('log', log_info)
+    if log_level >= level:
+        print(u'Sublime Haskell: {0}'.format(message))
 
 
 # unicode function
@@ -152,128 +176,167 @@ def encode_bytes(s):
     return s.encode('utf-8')
 
 
-def call_and_wait(command, wait = True, **popen_kwargs):
-    return call_and_wait_with_input(command, '', wait = wait, **popen_kwargs)
-
-
-def call_no_wait(command, **popen_kwargs):
-    """Run the specified command with no block"""
-    if subprocess.mswindows:
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        popen_kwargs['startupinfo'] = startupinfo
-
-    extended_env = get_extended_env()
-
-    subprocess.Popen(
-        command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        stdin=subprocess.PIPE,
-        env=extended_env,
-        **popen_kwargs)
-
-
-# Get extended environment from settings for Popen
-def get_extended_env():
-    ext_env = dict(os.environ)
-    PATH = os.getenv('PATH') or ""
-    add_to_PATH = get_setting_async('add_to_PATH', [])
-    if not PyV3:
-        # convert unicode strings to strings (for Python < 3) as env can contain only strings
-        add_to_PATH = map(str, add_to_PATH)
-    ext_env['PATH'] = os.pathsep.join(add_to_PATH + [PATH])
-    return ext_env
-
-
 def tool_enabled(feature):
     return 'enable_{0}'.format(feature)
 
 
-def call_and_wait_tool(command, tool_name, input = '', on_result = None, filename = None, on_line = None, check_enabled = True, **popen_kwargs):
-    if check_enabled and (not get_setting_async(tool_enabled(tool_name))):
+class ProcHelper(object):
+    """Command and tool process execution helper."""
+
+    # Tool name -> executable path cache. Avoids probing the file system multiple times.
+    which_cache = { }
+
+    def __init__(self, command, input_string = '', **popen_kwargs):
+        """waitOpen a pipe to a command or tool."""
+
+        self.process = None
+        self.process_err = None
+
+        if subprocess.mswindows:
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            popen_kwargs['startupinfo'] = startupinfo
+
+        try:
+            extended_env = ProcHelper.get_extended_env()
+            normcmd = ProcHelper.which(command, extended_env['PATH'])
+            if normcmd is not None:
+                self.process = subprocess.Popen(normcmd
+                                               , stdout=subprocess.PIPE
+                                               , stderr=subprocess.PIPE
+                                               , stdin=subprocess.PIPE
+                                               , env=extended_env
+                                               , **popen_kwargs
+                                               )
+
+                self.process.stdin.write(encode_bytes(input_string))
+                self.process.stdin.flush()
+            else:
+                self.process = None
+                self.process_err = "SublimeHaskell.ProcHelper: {0} was not found on PATH!".format(command[0])
+
+        except OSError as e:
+            self.process = None
+            self.process_err = "SublimeHaskell: {0} was not found!\n'{1}' is set to False".format(tool_name, tool_enabled(tool_name))
+            if e.errno == errno.ENOENT:
+                # Just paranoia
+                self.cleanup()
+
+            # Other consumers want this exception
+            raise e
+
+    # 'with' statement support:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.cleanup()
+        return False
+
+    def cleanup(self):
+        if self.process is not None:
+            self.process.stdin.close()
+            self.process.stdout.close()
+            self.process.stderr.close()
+
+    def wait(self):
+        """Wait for subprocess to complete and exit, collect and decode ``stdout`` and ``stderr``, returning the tuple
+        ``(exit_code, stdout, stderr)```"""
+        if self.process is not None:
+            stdout, stderr = self.process.communicate()
+            exit_code = self.process.wait()
+            # Ensure that we reap the file descriptors.
+            self.cleanup()
+            return (exit_code, crlf2lf(decode_bytes(stdout)), crlf2lf(decode_bytes(stderr)))
+        else:
+            return (-1, '', self.process_err or "?? unknown error -- no process.")
+
+    # Get extended environment from settings for Popen
+    @staticmethod
+    def get_extended_env():
+        def normalize_path(dir):
+            return os.path.normpath(os.path.expandvars(os.path.expanduser(dir)))
+
+        ext_env = dict(os.environ)
+        PATH = os.getenv('PATH') or ""
+        add_to_PATH = list(map(normalize_path, get_setting_async('add_to_PATH', [])))
+        if not PyV3:
+            # convert unicode strings to strings (for Python < 3) as env can contain only strings
+            add_to_PATH = map(str, add_to_PATH)
+        ext_env['PATH'] = os.pathsep.join(add_to_PATH + [PATH])
+        return ext_env
+
+    @staticmethod
+    def which(args, env_path):
+        def is_exe(fpath):
+            return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+
+        cval = ProcHelper.which_cache.get(args[0])
+        if cval is not None:
+            args[0] = cval
+            return args
+        else:
+            exeExts = [''] if not isWinXX() else ['.exe', '.cmd', '.bat']
+
+            program = args[0]
+            fpath, fname = os.path.split(program)
+            if fpath:
+                if is_exe(program):
+                    return args
+            else:
+                for path in env_path.split(os.pathsep):
+                    path = path.strip('"')
+                    for ext in exeExts:
+                        exe_file = os.path.join(path, program)
+                        if is_exe(exe_file + ext):
+                            ProcHelper.which_cache[program] = exe_file
+                            args[0] = exe_file
+                            return args
+
         return None
-    # extended_env = get_extended_env()
 
-    source_dir = get_source_dir(filename)
+    @staticmethod
+    def run_process(command, input_string = '', **popen_kwargs):
+        """Execute a subprocess, wait for it to complete, returning a ``(exit_code, stdout, stderr)``` tuple."""
+        with ProcHelper(command, input_string, **popen_kwargs) as p:
+            return p.wait()
 
-    def mk_result(s):
-        return on_result(s) if on_result else s
+    @staticmethod
+    def invoke_tool(command, tool_name, input = '', on_result = None, filename = None, on_line = None, check_enabled = True, **popen_kwargs):
+        if check_enabled and (not get_setting_async(tool_enabled(tool_name))):
+            return None
+        # extended_env = get_extended_env()
 
-    try:
-        if on_line:
-            p = call_and_wait_with_input(command, input, wait = False, cwd = source_dir, **popen_kwargs)
-            for l in p.stdout:
-                on_line(mk_result(crlf2lf(decode_bytes(l))))
-            exit_code = p.wait()
-            if exit_code != 0:
-                raise Exception('{0} exited with exit code {1} and stderr: {2}'.format(tool_name, exit_code, p.stderr.read()))
-        else:
-            exit_code, out, err = call_and_wait_with_input(command, input, cwd = source_dir, **popen_kwargs)
-            out = crlf2lf(out)
+        source_dir = get_source_dir(filename)
 
-            if exit_code != 0:
-                raise Exception('{0} exited with exit code {1} and stderr: {2}'.format(tool_name, exit_code, err))
+        def mk_result(s):
+            return on_result(s) if on_result else s
 
-            return mk_result(out)
+        try:
+            with ProcHelper(command, input, cwd = source_dir, **popen_kwargs) as p:
+                exit_code, stdout, stderr = p.wait()
+                if exit_code != 0:
+                    raise Exception('{0} exited with exit code {1} and stderr: {2}'.format(tool_name, exit_code, stderr))
 
-    except OSError as e:
-        if e.errno == errno.ENOENT:
-            output_error_async(sublime.active_window(), "SublimeHaskell: {0} was not found!\n'{1}' is set to False".format(tool_name, tool_enabled(tool_name)))
-            set_setting_async(tool_enabled(tool_name), False)
-        else:
+                if on_line:
+                    for l in stdout.splitlines():
+                        on_line(mk_result(l))
+                else:
+                    return mk_result(stdout)
+
+        except OSError as e:
+            if e.errno == errno.ENOENT:
+                output_error_async(sublime.active_window(), "SublimeHaskell: {0} was not found!\n'{1}' is set to False".format(tool_name, tool_enabled(tool_name)))
+                set_setting_async(tool_enabled(tool_name), False)
+            else:
+                log('{0} fails with {1}, command: {2}'.format(tool_name, e, command), log_error)
+
+            return None
+
+        except Exception as e:
             log('{0} fails with {1}, command: {2}'.format(tool_name, e, command), log_error)
 
         return None
-
-    except Exception as e:
-        log('{0} fails with {1}, command: {2}'.format(tool_name, e, command), log_error)
-
-    return None
-
-
-def call_and_wait_with_input(command, input_string, wait = True, **popen_kwargs):
-    """Run the specified command, block until it completes, and return
-    the exit code, stdout, and stderr.
-    Extends os.environment['PATH'] with the 'add_to_PATH' setting.
-    Additional parameters to Popen can be specified as keyword parameters."""
-    if subprocess.mswindows:
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        popen_kwargs['startupinfo'] = startupinfo
-
-    # For the subprocess, extend the env PATH to include the 'add_to_PATH' setting.
-    extended_env = get_extended_env()
-
-    process = subprocess.Popen(
-        command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        stdin=subprocess.PIPE,
-        env=extended_env,
-        **popen_kwargs)
-
-    if wait:
-        stdout, stderr = process.communicate(encode_bytes(input_string))
-        exit_code = process.wait()
-        return (exit_code, crlf2lf(decode_bytes(stdout)), crlf2lf(decode_bytes(stderr)))
-    else:
-        process.stdin.write(encode_bytes(input_string))
-        process.stdin.close()
-        return process
-
-log_error = 1
-log_warning = 2
-log_info = 3
-log_debug = 4
-log_trace = 5
-
-
-def log(message, level = log_info):
-    log_level = get_setting_async('log', log_info)
-    if log_level >= level:
-        print(u'Sublime Haskell: {0}'.format(message))
-
 
 def get_cabal_project_dir_and_name_of_view(view):
     """Return the path to the .cabal file project for the source file in the
@@ -330,7 +393,7 @@ def is_stack_project(project_dir):
 
 # Get stack dist path
 def stack_dist_path(project_dir):
-    exit_code, out, err = call_and_wait(['stack', 'path'], cwd = project_dir)
+    exit_code, out, err = ProcHelper.run_process(['stack', 'path'], cwd = project_dir)
     if exit_code == 0:
         ds = [d for d in out.splitlines() if d.startswith('dist-dir: ')]
         if len(ds):
@@ -462,7 +525,7 @@ def get_source_dir(filename):
         return os.path.dirname(filename)
 
     _project_name, cabal_file = get_cabal_in_dir(cabal_dir)
-    exit_code, out, err = call_and_wait(['hsinspect', cabal_file])
+    exit_code, out, err = ProcHelper.run_process(['hsinspect', cabal_file])
 
     if exit_code == 0:
         info = json.loads(out)
@@ -551,7 +614,7 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
             cabal_project_dir = get_cabal_project_dir_of_file(filename)
             if cabal_project_dir:
                 ghc_mod_current_dir = cabal_project_dir
-        exit_code, out, err = call_and_wait(command, cwd=ghc_mod_current_dir)
+        exit_code, out, err = ProcHelper.run_process(command, cwd=ghc_mod_current_dir)
 
         if exit_code != 0:
             raise Exception("%s exited with status %d and stderr: %s" % (' '.join(command), exit_code, err))
