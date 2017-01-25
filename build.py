@@ -343,11 +343,12 @@ class SublimeHaskellRunCommand(SublimeHaskellBaseCommand):
 
 def run_binary(name, bin_file, base_dir):
     with status_message_process('Running {0}'.format(name), priority = 5) as s:
-        exit_code, out, err = call_and_wait(bin_file, cwd=base_dir)
+        exit_code, out, err = ProcHelper.run_process(bin_file, cwd=base_dir)
         window = sublime.active_window()
         if not window:
             return
         if exit_code == 0:
+            s.ok()
             sublime.set_timeout(lambda: write_output(window, out, base_dir), 0)
         else:
             s.fail()

@@ -58,9 +58,13 @@
 	// Show error window on build/check/lint:
 	"show_error_window": true,
 
-	// Extra directories to be added to the front of the PATH environment variable.
-	// Specify this for using custom ghc, cabal, and ghc-mod
-	// Example: /home/user/.cabal/bin
+	// Extra directories to be added to the front of the PATH environment variable,
+	// if you don't have customary places where Haskell executables are installed,
+	// such as $HOME/.cabal/bin, $HOME/.local/bin (Unix) or %APPDATA%/local/bin on
+	// Windows.
+	//
+	// Note: You can use environment variables here, e.g., $HOME and %APPDATA%. Only
+	// "%something%" will work on Windows platforms.
 	"add_to_PATH": [],
 
 // Inhibit default Sublime word completions

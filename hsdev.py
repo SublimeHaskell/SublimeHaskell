@@ -6,6 +6,7 @@ import threading
 import json
 import time
 import re
+import sys
 from functools import reduce
 
 if int(sublime.version()) < 3000:
@@ -57,7 +58,7 @@ def flatten_opts(opts):
 
 def hsdev_version():
     try:
-        (exit_code, out, err) = call_and_wait(['hsdev', 'version'])
+        exit_code, out, err = ProcHelper.run_process(['hsdev', 'version'])
         if exit_code == 0:
             m = re.match('(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)\.(?P<build>\d+)', out)
             if m:
@@ -66,8 +67,10 @@ def hsdev_version():
                 revision = int(m.group('revision'))
                 build = int(m.group('build'))
                 return [major, minor, revision, build]
+        # fall through
     except FileNotFoundError:
         pass
+
     return None
 
 
@@ -113,12 +116,13 @@ def hsinspect(module = None, file = None, cabal = None, ghc_opts = []):
     for opt in ghc_opts:
         cmd.extend(['-g', opt])
 
-    r = call_and_wait_tool(cmd, 'hsinspect', lambda s: json.loads(s), file, None)
-    if r:
-        if 'error' in r:
-            log('hsinspect returns error: {0}'.format(r['error']), log_error)
-        else:
-            return on_result(r) if on_result else r
+    with ProcHelper(cmd, 'hsinspect', lambda s: json.loads(s), file, None) as p:
+        if p is not None:
+            r = p.wait()
+            if 'error' in r:
+                log('hsinspect returns error: {0}'.format(r['error']), log_error)
+            else:
+              return on_result(r) if on_result else r
     return None
 
 
@@ -537,6 +541,27 @@ class HsDevCallbacks(object):
         call_callback(self.on_error, e, ds)
 
 
+class DescriptorDrain(threading.Thread):
+    """Continually running thread that drains a Python file, sending everything read to stdout (which in ST's case
+    is a logging object)"""
+
+    ### This really belongs in sublime_haskell_common. But, since that module gets loaded later than this one OR
+    ### it gets reloaded, you end up with the dreaded super() TypeError.
+    def __init__(self, label, fd):
+        super(DescriptorDrain, self).__init__(name = 'drain-' + label)
+        self.label = label
+        self.fd = fd
+        self.stop_me = threading.Event()
+
+    def run(self):
+        while not self.stop_me.is_set():
+            l = crlf2lf(decode_bytes(self.fd.readline())).rstrip()
+            print('<{0}> {1}'.format(self.label, l))
+
+    def stop(self):
+        self.stop_me.set()
+
+
 # hsdev client
 # see for functions with command decorator for hsdev api
 class HsDev(object):
@@ -586,18 +611,17 @@ class HsDev(object):
             (log_config, ["--log-config", log_config])])
 
         log('Starting hsdev server', log_info)
-        p = call_and_wait(cmd, wait = False)
-        if not p:
-            log('Failed creating hsdev process', log_error)
+        p = ProcHelper(cmd)
+        if p.process is None:
+            log('Failed to create hsdev process', log_error)
             return None
+
         while True:
-            output = crlf2lf(decode_bytes(p.stdout.readline()))
+            output = crlf2lf(decode_bytes(p.process.stdout.readline()))
             m = re.match(r'^.*?hsdev> Server started at port (?P<port>\d+)$', output)
             if m:
                 log('hsdev server started at port {0}'.format(m.group('port')))
-                p.stdout.close()
-                p.stderr.close()
-                return p
+                return p.process
 
     # Socket functions
 
@@ -1051,6 +1075,8 @@ class HsDevProcess(threading.Thread):
     def __init__(self, port = 4567, cache = None, log_file = None, log_config = None):
         super(HsDevProcess, self).__init__()
         self.process = None
+        self.drain_stdout = None
+        self.drain_stderr = None
         self.on_start = None
         self.on_exit = None
         self.stop_event = threading.Event()
@@ -1070,8 +1096,16 @@ class HsDevProcess(threading.Thread):
                     log('failed to create hsdev process', log_error)
                     self.stop_event.set()
                 else:
+                    self.drain_stdout = DescriptorDrain('hsdev stdout', self.process.stdout)
+                    self.drain_stderr = DescriptorDrain('hsdev stderr', self.process.stderr)
+                    self.drain_stdout.start()
+                    self.drain_stderr.start()
                     call_callback(self.on_start, name = 'HsDevProcess.on_start')
                 self.process.wait()
+                if self.drain_stdout:
+                    self.drain_stdout.stop()
+                if self.drain_stderr:
+                    self.drain_stderr.stop()
                 call_callback(self.on_exit, name = 'HsDevProcess.on_exit')
             self.stop_event.clear()
 
