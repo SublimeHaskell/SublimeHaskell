@@ -289,8 +289,8 @@ def call_and_wait_with_input(command, input_string, wait = True, **popen_kwargs)
         process = subprocess.Popen(
             normcmd,
             stdout=subprocess.PIPE,
-            stderr=procoutput,
-            stdin=procoutput,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.PIPE,
             env=extended_env,
             **popen_kwargs)
 
@@ -301,9 +301,6 @@ def call_and_wait_with_input(command, input_string, wait = True, **popen_kwargs)
         else:
             process.stdin.write(encode_bytes(input_string))
             process.stdin.close()
-            # Can't use 'isinstance(procoutput, file)' -- doesn't work in Python 3.
-            if closeprocout:
-                close(procoutput)
             return process
 
 log_error = 1
