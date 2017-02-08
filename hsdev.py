@@ -117,12 +117,14 @@ def hsinspect(module = None, file = None, cabal = None, ghc_opts = []):
         cmd.extend(['-g', opt])
 
     with ProcHelper(cmd, 'hsinspect', lambda s: json.loads(s), file, None) as p:
-        if p is not None:
-            r = p.wait()
-            if 'error' in r:
-                log('hsinspect returns error: {0}'.format(r['error']), log_error)
+        if p.process is not None:
+            err_code, stdout, stderr = p.wait()
+            if 'error' in stdout:
+                log('hsinspect returns error: {0}'.format(stdout), log_error)
+            elif 'error' in stderr:
+                log('hsinspect returns error: {0}'.format(stderr), log_error)
             else:
-              return on_result(r) if on_result else r
+              return on_result(stdout) if on_result else stdout
     return None
 
 
@@ -139,15 +141,11 @@ def parse_database(s):
 
 
 def parse_decls(s):
-    if s is None:
-        return None
-    return [parse_module_declaration(decl) for decl in s]
+    return [parse_module_declaration(decl) for decl in s] if s is not None else []
 
 
 def parse_modules_brief(s):
-    if s is None:
-        return None
-    return [parse_module_id(m) for m in s]
+    return [parse_module_id(m) for m in s] if s is not None else []
 
 
 def get_value(dc, ks, defval = None):
@@ -260,9 +258,7 @@ def parse_declaration(decl):
 
 
 def parse_declarations(decls):
-    if decls is None:
-        return None
-    return [parse_declaration(d) for d in decls]
+    return [parse_declaration(d) for d in decls] if decls is not None else []
 
 
 def parse_module_declaration(d, parse_module_info = True):

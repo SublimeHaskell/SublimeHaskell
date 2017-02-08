@@ -340,13 +340,11 @@ class AutoCompletion(object):
             sandbox - get sandbox modules
         """
         if self.current_filename:
-            mods = hsdev.client.scope_modules(self.current_filename) or []
-            return set([m.name for m in mods])
+            return set([m.name for m in hsdev.client.scope_modules(self.current_filename)])
         elif current_dir:
             proj = hsdev.client.project(path = current_dir)
             if proj and 'path' in proj:
-                mods = hsdev.client.list_modules(deps = proj['path']) or []
-                return set([m.name for m in mods])
+                return set([m.name for m in hsdev.client.list_modules(deps = proj['path'])])
             sbox = hsdev.client.sandbox(path = current_dir)
             if sbox and type(sbox) == dict and 'sandbox' in sbox:
                 sbox = sbox.get('sandbox')
