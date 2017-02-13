@@ -4,9 +4,9 @@ import errno
 import sublime
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import is_enabled_haskell_command, call_and_wait_with_input, SublimeHaskellTextCommand
+    from sublime_haskell_common import is_enabled_haskell_command, crlf2lf, ProcHelper, SublimeHaskellTextCommand
 else:
-    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, call_and_wait_with_input, SublimeHaskellTextCommand
+    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, crlf2lf, ProcHelper, SublimeHaskellTextCommand
 
 
 class SublimeHaskellStylish(SublimeHaskellTextCommand):
@@ -20,10 +20,12 @@ class SublimeHaskellStylish(SublimeHaskellTextCommand):
                 else:
                     selection = region
                 sel_str = self.view.substr(selection).replace('\r\n', '\n')
-                exit_code, out, err = call_and_wait_with_input(['stylish-haskell'], sel_str)
-                out_str = out.replace('\r\n', '\n')
-                if exit_code == 0 and out_str != sel_str:
-                    self.view.replace(edit, selection, out_str)
+                with ProcHelper(['stylish-haskell'], sel_str) as p:
+                    if p.process is not None:
+                        exit_code, out, err = p.wait()
+                        out_str = crlf2lf(out)
+                        if exit_code == 0 and out_str != sel_str:
+                            self.view.replace(edit, selection, out_str)
 
             self.view.sel().clear()
             for region in regions:

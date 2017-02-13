@@ -139,17 +139,17 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
     output_log = output_panel(view.window(), '', panel_name = BUILD_LOG_PANEL_NAME, show_panel = get_setting_async('show_output_window'))
     for cmd in cmds:
         output_text(output_log, ' '.join(cmd) + '...\n')
-
-        cmd_p = call_and_wait(cmd, cwd = cabal_project_dir, wait = False)
-        lines = []
-        for cmd_line in cmd_p.stdout:
-            line = crlf2lf(decode_bytes(cmd_line))
-            lines.append(line)
-            output_text(output_log, line)
-            output_log.show(output_log.size())  # Scroll to the end
-        exit_code = cmd_p.wait()
-        # stdout = '\n'.join(lines)
-        stderr = crlf2lf(decode_bytes(cmd_p.stderr.read()))
+        with ProcHelper(cmd, cwd = cabal_project_dir) as p:
+            if p.process is not None:
+                lines = []
+                for cmd_line in p.process.stdout:
+                    line = crlf2lf(decode_bytes(cmd_line))
+                    lines.append(line)
+                    output_text(output_log, line)
+                    output_log.show(output_log.size())  # Scroll to the end
+                exit_code = p.process.wait()
+                # stdout = '\n'.join(lines)
+                stderr = crlf2lf(decode_bytes(p.process.stderr.read()))
     hide_panel(view.window(), panel_name = BUILD_LOG_PANEL_NAME)
 
     errmsg = stderr
@@ -212,10 +212,6 @@ def show_output_result_text(view, msg, text, exit_code, base_dir):
 
 def parse_output_messages_and_show(view, msg, base_dir, exit_code, stderr):
     """Parse errors and display resulting errors"""
-
-    # stderr/stdout can contain unicode characters
-    # already done in call_and_wait
-    # stderr = stderr.decode('utf-8')
 
     # The process has terminated; parse and display the output:
     parsed_messages = parse_output_messages(view, base_dir, stderr)
