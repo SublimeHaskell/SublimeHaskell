@@ -108,6 +108,10 @@
 	// Additional ghc options for repl
 	"ghci_opts": [],
 
+  // can be set to either always "cabal:, or to use "stack" whenever the project
+  // defines a stack.yml file in the root project directory
+  "haskell_build_tool":"cabal",
+
 	// Log level, 0 — no log, 1 — errors, 2 — warnings, 3 — info messages, 4 — debug, 5 — trace
 	"log": 3
 }
