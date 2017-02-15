@@ -58,16 +58,29 @@
 	// Show error window on build/check/lint:
 	"show_error_window": true,
 
-	// Extra directories to be added to the front of the PATH environment variable,
-	// if you don't have customary places where Haskell executables are installed,
-	// such as $HOME/.cabal/bin, $HOME/.local/bin (Unix) or %APPDATA%/local/bin on
-	// Windows.
+	// Add the "standard" directories where cabal and stack install executables,
+	// if they exist, in the following order (top to bottom):
 	//
-	// Note: You can use environment variables here, e.g., $HOME and %APPDATA%. Only
-	// "%something%" will work on Windows platforms.
+	// $HOME/.local/bin                       | %APPDATA%/local/bin
+	// user bindir from $HOME/.cabal/config   | %APPDATA%/cabal/config
+	// global bindir from $HOME/.cabal/config | %APPDATA%/cabal/config
+	// 
+	// The defaults for the user and global bindirs are:
+	//
+	// user:   {$HOME/.cabal|%APPDATA%/cabal}/bin
+	// global: {/usr/local|%PROGRAMFILES%/Haskell}/bin
+	"add_standard_dirs": true,
+
+	// Extra directories prepended to the PATH environment variable to
+	// supplement searching for various Haskell executables, such as ghc and
+	// stack.
+	//
+	// Note: You can use environment variables here, e.g., $HOME and %APPDATA%.
+	// Only "%something%" will work on Windows platforms. You can also use the
+	// tilde ("~") as an abbreviation for your home directory.
 	"add_to_PATH": [],
 
-// Inhibit default Sublime word completions
+	// Inhibit default Sublime word completions
 	"inhibit_completions": false,
 
 	// Auto autocompletion popup on '.' in import list
@@ -109,5 +122,5 @@
 	"ghci_opts": [],
 
 	// Log level, 0 — no log, 1 — errors, 2 — warnings, 3 — info messages, 4 — debug, 5 — trace
-	"log": 3
+	"log": 1
 }

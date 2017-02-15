@@ -230,7 +230,8 @@ def parse_module_id(d):
 def parse_declaration(decl):
     try:
         what = decl['decl']['what']
-        docs = crlf2lf(decl.get('docs'))
+        # docs = crlf2lf(decl.get('docs'))
+        docs = decl.get('docs')
         name = decl['name']
         pos = parse_position(decl.get('pos'))
         imported = []
@@ -551,7 +552,8 @@ class DescriptorDrain(threading.Thread):
 
     def run(self):
         while not self.stop_me.is_set():
-            l = crlf2lf(decode_bytes(self.fd.readline())).rstrip()
+            # l = crlf2lf(decode_bytes(self.fd.readline())).rstrip()
+            l = decode_bytes(self.fd.readline()).rstrip()
             print('<{0}> {1}'.format(self.label, l))
 
     def stop(self):
@@ -613,7 +615,8 @@ class HsDev(object):
             return None
 
         while True:
-            output = crlf2lf(decode_bytes(p.process.stdout.readline()))
+            # output = crlf2lf(decode_bytes(p.process.stdout.readline()))
+            output = decode_bytes(p.process.stdout.readline())
             m = re.match(r'^.*?hsdev> Server started at port (?P<port>\d+)$', output)
             if m:
                 log('hsdev server started at port {0}'.format(m.group('port')))

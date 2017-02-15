@@ -39,12 +39,9 @@ IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']
 def python3():
     return PyV3
 
+
 def isWinXX():
     return platform.system() == "Windows"
-
-
-def exeExts():
-    return [''] if not isWinXX() else ['.exe', '.cmd', '.bat']
 
 
 # Logging primitives
@@ -87,37 +84,53 @@ class LockedObject(object):
         self.object_lock.__exit__(type, value, traceback)
 
 
-# Setting can't be get from not main threads
-# So we using a trick:
-# Once setting loaded from main thread, it also stored in sublime_haskell_settings dictionary
-# and callback attached to update its value
-# And then setting can be get from any thread with get_setting_async
-# But setting must be loaded at least once from main thread
-# Some settings are loaded only from secondary threads, so we loading them here for first time
-def preload_settings():
-    # Now we can use get_setting_async for 'add_to_PATH' safely
-    get_setting('add_to_PATH')
-    get_setting('enable_auto_build')
-    get_setting('haskell_build_tool')
-    get_setting('show_error_window')
-    get_setting('show_output_window')
-    get_setting('enable_ghc_mod')
-    get_setting('enable_hdevtools')
-    get_setting('enable_hdocs')
-    get_setting('enable_hsdev')
-    get_setting('hsdev_log_config')
-    get_setting('inspect_modules')
-    get_setting('snippet_replace')
-    get_setting('lint_check_fly')
-    get_setting('lint_check_fly_idle')
-    get_setting('ghc_opts')
-    get_setting('log')
-
 # SublimeHaskell settings dictionary
 # used to retrieve it async from any thread
 sublime_haskell_settings = LockedObject({})
-# Callbacks on change settings
+# Callbacks for updated settings/change detection
 sublime_settings_changes = LockedObject({})
+
+# Can't retrieve settings from child threads, only from the main thread.
+#
+# So we use the following hack: Initially load settings from the main thread and
+# store them in the sublime_haskell_settings dictionary and callback attached to
+# update its value. And then setting can be retrieved from any thread with
+# get_setting_async. The setting must be loaded at least once from main thread.
+#
+# Some settings are loaded only from secondary threads, so we load them here for
+# first time.
+def preload_settings():
+    def change_func(key):
+        return lambda: on_changed_setting(str(key))
+
+    for key in [ 'add_standard_dirs'
+               , 'add_to_PATH'
+               , 'enable_auto_build'
+               , 'haskell_build_tool'
+               , 'show_error_window'
+               , 'show_output_window'
+               , 'enable_ghc_mod'
+               , 'enable_hdevtools'
+               , 'enable_hdocs'
+               , 'enable_hsdev'
+               , 'hsdev_log_config'
+               , 'inspect_modules'
+               , 'snippet_replace'
+               , 'lint_check_fly'
+               , 'lint_check_fly_idle'
+               , 'ghc_opts'
+               , 'log'
+               ]:
+        get_setting(key)
+        with sublime_haskell_settings as settings:
+            get_settings().add_on_change(str(key), change_func(key))
+            with sublime_settings_changes as changes:
+                changes[key] = []
+
+    # Register change detection:
+    with sublime_settings_changes as changes:
+        changes['add_to_PATH'].append(ProcHelper.update_environment)
+        changes['add_standard_dirs'].append(ProcHelper.update_environment)
 
 
 def is_enabled_haskell_command(view = None, must_be_project=True, must_be_main=False, must_be_file = False):
@@ -167,13 +180,13 @@ def head_of(l):
 def decode_bytes(s):
     if s is None:
         return None
-    return s.decode('utf-8')
+    return s if PyV3 else s.decode('utf-8')
 
 
 def encode_bytes(s):
     if s is None:
         return None
-    return s.encode('utf-8')
+    return s if PyV3 else s.encode('utf-8')
 
 
 def tool_enabled(feature):
@@ -185,9 +198,15 @@ class ProcHelper(object):
 
     # Tool name -> executable path cache. Avoids probing the file system multiple times.
     which_cache = { }
+    # Augmented environment for the subprocesses. Specifically, we really want
+    # to augment the user's PATH used to search for executables and tools:
+    augmented_env = None
 
     def __init__(self, command, input_string = '', **popen_kwargs):
-        """waitOpen a pipe to a command or tool."""
+        """Open a pipe to a command or tool."""
+
+        if ProcHelper.augmented_env is None:
+            ProcHelper.augmented_env = ProcHelper.get_extended_env()
 
         self.process = None
         self.process_err = None
@@ -198,14 +217,14 @@ class ProcHelper(object):
             popen_kwargs['startupinfo'] = startupinfo
 
         try:
-            extended_env = ProcHelper.get_extended_env()
-            normcmd = ProcHelper.which(command, extended_env['PATH'])
+            normcmd = ProcHelper.which(command, ProcHelper.augmented_env['PATH'])
             if normcmd is not None:
                 self.process = subprocess.Popen(normcmd
                                                , stdout=subprocess.PIPE
                                                , stderr=subprocess.PIPE
                                                , stdin=subprocess.PIPE
-                                               , env=extended_env
+                                               , env=ProcHelper.augmented_env
+                                               , universal_newlines=True
                                                , **popen_kwargs
                                                )
 
@@ -247,23 +266,102 @@ class ProcHelper(object):
             exit_code = self.process.wait()
             # Ensure that we reap the file descriptors.
             self.cleanup()
-            return (exit_code, crlf2lf(decode_bytes(stdout)), crlf2lf(decode_bytes(stderr)))
+            return (exit_code, decode_bytes(stdout), decode_bytes(stderr))
         else:
             return (-1, '', self.process_err or "?? unknown error -- no process.")
 
-    # Get extended environment from settings for Popen
+    # Update the augmented environment when `add_to_PATH` or `add_standard_dirs` change.
+    @staticmethod
+    def update_environment(key, val):
+        ProcHelper.augmented_env = ProcHelper.get_extended_env()
+
+    # Generate the augmented environment for subprocesses. This copies the
+    # current process environment and updates PATH with `add_to_PATH` extras.
     @staticmethod
     def get_extended_env():
         def normalize_path(dir):
             return os.path.normpath(os.path.expandvars(os.path.expanduser(dir)))
 
+        def cabal_config():
+            cconfig = os.environ.get('CABAL_CONFIG') or \
+                ('~/.cabal' if not isWinXX() else '%APPDATA%/cabal') + \
+                "/config"
+
+            # Various patterns to match...
+            re_user_dirs = re.compile('^install-dirs\s+user')
+            re_global_dirs = re.compile('^install-dirs\s+global')
+            re_section = re.compile('^\w+')
+            re_prefix = re.compile('prefix:\s+(.*)$')
+            re_bindir = re.compile('bindir:\s+(.*)$')
+
+            # Things to collect
+            user_prefix = "$HOME/.cabal" if not isWinXX() else "%APPDATA%/cabal"
+            # FIXME: Need to interrogate Shel32 for the Windows PROGRAMFILES known
+            # folder path:
+            global_prefix = "/usr/local" if not isWinXX() else "%PROGRAMFILES%/Haskell"
+            user_bindir = "bin"
+            global_bindir = "bin"
+            p_state = 0
+
+            try:
+                with open(normalize_path(cconfig), 'rU') as f_cconfig:
+                    # You would think that the Cabal maintainers would use a
+                    # well known file format... But now, they didn't. And they
+                    # had to go with an indentation-specific format.
+                    #
+                    # This is a "cheap and dirty" scanner to pick up 
+                    for l in f_cconfig:
+                        l1 = l.rstrip()
+                        # One of the sections?
+                        if re_user_dirs.match(l1):
+                            p_state = 1
+                        elif re_global_dirs.match(l1):
+                            p_state = 2
+                        elif re.match('^\s+\w', l1):
+                            # prefix attribute?
+                            m = re_prefix.search(l1)
+                            if m:
+                                if p_state == 1:
+                                    user_prefix = m.group(1)
+                                elif p_state == 2:
+                                    global_prefix = m.group(1)
+                            # bindir attribute?
+                            m = re_bindir.search(l1)
+                            if m:
+                                if p_state == 1:
+                                    user_bindir = m.group(1)
+                                elif p_state == 2:
+                                    global_bindir = m.group(1)
+                        elif re_section.match(l1):
+                            p_state = 0
+
+            except IOError as e:
+                # Silently fail.
+                pass
+
+            return [ os.path.join(user_prefix, user_bindir)
+                   , os.path.join(global_prefix, global_bindir)
+                   ]
+
         ext_env = dict(os.environ)
         PATH = os.getenv('PATH') or ""
+        std_places = []
+        if get_setting_async('add_standard_dirs', False):
+            std_places = ["$HOME/.local/bin" if not isWinXX() else "%APPDATA%/local/bin"] + cabal_config()
+            std_places = list(filter(os.path.isdir, map(normalize_path, std_places)))
+
         add_to_PATH = list(map(normalize_path, get_setting_async('add_to_PATH', [])))
         if not PyV3:
-            # convert unicode strings to strings (for Python < 3) as env can contain only strings
-            add_to_PATH = map(str, add_to_PATH)
-        ext_env['PATH'] = os.pathsep.join(add_to_PATH + [PATH])
+            # convert unicode strings to strings (for Python < 3). Environment
+            # can contain only strings.
+            add_to_PATH = list(map(str, add_to_PATH))
+
+        add_to_PATH = list(filter(os.path.isdir, add_to_PATH))
+
+        print("std_places = {0}".format(std_places))
+        print("add_to_PATH = {0}".format(add_to_PATH))
+
+        ext_env['PATH'] = os.pathsep.join(add_to_PATH + std_places + [PATH])
         return ext_env
 
     @staticmethod
@@ -432,7 +530,7 @@ def list_files_in_dir_recursively(base_dir):
 
 
 def get_settings():
-    return sublime.load_settings("SublimeHaskell.sublime-settings")
+    return sublime.load_settings('SublimeHaskell.sublime-settings')
 
 
 def save_settings():
@@ -441,12 +539,8 @@ def save_settings():
 
 def get_setting(key, default=None):
     "This should be used only from main thread"
-    # Get setting
     result = get_settings().get(key, default)
-    # Key was not retrieved, save its value and add callback to auto-update
     with sublime_haskell_settings as settings:
-        if key not in settings:
-            get_settings().add_on_change(key, lambda: on_changed_setting(key))
         settings[key] = result
     return result
 
@@ -459,12 +553,13 @@ def on_changed_setting(key):
     "Updates setting as it was changed"
     with sublime_haskell_settings as settings:
         old_val = settings.get(key)
-    val = get_setting(key)
-    if (old_val is not None) and (old_val != val):
-        with sublime_settings_changes as changes:
-            if key in changes:
-                for fn in changes[key]:
-                    fn(key, val)
+        val = get_setting(key)
+        # print("on_changed_settings: key {0} -> val != old_val {1}".format(key, old_val != val))
+        if old_val is not None and old_val != val:
+            with sublime_settings_changes as changes:
+                if key in changes:
+                    for fn in changes[key]:
+                        fn(key, val)
 
 
 def get_setting_async(key, default=None):
@@ -619,7 +714,8 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal = None):
         if exit_code != 0:
             raise Exception("%s exited with status %d and stderr: %s" % (' '.join(command), exit_code, err))
 
-        return crlf2lf(out)
+        # return crlf2lf(out)
+        return out
 
     except OSError as e:
         if e.errno == errno.ENOENT:

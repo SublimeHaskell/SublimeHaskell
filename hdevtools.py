@@ -26,7 +26,8 @@ class DescriptorDrain(threading.Thread):
 
     def run(self):
         while not self.stop_me.is_set():
-            l = crlf2lf(decode_bytes(self.fd.readline())).rstrip()
+            # l = crlf2lf(decode_bytes(self.fd.readline())).rstrip()
+            l = decode_bytes(self.fd.readline()).rstrip()
             print('<{0}> {1}'.format(self.label, l))
 
     def stop(self):
@@ -64,8 +65,7 @@ def call_hdevtools_and_wait(arg_list, filename = None, cabal = None):
         if exit_code != 0:
             show_hdevtools_error_and_disable()
             raise Exception("hdevtools exited with status %d and stderr: %s" % (exit_code, err))
-
-        return crlf2lf(out)
+        return out
 
     except OSError as e:
         if e.errno == errno.ENOENT:

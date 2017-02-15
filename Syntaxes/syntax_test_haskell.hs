@@ -1,3 +1,4 @@
+-- SYNTAX TEST "syntax_test_haskell.hs"
 {-# LANGUAGE GADTs #-}
 
 module Arrays (
@@ -16,6 +17,8 @@ data Type = Type Int deriving
 a = "asdf"
 b = 2
 
+newtype Fribbles x = Fribbles x
+
 class Myclass a
   -- Class before where comment (PASS)
   where
@@ -27,6 +30,24 @@ myFunction1 = undefined
 
 myFunction2 :: Int -> String -- Type signature (PASS)
 myFunction2 = undefined
+
+myFunction2a :: Fribbles a -> ()
+myFunction2a a = undefined
+
+myFunction2b :: (Myclass a) => Fribbles a -> ()
+myFunction2b a = undefined
+
+myFunction3 :: Int            -- Multiline type signature (PASS)
+            -> String
+myFunction3 = undefined
+
+myFunction4 :: (Myclass a) => -- Multiline type signature w/constraint (PASS)
+               Fribbles a
+            -> String
+myFunction4 _v =
+  let
+      animaniac = 0
+  in  show animaniac
 
 mymodule -- function containing "module" (PASS)
   = undefined
@@ -58,10 +79,21 @@ instance Foo Int where
   foo 2 = 3
   foo _ = 4
 
+class (Eq a) => Bar a where
+  fob :: Int -> a
+
+
 keys'Mb -- should not detect `Mb` as a constructor ("constant") (PASS)
   = undefined
 
 data D where{A :: Int -> D; B :: D } -- A should be highlighted (PASS)
+
+
+{- Multiline block comment.
+
+   Last line has an -- inline comment indicator -}
+
+data MyCTor = MyCtor
 
 
 -- The following things shouldn't be comments but operators (PASS):
@@ -103,3 +135,11 @@ _ --⋆ _ = undefined
 --` _ = undefined
 --{ _ = undefined
 --} _ = undefined
+
+guarded_func x
+  | x == 0
+  = True
+  | x < 0
+  = False
+  | otherwise
+  = False
