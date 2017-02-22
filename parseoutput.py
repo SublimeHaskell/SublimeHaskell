@@ -143,13 +143,11 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
             if p.process is not None:
                 lines = []
                 for cmd_line in p.process.stdout:
-                    # line = crlf2lf(decode_bytes(cmd_line))
                     line = decode_bytes(cmd_line)
                     lines.append(line)
                     output_text(output_log, line)
                     output_log.show(output_log.size())  # Scroll to the end
                 exit_code = p.process.wait()
-                # stderr = crlf2lf(decode_bytes(p.process.stderr.read()))
                 stderr = decode_bytes(p.process.stderr.read())
 
     hide_panel(view.window(), panel_name = BUILD_LOG_PANEL_NAME)

@@ -39,6 +39,27 @@ IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']
 def python3():
     return PyV3
 
+def isWinXX():
+    return platform.system() == "Windows"
+
+
+def exeExts():
+    return [''] if not isWinXX() else ['.exe', '.cmd', '.bat']
+
+
+# Logging primitives
+log_error = 1
+log_warning = 2
+log_info = 3
+log_debug = 4
+log_trace = 5
+
+
+def log(message, level = log_info):
+    log_level = get_setting_async('log', log_info)
+    if log_level >= level:
+        print(u'Sublime Haskell: {0}'.format(message))
+
 
 def isWinXX():
     return platform.system() == "Windows"

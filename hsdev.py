@@ -552,7 +552,6 @@ class DescriptorDrain(threading.Thread):
 
     def run(self):
         while not self.stop_me.is_set():
-            # l = crlf2lf(decode_bytes(self.fd.readline())).rstrip()
             l = decode_bytes(self.fd.readline()).rstrip()
             print('<{0}> {1}'.format(self.label, l))
 
@@ -615,7 +614,6 @@ class HsDev(object):
             return None
 
         while True:
-            # output = crlf2lf(decode_bytes(p.process.stdout.readline()))
             output = decode_bytes(p.process.stdout.readline())
             m = re.match(r'^.*?hsdev> Server started at port (?P<port>\d+)$', output)
             if m:
@@ -1187,7 +1185,7 @@ def use_hsdev(def_val = None):
 class HsDevAgent(threading.Thread):
     sleep_timeout = 60.0  # agent sleeping timeout
     min_ver = [0, 2, 0, 0]  # minimal hsdev version
-    max_ver = [0, 2, 2, 0]  # maximal hsdev version
+    max_ver = [0, 2, 3, 0]  # maximal hsdev version
 
     def __init__(self):
         super(HsDevAgent, self).__init__()
