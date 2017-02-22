@@ -65,20 +65,6 @@ def isWinXX():
     return platform.system() == "Windows"
 
 
-# Logging primitives
-log_error = 1
-log_warning = 2
-log_info = 3
-log_debug = 4
-log_trace = 5
-
-
-def log(message, level = log_info):
-    log_level = get_setting_async('log', log_info)
-    if log_level >= level:
-        print(u'Sublime Haskell: {0}'.format(message))
-
-
 # unicode function
 def to_unicode(s):
     return s if PyV3 else unicode(s)
@@ -141,6 +127,7 @@ def preload_settings():
                , 'lint_check_fly_idle'
                , 'ghc_opts'
                , 'log'
+               , 'use_improved_syntax'
                ]:
         get_setting(key)
         with sublime_haskell_settings as settings:
@@ -330,7 +317,7 @@ class ProcHelper(object):
                     # well known file format... But now, they didn't. And they
                     # had to go with an indentation-specific format.
                     #
-                    # This is a "cheap and dirty" scanner to pick up 
+                    # This is a "cheap and dirty" scanner to pick up
                     for l in f_cconfig:
                         l1 = l.rstrip()
                         # One of the sections?
@@ -367,7 +354,7 @@ class ProcHelper(object):
         ext_env = dict(os.environ)
         PATH = os.getenv('PATH') or ""
         std_places = []
-        if get_setting_async('add_standard_dirs', False):
+        if get_setting_async('add_standard_dirs', True):
             std_places = ["$HOME/.local/bin" if not isWinXX() else "%APPDATA%/local/bin"] + cabal_config()
             std_places = list(filter(os.path.isdir, map(normalize_path, std_places)))
 

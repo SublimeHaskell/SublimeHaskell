@@ -52,6 +52,13 @@
 	// (https://github.com/haskell/cabal/issues/1176, cabal 1.16).
 	"auto_build_mode": "normal-then-warnings",
 
+	// Use the improved/alternate Haskell syntax?
+	//
+	// SublimeHaskell ships with an improved/alternate syntax highlighter. If this setting
+	// 'true', Haskell files will use the new highlighter. If false, Haskell files will
+	// revert to the Haskell highlighter shipped with ST.
+	"use_improved_syntax": true,
+
 	// Show output window on clean/configure/build/install:
 	"show_output_window": true,
 
@@ -61,12 +68,13 @@
 	// Add the "standard" directories where cabal and stack install executables,
 	// if they exist, in the following order (top to bottom):
 	//
-	// $HOME/.local/bin                       | %APPDATA%/local/bin
-	// user bindir from $HOME/.cabal/config   | %APPDATA%/cabal/config
-	// global bindir from $HOME/.cabal/config | %APPDATA%/cabal/config
-	// 
-	// The defaults for the user and global bindirs are:
+	// stack's install dir
+	// user bindir from $HOME/.cabal/config (*nix) or  %APPDATA%/cabal/config (WinXX)
+	// global bindir from $HOME/.cabal/config (*nix) or %APPDATA%/cabal/config (WinXX)
 	//
+	// The defaults are:
+	//
+	// stack:  {$HOME/.local|%APPDATA%/local}/bin
 	// user:   {$HOME/.cabal|%APPDATA%/cabal}/bin
 	// global: {/usr/local|%PROGRAMFILES%/Haskell}/bin
 	"add_standard_dirs": true,
@@ -78,6 +86,10 @@
 	// Note: You can use environment variables here, e.g., $HOME and %APPDATA%.
 	// Only "%something%" will work on Windows platforms. You can also use the
 	// tilde ("~") as an abbreviation for your home directory.
+	//
+	// If used in combination with "add_standard_dirs", PATH is:
+	//
+	//   [add_to_PATH directories] + [standard_dirs] + [PATH]
 	"add_to_PATH": [],
 
 	// Inhibit default Sublime word completions

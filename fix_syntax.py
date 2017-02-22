@@ -10,17 +10,23 @@
 import sublime_plugin
 import os
 
+if int(sublime.version()) < 3000:
+    from sublime_haskell_common import get_settings_async
+else:
+    from SublimeHaskell.sublime_haskell_common import get_settings_async
+
 
 class DetectFileTypeCommand(sublime_plugin.EventListener):
 
     def on_load(self, view):
-        filename = view.file_name()
-        if not filename:  # buffer has never been saved
-            return
+        if get_settings_async('use_improved_syntax', True):
+            filename = view.file_name()
+            if not filename:  # buffer has never been saved
+                return
 
-        name = os.path.basename(filename.lower())
-        if name.endswith(".hs") or name.endswith(".hsc"):
-            set_our_syntax(view, filename)
+            name = os.path.basename(filename.lower())
+            if name.endswith(".hs") or name.endswith(".hsc"):
+                set_our_syntax(view, filename)
         # TODO Do we also have to fix Literate Haskell?
 
 
