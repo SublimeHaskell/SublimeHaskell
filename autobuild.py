@@ -6,9 +6,11 @@ import threading
 import time
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import get_cabal_project_dir_and_name_of_view, get_setting, get_setting_async, is_haskell_source, LockedObject
+    from sublime_haskell_common import get_cabal_project_dir_and_name_of_view, get_setting, get_setting_async, \
+        is_haskell_source, LockedObject
 else:
-    from SublimeHaskell.sublime_haskell_common import get_cabal_project_dir_and_name_of_view, get_setting, get_setting_async, is_haskell_source, LockedObject
+    from SublimeHaskell.sublime_haskell_common import get_cabal_project_dir_and_name_of_view, get_setting, get_setting_async, \
+        is_haskell_source, LockedObject
 
 
 class SublimeHaskellAutobuild(sublime_plugin.EventListener):
@@ -79,7 +81,7 @@ class FlyCheckLint(threading.Thread):
                 self.event.clear()
                 time.sleep(delay)
                 continue
-            
+
             if time.time() - mtime_ < delay:  # Was modified recently, sleep more
                 time.sleep(delay)
                 continue

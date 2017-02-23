@@ -124,7 +124,7 @@ repository:
     begin: ^(\s*)(data|newtype)\s+([A-Z][\w']*)?
     beginCaptures:
       '2': {name: keyword.declaration.data.haskell}
-      '3': {name: entity.name.type.haskell}
+      '3': {name: constant.other.haskell entity.name.class.haskell}
     end: ^(?!\1\s)
     patterns:
     - name: keyword.declaration.data.haskell

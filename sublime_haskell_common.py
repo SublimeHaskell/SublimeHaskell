@@ -43,10 +43,6 @@ def isWinXX():
     return platform.system() == "Windows"
 
 
-def exeExts():
-    return [''] if not isWinXX() else ['.exe', '.cmd', '.bat']
-
-
 # Logging primitives
 log_error = 1
 log_warning = 2
@@ -188,7 +184,7 @@ def head_of(l):
 def decode_bytes(s):
     if s is None:
         return None
-    return s if PyV3 else s.decode('utf-8')
+    return s if (PyV3 and isinstance(s, str)) else s.decode('utf-8')
 
 
 def encode_bytes(s):
@@ -205,7 +201,7 @@ class ProcHelper(object):
     """Command and tool process execution helper."""
 
     # Tool name -> executable path cache. Avoids probing the file system multiple times.
-    which_cache = { }
+    which_cache = LockedObject({})
     # Augmented environment for the subprocesses. Specifically, we really want
     # to augment the user's PATH used to search for executables and tools:
     augmented_env = None
@@ -224,12 +220,17 @@ class ProcHelper(object):
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             popen_kwargs['startupinfo'] = startupinfo
 
+        # Allow caller to specify something different for stdout or stderr -- provide
+        # the default here if unspecified.
+        if popen_kwargs.get('stdout') is None:
+            popen_kwargs['stdout'] = subprocess.PIPE
+        if popen_kwargs.get('stderr') is None:
+            popen_kwargs['stderr'] = subprocess.PIPE
+
         try:
             normcmd = ProcHelper.which(command, ProcHelper.augmented_env['PATH'])
             if normcmd is not None:
                 self.process = subprocess.Popen(normcmd
-                                               , stdout=subprocess.PIPE
-                                               , stderr=subprocess.PIPE
                                                , stdin=subprocess.PIPE
                                                , env=ProcHelper.augmented_env
                                                , universal_newlines=True
@@ -237,20 +238,33 @@ class ProcHelper(object):
                                                )
 
                 self.process.stdin.write(encode_bytes(input_string))
-                self.process.stdin.flush()
             else:
                 self.process = None
                 self.process_err = "SublimeHaskell.ProcHelper: {0} was not found on PATH!".format(command[0])
 
         except OSError as e:
-            self.process = None
-            self.process_err = "SublimeHaskell: {0} was not found!\n'{1}' is set to False".format(tool_name, tool_enabled(tool_name))
-            if e.errno == errno.ENOENT:
-                # Just paranoia
-                self.cleanup()
+            self.process_err = \
+                '\n'.join([ "SublimeHaskell: Problem executing '{0}'".format(' '.join(command))
+                          , 'Operating system error: {0}'.format(e)
+                          ])
 
-            # Other consumers want this exception
-            raise e
+            if e.errno == errno.EPIPE:
+                # Most likely reason: subprocess output a usage message
+                stdout, stderr = self.process.communicate()
+                exit_code = self.process.wait()
+                self.process_err = self.process_err + \
+                    '\n'.join([ ''
+                              , 'Process exit code: {0}'.format(exit_code)
+                              , ''
+                              , "output:"
+                              , stdout if stdout and len(stdout) > 0 else "--no output--"
+                              , ''
+                              , 'error:'
+                              , stderr if stderr and len(stderr) > 0 else "--no error output--"])
+                self.process = None
+            else:
+                self.process = None
+                raise e
 
     # 'with' statement support:
     def __enter__(self):
@@ -264,7 +278,9 @@ class ProcHelper(object):
         if self.process is not None:
             self.process.stdin.close()
             self.process.stdout.close()
-            self.process.stderr.close()
+            if self.process.stderr is not None:
+                # stderr can be None if it is tied to stdout (i.e., 'stderr=subprocess.STDOUT')
+                self.process.stderr.close()
 
     def wait(self):
         """Wait for subprocess to complete and exit, collect and decode ``stdout`` and ``stderr``, returning the tuple
@@ -281,6 +297,9 @@ class ProcHelper(object):
     # Update the augmented environment when `add_to_PATH` or `add_standard_dirs` change.
     @staticmethod
     def update_environment(key, val):
+        # Reinitialize the tool -> path cache:
+        with ProcHelper.which_cache as c:
+            c = { }
         ProcHelper.augmented_env = ProcHelper.get_extended_env()
 
     # Generate the augmented environment for subprocesses. This copies the
@@ -377,10 +396,11 @@ class ProcHelper(object):
         def is_exe(fpath):
             return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 
-        cval = ProcHelper.which_cache.get(args[0])
+        with ProcHelper.which_cache as c:
+            cval = c.get(args[0])
+
         if cval is not None:
-            args[0] = cval
-            return args
+            return [cval] + args[1:]
         else:
             exeExts = [''] if not isWinXX() else ['.exe', '.cmd', '.bat']
 
@@ -395,9 +415,9 @@ class ProcHelper(object):
                     for ext in exeExts:
                         exe_file = os.path.join(path, program)
                         if is_exe(exe_file + ext):
-                            ProcHelper.which_cache[program] = exe_file
-                            args[0] = exe_file
-                            return args
+                            with ProcHelper.which_cache as c:
+                                c[program] = exe_file
+                            return [exe_file] + args[1:]
 
         return None
 
@@ -1223,24 +1243,6 @@ def plugin_loaded():
 
 if int(sublime.version()) < 3000:
     plugin_loaded()
-
-
-def create_process(command, **kwargs):
-    if subprocess.mswindows:
-        startupinfo = subprocess.STARTUPINFO()
-        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        kwargs['startupinfo'] = startupinfo
-
-    process = subprocess.Popen(
-        command,
-        stdout=subprocess.PIPE,
-        stdin=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        shell=False,
-        universal_newlines=True,
-        **kwargs)
-
-    return process
 
 
 class SublimeHaskellWindowCommand(sublime_plugin.WindowCommand):

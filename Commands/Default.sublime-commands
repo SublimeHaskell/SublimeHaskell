@@ -94,6 +94,14 @@
         "command": "sublime_haskell_stylish"
     },
     {
+        "caption": "SublimeHaskell: HIndent",
+        "command": "sublime_haskell_hindent"
+    },
+    {
+        "caption": "SublimeHaskell: Stack Exec",
+        "command": "sublime_haskell_stack_exec"
+    },
+    {
         "caption": "SublimeHaskell: Go to declaration",
         "command": "sublime_haskell_go_to_declaration"
     },

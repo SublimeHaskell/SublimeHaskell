@@ -354,7 +354,7 @@
 				<key>3</key>
 				<dict>
 					<key>name</key>
-					<string>entity.name.type.haskell</string>
+					<string>constant.other.haskell entity.name.class.haskell</string>
 				</dict>
 			</dict>
 			<key>end</key>

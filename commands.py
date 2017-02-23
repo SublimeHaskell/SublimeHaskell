@@ -1,5 +1,6 @@
 import json
 import os.path
+import shlex
 import sublime
 import sublime_plugin
 import webbrowser
@@ -1207,3 +1208,57 @@ class SublimeHaskellReplaceRegions(sublime_plugin.TextCommand):
             rs = self.view.get_regions('sublime_haskell_replace_regions')
             self.view.replace(edit, rs[i], text)
         self.view.erase_regions('sublime_haskell_replace_regions')
+
+
+class SublimeHaskellStackExec(sublime_plugin.TextCommand):
+    """Execute a command via `stack exec`, displaying the stdout and stderr live in the SublimeHaskell output window.
+    This utility command understands basic shell argument lexing, which allows quotes arounds arguments (especially needed
+    when using path names containing spaces.)"""
+
+    OUTPUT_PANEL_NAME = 'haskell_run_output'
+
+    def run(self, edit):
+        win = self.view.window()
+        win.show_input_panel('stack exec --', '', self.stack_exec, None, None)
+
+    def stack_exec(self, arg):
+        cmdargs = ['stack', 'exec', '--'] + shlex.split(arg)
+        window = self.view.window()
+        runv = window.get_output_panel(SublimeHaskellStackExec.OUTPUT_PANEL_NAME)
+        runv.run_command('select_all')
+        runv.run_command('right_delete')
+        runv.sel().add(sublime.Region(0, 0))
+        pretty_cmdargs = 'Running \'{0}\''.format(' '.join(cmdargs))
+        runv.run_command('insert', {'characters': '{0}\n{1}\n'.format(pretty_cmdargs, '-' * len(pretty_cmdargs))})
+        window.run_command('show_panel', {'panel': 'output.' + SublimeHaskellStackExec.OUTPUT_PANEL_NAME})
+        ShowStdout(runv, cmdargs).start()
+
+    def show_output_panel(self):
+        return output_view
+
+class ShowStdout(threading.Thread):
+    """Show a process' stdout in an output window. Assumes that stderr is tied to stdout."""
+
+    def __init__(self, panel, cmdargs):
+        super(ShowStdout, self).__init__(name = 'show-stdout-runner')
+        self.panel = panel
+        self.cmdargs = cmdargs
+
+    def run(self):
+        panel_settings = self.panel.settings()
+        autoindent = panel_settings.get('auto_indent')
+        panel_settings.set('auto_indent', False)
+
+        with ProcHelper(self.cmdargs, stderr = subprocess.STDOUT) as p:
+            if p.process is not None:
+                # readine has a size argument to make it more reactive...
+                try:
+                    for l in p.process.stdout:
+                        self.panel.run_command('insert', {'characters': l})
+                except ValueError as ve:
+                    pass
+
+                exit_code = p.process.wait()
+                self.panel.run_command('insert', {'characters': '\n\nExit code: {0}'.format(exit_code)})
+
+        panel_settings.set('auto_indent', auto_indent)
