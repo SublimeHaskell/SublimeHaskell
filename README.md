@@ -10,89 +10,108 @@ README
 
 ![look](Themes/info+repl.png)
 
-Requirements
-------------
+Quick link ==> SublimeHaskell's [Documentation](SubHaskEditing.md)
 
-Necessary:
+Setup
+-----
 
-* ghc and a recent Haskell Platform (>= 2012 should do fine)
-* cabal
-* [hsdev](http://hackage.haskell.org/package/hsdev) cabal package (`cabal install hsdev`) for inspection, enhanced completion, goto, symbol info etc.
+### Required (Before You Install SublimeHaskell)
 
-Not necessary, but useful:
+You will need to install the GHC Haskell compiler, the `cabal` build tool and a backend before you install SublimeHaskell.
 
-* [SublimeREPL](https://github.com/wuub/SublimeREPL) package for repl commands
-* [stylish-haskell](https://github.com/jaspervdj/stylish-haskell) (for code prettification, `cabal install stylish-haskell`)
+* [The Glorious Haskell Computer (ghc)](https://www.haskell.org/downloads). Preferably, you should install the Haskell Platform if you don't already have a Haskell development and hacking environment set up.
+* [cabal](https://www.haskell.org/cabal/). Under normal circumstances, `cabal` should come pre-installed with your Haskell environment, e.g., if you installed the Haskell Platform.
+* A backend. SublimeHaskell communicates with the backend to support the interesting editing features. The preferred backend is `hsdev`. You can use one of the deprecated backends, __but know that support for these backends may be dropped or removed in a future SublimeHaskell release.__
+  * [hsdev](http://hackage.haskell.org/package/hsdev) cabal package (`cabal install hsdev`) for inspection, enhanced completion, goto, symbol info etc.
+  * Deprecated backends
+    * [ghc-mod](http://hackage.haskell.org/package/ghc-mod) (for import and LANGUAGE completions and type inference, `cabal install ghc-mod`, not used if `hsdev` enabled, `ghc-mod` is used by `hsdev` as a library)
+    * [hdevtools](https://github.com/bitc/hdevtools) (or [fork for windows](https://github.com/mvoidex/hdevtools)) (for type inference, `cabal install hdevtools`, not used if `hsdev` enabled)
 
-Deprecated:
+### Install SublimeHaskell
 
-* [ghc-mod](http://hackage.haskell.org/package/ghc-mod) (for import and LANGUAGE completions and type inference, `cabal install ghc-mod`, not used if `hsdev` enabled, `ghc-mod` is used by `hsdev` as a library)
-* [hdevtools](https://github.com/bitc/hdevtools) (or [fork for windows](https://github.com/mvoidex/hdevtools)) (for type inference, `cabal install hdevtools`, not used if `hsdev` enabled)
+1. Get Sublime Text: <http://www.sublimetext.com/>
+2. Install the Sublime Package Control package: <http://wbond.net/sublime_packages/package_control/installation>
+3. Use Package Control to install SublimeHaskell
 
-Binaries:
+Open a Haskell source file, `cabal` builder file or a `stack.yaml` builder and have a productive Haskell development session!
 
-* If your `cabal`, `ghc-mod`, `ghc` etc. are not installed in a system PATH, you have to adjust SublimeHaskell's `add_to_PATH` setting.
+### Optional Tools
 
-There are also [special theme](Themes/Hasky%20\(Dark\).gif) with enhanced haskell entities and marks (errors, warnings and hints) coloring<br>
-Note different coloring for types and constructors (in import list, data declaration etc.), special coloring of generic variables in types, pragmas and module imports
+* [stack](https://docs.haskellstack.org/en/stable/README/). The Haskell Tool Stack. If you installed the Haskell Platform, you already have this installed. `stack` is a companion Haskell build tool that supplements `cabal`.
+* [SublimeREPL](https://github.com/wuub/SublimeREPL) package for REPL support, if you want to interact with GHCI from within SublimeText.
+* Code prettifier:
+  * [stylish-haskell](https://github.com/jaspervdj/stylish-haskell) (`cabal install stylish-haskell`)
+  * [hindent](https://github.com/commercialhaskell/hindent) (`cabal install hindent`)
+
+### Tool Installation Location
+
+Tools (`cabal`, `hsdev`, `ghc-mod`, `ghc`, etc.) are usually installed in a directory that is already added to your `PATH` environment variable. SublimeHaskell will also look for these tools in several _"Haskell standard"_ places. These places include:
+
+| Builder      | *nix Platforms     | Windows                      |
+| ------------ | ------------------ | ---------------------------- |
+| stack        | `$HOME/.local/bin` | `%APPDATA%/local/bin`        |
+| cabal user   | `$HOME/.cabal/bin` | `%APPDATA/cabal/bin`         |
+| cabal global | `/usr/local/bin`   | `%PROGRAMFILES%/Haskell/bin` |
+
+More advanced users can configure `cabal`'s _user_ and _global_ install paths in `$HOME/.cabal/config`. SublimeHaskell will use these values if configured and if the directories to which they refer exist.
+
+If you have a non-standard installation location for your tools, you can configure this in SublimeHaskell's _"User Settings"_ by adjusting `add_to_PATH`. You will have to restart SublimeText after you save your preferences.
+
+### SublimeHaskell Theme
+
+There is a [special theme](Themes/Hasky%20\(Dark\).gif) with enhanced Haskell entities and marks (errors, warnings and hints) coloring. Note different coloring for types and constructors (in import list, data declaration etc.), special coloring of generic variables in types, pragmas and module imports
 
 ![compare](Themes/Hasky%20\(Dark\).small.gif)
 
-Installation
-------------
+Quickstart
+----------
 
-1. Get Sublime Text 2/3: <http://www.sublimetext.com/>
-2. Install the Sublime Package Control package: <http://wbond.net/sublime_packages/package_control/installation>
-3. Use Package Control to install this package (SublimeHaskell)
+- Open the SublimeText Command Palette ( `Ctrl-Shift-P` or `Option-Command-P` on OS X) and type `haskell` to explore SublimeHaskell's goodness.
 
-Usage
------
+- When editing Haskell source files, automatic error highlighting and enhanced auto-completion is available.
 
-In short: Press `shift-ctrl-p` and type `haskell` to explore all commands.
+- Each time you save, any errors in your program will be listed at the bottom of the window and highlighted in the source code.
 
-When editing Haskell source files, automatic error highlighting and enhanced auto-completion is available.
+- All source files in the project are scanned on change. Any symbols that they export are provided in the auto-complete suggestions.
 
-Each time you save, any errors in your program will be listed at the bottom of the window and highlighted in the source code.
+- Stylish-haskell can be used to stylish file or selected text.
 
-All source files in the project are scanned on change. Any symbols that they export are provided in the auto-complete suggestions.
+- Use `F12` to go to declaration and `ctrl+k ctrl+i` to show symbol info with documentation. These commands are also available through context menu with right-click.
 
-Stylish-haskell can be used to stylish file or selected text.
+- To show inferred types use `Show type` (`ctrl-k ctrl-h ctrl-t`) command.
 
-Use `f12` to go to declaration and `ctrl+k ctrl+i` to show symbol info with documentation. These command are also available through context menu with right-click.
+- To insert inferred type use `Insert type` (`ctrl-k ctrl-h ctrl-i`).
 
-To show inferred types use `Show type` (`ctrl-k ctrl-h ctrl-t`) command.
+- You can jump between the errors and warnings with `alt+d alt+e` and `alt+shift+d alt+shift+e`.
 
-To insert inferred type use `Insert type` (`ctrl-k ctrl-h ctrl-i`).
+- To show hidden error output, use command `Show error panel` (`ctrl-alt-e`)
 
-You can jump between the errors and warnings with `alt+d alt+e` and `alt+shift+d alt+shift+e`.
-To show hidden error output, use command `Show error panel` (`ctrl-alt-e`)
+Features and SublimeHaskell Goodness
+------------------------------------
 
-Stack support
----
+### Stack support
 
 Build commands such as `Build`, `Clean`, `Install`, `Rebuild` uses `stack` if there is `stack.yaml` near `.cabal`. If you don't want to use `stack`, set `haskell_build_tool` setting to `cabal`.
 
 `hsdev` uses `stack` to build dependencies and to get corresponding package-dbs. Since `0.1.7.2` it passes `--compiler` and `--arch` options to `stack` to get package-dbs built with `hsdev`-compatible compiler.
 
-Enhanced completion
----
+### Enhanced completion
 
 Works in export list (showing symbols in scope), import list, expressions. Completes after module qualifier (several modules can be `import qualified as` with same qualifier). Takes into account module reexports for sources.
 ![Autocompletion](Commands/Autocompletion.gif)
 
-Popup
----
-Show popup with symbol info and with error/warning/hint details. Requires SublimeText 3 dev build > 3116 (https://forum.sublimetext.com/t/dev-build-3116/21148).
+### Popups
+
+- Show popup with symbol info and with error/warning/hint details. Requires SublimeText 3 dev build > 3116 (https://forum.sublimetext.com/t/dev-build-3116/21148).
 ![Hover](Commands/Hover.gif)
 
-It also shows inferred type when possible
+- It also shows inferred type when possible
 ![HoverTypes](Commands/HoverTypes.gif)
 
-And you can autofix warnings/hints on popup for warnings/hints
+- And you can autofix warnings/hints on popup for warnings/hints
 ![AutoFixHover](Commands/AutoFixHover.gif)
 
-Commands:
----
+### Commands:
 
 * `SublimeHaskell: Insert import for symbol` — add import for declaration
 ![InsertImport](Commands/InsertImport.gif)
@@ -146,64 +165,6 @@ Commands:
   * `SublimeHaskell: Go to previous error` — go to previous error in file, `alt+shift+d alt+shift+e`
   * `SublimeHaskell: Show error panel` — show error panel if it was hidden, `ctrl+alt+e`
 
-Build Systems
--------------
-
-You don't have to use SublimeHaskell's built-in build functionality.
-
-If you prefer, you can disable them in the settings, and use plain Sublime Build Systems:
-
-### cabal
-
-Save this to your `~/.config/sublime-text-2/Packages/User/cabal-custom.sublime-build` to make a custom `cabal` build system:
-
-```json
-{
-  "cmd": ["cabal build --ghc-options='-O0 -hidir o0 -odir o0'"],  // append lib:myPackage or myexecutable here to only build certain cabal targets
-  "shell": true,
-  "file_regex": "^(\\S*?):(\\d+):(\\d+):$"  // this matches the output of ghc
-}
-```
-
-For more options, [look here](http://docs.sublimetext.info/en/latest/reference/build_systems.html).
-
-### hdevtools
-
-Save this to your `~/.config/sublime-text-2/Packages/User/hdevtools.sublime-build` to make `hdevtools` a build system:
-
-```json
-{
-  "cmd": ["/home/USERNAME/.cabal/bin/hdevtools", "check", "-g", "-Wall", "$file"],
-  "file_regex": "^(.*?):(\\d+):(\\d+):",
-  "selector": "source.haskell"
-}
-```
-
-### Using build system results
-
-You can then build with `Ctrl-B` and jump between the errors with (Shift-)`F4`.
-
-It is also useful to add this to your key bindings to redisplay the error panel at any time:
-
-```json
-  { "keys": ["ctrl+alt+b"], "command": "show_panel", "args": {"panel": "output.exec"} }
-```
-
-Using other useful projects with SublimeText
---------------------------------------------
-
-### Jump-to-definition
-
-There are two kinds of jump-to-definition: Inside your project and outside your project.
-In any case, install the Sublime [`CTags`](https://github.com/SublimeText/CTags) package via Package Control,
-and `cabal install hasktags`.
-
-`CTags` expects the extended exuberant ctags format.
-
-#### Inside your project: hasktags
-
-* In your project, `hasktags --ctags --extendedctag .`
-* You can now jump to definitions inside your project (`Ctrl-T, Ctrl-T` is the default keybinding)
 
 #### Inside and outside your project: codex
 
@@ -217,11 +178,11 @@ and `cabal install hasktags`.
 * The commands `CTags: Show Symbols` and `CTags: Rebuild Tags` currently don't work with `codex`
 
 Credits
----
+-------
 
 Icons from [FlatIcon](http://www.flaticon.com).
 
 Error icon by [Eleonor Wang](http://www.flaticon.com/authors/eleonor-wang)<br>
 Warning icon by [Freepik](http://www.freepik.com)<br>
-Hint icon by [Gregor Cresnar](http://www.flaticon.com/authors/gregor-cresnar)
+Hint icon by [Gregor Cresnar](http://www.flaticon.com/authors/gregor-cresnar)<br>
 Wrench icon by [Gregor Cresnar](http://www.flaticon.com/authors/gregor-cresnar)
