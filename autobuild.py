@@ -7,10 +7,14 @@ import time
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import get_cabal_project_dir_and_name_of_view, get_setting, get_setting_async, \
-        is_haskell_source, LockedObject
+        is_haskell_source
+    from internals.locked_object import LockedObject
+    from internals.settings import get_setting_async
 else:
     from SublimeHaskell.sublime_haskell_common import get_cabal_project_dir_and_name_of_view, get_setting, get_setting_async, \
-        is_haskell_source, LockedObject
+        is_haskell_source
+    from SublimeHaskell.internals.locked_object import LockedObject
+    from SublimeHaskell.internals.settings import get_setting_async
 
 
 class SublimeHaskellAutobuild(sublime_plugin.EventListener):

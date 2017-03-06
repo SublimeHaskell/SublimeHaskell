@@ -173,5 +173,17 @@
     {
         "caption": "SublimeHaskell: Auto fix",
         "command": "sublime_haskell_auto_fix"
+    },
+    {
+        "caption": "SublimeHaskell: Backend: Start",
+        "command": "sublime_haskell_start_backend"
+    },
+    {
+        "caption": "SublimeHaskell: Backend: Stop",
+        "command": "sublime_haskell_stop_backend"
+    },
+    {
+        "caption": "SublimeHaskell: Backend: Restart",
+        "command": "sublime_haskell_restart_backend"
     }
 ]

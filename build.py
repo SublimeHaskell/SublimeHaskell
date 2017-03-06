@@ -7,10 +7,14 @@ from threading import Thread
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
+    from internals.proc_helper import ProcHelper
+    from internals.settings import get_setting_async
     from parseoutput import run_chain_build_thread
     import hsdev
 else:
     from SublimeHaskell.sublime_haskell_common import *
+    from SublimeHaskell.internals.proc_helper import ProcHelper
+    from SublimeHaskell.internals.settings import get_setting_async
     from SublimeHaskell.parseoutput import run_chain_build_thread
     import SublimeHaskell.hsdev as hsdev
 

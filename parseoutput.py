@@ -5,17 +5,22 @@ import os.path
 import re
 import sublime
 import time
-from sys import version
 from threading import Thread
 from collections import defaultdict
 
-PyV3 = version[0] == "3"
-
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
+    from internals.proc_helper import ProcHelper
+    from internals.settings import get_setting_async
+    from internals.utils import decode_bytes, PyV3
+    from internals.output_collector import OutputCollector
     import symbols
 else:
     from SublimeHaskell.sublime_haskell_common import *
+    from SublimeHaskell.internals.proc_helper import ProcHelper
+    from SublimeHaskell.internals.settings import get_setting_async
+    from SublimeHaskell.internals.utils import decode_bytes, PyV3
+    from SublimeHaskell.internals.output_collector import OutputCollector
     import SublimeHaskell.symbols as symbols
 
 # This regex matches an unindented line, followed by zero or more
@@ -139,25 +144,20 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
     output_log = output_panel(view.window(), '', panel_name = BUILD_LOG_PANEL_NAME, show_panel = get_setting_async('show_output_window'))
     for cmd in cmds:
         output_text(output_log, ' '.join(cmd) + '...\n')
-        with ProcHelper(cmd, cwd = cabal_project_dir) as p:
-            if p.process is not None:
-                lines = []
-                for cmd_line in p.process.stdout:
-                    line = decode_bytes(cmd_line)
-                    lines.append(line)
-                    output_text(output_log, line)
-                    output_log.show(output_log.size())  # Scroll to the end
-                exit_code = p.process.wait()
-                stderr = decode_bytes(p.process.stderr.read())
 
-    hide_panel(view.window(), panel_name = BUILD_LOG_PANEL_NAME)
+        # Don't tie stderr to stdout, since we're interested in the error messages
+        oc = OutputCollector(output_log, cmd, cwd = cabal_project_dir, tie_stderr = False)
+        oc.start()
+        exit_code, stderr = oc.wait()
 
-    errmsg = stderr
+    if len(stderr) > 0:
+        # We're going to show the errors in the output panel...
+        hide_panel(view.window(), panel_name = BUILD_LOG_PANEL_NAME)
 
     # Notify UI thread that commands are done
     sublime.set_timeout(on_done, 0)
 
-    parse_output_messages_and_show(view, msg, cabal_project_dir, exit_code, errmsg)
+    parse_output_messages_and_show(view, msg, cabal_project_dir, exit_code, stderr)
 
 
 def format_output_messages(messages):
@@ -228,7 +228,7 @@ def parse_output_messages_and_show(view, msg, base_dir, exit_code, stderr):
     if parsed_messages:
         outputs += [format_output_messages(parsed_messages)]
     if unparsable:
-        outputs += ["\nREMAINING STDERR:\n", unparsable]
+        outputs += ["Collected error output and messages:\n", unparsable]
 
     output_text = '\n'.join(outputs)
 

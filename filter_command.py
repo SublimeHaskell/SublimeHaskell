@@ -2,11 +2,13 @@
 import sublime
 
 if int(sublime.version()) < 3000:
-    import sublime_haskell_common as SH
+    from sublime_haskell_common import SublimeHaskellTextCommand
+    from internals.proc_helper import ProcHelper
 else:
-    import SublimeHaskell.sublime_haskell_common as SH
+    from SublimeHaskell.sublime_haskell_common import SublimeHaskellTextCommand
+    from SublimeHaskell.internals.proc_helper import ProcHelper
 
-class SublimeHaskellFilterCommand(SH.SublimeHaskellTextCommand):
+class SublimeHaskellFilterCommand(SublimeHaskellTextCommand):
     """Utility class to run filter-like commands, for example, 'stylish-haskell' and 'hindent'. Error/diagnostic
     output is sent to the Haskell Run Output window."""
     OUTPUT_PANEL_NAME = 'haskell_run_output'

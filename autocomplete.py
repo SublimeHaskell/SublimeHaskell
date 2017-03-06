@@ -7,11 +7,17 @@ import time
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
+    from internals.locked_object import LockedObject
+    from internals.settings import get_setting_async
+    from internals.utils import to_unicode
     from hdevtools import start_hdevtools, stop_hdevtools
     import hsdev
     from worker import run_async
 else:
     from SublimeHaskell.sublime_haskell_common import *
+    from SublimeHaskell.internals.locked_object import LockedObject
+    from SublimeHaskell.internals.settings import get_setting_async
+    from SublimeHaskell.internals.utils import to_unicode
     from SublimeHaskell.hdevtools import start_hdevtools, stop_hdevtools
     import SublimeHaskell.hsdev as hsdev
     from SublimeHaskell.worker import run_async

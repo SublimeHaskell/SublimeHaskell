@@ -6,7 +6,8 @@ import re
 from functools import total_ordering
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import is_enabled_haskell_command, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, get_ghc_opts, is_haskell_source, show_panel, hide_panel, head_of, get_setting_async
+    from sublime_haskell_common import is_enabled_haskell_command, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, get_ghc_opts, is_haskell_source, show_panel, hide_panel, head_of
+    from internals.settings import get_setting_async
     from autocomplete import get_qualified_symbol_at_region
     import hsdev
     from hdevtools import hdevtools_type
@@ -14,7 +15,8 @@ if int(sublime.version()) < 3000:
     from parseoutput import sublime_column_to_ghc_column, ghc_column_to_sublime_column
     from symbols import unicode_operators, use_unicode_operators
 else:
-    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, get_ghc_opts, is_haskell_source, show_panel, hide_panel, head_of, get_setting_async
+    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, get_ghc_opts, is_haskell_source, show_panel, hide_panel, head_of
+    from SublimeHaskell.internals.settings import get_setting_async
     from SublimeHaskell.autocomplete import get_qualified_symbol_at_region
     import SublimeHaskell.hsdev as hsdev
     from SublimeHaskell.hdevtools import hdevtools_type

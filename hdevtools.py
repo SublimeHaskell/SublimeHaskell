@@ -6,31 +6,18 @@ import threading
 
 if int(sublime.version()) < 3000:
     from sublime_haskell_common import *
+    from internals.proc_helper import ProcHelper
+    from internals.settings import get_setting_async
+    from internals.utils import decode_bytes
+    from internals.output_collector import DescriptorDrain
     from parseoutput import parse_info
 else:
     from SublimeHaskell.sublime_haskell_common import *
+    from SublimeHaskell.internals.proc_helper import ProcHelper
+    from SublimeHaskell.internals.settings import get_setting_async
+    from SublimeHaskell.internals.utils import decode_bytes
+    from SublimeHaskell.internals.output_collector import DescriptorDrain
     from SublimeHaskell.parseoutput import parse_info
-
-
-class DescriptorDrain(threading.Thread):
-    """Continually running thread that drains a Python file, sending everything read to stdout (which in ST's case
-    is a logging object)"""
-
-    ### This really belongs in sublime_haskell_common. But, since that module gets loaded later than this one OR
-    ### it gets reloaded, you end up with the dreaded super() TypeError.
-    def __init__(self, label, fd):
-        super(DescriptorDrain, self).__init__(name = 'drain-' + label)
-        self.label = label
-        self.fd = fd
-        self.stop_me = threading.Event()
-
-    def run(self):
-        while not self.stop_me.is_set():
-            l = decode_bytes(self.fd.readline()).rstrip()
-            print('<{0}> {1}'.format(self.label, l))
-
-    def stop(self):
-        self.stop_me.set()
 
 
 def show_hdevtools_error_and_disable():

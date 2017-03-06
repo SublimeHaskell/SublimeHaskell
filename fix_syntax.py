@@ -12,9 +12,9 @@ import sublime_plugin
 import os
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import get_setting_async
+    from internals.settings import get_setting_async
 else:
-    from SublimeHaskell.sublime_haskell_common import get_setting_async
+    from SublimeHaskell.internals.settings import get_setting_async
 
 
 class DetectFileTypeCommand(sublime_plugin.EventListener):
