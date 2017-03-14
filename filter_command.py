@@ -30,7 +30,7 @@ class SublimeHaskellFilterCommand(SH.SublimeHaskellTextCommand):
                 # Newline conversion seems dubious here, but... leave it alone for the time being.
                 sel_str = self.view.substr(selection).replace('\r\n', '\n')
 
-                with ProcHelper(self.indenter, sel_str) as p:
+                with SH.ProcHelper(self.indenter, sel_str) as p:
                     if p.process is not None:
                         exit_code, out, err = p.wait()
                         # stylish-haskell does not have a non-zero exit code if it errors out! (Surprise!)
