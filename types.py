@@ -1,5 +1,7 @@
 # -*- coding: UTF-8 -*-
 
+"""Haskell type display and query support"""
+
 import sublime
 import sublime_plugin
 import re
@@ -176,7 +178,7 @@ def get_type(view, filename, module_name, line, column, cabal = None):
 
     if get_setting_async('enable_hsdev'):
         # Convert from hsdev one-based locations to sublime zero-based positions
-        ts = get_types(filename, cabal = cabal)
+        ts = get_types(filename, cabal=cabal) or []
         pt = FilePosition(line, column).point(view)
         return sorted_types(view, ts, pt)
     column = sublime_column_to_ghc_column(view, line, column)

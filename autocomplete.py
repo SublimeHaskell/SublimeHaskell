@@ -1,4 +1,7 @@
 # -*- coding: UTF-8 -*-
+# pyline: disable=todo
+
+"""SublimeHaskell autocompletion support."""
 
 import re
 import sublime
@@ -62,7 +65,7 @@ def get_flags_pragmas():
 
 
 def sort_completions(comps):
-    comps.sort(key = lambda k: k[0])
+    comps.sort(key=lambda k: k[0])
 
 
 def sorted_completions(comps):
@@ -70,11 +73,12 @@ def sorted_completions(comps):
 
 
 def make_completions(suggestions):
-    return sorted_completions([s.suggest() for s in (suggestions or [])])
+    return sorted_completions([s.suggest() for s in suggestions or []])
 
 
 def make_locations(comps):
-    return sorted([[s.brief(), s.get_source_location()] for s in comps if s.has_source_location()], key = lambda k: k[0])
+    return sorted([[s.brief(), s.get_source_location()] for s in comps if s.has_source_location()],
+                  key=lambda k: k[0])
 
 
 class CompletionCache(object):
@@ -109,14 +113,16 @@ class AutoCompletion(object):
         self.language_pragmas = []
         self.flags_pragmas = []
 
-        # cabal name => set of modules, where cabal name is 'cabal' for cabal or sandbox path for cabal-devs
+        # cabal name => set of modules, where cabal name is 'cabal' for cabal or sandbox path
+        # for cabal-devs
         self.module_completions = LockedObject({})
 
         # keywords
         # TODO: keywords can't appear anywhere, we can suggest in right places
         self.keyword_completions = list(map(
             lambda k: (k + '\tkeyword', k),
-            ['do', 'case', 'of', 'let', 'in', 'data', 'instance', 'type', 'newtype', 'where', 'deriving', 'import', 'module']))
+            ['do', 'case', 'of', 'let', 'in', 'data', 'instance', 'type', 'newtype', 'where',
+             'deriving', 'import', 'module']))
 
         self.current_filename = None
 
@@ -128,10 +134,10 @@ class AutoCompletion(object):
         self.wide_completion = view
 
     @hsdev.use_hsdev([])
-    def get_completions_async(self, file_name = None):
+    def get_completions_async(self, file_name=None):
         def log_result(r):
             log('completions: {0}'.format(len(r or [])), log_trace)
-            return (r or [])
+            return r or []
         none_comps = []
         update_cabal = False
         update_sources = False
@@ -155,15 +161,19 @@ class AutoCompletion(object):
             return log_result(none_comps)
         else:
             log('preparing completions for {0}'.format(file_name), log_debug)
-            current_module = head_of(hsdev.client_back.module(file = file_name))
+            current_module = head_of(hsdev.client_back.module(file=file_name))
             if current_module:
                 comps = make_completions(
-                    hsdev.client_back.complete('', file_name, timeout = None))
+                    hsdev.client_back.complete('', file_name, timeout=None))
 
-                # Get imports names
-                # Note, that if module imported with 'as', then it can be used only with its synonym instead of full name
-                import_names.extend([('{0}\tmodule {1}'.format(i.import_as, i.module), i.import_as) for i in current_module.imports if i.import_as])
-                import_names.extend([('{0}\tmodule'.format(i.module), i.module) for i in current_module.imports if not i.import_as])
+                # Get import names
+                #
+                # Note, that if module imported with 'as', then it can be used only with its synonym
+                # instead of full name
+                import_names.extend([('{0}\tmodule {1}'.format(i.import_as, i.module), i.import_as)
+                                     for i in current_module.imports if i.import_as])
+                import_names.extend([('{0}\tmodule'.format(i.module), i.module)
+                                     for i in current_module.imports if not i.import_as])
 
                 comps.extend(import_names)
                 sort_completions(comps)
@@ -172,7 +182,7 @@ class AutoCompletion(object):
             cache_.files[file_name] = comps
             return log_result(cache_.files[file_name])
 
-    def drop_completions_async(self, file_name = None):
+    def drop_completions_async(self, file_name=None):
         log('drop prepared completions')
         with self.cache as cache_:
             if file_name is None:
@@ -216,34 +226,41 @@ class AutoCompletion(object):
             self.wide_completion = None
 
         if qsymbol.module:
-            current_module = head_of(hsdev.client.module(file = current_file_name))
+            current_module = head_of(hsdev.client.module(file=current_file_name))
             current_project = None
             if current_module:
                 current_project = current_module.location.project
                 if qsymbol.is_import_list:
                     if current_project:
                         # Search for declarations of qsymbol.module within current project
-                        q_module = head_of(hsdev.client.scope_modules(file = current_file_name, input = qsymbol.module, search_type = 'exact'))
+                        q_module = head_of(hsdev.client.scope_modules(file=current_file_name,
+                                                                      input=qsymbol.module,
+                                                                      search_type='exact'))
                         if q_module.by_source():
-                            proj_module = hsdev.client.resolve(file = q_module.location.filename, exports = True)
+                            proj_module = hsdev.client.resolve(file=q_module.location.filename,
+                                                               exports=True)
                             if proj_module:
                                 suggestions = proj_module.declarations.values()
                         elif q_module.by_cabal():
-                            cabal_module = head_of(hsdev.client.module(q_module.name, search_type = 'exact', package = q_module.location.package.name))
+                            cabal_module = head_of(hsdev.client.module(q_module.name,
+                                                                       search_type='exact',
+                                                                       package=q_module.location.package.name))
                             if cabal_module:
                                 suggestions = cabal_module.declarations.values()
                 else:
-                    suggestions = hsdev.client.complete(qualified_prefix, current_file_name, wide = wide)
+                    suggestions = hsdev.client.complete(qualified_prefix, current_file_name,
+                                                        wide=wide)
             return self.keyword_completions + make_completions(suggestions)
         else:
             with self.cache as cache_:
                 if wide:
                     return self.keyword_completions + cache_.global_completions()
                 else:
-                    return self.keyword_completions + cache_.files.get(current_file_name, cache_.global_completions())
+                    return self.keyword_completions + cache_.files.get(current_file_name,
+                                                                       cache_.global_completions())
 
     @hsdev.use_hsdev([])
-    def completions_for_module(self, module, filename = None):
+    def completions_for_module(self, module, filename=None):
         """
         Returns completions for module
         """
@@ -251,18 +268,18 @@ class AutoCompletion(object):
             return []
         ms = []
         if filename:
-            ms = hsdev.client.scope_modules(filename, input = module, search_type = 'exact')
+            ms = hsdev.client.scope_modules(filename, input=module, search_type='exact')
         m = head_of(hsdev.client.module(
-            input = module,
-            search_type = 'exact',
-            file = ms[0].location.filename if ms and ms[0].by_source() else None,
-            db = ms[0].location.db if ms and ms[0].by_cabal() else None,
-            package = ms[0].location.package.name if ms and ms[0].by_cabal() else None))
+            input=module,
+            search_type='exact',
+            file=ms[0].location.filename if ms and ms[0].by_source() else None,
+            db=ms[0].location.db if ms and ms[0].by_cabal() else None,
+            package=ms[0].location.package.name if ms and ms[0].by_cabal() else None))
         if not m:
             return []
         return make_completions(m.declarations.values())
 
-    def completions_for(self, module_name, filename = None):
+    def completions_for(self, module_name, filename=None):
         """
         Returns completions for module
         """
@@ -323,7 +340,7 @@ class AutoCompletion(object):
         return []
 
     @hsdev.use_hsdev([])
-    def get_module_completions_for(self, qualified_prefix, modules = None, current_dir = None):
+    def get_module_completions_for(self, qualified_prefix, modules=None, current_dir=None):
         def module_next_name(mname):
             """
             Returns next name for prefix
@@ -333,11 +350,12 @@ class AutoCompletion(object):
             # Sublime replaces full module name with suffix, if it contains no dots?
             return suffix[0]
 
-        module_list = modules if modules else self.get_current_module_completions(current_dir = current_dir)
-        return list(set((module_next_name(m) + '\tmodule', module_next_name(m)) for m in module_list if m.startswith(qualified_prefix)))
+        module_list = modules if modules else self.get_current_module_completions(current_dir=current_dir)
+        return list(set((module_next_name(m) + '\tmodule', module_next_name(m))
+                        for m in module_list if m.startswith(qualified_prefix)))
 
     @hsdev.use_hsdev([])
-    def get_current_module_completions(self, current_dir = None):
+    def get_current_module_completions(self, current_dir=None):
         """
         Get modules, that are in scope of file/project
         In case of file we just return 'scope modules' result
@@ -348,17 +366,17 @@ class AutoCompletion(object):
         if self.current_filename:
             return set([m.name for m in hsdev.client.scope_modules(self.current_filename)])
         elif current_dir:
-            proj = hsdev.client.project(path = current_dir)
+            proj = hsdev.client.project(path=current_dir)
             if proj and 'path' in proj:
-                return set([m.name for m in hsdev.client.list_modules(deps = proj['path'])])
-            sbox = hsdev.client.sandbox(path = current_dir)
+                return set([m.name for m in hsdev.client.list_modules(deps=proj['path'])])
+            sbox = hsdev.client.sandbox(path=current_dir)
             if sbox and type(sbox) == dict and 'sandbox' in sbox:
                 sbox = sbox.get('sandbox')
             if sbox:
-                mods = hsdev.client.list_modules(sandbox = sbox) or []
+                mods = hsdev.client.list_modules(sandbox=sbox) or []
                 return set([m.name for m in mods])
         else:
-            mods = hsdev.client.list_modules(cabal = True) or []
+            mods = hsdev.client.list_modules(cabal=True) or []
             return set([m.name for m in mods])
 
 autocompletion = AutoCompletion()
@@ -377,7 +395,7 @@ def can_complete_qualified_symbol(info):
         return list(filter(lambda m: m.startswith(info.module), autocompletion.get_current_module_completions())) != []
 
 
-def update_completions_async(files = [], drop_all = False):
+def update_completions_async(files=[], drop_all=False):
     if drop_all:
         run_async('drop all completions', autocompletion.drop_completions_async)
     else:
@@ -398,7 +416,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         # Only suggest symbols if the current file is part of a Cabal project.
 
         completions = (autocompletion.get_import_completions(view, prefix, locations) +
-            autocompletion.get_special_completions(view, prefix, locations))
+                       autocompletion.get_special_completions(view, prefix, locations))
 
         # Export list
         if 'meta.declaration.exports.haskell' in view.scope_name(view.sel()[0].a):
@@ -450,7 +468,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             filename = view.file_name()
             if filename:
                 hsdev.agent.mark_file_dirty(filename)
-                update_completions_async(drop_all = True)
+                update_completions_async(drop_all=True)
 
     def on_load(self, view):
         hsdev.start_agent()
@@ -460,7 +478,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             filename = view.file_name()
             if filename:
                 hsdev.agent.mark_file_dirty(filename)
-                update_completions_async(drop_all = True)
+                update_completions_async(drop_all=True)
 
     def on_activated(self, view):
         hsdev.start_agent()
@@ -483,14 +501,14 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
                         hsdev.agent.start_inspect()
                         hsdev.agent.force_inspect()
                     else:
-                        show_status_message("inspector not connected", is_ok = False)
+                        show_status_message("inspector not connected", is_ok=False)
 
     def on_post_save(self, view):
         if is_inspected_source(view):
             filename = view.file_name()
             if filename:
                 hsdev.agent.mark_file_dirty(filename)
-                update_completions_async(drop_all = True)
+                update_completions_async(drop_all=True)
 
 
 def plugin_loaded():
