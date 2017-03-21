@@ -7,9 +7,9 @@ import os.path
 from functools import total_ordering
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import *
+    import sublime_haskell_common as Common
 else:
-    from SublimeHaskell.sublime_haskell_common import *
+    import SublimeHaskell.sublime_haskell_common as Common
     from functools import reduce
 
 
@@ -405,7 +405,7 @@ def unicode_operators(fn):
     def wrapped(*args, use_unicode = None, **kwargs):
         if use_unicode is False:
             return fn(*args, **kwargs)
-        return use_unicode_operators(fn(*args, **kwargs), force = use_unicode is True)
+        return Common.use_unicode_operators(fn(*args, **kwargs), force = use_unicode is True)
     return wrapped
 
 
@@ -574,7 +574,7 @@ class Function(Declaration):
         self.type = function_type
 
     def suggest(self):
-        return (use_unicode_operators(u'{0} :: {1}\t{2}'.format(wrap_operator(self.name), self.type, self.imported_from_name())), self.name)
+        return (Common.use_unicode_operators(u'{0} :: {1}\t{2}'.format(wrap_operator(self.name), self.type, self.imported_from_name())), self.name)
 
     @unicode_operators
     def brief(self, short = False):
@@ -601,7 +601,7 @@ class TypeBase(Declaration):
         self.definition = definition
 
     def suggest(self):
-        return (use_unicode_operators(u'{0} {1}\t{2}'.format(self.name, ' '.join(self.args), self.imported_from_name())), self.name)
+        return (Common.use_unicode_operators(u'{0} {1}\t{2}'.format(self.name, ' '.join(self.args), self.imported_from_name())), self.name)
 
     @unicode_operators
     def brief(self, short = False):

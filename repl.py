@@ -7,22 +7,24 @@ import re
 has_sublime_repl = True
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import *
+    import sublime_haskell_common as Common
     import autocomplete
+    import internals.logging as Logging
     import hsdev
     try:
-        import sublimerepl
+        import SublimeREPL.sublimerepl as sublimerepl
     except ImportError:
-        log('SublimeREPL is not installed, ghci/repl commands disabled', log_info)
+        Logging.log('SublimeREPL is not installed, ghci/repl commands disabled', Logging.LOG_INFO)
         has_sublime_repl = False
 else:
-    from SublimeHaskell.sublime_haskell_common import *
+    import SublimeHaskell.sublime_haskell_common as Common
     import SublimeHaskell.autocomplete as autocomplete
+    import SublimeHaskell.internals.logging as Logging
     import SublimeHaskell.hsdev as hsdev
     try:
         import SublimeREPL.sublimerepl as sublimerepl
     except ImportError:
-        log('SublimeREPL is not installed, ghci/repl commands disabled', log_info)
+        Logging.log('SublimeREPL is not installed, ghci/repl commands disabled', Logging.LOG_INFO)
         has_sublime_repl = False
 
 
@@ -80,7 +82,7 @@ class SublimeHaskellAutocompleteRepl(sublime_plugin.EventListener):
         return [(":{0}".format(cmd), ":{0}".format(cmd)) for cmd in cmds]
 
     def on_query_completions(self, view, prefix, locations):
-        if not has_sublime_repl or not is_haskell_repl(view):
+        if not has_sublime_repl or not Common.is_haskell_repl(view):
             return []
 
         repl = sublimerepl.manager.repl_view(view)
@@ -121,7 +123,7 @@ def repl_args(**kwargs):
     return ret_args
 
 
-class SublimeHaskellReplGhci(SublimeHaskellWindowCommand):
+class SublimeHaskellReplGhci(Common.SublimeHaskellWindowCommand):
     def run(self):
         opts = get_setting('ghci_opts') or []
         self.window.run_command("repl_open", repl_args(
@@ -133,11 +135,11 @@ class SublimeHaskellReplGhci(SublimeHaskellWindowCommand):
         return has_sublime_repl
 
 
-class SublimeHaskellReplGhciCurrentFile(SublimeHaskellWindowCommand):
+class SublimeHaskellReplGhciCurrentFile(Common.SublimeHaskellWindowCommand):
     def run(self):
         view = self.window.active_view()
         if not view:
-            show_status_message("No file active", False)
+            Common.show_status_message("No file active", False)
         else:
             opts = get_setting('ghci_opts') or []
             self.window.run_command("repl_open", repl_args(
@@ -147,18 +149,18 @@ class SublimeHaskellReplGhciCurrentFile(SublimeHaskellWindowCommand):
             repls.set_repl_view(repl_external_id(view.file_name()), view)
 
     def is_enabled(self):
-        return has_sublime_repl and SublimeHaskellWindowCommand.is_enabled(self)
+        return has_sublime_repl and Common.SublimeHaskellWindowCommand.is_enabled(self)
 
 
-class SublimeHaskellReplCabal(SublimeHaskellWindowCommand):
+class SublimeHaskellReplCabal(Common.SublimeHaskellWindowCommand):
     def run(self):
         view = self.window.active_view()
         if not view:
-            show_status_message("No file active", False)
+            Common.show_status_message("No file active", False)
         else:
-            project_dir, project_name = get_cabal_project_dir_and_name_of_view(view)
+            project_dir, project_name = Common.get_cabal_project_dir_and_name_of_view(view)
             if not project_dir:
-                show_status_message("Not in project", False)
+                Common.show_status_message("Not in project", False)
             proj_info = hsdev.client.project(project_name)
             self.project_name = project_name
             self.project_dir = project_dir
@@ -182,20 +184,20 @@ class SublimeHaskellReplCabal(SublimeHaskellWindowCommand):
         repls.set_repl_view(repl_external_id(self.project_dir), view, path = self.project_dir, project_name = self.project_name)
 
     def is_enabled(self):
-        return has_sublime_repl and is_enabled_haskell_command(None, True)
+        return has_sublime_repl and Common.is_enabled_haskell_command(None, True)
 
 
-class SublimeHaskellReplLoad(SublimeHaskellWindowCommand):
+class SublimeHaskellReplLoad(Common.SublimeHaskellWindowCommand):
     def run(self):
         view = self.window.active_view()
         if not view:
-            show_status_message("No file active", False)
+            Common.show_status_message("No file active", False)
         else:
-            project_dir, project_name = get_cabal_project_dir_and_name_of_view(view)
+            project_dir, project_name = Common.get_cabal_project_dir_and_name_of_view(view)
             if not project_dir:
                 self.window.run_command("sublime_haskell_repl_ghci_current_file", {})
             else:
                 self.window.run_command("sublime_haskell_repl_cabal", {})
 
     def is_enabled(self):
-        return has_sublime_repl and SublimeHaskellWindowCommand.is_enabled(self)
+        return has_sublime_repl and Common.SublimeHaskellWindowCommand.is_enabled(self)

@@ -10,15 +10,16 @@
 import sublime
 
 if int(sublime.version()) < 3000:
-    from internals.locked_object import LockedObject
+    # from internals.locked_object import LockedObject
+    pass
 else:
-    from SublimeHaskell.internals.locked_object import LockedObject
+    import SublimeHaskell.internals.locked_object as LockedObject
 
 # SublimeHaskell settings dictionary used to retrieve a settnig asynchronously from any thread
-sublime_haskell_settings = LockedObject({})
+sublime_haskell_settings = LockedObject.LockedObject({})
 
 # Callbacks for updated settings/change detection
-sublime_settings_changes = LockedObject({})
+sublime_settings_changes = LockedObject.LockedObject({})
 
 
 def get_settings():
@@ -50,8 +51,8 @@ def on_changed_setting(key):
         if old_val is not None and old_val != val:
             with sublime_settings_changes as changes:
                 if key in changes:
-                    for fn in changes[key]:
-                        fn(key, val)
+                    for change_fn in changes[key]:
+                        change_fn(key, val)
 
 
 def get_setting_async(key, default=None):
@@ -81,3 +82,10 @@ def set_setting(key, value):
 
 def set_setting_async(key, value):
     sublime.set_timeout(lambda: set_setting(key, value), 0)
+
+
+def subscribe_setting(key, change_fn):
+    with sublime_settings_changes as changes:
+        if key not in changes:
+            changes[key] = []
+        changes[key].append(change_fn)

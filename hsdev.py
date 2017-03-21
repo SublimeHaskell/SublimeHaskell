@@ -5,25 +5,28 @@ import sublime
 import threading
 import json
 import time
+import os
 import re
 import sys
 from functools import reduce
 
 if int(sublime.version()) < 3000:
     import symbols
-    from sublime_haskell_common import *
-    from internals.proc_helper import ProcHelper
-    from internals.locked_object import LockedObject
-    from internals.settings import get_setting_async
+    import sublime_haskell_common as Common
+    import internals.logging as Logging
+    import internals.locked_object as LockedObject
+    import internals.proc_helper as ProcHelper
+    import internals.settings as Settings
     from internals.utils import decode_bytes, PyV3
     from internals.output_collector import DescriptorDrain
     from worker import run_async
 else:
     import SublimeHaskell.symbols as symbols
-    from SublimeHaskell.sublime_haskell_common import *
-    from SublimeHaskell.internals.locked_object import LockedObject
-    from SublimeHaskell.internals.proc_helper import ProcHelper
-    from SublimeHaskell.internals.settings import get_setting_async
+    import SublimeHaskell.sublime_haskell_common as Common
+    import SublimeHaskell.internals.logging as Logging
+    import SublimeHaskell.internals.locked_object as LockedObject
+    import SublimeHaskell.internals.proc_helper as ProcHelper
+    import SublimeHaskell.internals.settings as Settings
     from SublimeHaskell.internals.utils import decode_bytes, PyV3
     from SublimeHaskell.internals.output_collector import DescriptorDrain
     from SublimeHaskell.worker import run_async
@@ -68,9 +71,9 @@ def flatten_opts(opts):
 
 def hsdev_version():
     try:
-        exit_code, out, err = ProcHelper.run_process(['hsdev', 'version'])
+        exit_code, out, err = ProcHelper.ProcHelper.run_process(['hsdev', 'version'])
         if exit_code == 0:
-            m = re.match('(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)\.(?P<build>\d+)', out)
+            m = re.match(r'(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)\.(?P<build>\d+)', out)
             if m:
                 major = int(m.group('major'))
                 minor = int(m.group('minor'))
@@ -88,7 +91,7 @@ def show_version(ver):
     return '.'.join(map(lambda i: str(i), ver))
 
 
-def check_version(ver, minimal = [0, 0, 0, 0], maximal = None):
+def check_version(ver, minimal=[0, 0, 0, 0], maximal=None):
     if ver is None:
         return False
     if ver < minimal:
@@ -120,19 +123,19 @@ def hsinspect(module = None, file = None, cabal = None, ghc_opts = []):
     elif cabal:
         cmd.extend([cabal])
     else:
-        log('hsinspect must specify module, file or cabal', log_debug)
+        Logging.log('hsinspect must specify module, file or cabal', Logging.LOG_DEBUG)
         return None
 
     for opt in ghc_opts:
         cmd.extend(['-g', opt])
 
-    with ProcHelper(cmd, 'hsinspect', lambda s: json.loads(s), file, None) as p:
+    with ProcHelper.ProcHelper(cmd, 'hsinspect', lambda s: json.loads(s), file, None) as p:
         if p.process is not None:
             err_code, stdout, stderr = p.wait()
             if 'error' in stdout:
-                log('hsinspect returns error: {0}'.format(stdout), log_error)
+                Logging.log('hsinspect returns error: {0}'.format(stdout), Logging.LOG_ERROR)
             elif 'error' in stderr:
-                log('hsinspect returns error: {0}'.format(stderr), log_error)
+                Logging.log('hsinspect returns error: {0}'.format(stderr), Logging.LOG_ERROR)
             else:
               return on_result(stdout) if on_result else stdout
     return None
@@ -240,7 +243,6 @@ def parse_module_id(d):
 def parse_declaration(decl):
     try:
         what = decl['decl']['what']
-        # docs = crlf2lf(decl.get('docs'))
         docs = decl.get('docs')
         name = decl['name']
         pos = parse_position(decl.get('pos'))
@@ -264,7 +266,7 @@ def parse_declaration(decl):
         else:
             return None
     except Exception as e:
-        log('Error pasring declaration: {0}'.format(e), log_error)
+        Logging.log('Error pasring declaration: {0}'.format(e), Logging.LOG_ERROR)
         return None
 
 
@@ -423,11 +425,11 @@ def connect_function(fn):
             with begin_connecting(self):
                 return fn(self, *args, **kwargs)
         else:
-            log('hsdev already connected', log_warning)
+            Logging.log('hsdev already connected', Logging.LOG_WARNING)
     return wrapped
 
 
-def hsdev_command(async = False, timeout = None, is_list = False):
+def hsdev_command(async = False, timeout=None, is_list=False):
     def wrap_function(fn):
         def wrapped(self, *args, **kwargs):
             wait_flag = kwargs.pop('wait', not async)
@@ -513,7 +515,7 @@ def call_callback(fn, *args, **kwargs):
         if fn is not None:
             fn(*args, **kwargs)
     except Exception as e:
-        log("callback '{0}' throws exception: {1}".format(name or '<unnamed>', e))
+        Logging.log("callback '{0}' throws exception: {1}".format(name or '<unnamed>', e))
 
 
 def format_error_details(ds):
@@ -533,7 +535,7 @@ class HsDevCallbacks(object):
         return time.clock() - self.start_time if self.start_time is not None else None
 
     def log_time(self):
-        log('{0}: {1} seconds'.format(self.command, self.time()), log_trace)
+        Logging.log('{0}: {1} seconds'.format(self.command, self.time()), Logging.LOG_TRACE)
 
     def call_response(self, r):
         self.log_time()
@@ -544,7 +546,7 @@ class HsDevCallbacks(object):
 
     def call_error(self, e, ds):
         self.log_time()
-        log('{0} returns error: {1}, {2}'.format(self.command, e, format_error_details(ds)), log_error)
+        Logging.log('{0} returns error: {1}, {2}'.format(self.command, e, format_error_details(ds)), Logging.LOG_ERROR)
         call_callback(self.on_error, e, ds)
 
 
@@ -559,7 +561,7 @@ class HsDev(object):
         self.listener = None
         self.hsdev_address = None
         self.autoconnect = True
-        self.map = LockedObject({})
+        self.map = LockedObject.LockedObject({})
         self.id = 1
 
         self.connect_fun = None
@@ -580,11 +582,11 @@ class HsDev(object):
 
     def reconnect(self):
         if self.connect_fun is not None:
-            log('Reconnecting to hsdev...', log_info)
+            Logging.log('Reconnecting to hsdev...', Logging.LOG_INFO)
             call_callback(self.on_reconnect, name = 'HsDev.on_reconnect')
             self.connect_fun()
         else:
-            log('No reconnect function')
+            Logging.log('No reconnect function')
 
     # Create server process
     @staticmethod
@@ -596,17 +598,17 @@ class HsDev(object):
             (log_file, ["--log", log_file]),
             (log_config, ["--log-config", log_config])])
 
-        log('Starting hsdev server', log_info)
-        p = ProcHelper(cmd)
+        Logging.log('Starting hsdev server', Logging.LOG_INFO)
+        p = ProcHelper.ProcHelper(cmd)
         if p.process is None:
-            log('Failed to create hsdev process', log_error)
+            Logging.log('Failed to create hsdev process', Logging.LOG_ERROR)
             return None
 
         while True:
             output = decode_bytes(p.process.stdout.readline())
             m = re.match(r'^.*?hsdev> Server started at port (?P<port>\d+)$', output)
             if m:
-                log('hsdev server started at port {0}'.format(m.group('port')))
+                Logging.log('hsdev server started at port {0}'.format(m.group('port')))
                 return p.process
 
     # Socket functions
@@ -618,18 +620,18 @@ class HsDev(object):
 
         for n in range(0, tries):
             try:
-                log('connecting to hsdev server ({0})...'.format(n), log_info)
+                Logging.log('connecting to hsdev server ({0})...'.format(n), Logging.LOG_INFO)
                 self.socket.connect(('127.0.0.1', self.port))
                 self.hsdev_socket = self.socket
                 self.hsdev_address = '127.0.0.1'
                 self.set_connected()
                 self.listener = threading.Thread(target = self.listen)
                 self.listener.start()
-                log('connected to hsdev server', log_info)
+                Logging.log('connected to hsdev server', Logging.LOG_INFO)
                 call_callback(self.on_connected, name = 'HsDev.on_connected')
                 return True
             except Exception:
-                log('failed to connect to hsdev server ({0})'.format(n), log_warning)
+                Logging.log('failed to connect to hsdev server ({0})'.format(n), Logging.LOG_WARNING)
                 time.sleep(delay)
 
         return False
@@ -677,7 +679,7 @@ class HsDev(object):
             self.connected.set()
             self.connecting.clear()
         else:
-            log('HsDev.set_connected called while not in connecting state', log_debug)
+            Logging.log('HsDev.set_connected called while not in connecting state', Logging.LOG_DEBUG)
 
     def on_receive(self, id, command, on_response = None, on_notify = None, on_error = None):
         with self.map as m:
@@ -694,7 +696,7 @@ class HsDev(object):
         if self.is_unconnected():
             return
         self.close()
-        log('{0}: connection to hsdev lost: {1}'.format(fn, e), log_error)
+        Logging.log('{0}: connection to hsdev lost: {1}'.format(fn, e), Logging.LOG_ERROR)
         call_callback(self.on_disconnected, name = 'HsDev.on_disconnected')
 
         # send error to callbacks
@@ -748,7 +750,7 @@ class HsDev(object):
             # It's hackish, but I haven't found easy solution
             self.hsdev_socket.sendall(msg.encode('utf-8'))
             self.hsdev_socket.sendall('\n'.encode('utf-8'))
-            log(call_cmd, log_trace)
+            Logging.log(call_cmd, Logging.LOG_TRACE)
 
             if wait:
                 wait_receive.wait(timeout)
@@ -756,7 +758,7 @@ class HsDev(object):
 
             return True
         except Exception as e:
-            log('{0} fails with exception: {1}'.format(call_cmd, e), log_error)
+            Logging.log('{0} fails with exception: {1}'.format(call_cmd, e), Logging.LOG_ERROR)
             self.connection_lost('call', e)
             return False
 
@@ -795,16 +797,15 @@ class HsDev(object):
     # Commands
 
     @command
-    def link(self, hold = False, **kwargs):
-        return cmd('link', {
-            'hold': hold})
+    def link(self, hold=False, **kwargs):
+        return cmd('link', {'hold': hold})
 
     @command
     def ping(self):
         return cmd('ping', {}, lambda r: r and ('message' in r) and (r['message'] == 'pong'))
 
     @async_command
-    def scan(self, cabal = False, sandboxes = [], projects = [], files = [], paths = [], ghc = [], contents = {}, docs = False, infer = False):
+    def scan(self, cabal=False, sandboxes=[], projects = [], files = [], paths = [], ghc = [], contents = {}, docs = False, infer=False):
         return cmd('scan', {
             'projects': projects,
             'cabal': cabal,
@@ -1040,7 +1041,7 @@ def wait_result(fn, *args, **kwargs):
         wait_receive.set()
 
     def wait_error(e, ds):
-        log('hsdev call fails with: {0}, {1}'.format(e, format_error_details(ds)))
+        Logging.log('hsdev call fails with: {0}, {1}'.format(e, format_error_details(ds)))
         if on_err:
             on_err(e, ds)
         wait_receive.set()
@@ -1079,7 +1080,7 @@ class HsDevProcess(threading.Thread):
             while not self.stop_event.is_set():
                 self.process = HsDev.create_server(port = self.port, cache = self.cache, log_file = self.log_file, log_config = self.log_config)
                 if not self.process:
-                    log('failed to create hsdev process', log_error)
+                    Logging.log('failed to create hsdev process', Logging.LOG_ERROR)
                     self.stop_event.set()
                 else:
                     self.drain_stdout = DescriptorDrain('hsdev stdout', self.process.stdout)
@@ -1147,7 +1148,7 @@ def dirty(fn):
 
 def use_inspect_modules(fn):
     def wrapped(self, *args, **kwargs):
-        if get_setting_async('inspect_modules'):
+        if Settings.get_setting_async('inspect_modules'):
             return fn(self, *args, **kwargs)
     return wrapped
 
@@ -1160,7 +1161,7 @@ def agent_connected():
 def use_hsdev(def_val = None):
     def wrap(fn):
         def wrapped(*args, **kwargs):
-            if get_setting_async('enable_hsdev') and agent_connected():
+            if Settings.get_setting_async('enable_hsdev') and agent_connected():
                 return fn(*args, **kwargs)
             else:
                 return def_val
@@ -1179,13 +1180,12 @@ class HsDevAgent(threading.Thread):
     def __init__(self):
         super(HsDevAgent, self).__init__()
         self.daemon = True
-        self.cabal_to_load = LockedObject([])
-        self.dirty_files = LockedObject([])
-        self.dirty_paths = LockedObject([])
-        self.hsdev_process = HsDevProcess(
-            cache = os.path.join(sublime_haskell_cache_path(), 'hsdev'),
-            log_file = os.path.join(sublime_haskell_cache_path(), 'hsdev', 'hsdev.log'),
-            log_config = get_setting_async('hsdev_log_config'))
+        self.cabal_to_load = LockedObject.LockedObject([])
+        self.dirty_files = LockedObject.LockedObject([])
+        self.dirty_paths = LockedObject.LockedObject([])
+        self.hsdev_process = HsDevProcess(cache=os.path.join(Common.sublime_haskell_cache_path(), 'hsdev'),
+                                          log_file=os.path.join(Common.sublime_haskell_cache_path(), 'hsdev', 'hsdev.log'),
+                                          log_config=Settings.get_setting_async('hsdev_log_config'))
         self.client = HsDev()
         self.client_back = HsDev()
 
@@ -1194,10 +1194,10 @@ class HsDevAgent(threading.Thread):
     def is_connected(self):
         return self.client.is_connected()
 
-    def start_hsdev(self, start_server = True):
+    def start_hsdev(self, start_server=True):
         hsdev_ver = hsdev_version()
         if hsdev_ver is None:
-            output_error_async(sublime.active_window(), "\n".join([
+            Common.output_error_async(sublime.active_window(), "\n".join([
                 "SublimeHaskell: hsdev executable couldn't be found!",
                 "It's used in most features of SublimeHaskell",
                 "Check if it's installed and in PATH",
@@ -1206,7 +1206,7 @@ class HsDevAgent(threading.Thread):
                 "",
                 "To supress this message and disable hsdev set 'enable_hsdev' to false"]))
         elif not check_version(hsdev_ver, HsDevAgent.min_ver, HsDevAgent.max_ver):
-            output_error_async(sublime.active_window(), "\n".join([
+            Common.output_error_async(sublime.active_window(), "\n".join([
                 "SublimeHaskell: hsdev version is incorrect: {0}".format(show_version(hsdev_ver)),
                 "Required version: >= {0} and < {1}".format(show_version(HsDevAgent.min_ver), show_version(HsDevAgent.max_ver)),
                 "Update it by running 'cabal update' and 'cabal install hsdev'",
@@ -1214,21 +1214,21 @@ class HsDevAgent(threading.Thread):
                 "To supress this message and disable hsdev set 'enable_hsdev' to false"]))
         else:
             def start_():
-                log('hsdev process started', log_trace)
+                Logging.log('hsdev process started', Logging.LOG_TRACE)
                 self.client.connect_async()
                 self.client_back.connect_async()
 
             def exit_():
-                log('hsdev process exited', log_trace)
+                Logging.log('hsdev process exited', Logging.LOG_TRACE)
                 self.client.close()
                 self.client_back.close()
 
             def connected_():
-                log('hsdev agent: connected to hsdev', log_trace)
+                Logging.log('hsdev agent: connected to hsdev', Logging.LOG_TRACE)
                 self.client.link()
 
             def back_connected_():
-                log('hsdev agent: connected to hsdev', log_trace)
+                Logging.log('hsdev agent: connected to hsdev', Logging.LOG_TRACE)
                 self.start_inspect()
 
             self.client.on_connected = connected_
@@ -1247,10 +1247,10 @@ class HsDevAgent(threading.Thread):
     def on_hsdev_enabled(self, key, value):
         if key == 'enable_hsdev':
             if value:
-                log("starting hsdev", log_info)
+                Logging.log("starting hsdev", Logging.LOG_INFO)
                 self.hsdev_process.create()
             else:
-                log("stopping hsdev", log_info)
+                Logging.log("stopping hsdev", Logging.LOG_INFO)
                 self.hsdev_process.stop()
                 self.client.close()
                 self.client_back.close()
@@ -1261,15 +1261,15 @@ class HsDevAgent(threading.Thread):
                 self.mark_all_files()
 
     def run(self):
-        subscribe_setting('enable_hsdev', self.on_hsdev_enabled)
-        subscribe_setting('inspect_modules', self.on_inspect_modules_changed)
+        Settings.subscribe_setting('enable_hsdev', self.on_hsdev_enabled)
+        Settings.subscribe_setting('inspect_modules', self.on_inspect_modules_changed)
 
-        if get_setting_async('enable_hsdev'):
+        if Settings.get_setting_async('enable_hsdev'):
             self.start_hsdev()
 
         while True:
-            if get_setting_async('enable_hsdev') and not self.client.ping():
-                log('hsdev ping: no pong', log_warning)
+            if Settings.get_setting_async('enable_hsdev') and not self.client.ping():
+                Logging.log('hsdev ping: no pong', Logging.LOG_WARNING)
 
             scan_paths = []
             with self.dirty_paths as dirty_paths:
@@ -1288,7 +1288,7 @@ class HsDevAgent(threading.Thread):
                 projects = []
                 files = []
                 for f in files_to_reinspect:
-                    d = get_cabal_project_dir_of_file(f)
+                    d = Common.get_cabal_project_dir_of_file(f)
                     if d is not None:
                         projects.append(d)
                     else:
@@ -1300,7 +1300,7 @@ class HsDevAgent(threading.Thread):
             try:
                 self.inspect(paths = scan_paths, projects = projects, files = files)
             except Exception as e:
-                log('HsDevAgent inspect exception: {0}'.format(e))
+                Logging.log('HsDevAgent inspect exception: {0}'.format(e))
 
             load_cabal = []
             with self.cabal_to_load as cabal_to_load:
@@ -1311,7 +1311,7 @@ class HsDevAgent(threading.Thread):
                 run_async('inspect cabal {0}'.format(c), self.inspect_cabal, c)
 
             if files_to_reinspect:
-                if get_setting_async('enable_hdocs'):
+                if Settings.get_setting_async('enable_hdocs'):
                     self.client_back.docs(files = files_to_reinspect)
             self.reinspect_event.wait(HsDevAgent.sleep_timeout)
             self.reinspect_event.clear()
@@ -1348,67 +1348,71 @@ class HsDevAgent(threading.Thread):
             cabal_to_load.append(cabal_name or 'cabal')
 
     @use_hsdev()
-    def inspect_cabal(self, cabal = None):
+    def inspect_cabal(self, cabal=None):
         try:
-            with status_message_process('Inspecting {0}'.format(cabal or 'cabal'), priority = 1) as s:
-                self.client_back.scan(cabal = (cabal == 'cabal'), sandboxes = [] if cabal == 'cabal' else [cabal], on_notify = scan_status(s), wait = True, docs = get_setting_async('enable_hdocs'))
+            with Common.status_message_process('Inspecting {0}'.format(cabal or 'cabal'), priority=1) as s:
+                self.client_back.scan(cabal=(cabal == 'cabal'),
+                                      sandboxes=[] if cabal == 'cabal' else [cabal],
+                                      on_notify=scan_status(s),
+                                      wait=True,
+                                      docs=Settings.get_setting_async('enable_hdocs'))
         except Exception as e:
-            log('loading standard modules info for {0} failed with {1}'.format(cabal or 'cabal', e), log_error)
+            Logging.log('loading standard modules info for {0} failed with {1}'.format(cabal or 'cabal', e), Logging.LOG_ERROR)
 
     @use_hsdev()
     @use_inspect_modules
     def inspect(self, paths, projects, files):
         if paths or projects or files:
             try:
-                with status_message_process('Inspecting', priority = 1) as s:
-                    self.client_back.scan(paths = paths, projects = projects, files = files, on_notify = scan_status(s), wait = True, ghc = get_setting_async('ghc_opts'), docs = get_setting_async('enable_hdocs'))
+                with Common.status_message_process('Inspecting', priority=1) as s:
+                    self.client_back.scan(paths = paths, projects = projects, files = files, on_notify = scan_status(s), wait = True, ghc = Settings.get_setting_async('ghc_opts'), docs = Settings.get_setting_async('enable_hdocs'))
             except Exception as e:
-                log('Inspection failed: {0}'.format(e), log_error)
+                Logging.log('Inspection failed: {0}'.format(e), Logging.LOG_ERROR)
 
     @use_hsdev()
     @use_inspect_modules
     def inspect_path(self, path):
         try:
-            with status_message_process('Inspecting path {0}'.format(path), priority = 1) as s:
-                self.client_back.scan(paths = [path], on_notify = scan_status(s), wait = True, ghc = get_setting_async('ghc_opts'), docs = get_setting_async('enable_hdocs'))
+            with Common.status_message_process('Inspecting path {0}'.format(path), priority = 1) as s:
+                self.client_back.scan(paths = [path], on_notify = scan_status(s), wait = True, ghc = Settings.get_setting_async('ghc_opts'), docs = Settings.get_setting_async('enable_hdocs'))
         except Exception as e:
-            log('Inspecting path {0} failed: {1}'.format(path, e), log_error)
+            Logging.log('Inspecting path {0} failed: {1}'.format(path, e), Logging.LOG_ERROR)
 
     @use_hsdev()
     @use_inspect_modules
     def inspect_project(self, cabal_dir):
-        (project_name, cabal_file) = get_cabal_in_dir(cabal_dir)
+        (project_name, cabal_file) = Common.get_cabal_in_dir(cabal_dir)
 
         try:
-            with status_message_process('Inspecting project {0}'.format(project_name), priority = 1) as s:
-                self.client_back.scan(projects = [cabal_dir], on_notify = scan_status(s), wait = True, docs = get_setting_async('enable_hdocs'))
+            with Common.status_message_process('Inspecting project {0}'.format(project_name), priority = 1) as s:
+                self.client_back.scan(projects = [cabal_dir], on_notify = scan_status(s), wait = True, docs = Settings.get_setting_async('enable_hdocs'))
         except Exception as e:
-            log('Inspecting project {0} failed: {1}'.format(cabal_dir, e), log_error)
+            Logging.log('Inspecting project {0} failed: {1}'.format(cabal_dir, e), Logging.LOG_ERROR)
 
     @use_hsdev()
     @use_inspect_modules
     def inspect_files(self, filenames):
         try:
-            with status_message_process('Inspecting files', priority = 1) as s:
-                self.client_back.scan(files = filenames, on_notify = scan_status(s), wait = True, ghc = get_setting_async('ghc_opts'), docs = get_setting_async('enable_hdocs'))
+            with Common.status_message_process('Inspecting files', priority = 1) as s:
+                self.client_back.scan(files = filenames, on_notify = scan_status(s), wait = True, ghc = Settings.get_setting_async('ghc_opts'), docs = Settings.get_setting_async('enable_hdocs'))
         except Exception as e:
-            log('Inspecting files failed: {0}'.format(e), log_error)
+            Logging.log('Inspecting files failed: {0}'.format(e), Logging.LOG_ERROR)
 
 
-class HsDevWindowCommand(SublimeHaskellWindowCommand):
+class HsDevWindowCommand(Common.SublimeHaskellWindowCommand):
     def is_enabled(self):
-        return get_setting_async('enable_hsdev') and agent_connected() and SublimeHaskellWindowCommand.is_enabled(self)
+        return Settings.get_setting_async('enable_hsdev') and agent_connected() and Common.SublimeHaskellWindowCommand.is_enabled(self)
 
     def is_visible(self):
-        return get_setting_async('enable_hsdev') and SublimeHaskellWindowCommand.is_visible(self)
+        return Settings.get_setting_async('enable_hsdev') and Common.SublimeHaskellWindowCommand.is_visible(self)
 
 
-class HsDevTextCommand(SublimeHaskellTextCommand):
+class HsDevTextCommand(Common.SublimeHaskellTextCommand):
     def is_enabled(self):
-        return get_setting_async('enable_hsdev') and agent_connected() and SublimeHaskellTextCommand.is_enabled(self)
+        return Settings.get_setting_async('enable_hsdev') and agent_connected() and Common.SublimeHaskellTextCommand.is_enabled(self)
 
     def is_visible(self):
-        return get_setting_async('enable_hsdev') and SublimeHaskellTextCommand.is_visible(self)
+        return Settings.get_setting_async('enable_hsdev') and Common.SublimeHaskellTextCommand.is_visible(self)
 
 
 def start_agent():
@@ -1419,7 +1423,7 @@ def start_agent():
     if agent is not None:
         return
 
-    log('starting agent', log_trace)
+    Logging.log('starting agent', Logging.LOG_TRACE)
 
     agent = HsDevAgent()
     client = agent.client

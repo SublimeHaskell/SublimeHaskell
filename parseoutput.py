@@ -9,18 +9,18 @@ from threading import Thread
 from collections import defaultdict
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import *
-    from internals.proc_helper import ProcHelper
-    from internals.settings import get_setting_async
+    import sublime_haskell_common as Common
+    import internals.logging as Logging
+    import internals.settings as Settings
     from internals.utils import decode_bytes, PyV3
-    from internals.output_collector import OutputCollector
+    import internals.output_collector as OutputCollector
     import symbols
 else:
-    from SublimeHaskell.sublime_haskell_common import *
-    from SublimeHaskell.internals.proc_helper import ProcHelper
-    from SublimeHaskell.internals.settings import get_setting_async
+    import SublimeHaskell.sublime_haskell_common as Common
+    import SublimeHaskell.internals.logging as Logging
+    import SublimeHaskell.internals.settings as Settings
     from SublimeHaskell.internals.utils import decode_bytes, PyV3
-    from SublimeHaskell.internals.output_collector import OutputCollector
+    import SublimeHaskell.internals.output_collector as OutputCollector
     import SublimeHaskell.symbols as symbols
 
 # This regex matches an unindented line, followed by zero or more
@@ -117,7 +117,7 @@ def run_build_thread(view, cabal_project_dir, msg, cmd, on_done):
 
 
 def run_chain_build_thread(view, cabal_project_dir, msg, cmds, on_done):
-    show_status_message_process(msg, priority = 3)
+    Common.show_status_message_process(msg, priority = 3)
     thread = Thread(
         target=wait_for_chain_to_complete,
         args=(view, cabal_project_dir, msg, cmds, on_done))
@@ -140,24 +140,27 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
 
     # run and wait commands, fail on first fail
     # stdout = ''
-    stderr = ''
-    output_log = output_panel(view.window(), '', panel_name = BUILD_LOG_PANEL_NAME, show_panel = get_setting_async('show_output_window'))
+    collected_out = []
+    output_log = Common.output_panel(view.window(), '', panel_name=BUILD_LOG_PANEL_NAME, show_panel=Settings.get_setting_async('show_output_window'))
     for cmd in cmds:
-        output_text(output_log, ' '.join(cmd) + '...\n')
+        Common.output_text(output_log, ' '.join(cmd) + '...\n')
 
         # Don't tie stderr to stdout, since we're interested in the error messages
-        oc = OutputCollector(output_log, cmd, cwd = cabal_project_dir, tie_stderr = False)
-        oc.start()
-        exit_code, stderr = oc.wait()
+        out = OutputCollector.OutputCollector(output_log, cmd, cwd=cabal_project_dir)
+        exit_code, cmd_out = out.wait()
+        collected_out.append(cmd_out)
 
-    if len(stderr) > 0:
+        # Bail if the command failed...
+        if exit_code != 0:
+            break
+
+    if len(collected_out) > 0:
         # We're going to show the errors in the output panel...
-        hide_panel(view.window(), panel_name = BUILD_LOG_PANEL_NAME)
+        Common.hide_panel(view.window(), panel_name=BUILD_LOG_PANEL_NAME)
 
     # Notify UI thread that commands are done
     sublime.set_timeout(on_done, 0)
-
-    parse_output_messages_and_show(view, msg, cabal_project_dir, exit_code, stderr)
+    parse_output_messages_and_show(view, msg, cabal_project_dir, exit_code, ''.join(collected_out))
 
 
 def format_output_messages(messages):
@@ -203,10 +206,10 @@ def show_output_result_text(view, msg, text, exit_code, base_dir):
     success_message = 'SUCCEEDED' if success else 'FAILED'
     output = u'Build {0}\n\n{1}'.format(success_message, text.strip())
 
-    show_status_message_process(msg, success)
+    Common.show_status_message_process(msg, success)
     # Show panel if there is any text to show (without the part that we add)
     if text:
-        if get_setting_async('show_error_window'):
+        if Settings.get_setting_async('show_error_window'):
             sublime.set_timeout(lambda: write_output(view, output, base_dir), 0)
 
 
@@ -227,13 +230,12 @@ def parse_output_messages_and_show(view, msg, base_dir, exit_code, stderr):
 
     if parsed_messages:
         outputs += [format_output_messages(parsed_messages)]
+        if unparsable:
+            outputs += ['', '']
     if unparsable:
-        outputs += ["Collected error output and messages:\n", unparsable]
+        outputs += ["Collected output:\n", unparsable]
 
-    output_text = '\n'.join(outputs)
-
-    show_output_result_text(view, msg, output_text, exit_code, base_dir)
-
+    show_output_result_text(view, msg, '\n'.join(outputs), exit_code, base_dir)
     sublime.set_timeout(lambda: mark_messages_in_views(parsed_messages), 0)
 
 
@@ -252,8 +254,8 @@ def mark_messages_in_views(errors):
                 errors))
             mark_messages_in_view(errors_in_view, v)
     end_time = time.clock()
-    log('total time to mark {0} diagnostics: {1} seconds'.format(
-        len(errors), end_time - begin_time), log_debug)
+    Logging.log('total time to mark {0} diagnostics: {1} seconds'.format(
+        len(errors), end_time - begin_time), Logging.LOG_DEBUG)
 
 
 message_levels = {
@@ -332,22 +334,22 @@ def get_prev_value(lst, p, cycle = True):
     return get_next_value(reversed(lst), p, cycle)
 
 
-class SublimeHaskellNextError(SublimeHaskellTextCommand):
+class SublimeHaskellNextError(Common.SublimeHaskellTextCommand):
     def run(self, edit):
         errs = errors_for_view(self.view)
         if not errs:
-            show_status_message('No errors or warnings!', priority = 5)
+            Common.show_status_message('No errors or warnings!', priority = 5)
         next_err = get_next_value(errs, lambda e: e.region > v.sel()[0])
         v.sel().clear()
         v.sel().add(next_err.region.to_region(self.view))
         goto_error(self.view, next_err)
 
 
-class SublimeHaskellPreviousError(SublimeHaskellTextCommand):
+class SublimeHaskellPreviousError(Common.SublimeHaskellTextCommand):
     def run(self, edit):
         errs = errors_for_view(self.view)
         if not errs:
-            show_status_message("No errors or warnings!", priority = 5)
+            Common.show_status_message("No errors or warnings!", priority = 5)
         prev_err = get_prev_value(errs, lambda e: e.region < v.sel()[0])
         v.sel().clear()
         v.sel().add(prev_err.region.to_region(self.view))
@@ -394,7 +396,7 @@ def mark_messages_in_view(messages, view):
 def write_output(view, text, cabal_project_dir, show_panel = True):
     "Write text to Sublime's output panel."
     global error_view
-    error_view = output_panel(view.window(), text, panel_name = OUTPUT_PANEL_NAME, syntax = 'HaskellOutputPanel', show_panel = show_panel)
+    error_view = Common.output_panel(view.window(), text, panel_name = OUTPUT_PANEL_NAME, syntax = 'HaskellOutputPanel', show_panel = show_panel)
     error_view.settings().set("result_file_regex", result_file_regex)
     error_view.settings().set("result_base_dir", cabal_project_dir)
 

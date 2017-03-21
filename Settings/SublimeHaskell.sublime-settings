@@ -134,5 +134,9 @@
 	"ghci_opts": [],
 
 	// Log level, 0 — no log, 1 — errors, 2 — warnings, 3 — info messages, 4 — debug, 5 — trace
-	"log": 3
+	"log": 1,
+
+	// hsdev's logging: 'use default' (somewhat verbose, informational), 'use silent' (quiet)
+	// This is a somewhat magic setting that comes from the Haskell 'simple-log' documentation.
+  "hsdev_log_config": "use silent"
 }
