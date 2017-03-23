@@ -93,13 +93,15 @@ class FlyCheckLint(threading.Thread):
                     v['mtime'] = None
 
                 fly_view = view_
+                fly_window = fly_view.window()
 
                 auto_check_enabled = Settings.get_setting_async('enable_auto_check')
                 auto_lint_enabled = Settings.get_setting_async('enable_auto_lint')
-                sublime.set_timeout(lambda: fly_view.window().run_command('sublime_haskell_scan_contents'), 0)
+                sublime.set_timeout(lambda: fly_window.run_command('sublime_haskell_scan_contents'), 0)
+                
                 if auto_check_enabled and auto_lint_enabled:
-                    sublime.set_timeout(lambda: fly_view.window().run_command('sublime_haskell_check_and_lint', {'fly': True}), 0)
+                    sublime.set_timeout(lambda: fly_window.run_command('sublime_haskell_check_and_lint', {'fly': True}), 0)
                 elif auto_check_enabled:
-                    sublime.set_timeout(lambda: fly_view.window().run_command('sublime_haskell_check', {'fly': True}), 0)
+                    sublime.set_timeout(lambda: fly_window.run_command('sublime_haskell_check', {'fly': True}), 0)
                 elif auto_lint_enabled:
-                    sublime.set_timeout(lambda: fly_view.window().run_command('sublime_haskell_lint', {'fly': True}), 0)
+                    sublime.set_timeout(lambda: fly_window.run_command('sublime_haskell_lint', {'fly': True}), 0)
