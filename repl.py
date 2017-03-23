@@ -10,6 +10,7 @@ if int(sublime.version()) < 3000:
     import sublime_haskell_common as Common
     import autocomplete
     import internals.logging as Logging
+    import internals.settings as Settings
     import hsdev
     try:
         import SublimeREPL.sublimerepl as sublimerepl
