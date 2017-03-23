@@ -20,6 +20,7 @@ else:
     import SublimeHaskell.sublime_haskell_common as Common
     import SublimeHaskell.autocomplete as autocomplete
     import SublimeHaskell.internals.logging as Logging
+    import SublimeHaskell.internals.Settings as Settings
     import SublimeHaskell.hsdev as hsdev
     try:
         import SublimeREPL.sublimerepl as sublimerepl
@@ -100,7 +101,7 @@ class SublimeHaskellAutocompleteRepl(sublime_plugin.EventListener):
 
         completions = []
 
-        if get_setting('inhibit_completions') and len(completions) != 0:
+        if Settings.get_setting('inhibit_completions') and len(completions) != 0:
             return (completions, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         return completions
 
@@ -125,7 +126,7 @@ def repl_args(**kwargs):
 
 class SublimeHaskellReplGhci(Common.SublimeHaskellWindowCommand):
     def run(self):
-        opts = get_setting('ghci_opts') or []
+        opts = Settings.get_setting('ghci_opts') or []
         self.window.run_command("repl_open", repl_args(
             cmd = ["ghci"] + opts,
             loaded = None,
@@ -141,7 +142,7 @@ class SublimeHaskellReplGhciCurrentFile(Common.SublimeHaskellWindowCommand):
         if not view:
             Common.show_status_message("No file active", False)
         else:
-            opts = get_setting('ghci_opts') or []
+            opts = Settings.get_setting('ghci_opts') or []
             self.window.run_command("repl_open", repl_args(
                 cmd = ["ghci", "$file"] + opts,
                 loaded = view.file_name(),

@@ -88,7 +88,7 @@ class SublimeHaskellContext(sublime_plugin.EventListener):
         if key == 'haskell_autofix':
             return view.settings().get('autofix')
         if key == 'auto_completion_popup':
-            return get_setting('auto_completion_popup')
+            return Settings.get_setting('auto_completion_popup')
         elif key == 'haskell_source':
             return Common.is_haskell_source(view)
         elif key == 'haskell_source_or_repl':

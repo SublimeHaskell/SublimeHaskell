@@ -279,8 +279,8 @@ class SublimeHaskellBuildAutoCommand(SublimeHaskellBaseCommand):
     def run(self):
         current_project_dir, current_project_name = Common.get_cabal_project_dir_and_name_of_view(self.window.active_view())
         if current_project_name and current_project_dir:
-            build_mode = get_setting('auto_build_mode')
-            # run_tests = get_setting('auto_run_tests')
+            build_mode = Settings.get_setting('auto_build_mode')
+            # run_tests = Settings.get_setting('auto_run_tests')
 
             build_command = {
                'normal': 'build',

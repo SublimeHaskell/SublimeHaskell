@@ -296,7 +296,7 @@ class AutoCompletion(object):
         line_contents = Common.get_line_contents(view, locations[0])
 
         # Autocompletion for import statements
-        if get_setting('auto_complete_imports'):
+        if Settings.get_setting('auto_complete_imports'):
             match_import_list = IMPORT_SYMBOL_RE.search(line_contents)
             if match_import_list:
                 module_name = match_import_list.group('module')
@@ -328,7 +328,7 @@ class AutoCompletion(object):
         line_contents = Common.get_line_contents(view, locations[0])
 
         # Autocompletion for LANGUAGE pragmas
-        if get_setting('auto_complete_language_pragmas'):
+        if Settings.get_setting('auto_complete_language_pragmas'):
             # TODO handle multiple selections
             match_language = LANGUAGE_RE.match(line_contents)
             if match_language:
@@ -442,11 +442,11 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
         # TODO: work around this
         # comp = [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0].split('\t')[0])]
-        # if get_setting('inhibit_completions') and len(comp) != 0:
+        # if Settings.get_setting('inhibit_completions') and len(comp) != 0:
         #     return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         # return comp
 
-        if get_setting('inhibit_completions') and len(completions) != 0:
+        if Settings.get_setting('inhibit_completions') and len(completions) != 0:
             return (completions, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         return completions
 
