@@ -20,7 +20,7 @@ else:
     import SublimeHaskell.sublime_haskell_common as Common
     import SublimeHaskell.autocomplete as autocomplete
     import SublimeHaskell.internals.logging as Logging
-    import SublimeHaskell.internals.Settings as Settings
+    import SublimeHaskell.internals.settings as Settings
     import SublimeHaskell.hsdev as hsdev
     try:
         import SublimeREPL.sublimerepl as sublimerepl
