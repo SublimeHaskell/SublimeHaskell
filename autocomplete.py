@@ -297,7 +297,7 @@ class AutoCompletion(object):
 
         # Autocompletion for import statements
         if Settings.get_setting('auto_complete_imports'):
-            match_import_list = IMPORT_SYMBOL_RE.search(line_contents)
+            match_import_list = Common.IMPORT_SYMBOL_RE.search(line_contents)
             if match_import_list:
                 module_name = match_import_list.group('module')
                 import_list_completions = []
