@@ -2,29 +2,30 @@
 
 """Haskell type display and query support"""
 
-import sublime
-import sublime_plugin
 import re
 from functools import total_ordering
 
+import sublime
+import sublime_plugin
+
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import is_enabled_haskell_command, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, get_ghc_opts, is_haskell_source, show_panel, hide_panel, head_of
-    from internals.settings import get_setting_async
-    from autocomplete import get_qualified_symbol_at_region
+    import sublime_haskell_common as Common
+    import internals.settings as Settings
+    import internals.utils as Utils
+    import ghci_backend as GHCIMod
     import hsdev
-    from hdevtools import hdevtools_type
-    from check_lint import ghcmod_type
+    import hdevtools as HDevTools
     from parseoutput import sublime_column_to_ghc_column, ghc_column_to_sublime_column
-    from symbols import unicode_operators, use_unicode_operators
+    from symbols import unicode_operators
 else:
-    from SublimeHaskell.sublime_haskell_common import is_enabled_haskell_command, show_status_message, SublimeHaskellTextCommand, output_panel, output_text, get_ghc_opts, is_haskell_source, show_panel, hide_panel, head_of
-    from SublimeHaskell.internals.settings import get_setting_async
-    from SublimeHaskell.autocomplete import get_qualified_symbol_at_region
+    import SublimeHaskell.sublime_haskell_common as Common
+    import SublimeHaskell.internals.settings as Settings
+    import SublimeHaskell.internals.utils as Utils
+    import SublimeHaskell.ghci_backend as GHCIMod
     import SublimeHaskell.hsdev as hsdev
-    from SublimeHaskell.hdevtools import hdevtools_type
-    from SublimeHaskell.check_lint import ghcmod_type
+    import SublimeHaskell.hdevtools as HDevTools
     from SublimeHaskell.parseoutput import sublime_column_to_ghc_column, ghc_column_to_sublime_column
-    from SublimeHaskell.symbols import unicode_operators, use_unicode_operators
+    from SublimeHaskell.symbols import unicode_operators
 
 # Used to find out the module name.
 MODULE_RE_STR = r'module\s+([^\s\(]*)'  # "module" followed by everything that is neither " " nor "("
@@ -95,7 +96,7 @@ def position_by_point(view, point):
 
 
 class RegionType(object):
-    def __init__(self, typename, start, end = None):
+    def __init__(self, typename, start, end=None):
         self.typename = typename
         self.start = start
         self.end = end if end else start
@@ -168,29 +169,28 @@ def parse_type_output(view, s):
 
 
 def sorted_types(view, types, pt):
-    return sorted(
-        list(filter(lambda t: t.region(view).contains(pt), types)),
-        key = lambda t: t.region(view).size())
+    return sorted(list(filter(lambda t: t.region(view).contains(pt), types)),
+                  key=lambda t: t.region(view).size())
 
 
-def get_type(view, filename, module_name, line, column, cabal = None):
+def get_type(view, filename, module_name, line, column, cabal=None):
     result = None
 
-    if get_setting_async('enable_hsdev'):
+    if Settings.get_setting_async('enable_hsdev'):
         # Convert from hsdev one-based locations to sublime zero-based positions
         ts = get_types(filename, cabal=cabal) or []
         pt = FilePosition(line, column).point(view)
         return sorted_types(view, ts, pt)
     column = sublime_column_to_ghc_column(view, line, column)
     line = line + 1
-    if get_setting_async('enable_hdevtools'):
-        result = hdevtools_type(filename, line, column, cabal = cabal)
-    if not result and module_name and get_setting_async('enable_ghc_mod'):
-        result = ghcmod_type(filename, module_name, line, column)
+    if Settings.get_setting_async('enable_hdevtools'):
+        result = HDevTools.hdevtools_type(filename, line, column, cabal=cabal)
+    if not result and module_name and Settings.get_setting_async('enable_ghc_mod'):
+        result = GHCIMod.ghcmod_type(filename, module_name, line, column)
     return parse_type_output(view, result) if result else None
 
 
-def get_type_view(view, selection = None):
+def get_type_view(view, selection=None):
     filename = view.file_name()
 
     if selection is None:
@@ -201,15 +201,15 @@ def get_type_view(view, selection = None):
     column = c
 
     module_name = None
-    m = head_of(hsdev.client.module(file = filename))
+    m = Utils.head_of(hsdev.client.module(file=filename))
     if m:
         module_name = m.name
 
     return get_type(view, filename, module_name, line, column)
 
 
-def get_types(filename, on_result = None, cabal = None):
-    if get_setting_async('enable_hsdev'):
+def get_types(filename, on_result=None, cabal=None):
+    if Settings.get_setting_async('enable_hsdev'):
         def to_file_pos(r):
             return FilePosition(int(r['line']) - 1, int(r['column']) - 1)
 
@@ -228,19 +228,21 @@ def get_types(filename, on_result = None, cabal = None):
             return file_types.get(filename)
 
         wait = on_result is None
-        res = hsdev.client.types(files = [filename], ghc = get_ghc_opts(filename), wait = wait, on_response = on_resp if on_result is not None else None)
+        res = hsdev.client.types(files=[filename],
+                                 ghc=GHCIMod.get_ghc_opts(filename),
+                                 wait=wait, on_response=on_resp if on_result is not None else None)
         if res is not None and wait:
             ts = [to_region_type(r) for r in res]
             file_types.set(filename, ts, False)
             return ts
 
 
-class SublimeHaskellShowType(SublimeHaskellTextCommand):
-    def run(self, edit, filename = None, line = None, column = None):
+class SublimeHaskellShowType(Common.SublimeHaskellTextCommand):
+    def run(self, edit, filename=None, line=None, column=None):
         result = self.get_types(filename, int(line) if line else None, int(column) if column else None)
         self.show_types(result)
 
-    def get_types(self, filename = None, line = None, column = None):
+    def get_types(self, filename=None, line=None, column=None):
         if not filename:
             filename = self.view.file_name()
 
@@ -250,7 +252,7 @@ class SublimeHaskellShowType(SublimeHaskellTextCommand):
             column = c
 
         module_name = None
-        m = head_of(hsdev.client.module(file = filename))
+        m = Utils.head_of(hsdev.client.module(file=filename))
         if m:
             module_name = m.name
 
@@ -263,17 +265,17 @@ class SublimeHaskellShowType(SublimeHaskellTextCommand):
         region = self.view.sel()[0]
         file_region = region_by_region(self.view, region, '')
         if region.a != region.b:
-            return sorted(types, key = lambda r: file_region.precise_in_region(self.view, r))[0]
+            return sorted(types, key=lambda r: file_region.precise_in_region(self.view, r))[0]
         else:
             return types[0]
 
     def show_types(self, types):
         if not types:
-            show_status_message("Can't infer type", False)
+            Common.show_status_message("Can't infer type", False)
             return
 
         self.types = types
-        self.output_view = output_panel(self.view.window(), '', panel_name = TYPES_PANEL_NAME, syntax = 'Haskell-SublimeHaskell')
+        self.output_view = Common.output_panel(self.view.window(), '', panel_name = TYPES_PANEL_NAME, syntax = 'Haskell-SublimeHaskell')
         self.view.window().show_quick_panel([t.typename for t in self.types], self.on_done, 0, -1, self.on_changed)
 
     def on_done(self, idx):
@@ -283,18 +285,18 @@ class SublimeHaskellShowType(SublimeHaskellTextCommand):
             return
 
         t = self.types[idx]
-        output_text(self.output_view, t.show(self.view), clear = True)
+        Common.output_text(self.output_view, t.show(self.view), clear = True)
 
     def on_changed(self, idx):
         if idx == -1:
             return
 
         t = self.types[idx]
-        output_text(self.output_view, t.show(self.view), clear = True)
+        Common.output_text(self.output_view, t.show(self.view), clear = True)
         self.view.add_regions('typed', [t.region(self.view)], 'string', 'dot', sublime.DRAW_OUTLINED)
 
     def is_enabled(self):
-        return is_enabled_haskell_command(self.view, False)
+        return Common.is_enabled_haskell_command(self.view, False)
 
 
 class FileTypes(object):
@@ -336,20 +338,20 @@ class SublimeHaskellShowTypes(SublimeHaskellShowType):
 
     def show_types(self, types):
         if not types:
-            show_status_message("Can't infer type", False)
+            Common.show_status_message("Can't infer type", False)
             return
 
         self.types = types
-        self.output_view = output_panel(self.view.window(), '', panel_name = TYPES_PANEL_NAME, syntax = 'Haskell-SublimeHaskell', show_panel = False)
+        self.output_view = Common.output_panel(self.view.window(), '', panel_name = TYPES_PANEL_NAME, syntax = 'Haskell-SublimeHaskell', show_panel = False)
         regions = []
         for t in self.types:
-            output_text(self.output_view, '{0}\n'.format(t.show(self.view)), clear = False)
-            regions.append(sublime.Region(self.output_view.size() - 1 - len(use_unicode_operators(t.typename)), self.output_view.size() - 1))
+            Common.output_text(self.output_view, '{0}\n'.format(t.show(self.view)), clear = False)
+            regions.append(sublime.Region(self.output_view.size() - 1 - len(Common.use_unicode_operators(t.typename)), self.output_view.size() - 1))
         self.output_view.add_regions('types', regions, 'comment', '', sublime.DRAW_OUTLINED)
-        show_panel(self.view.window(), panel_name = TYPES_PANEL_NAME)
+        Common.show_panel(self.view.window(), panel_name = TYPES_PANEL_NAME)
 
 
-class SublimeHaskellGetTypes(SublimeHaskellTextCommand):
+class SublimeHaskellGetTypes(Common.SublimeHaskellTextCommand):
     def run(self, edit, filename = None):
         self.filename = filename
         if not self.filename:
@@ -361,7 +363,7 @@ class SublimeHaskellGetTypes(SublimeHaskellTextCommand):
         pass
 
 
-class SublimeHaskellShowAllTypes(SublimeHaskellTextCommand):
+class SublimeHaskellShowAllTypes(Common.SublimeHaskellTextCommand):
     def run(self, edit, filename = None):
         self.filename = filename
         if not self.filename:
@@ -377,35 +379,38 @@ class SublimeHaskellShowAllTypes(SublimeHaskellTextCommand):
 
     def show_types(self, types):
         if not types:
-            show_status_message("Can't infer type", False)
+            Common.show_status_message("Can't infer type", False)
             return
 
         types = sorted(
             list(filter(lambda t: t.region(self.view).contains(self.view.sel()[0]), types)),
             key = lambda t: t.region(self.view).size())
-        self.output_view = output_panel(self.view.window(), '', panel_name = TYPES_PANEL_NAME, syntax = 'Haskell-SublimeHaskell', show_panel = False)
+        self.output_view = Common.output_panel(self.view.window(), '', panel_name = TYPES_PANEL_NAME, syntax = 'Haskell-SublimeHaskell', show_panel = False)
 
         regions = []
         for t in types:
-            output_text(self.output_view, '{0}\n'.format(t.show(self.view)), clear = False)
-            regions.append(sublime.Region(self.output_view.size() - 1 - len(use_unicode_operators(t.typename)), self.output_view.size() - 1))
+            Common.output_text(self.output_view, '{0}\n'.format(t.show(self.view)), clear = False)
+            regions.append(sublime.Region(self.output_view.size() - 1 - len(Common.use_unicode_operators(t.typename)), self.output_view.size() - 1))
         self.output_view.add_regions('types', regions, 'comment', '', sublime.DRAW_OUTLINED)
-        show_panel(self.view.window(), panel_name = TYPES_PANEL_NAME)
+        Common.show_panel(self.view.window(), panel_name = TYPES_PANEL_NAME)
 
     def is_enabled(self):
-        return is_haskell_source(self.view) and self.view.file_name() is not None
+        return Common.is_haskell_source(self.view) and self.view.file_name() is not None
 
 
-class SublimeHaskellHideAllTypes(SublimeHaskellTextCommand):
+class SublimeHaskellHideAllTypes(Common.SublimeHaskellTextCommand):
     def run(self, edit):
         file_types.hide(self.view.file_name())
-        hide_panel(self.view.window(), panel_name = TYPES_PANEL_NAME)
+        Common.hide_panel(self.view.window(), panel_name=TYPES_PANEL_NAME)
 
     def is_enabled(self):
-        return is_haskell_source(self.view) and self.view.file_name() is not None and file_types.has(self.view.file_name()) and file_types.shown(self.view.file_name())
+        return Common.is_haskell_source(self.view) and \
+               self.view.file_name() is not None and \
+               file_types.has(self.view.file_name()) and \
+               file_types.shown(self.view.file_name())
 
 
-class SublimeHaskellToggleAllTypes(SublimeHaskellTextCommand):
+class SublimeHaskellToggleAllTypes(Common.SublimeHaskellTextCommand):
     def run(self, edit):
         if file_types.shown(self.view.file_name()):
             self.view.run_command('sublime_haskell_hide_all_types')
@@ -413,7 +418,7 @@ class SublimeHaskellToggleAllTypes(SublimeHaskellTextCommand):
             self.view.run_command('sublime_haskell_show_all_types')
 
     def is_enabled(self):
-        return is_haskell_source(self.view) and self.view.file_name() is not None
+        return Common.is_haskell_source(self.view) and self.view.file_name() is not None
 
 
 # Works only with the cursor being in the name of a toplevel function so far.
@@ -422,16 +427,16 @@ class SublimeHaskellInsertType(SublimeHaskellShowType):
         result = self.get_best_type(self.get_types())
         if result:
             r = result.region(self.view)
-            qsymbol = get_qualified_symbol_at_region(self.view, self.view.word(r.begin()))
+            qsymbol = Common.get_qualified_symbol_at_region(self.view, self.view.word(r.begin()))
             line_begin = self.view.line(r).begin()
             prefix = self.view.substr(sublime.Region(line_begin, r.begin()))
-            indent = re.search('(?P<indent>\s*)', prefix).group('indent')
+            indent = re.search(r'(?P<indent>\s*)', prefix).group('indent')
             signature = '{0}{1} :: {2}\n'.format(indent, qsymbol.name, result.typename)
             self.view.insert(edit, line_begin, signature)
 
 
 class ExpandSelectionInfo(object):
-    def __init__(self, view, selection = None):
+    def __init__(self, view, selection=None):
         self.view = view
         self.selection = selection if selection is not None else view.sel()[0]
         if file_types.has(self.view.file_name()):
@@ -444,7 +449,7 @@ class ExpandSelectionInfo(object):
     def is_valid(self):
         return self.regions is not None
 
-    def is_actual(self, view = None, selection = None):
+    def is_actual(self, view=None, selection=None):
         if not view:
             view = self.view
         if selection is None:
@@ -489,22 +494,28 @@ class SublimeHaskellExpandSelectionExpression(SublimeHaskellShowType):
             self.Infos = [ExpandSelectionInfo(self.view, s) for s in selections]
 
         if not self.is_infos_valid(selections):
-            show_status_message('Unable to retrieve expand selection info', False)
+            Common.show_status_message('Unable to retrieve expand selection info', False)
             return
 
         tr = [i.expand() for i in self.Infos]
         self.view.sel().clear()
         self.view.sel().add_all([t.region for t in tr])
 
-        output_panel(self.view.window(), '\n'.join([use_unicode_operators(t.typename) for t in tr]), panel_name = 'sublime_haskell_expand_selection_expression', syntax = 'Haskell-SublimeHaskell')
+        Common.output_panel(self.view.window(),
+                            '\n'.join([Common.use_unicode_operators(t.typename) for t in tr]),
+                            panel_name='sublime_haskell_expand_selection_expression',
+                            syntax='Haskell-SublimeHaskell')
 
     def is_infos_valid(self, selections):
-        return self.Infos and all([i.is_valid() for i in self.Infos]) and len(selections) == len(self.Infos) and all([i.is_actual(self.view, s) for i, s in zip(self.Infos, selections)])
+        return self.Infos and \
+               all([i.is_valid() for i in self.Infos]) and \
+               len(selections) == len(self.Infos) and \
+               all([i.is_actual(self.view, s) for i, s in zip(self.Infos, selections)])
 
 
 class SublimeHaskellTypes(sublime_plugin.EventListener):
     def on_selection_modified(self, view):
-        if is_haskell_source(view) and view.file_name() and file_types.has(view.file_name()) and file_types.shown(view.file_name()):
+        if Common.is_haskell_source(view) and view.file_name() and file_types.has(view.file_name()) and file_types.shown(view.file_name()):
             view.run_command('sublime_haskell_show_all_types', {'filename': view.file_name()})
 
     def on_modified(self, view):

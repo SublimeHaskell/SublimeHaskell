@@ -9,19 +9,23 @@ import sublime_plugin
 import time
 
 if int(sublime.version()) < 3000:
-    from sublime_haskell_common import *
-    from internals.locked_object import LockedObject
-    from internals.settings import get_setting_async
-    from internals.utils import to_unicode
+    import sublime_haskell_common as Common
+    import internals.logging as Logging
+    import internals.locked_object as LockedObject
+    import internals.settings as Settings
+    import internals.utils as Utils
     from hdevtools import start_hdevtools, stop_hdevtools
+    import ghci_backend as GHCIMod
     import hsdev
     from worker import run_async
 else:
-    from SublimeHaskell.sublime_haskell_common import *
-    from SublimeHaskell.internals.locked_object import LockedObject
-    from SublimeHaskell.internals.settings import get_setting_async
-    from SublimeHaskell.internals.utils import to_unicode
+    import SublimeHaskell.sublime_haskell_common as Common
+    import SublimeHaskell.internals.logging as Logging
+    import SublimeHaskell.internals.locked_object as LockedObject
+    import SublimeHaskell.internals.settings as Settings
+    import SublimeHaskell.internals.utils as Utils
     from SublimeHaskell.hdevtools import start_hdevtools, stop_hdevtools
+    import SublimeHaskell.ghci_backend as GHCIMod
     import SublimeHaskell.hsdev as hsdev
     from SublimeHaskell.worker import run_async
 
@@ -46,20 +50,20 @@ EXPORT_MODULE_RE = re.compile(r'\bmodule\s+[\w\d\.]*$')
 # Gets available LANGUAGE options and import modules from ghc-mod
 def get_language_pragmas():
 
-    if get_setting_async('enable_hsdev'):
+    if Settings.get_setting_async('enable_hsdev'):
         return hsdev.client.langs()
-    elif get_setting_async('enable_ghc_mod'):
-        return call_ghcmod_and_wait(['lang']).splitlines()
+    elif Settings.get_setting_async('enable_ghc_mod'):
+        return GHCIMod.call_ghcmod_and_wait(['lang']).splitlines()
 
     return []
 
 
 def get_flags_pragmas():
 
-    if get_setting_async('enable_hsdev'):
+    if Settings.get_setting_async('enable_hsdev'):
         return hsdev.client.flags()
-    elif get_setting_async('enable_ghc_mod'):
-        return call_ghcmod_and_wait(['flag']).splitlines()
+    elif Settings.get_setting_async('enable_ghc_mod'):
+        return GHCIMod.call_ghcmod_and_wait(['flag']).splitlines()
 
     return []
 
@@ -115,7 +119,7 @@ class AutoCompletion(object):
 
         # cabal name => set of modules, where cabal name is 'cabal' for cabal or sandbox path
         # for cabal-devs
-        self.module_completions = LockedObject({})
+        self.module_completions = LockedObject.LockedObject({})
 
         # keywords
         # TODO: keywords can't appear anywhere, we can suggest in right places
@@ -127,7 +131,7 @@ class AutoCompletion(object):
         self.current_filename = None
 
         # filename ⇒ preloaded completions + None ⇒ all completions
-        self.cache = LockedObject(CompletionCache())
+        self.cache = LockedObject.LockedObject(CompletionCache())
         self.wide_completion = None
 
     def mark_wide_completion(self, view):
@@ -136,7 +140,7 @@ class AutoCompletion(object):
     @hsdev.use_hsdev([])
     def get_completions_async(self, file_name=None):
         def log_result(r):
-            log('completions: {0}'.format(len(r or [])), log_trace)
+            Logging.log('completions: {0}'.format(len(r or [])), Logging.LOG_TRACE)
             return r or []
         none_comps = []
         update_cabal = False
@@ -160,8 +164,8 @@ class AutoCompletion(object):
         if file_name is None:
             return log_result(none_comps)
         else:
-            log('preparing completions for {0}'.format(file_name), log_debug)
-            current_module = head_of(hsdev.client_back.module(file=file_name))
+            Logging.log('preparing completions for {0}'.format(file_name), Logging.LOG_DEBUG)
+            current_module = Utils.head_of(hsdev.client_back.module(file=file_name))
             if current_module:
                 comps = make_completions(
                     hsdev.client_back.complete('', file_name, timeout=None))
@@ -183,7 +187,7 @@ class AutoCompletion(object):
             return log_result(cache_.files[file_name])
 
     def drop_completions_async(self, file_name=None):
-        log('drop prepared completions')
+        Logging.log('drop prepared completions')
         with self.cache as cache_:
             if file_name is None:
                 cache_.files.clear()
@@ -200,7 +204,7 @@ class AutoCompletion(object):
         window = sublime.active_window()
         if window:
             view = window.active_view()
-            if view and is_haskell_source(view):
+            if view and Common.is_haskell_source(view):
                 filename = view.file_name()
                 if filename:
                     self.get_completions_async(filename)
@@ -215,8 +219,8 @@ class AutoCompletion(object):
             return []
 
         self.current_filename = current_file_name
-        line_contents = get_line_contents(view, locations[0])
-        qsymbol = get_qualified_symbol(line_contents)
+        line_contents = Common.get_line_contents(view, locations[0])
+        qsymbol = Common.get_qualified_symbol(line_contents)
         qualified_prefix = qsymbol.qualified_name()
 
         suggestions = []
@@ -226,7 +230,7 @@ class AutoCompletion(object):
             self.wide_completion = None
 
         if qsymbol.module:
-            current_module = head_of(hsdev.client.module(file=current_file_name))
+            current_module = Utils.head_of(hsdev.client.module(file=current_file_name))
             current_project = None
             if current_module:
                 current_project = current_module.location.project
@@ -289,11 +293,11 @@ class AutoCompletion(object):
     def get_import_completions(self, view, prefix, locations):
 
         self.current_filename = view.file_name()
-        line_contents = get_line_contents(view, locations[0])
+        line_contents = Common.get_line_contents(view, locations[0])
 
         # Autocompletion for import statements
-        if get_setting('auto_complete_imports'):
-            match_import_list = IMPORT_SYMBOL_RE.search(line_contents)
+        if Settings.get_setting('auto_complete_imports'):
+            match_import_list = Common.IMPORT_SYMBOL_RE.search(line_contents)
             if match_import_list:
                 module_name = match_import_list.group('module')
                 import_list_completions = []
@@ -321,21 +325,21 @@ class AutoCompletion(object):
     def get_special_completions(self, view, prefix, locations):
 
         # Contents of the current line up to the cursor
-        line_contents = get_line_contents(view, locations[0])
+        line_contents = Common.get_line_contents(view, locations[0])
 
         # Autocompletion for LANGUAGE pragmas
-        if get_setting('auto_complete_language_pragmas'):
+        if Settings.get_setting('auto_complete_language_pragmas'):
             # TODO handle multiple selections
             match_language = LANGUAGE_RE.match(line_contents)
             if match_language:
                 if not self.language_pragmas:
                     self.language_pragmas = get_language_pragmas()
-                return [(to_unicode(c),) * 2 for c in self.language_pragmas]
+                return [(Utils.to_unicode(c),) * 2 for c in self.language_pragmas]
             match_options = OPTIONS_GHC_RE.match(line_contents)
             if match_options:
                 if not self.flags_pragmas:
                     self.flags_pragmas = get_flags_pragmas()
-                return [(to_unicode(c),) * 2 for c in self.flags_pragmas]
+                return [(Utils.to_unicode(c),) * 2 for c in self.flags_pragmas]
 
         return []
 
@@ -409,7 +413,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         self.project_file_name = None
 
     def on_query_completions(self, view, prefix, locations):
-        if not is_haskell_source(view):
+        if not Common.is_haskell_source(view):
             return []
 
         begin_time = time.clock()
@@ -420,10 +424,10 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 
         # Export list
         if 'meta.declaration.exports.haskell' in view.scope_name(view.sel()[0].a):
-            line_contents = get_line_contents(view, locations[0])
+            line_contents = Common.get_line_contents(view, locations[0])
             export_module = EXPORT_MODULE_RE.search(line_contents)
             if export_module:
-                # qsymbol = get_qualified_symbol_at_region(view, view.sel()[0])
+                # qsymbol = Common.get_qualified_symbol_at_region(view, view.sel()[0])
                 # TODO: Implement
                 pass
 
@@ -431,31 +435,31 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             completions = autocompletion.get_completions(view, prefix, locations)
 
         end_time = time.clock()
-        log('time to get completions: {0} seconds'.format(end_time - begin_time), log_debug)
+        Logging.log('time to get completions: {0} seconds'.format(end_time - begin_time), Logging.LOG_DEBUG)
 
         # Don't put completions with special characters (?, !, ==, etc.)
         # into completion because that wipes all default Sublime completions:
         # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
         # TODO: work around this
         # comp = [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0].split('\t')[0])]
-        # if get_setting('inhibit_completions') and len(comp) != 0:
+        # if Settings.get_setting('inhibit_completions') and len(comp) != 0:
         #     return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         # return comp
 
-        if get_setting('inhibit_completions') and len(completions) != 0:
+        if Settings.get_setting('inhibit_completions') and len(completions) != 0:
             return (completions, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         return completions
 
     def set_cabal_status(self, view):
         filename = view.file_name()
         if filename:
-            (cabal_dir, project_name) = get_cabal_project_dir_and_name_of_file(filename)
+            (cabal_dir, project_name) = Common.get_cabal_project_dir_and_name_of_file(filename)
             if project_name:
                 # TODO: Set some useful status instead of this
                 view.set_status('sublime_haskell_cabal', '{0}: {1}'.format('cabal', project_name))
 
     def on_activated_async(self, view):
-        if is_haskell_source(view):
+        if Common.is_haskell_source(view):
             filename = view.file_name()
             if filename:
                 run_async('get completions for {0}'.format(filename), autocompletion.get_completions_async, filename)
@@ -464,7 +468,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         hsdev.start_agent()
 
         self.set_cabal_status(view)
-        if is_inspected_source(view):
+        if Common.is_inspected_source(view):
             filename = view.file_name()
             if filename:
                 hsdev.agent.mark_file_dirty(filename)
@@ -474,7 +478,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         hsdev.start_agent()
 
         self.set_cabal_status(view)
-        if is_inspected_source(view):
+        if Common.is_inspected_source(view):
             filename = view.file_name()
             if filename:
                 hsdev.agent.mark_file_dirty(filename)
@@ -494,17 +498,17 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
                     self.project_file_name = window.project_file_name()
                 if window.project_file_name() is not None and window.project_file_name() != self.project_file_name:
                     self.project_file_name = window.project_file_name()
-                    log('project switched to {0}, reinspecting'.format(self.project_file_name))
+                    Logging.log('project switched to {0}, reinspecting'.format(self.project_file_name))
                     if hsdev.agent_connected():
-                        log('reinspect all', log_trace)
+                        Logging.log('reinspect all', Logging.LOG_TRACE)
                         hsdev.client.remove_all()
                         hsdev.agent.start_inspect()
                         hsdev.agent.force_inspect()
                     else:
-                        show_status_message("inspector not connected", is_ok=False)
+                        Common.show_status_message("inspector not connected", is_ok=False)
 
     def on_post_save(self, view):
-        if is_inspected_source(view):
+        if Common.is_inspected_source(view):
             filename = view.file_name()
             if filename:
                 hsdev.agent.mark_file_dirty(filename)

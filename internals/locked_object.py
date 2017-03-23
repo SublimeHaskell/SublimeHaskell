@@ -13,7 +13,7 @@ class LockedObject(object):
         pass
     """
 
-    def __init__(self, obj, lock = None):
+    def __init__(self, obj, lock=None):
         self.object_lock = lock if lock else threading.RLock()
         self.object = obj
 
@@ -21,5 +21,5 @@ class LockedObject(object):
         self.object_lock.__enter__()
         return self.object
 
-    def __exit__(self, type, value, traceback):
-        self.object_lock.__exit__(type, value, traceback)
+    def __exit__(self, otype, value, traceback):
+        self.object_lock.__exit__(otype, value, traceback)
