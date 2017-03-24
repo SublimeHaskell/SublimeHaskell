@@ -5,14 +5,9 @@ import re
 
 import sublime
 
-if int(sublime.version()) < 3000:
-    import sublime_haskell_common as Common
-    import internals.settings as Settings
-    import internals.proc_helper as ProcHelper
-else:
-    import SublimeHaskell.sublime_haskell_common as Common
-    import SublimeHaskell.internals.settings as Settings
-    import SublimeHaskell.internals.proc_helper as ProcHelper
+import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.internals.proc_helper as ProcHelper
 
 def ghci_package_db(cabal=None):
     if not cabal or cabal == 'cabal':

@@ -6,11 +6,8 @@ import sublime
 import os.path
 from functools import total_ordering
 
-if int(sublime.version()) < 3000:
-    import sublime_haskell_common as Common
-else:
-    import SublimeHaskell.sublime_haskell_common as Common
-    from functools import reduce
+import SublimeHaskell.sublime_haskell_common as Common
+from functools import reduce
 
 
 @total_ordering
@@ -336,7 +333,7 @@ class Module(Symbol):
     Haskell module symbol
     """
     def __init__(self, module_name, exports = None, imports = [], declarations = {}, location = None, last_inspection_time = 0):
-        super(Module, self).__init__('module', module_name)
+        super().__init__('module', module_name)
         self.location = location
         # List of strings
         if exports is not None:
@@ -411,7 +408,7 @@ def unicode_operators(fn):
 
 class Declaration(Symbol):
     def __init__(self, name, decl_type = 'declaration', docs = None, imported = [], defined = None, position = None, module = None):
-        super(Declaration, self).__init__(decl_type, name)
+        super().__init__(decl_type, name)
         self.docs = docs
         self.imported = imported[:]
         self.defined = defined
@@ -570,7 +567,7 @@ class Function(Declaration):
     Haskell function declaration
     """
     def __init__(self, name, function_type, docs = None, imported = [], defined = None, position = None, module = None):
-        super(Function, self).__init__(name, 'function', docs, imported, defined, position, module)
+        super().__init__(name, 'function', docs, imported, defined, position, module)
         self.type = function_type
 
     def suggest(self):
@@ -595,7 +592,7 @@ class TypeBase(Declaration):
     Haskell type, data or class
     """
     def __init__(self, name, decl_type, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
-        super(TypeBase, self).__init__(name, decl_type, docs, imported, defined, position, module)
+        super().__init__(name, decl_type, docs, imported, defined, position, module)
         self.context = context
         self.args = args
         self.definition = definition
@@ -653,7 +650,7 @@ class Type(TypeBase):
     Haskell type synonym
     """
     def __init__(self, name, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
-        super(Type, self).__init__(name, 'type', context, args, definition, docs, imported, defined, position, module)
+        super().__init__(name, 'type', context, args, definition, docs, imported, defined, position, module)
 
 
 class Newtype(TypeBase):
@@ -661,7 +658,7 @@ class Newtype(TypeBase):
     Haskell newtype synonym
     """
     def __init__(self, name, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
-        super(Newtype, self).__init__(name, 'newtype', context, args, definition, docs, imported, defined, position, module)
+        super().__init__(name, 'newtype', context, args, definition, docs, imported, defined, position, module)
 
 
 class Data(TypeBase):
@@ -669,7 +666,7 @@ class Data(TypeBase):
     Haskell data declaration
     """
     def __init__(self, name, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
-        super(Data, self).__init__(name, 'data', context, args, definition, docs, imported, defined, position, module)
+        super().__init__(name, 'data', context, args, definition, docs, imported, defined, position, module)
 
 
 class Class(TypeBase):
@@ -677,7 +674,7 @@ class Class(TypeBase):
     Haskell class declaration
     """
     def __init__(self, name, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
-        super(Class, self).__init__(name, 'class', context, args, definition, docs, imported, defined, position, module)
+        super().__init__(name, 'class', context, args, definition, docs, imported, defined, position, module)
 
 
 def update_with(l, r, default_value, f):

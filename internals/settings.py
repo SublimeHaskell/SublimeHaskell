@@ -9,11 +9,7 @@
 
 import sublime
 
-if int(sublime.version()) < 3000:
-    # from internals.locked_object import LockedObject
-    pass
-else:
-    import SublimeHaskell.internals.locked_object as LockedObject
+import SublimeHaskell.internals.locked_object as LockedObject
 
 # SublimeHaskell settings dictionary used to retrieve a settnig asynchronously from any thread
 sublime_haskell_settings = LockedObject.LockedObject({})

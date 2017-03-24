@@ -7,26 +7,15 @@ import webbrowser
 import sublime
 import sublime_plugin
 
-if int(sublime.version()) < 3000:
-    import sublime_haskell_common as Common
-    import internals.logging as Logging
-    import internals.proc_helper as ProcHelper
-    import internals.settings as Settings
-    import internals.output_collector as OutputCollector
-    import internals.utils as Utils
-    import autocomplete
-    import symbols
-    import hsdev
-else:
-    import SublimeHaskell.sublime_haskell_common as Common
-    import SublimeHaskell.internals.logging as Logging
-    import SublimeHaskell.internals.proc_helper as ProcHelper
-    import SublimeHaskell.internals.settings as Settings
-    import SublimeHaskell.internals.output_collector as OutputCollector
-    import SublimeHaskell.internals.utils as Utils
-    import SublimeHaskell.autocomplete as autocomplete
-    import SublimeHaskell.symbols as symbols
-    import SublimeHaskell.hsdev as hsdev
+import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.internals.logging as Logging
+import SublimeHaskell.internals.proc_helper as ProcHelper
+import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.internals.output_collector as OutputCollector
+import SublimeHaskell.internals.utils as Utils
+import SublimeHaskell.autocomplete as autocomplete
+import SublimeHaskell.symbols as symbols
+import SublimeHaskell.hsdev as hsdev
 
 # Extract the filename, line, column from symbol info
 symbol_file_regex = r'^Defined at: (.*):(\d+):(\d+)$'
@@ -1193,7 +1182,7 @@ class SublimeHaskellAutoFixUndo(SublimeHaskellAutoFixWindowBase):
         autofix_state.undo()
 
     def is_enabled(self):
-        return super(SublimeHaskellAutoFixUndo, self).is_enabled() and autofix_state.has_undo()
+        return super().is_enabled() and autofix_state.has_undo()
 
 
 class SublimeHaskellAutoFixRedo(SublimeHaskellAutoFixWindowBase):
@@ -1205,7 +1194,7 @@ class SublimeHaskellAutoFixRedo(SublimeHaskellAutoFixWindowBase):
         autofix_state.redo()
 
     def is_enabled(self):
-        return super(SublimeHaskellAutoFixRedo, self).is_enabled() and autofix_state.has_redo()
+        return super().is_enabled() and autofix_state.has_redo()
 
 
 class SublimeHaskellAutoFixStop(SublimeHaskellAutoFixWindowBase):
@@ -1231,7 +1220,7 @@ class SublimeHaskellStackExec(sublime_plugin.TextCommand):
 
     class SExecRunner(threading.Thread):
         def __init__(self, panel, cmdargs):
-            super(SExecRunner, self).__init__()
+            super().__init__()
             self.sexec_proc = OutputCollector.OutputCollector(panel, cmdargs)
 
         def run(self):

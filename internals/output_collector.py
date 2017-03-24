@@ -6,12 +6,8 @@ import io
 import threading
 import subprocess
 
-if int(sublime.version()) < 3000:
-    from internals.proc_helper import ProcHelper
-    from sublime_haskell_common import output_text
-else:
-    import SublimeHaskell.internals.proc_helper as ProcHelper
-    import SublimeHaskell.internals.utils as Utils
+import SublimeHaskell.internals.proc_helper as ProcHelper
+import SublimeHaskell.internals.utils as Utils
 
 
 class OutputCollector(object):
@@ -74,7 +70,7 @@ class FileObjectCollector(threading.Thread):
     """stderr file object output collector. This accumulates lines into a list and also sends
     each line to a designated output panel."""
     def __init__(self, name, panel, lines_lock, lines, fobject):
-        super(FileObjectCollector, self).__init__(name=name)
+        super().__init__(name=name)
 
         self.panel = panel
         self.lines_lock = lines_lock
@@ -103,7 +99,7 @@ class DescriptorDrain(threading.Thread):
     ### This really belongs in sublime_haskell_common. But, since that module gets loaded later
     ### than this one OR it gets reloaded, you end up with the dreaded super() TypeError.
     def __init__(self, label, fd):
-        super(DescriptorDrain, self).__init__(name='drain-' + label)
+        super().__init__(name='drain-' + label)
         self.label = label
         self.fd = fd
         self.stop_me = threading.Event()

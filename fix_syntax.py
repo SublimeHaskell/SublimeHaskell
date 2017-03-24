@@ -13,10 +13,7 @@ import os
 import sublime
 import sublime_plugin
 
-if int(sublime.version()) < 3000:
-    import internals.settings as Settings
-else:
-    import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.internals.settings as Settings
 
 
 class DetectFileTypeCommand(sublime_plugin.EventListener):

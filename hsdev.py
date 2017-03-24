@@ -8,30 +8,19 @@ import re
 import sys
 import threading
 import time
+import traceback
 
 import socket
 import sublime
 
-if int(sublime.version()) < 3000:
-    import symbols
-    import sublime_haskell_common as Common
-    import internals.logging as Logging
-    import internals.locked_object as LockedObject
-    import internals.proc_helper as ProcHelper
-    import internals.settings as Settings
-    from internals.utils import PyV3
-    from internals.output_collector import DescriptorDrain
-    from worker import run_async
-else:
-    import SublimeHaskell.symbols as symbols
-    import SublimeHaskell.sublime_haskell_common as Common
-    import SublimeHaskell.internals.logging as Logging
-    import SublimeHaskell.internals.locked_object as LockedObject
-    import SublimeHaskell.internals.proc_helper as ProcHelper
-    import SublimeHaskell.internals.settings as Settings
-    from SublimeHaskell.internals.utils import PyV3
-    from SublimeHaskell.internals.output_collector import DescriptorDrain
-    from SublimeHaskell.worker import run_async
+import SublimeHaskell.symbols as symbols
+import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.internals.logging as Logging
+import SublimeHaskell.internals.locked_object as LockedObject
+import SublimeHaskell.internals.proc_helper as ProcHelper
+import SublimeHaskell.internals.settings as Settings
+from SublimeHaskell.internals.output_collector import DescriptorDrain
+from SublimeHaskell.worker import run_async
 
 
 def concat_args(args):
@@ -1104,7 +1093,7 @@ def wait_result(fn, *args, **kwargs):
 # hsdev server process with auto-restart
 class HsDevProcess(threading.Thread):
     def __init__(self, port=4567, cache=None, log_file=None, log_config=None):
-        super(HsDevProcess, self).__init__()
+        super().__init__()
         self.process = None
         self.drain_stdout = None
         self.drain_stderr = None
@@ -1156,9 +1145,12 @@ class HsDevProcess(threading.Thread):
         self.stop_event.set()
 
 
-agent = None  # global hsdev agent
-client = None  # global hsdev agent's hsdev client for command tasks
-client_back = None  # global hsdev agent's hsdev client for background tasks (commonly scanning)
+if 'agent' not in globals():
+    agent = None  # global hsdev agent
+if 'client' not in globals():
+    client = None  # global hsdev agent's hsdev client for command tasks
+if 'client_back' not in globals():
+    client_back = None  # global hsdev agent's hsdev client for background tasks (commonly scanning)
 
 
 # Show scan progress in status bar
@@ -1179,11 +1171,7 @@ def dirty(fn):
     def wrapped(self, *args, **kwargs):
         if not hasattr(self, 'dirty_lock'):
             self.dirty_lock = threading.Lock()
-        acquired = None
-        if PyV3:
-            acquired = self.dirty_lock.acquire(blocking=False)
-        else:
-            acquired = self.dirty_lock.acquire(False)
+        acquired = self.dirty_lock.acquire(blocking=False)
         try:
             return fn(self, *args, **kwargs)
         finally:
@@ -1225,7 +1213,7 @@ class HsDevAgent(threading.Thread):
     max_ver = [0, 2, 3, 0]  # maximal hsdev version
 
     def __init__(self):
-        super(HsDevAgent, self).__init__()
+        super().__init__()
         self.daemon = True
         self.cabal_to_load = LockedObject.LockedObject([])
         self.dirty_files = LockedObject.LockedObject([])
@@ -1403,8 +1391,10 @@ class HsDevAgent(threading.Thread):
                                       on_notify=scan_status(s),
                                       wait=True,
                                       docs=Settings.get_setting_async('enable_hdocs'))
-        except Exception as e:
-            Logging.log('loading standard modules info for {0} failed with {1}'.format(cabal or 'cabal', e), Logging.LOG_ERROR)
+        except:
+            Logging.log('loading standard modules info for {0} failed:'.format(cabal or 'cabal'),
+                        Logging.LOG_ERROR)
+            traceback.print_exception(sys.exc_info()[0], sys.exc_info()[1], sys.exc_info()[2])
 
     @use_hsdev()
     @use_inspect_modules
@@ -1488,12 +1478,10 @@ def start_agent():
     global client
     global client_back
 
-    if agent is not None:
-        return
+    if agent is None:
+        Logging.log('starting agent', Logging.LOG_TRACE)
 
-    Logging.log('starting agent', Logging.LOG_TRACE)
-
-    agent = HsDevAgent()
-    client = agent.client
-    client_back = agent.client_back
-    agent.start()
+        agent = HsDevAgent()
+        agent.start()
+        client = agent.client
+        client_back = agent.client_back

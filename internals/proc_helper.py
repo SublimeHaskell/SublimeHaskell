@@ -13,17 +13,11 @@ import platform
 
 import sublime
 
-if int(sublime.version()) < 3000:
-    # from internals.locked_object import LockedObject
-    # from internals.settings import get_setting_async
-    # from internal.utils import decode_bytes, encode_bytes
-    pass
-else:
-    import SublimeHaskell.sublime_haskell_common as Common
-    import SublimeHaskell.internals.logging as Logging
-    import SublimeHaskell.internals.locked_object as LockedObject
-    import SublimeHaskell.internals.settings as Settings
-    import SublimeHaskell.internals.utils as Utils
+import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.internals.logging as Logging
+import SublimeHaskell.internals.locked_object as LockedObject
+import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.internals.utils as Utils
 
 def isWinXX():
     return platform.system() == "Windows"
@@ -193,7 +187,7 @@ class ProcHelper(object):
                         elif re_section.match(l1):
                             p_state = 0
 
-            except IOError as e:
+            except IOError:
                 # Silently fail.
                 pass
 
@@ -208,16 +202,10 @@ class ProcHelper(object):
             std_places = ["$HOME/.local/bin" if not isWinXX() else "%APPDATA%/local/bin"] + cabal_config()
             std_places = list(filter(os.path.isdir, map(normalize_path, std_places)))
 
-        add_to_PATH = list(map(normalize_path, Settings.get_setting_async('add_to_PATH', [])))
-        if not Utils.PyV3:
-            # convert unicode strings to strings (for Python < 3). Environment
-            # can contain only strings.
-            add_to_PATH = list(map(str, add_to_PATH))
+        add_to_PATH = list(filter(os.path.isdir, map(normalize_path, Settings.get_setting_async('add_to_PATH', []))))
 
-        add_to_PATH = list(filter(os.path.isdir, add_to_PATH))
-
-        print("std_places = {0}".format(std_places))
-        print("add_to_PATH = {0}".format(add_to_PATH))
+        Logging.log("std_places = {0}".format(std_places), Logging.LOG_INFO)
+        Logging.log("add_to_PATH = {0}".format(add_to_PATH), Logging.LOG_INFO)
 
         ext_env['PATH'] = os.pathsep.join(add_to_PATH + std_places + [PATH])
         return ext_env

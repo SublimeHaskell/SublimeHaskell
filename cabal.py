@@ -2,12 +2,8 @@
 
 import sublime
 
-if int(sublime.version()) < 3000:
-    import sublime_haskell_common as Common
-    import hsdev
-else:
-    import SublimeHaskell.sublime_haskell_common as Common
-    import SublimeHaskell.hsdev as hsdev
+import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.hsdev as hsdev
 
 
 class SublimeHaskellCabalList(Common.SublimeHaskellWindowCommand):

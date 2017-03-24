@@ -4,20 +4,12 @@ import sublime_plugin
 import webbrowser
 from xml.etree import ElementTree
 
-if int(sublime.version()) < 3000:
-    import sublime_haskell_common as Common
-    import internals.utils as Utils
-    import symbols
-    import hsdev
-    import parseoutput
-    import types
-else:
-    import SublimeHaskell.sublime_haskell_common as Common
-    import SublimeHaskell.internals.utils as Utils
-    import SublimeHaskell.symbols as symbols
-    import SublimeHaskell.hsdev as hsdev
-    import SublimeHaskell.parseoutput as parseoutput
-    import SublimeHaskell.types as types
+import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.internals.utils as Utils
+import SublimeHaskell.symbols as symbols
+import SublimeHaskell.hsdev as hsdev
+import SublimeHaskell.parseoutput as parseoutput
+import SublimeHaskell.types as types
 
 
 classes = {

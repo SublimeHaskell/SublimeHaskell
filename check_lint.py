@@ -5,22 +5,13 @@ import re
 import sublime
 from threading import Thread
 
-if int(sublime.version()) < 3000:
-    import sublime_haskell_common as Common
-    import internals.settings as Settings
-    import internals.logging as Logging
-    import ghci_backend as GHCIMod
-    import hsdev as hsdev
-    import parseoutput as ParseOutput
-    import symbols
-else:
-    import SublimeHaskell.sublime_haskell_common as Common
-    import SublimeHaskell.internals.settings as Settings
-    import SublimeHaskell.internals.logging as Logging
-    import SublimeHaskell.ghci_backend as GHCIMod
-    import SublimeHaskell.hsdev as hsdev
-    import SublimeHaskell.parseoutput as ParseOutput
-    import SublimeHaskell.symbols as symbols
+import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.internals.logging as Logging
+import SublimeHaskell.ghci_backend as GHCIMod
+import SublimeHaskell.hsdev as hsdev
+import SublimeHaskell.parseoutput as ParseOutput
+import SublimeHaskell.symbols as symbols
 
 
 def lint_as_hints(msgs):

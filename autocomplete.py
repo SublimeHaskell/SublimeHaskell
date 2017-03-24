@@ -8,26 +8,15 @@ import sublime
 import sublime_plugin
 import time
 
-if int(sublime.version()) < 3000:
-    import sublime_haskell_common as Common
-    import internals.logging as Logging
-    import internals.locked_object as LockedObject
-    import internals.settings as Settings
-    import internals.utils as Utils
-    from hdevtools import start_hdevtools, stop_hdevtools
-    import ghci_backend as GHCIMod
-    import hsdev
-    from worker import run_async
-else:
-    import SublimeHaskell.sublime_haskell_common as Common
-    import SublimeHaskell.internals.logging as Logging
-    import SublimeHaskell.internals.locked_object as LockedObject
-    import SublimeHaskell.internals.settings as Settings
-    import SublimeHaskell.internals.utils as Utils
-    from SublimeHaskell.hdevtools import start_hdevtools, stop_hdevtools
-    import SublimeHaskell.ghci_backend as GHCIMod
-    import SublimeHaskell.hsdev as hsdev
-    from SublimeHaskell.worker import run_async
+import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.internals.logging as Logging
+import SublimeHaskell.internals.locked_object as LockedObject
+import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.internals.utils as Utils
+from SublimeHaskell.hdevtools import start_hdevtools, stop_hdevtools
+import SublimeHaskell.ghci_backend as GHCIMod
+import SublimeHaskell.hsdev as hsdev
+from SublimeHaskell.worker import run_async
 
 
 # Checks if we are in a LANGUAGE pragma.
@@ -523,6 +512,3 @@ def plugin_loaded():
 def plugin_unloaded():
     # Does this work properly on exit?
     stop_hdevtools()
-
-if int(sublime.version()) < 3000:
-    plugin_loaded()

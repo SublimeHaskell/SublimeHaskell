@@ -1,4 +1,5 @@
 # -*- coding: UTF-8 -*-
+# [SublimeLinter pylint-@python:3]
 
 import errno
 import fnmatch
@@ -9,24 +10,18 @@ import json
 import html
 import platform
 import string
-import sublime
-import sublime_plugin
 import subprocess
+import sys
 import threading
 import time
-from sys import stdout, stderr
 
-if int(sublime.version()) < 3000:
-    # from internals.locked_object import LockedObject
-    # from internals.settings import get_settings, get_setting, get_setting_async, on_changed_setting, sublime_haskell_settings, \
-    #     sublime_settings_changes
-    # from internals.proc_helper import ProcHelper
-    # from internals.utils import PyV3
-    pass
-else:
-    import SublimeHaskell.internals.logging as Logging
-    import SublimeHaskell.internals.locked_object as LockedObject
-    import SublimeHaskell.internals.settings as Settings
+import sublime
+import sublime_plugin
+
+import SublimeHaskell.internals.logging as Logging
+import SublimeHaskell.internals.locked_object as LockedObject
+import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.internals.utils as Utils
 
 # Maximum seconds to wait for window to appear
 # This dirty hack is used in wait_for_window function
@@ -38,15 +33,18 @@ ERROR_PANEL_NAME = 'sublime_haskell_error_panel'
 
 WORD_RE = re.compile(r'^(?P<word>[\w\d\'\.]*)(?P<tail>.*)')
 # Get symbol qualified prefix and its name
-SYMBOL_RE = re.compile(r'((?P<module>[A-Z][\w\d]*(\.[A-Z][\w\d\']*)*)\.)?((?P<identifier>(\w[\w\d\']*)?)|(?P<operator>[!#$%&*+\./<=>?@\\\^|\-~:]+))$')
+SYMBOL_RE = re.compile(r'((?P<module>[A-Z][\w\d]*(\.[A-Z][\w\d\']*)*)\.)?' + \
+                       r'((?P<identifier>(\w[\w\d\']*)?)|(?P<operator>[!#$%&*+\./<=>?@\\\^|\-~:]+))$')
 # Get import name
 IMPORT_MODULE_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']*(\.[A-Z][\w\d\']*)*)\b')
 # SYMBOL_RE = re.compile(r'((?P<module>\w+(\.\w+)*)\.)?(?P<identifier>((\w*)|([]*)))$')
 # Get symbol module scope and its name within import statement
-IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']*(\.[A-Z][\w\d\']*)*)(\s+as\s+(?P<as>[A-Z][\w\d\']*))?\s*\(.*?((?P<identifier>([a-z][\w\d\']*)?)|(\((?P<operator>[!#$%&*+\.\/<=>?@\\\^|\-~:]*)))$')
+IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']*(\.[A-Z][\w\d\']*)*)' + \
+                              r'(\s+as\s+(?P<as>[A-Z][\w\d\']*))?\s*' + \
+                              r'\(.*?((?P<identifier>([a-z][\w\d\']*)?)|(\((?P<operator>[!#$%&*+\.\/<=>?@\\\^|\-~:]*)))$')
 
 
-def is_enabled_haskell_command(view = None, must_be_project=True, must_be_main=False, must_be_file = False):
+def is_enabled_haskell_command(view=None, must_be_project=True, must_be_main=False, must_be_file=False):
     """Returns True if command for .hs can be invoked"""
     window, view, file_shown_in_view = get_haskell_command_window_view_file_project(view)
 
@@ -69,7 +67,7 @@ def is_enabled_haskell_command(view = None, must_be_project=True, must_be_main=F
     return True
 
 
-def get_haskell_command_window_view_file_project(view = None):
+def get_haskell_command_window_view_file_project(view=None):
     """Returns window, view and file"""
     if view:
         return view.window(), view, view.file_name()
@@ -187,7 +185,7 @@ def wait_for_window(on_appear, seconds_to_wait=MAX_WAIT_FOR_WINDOW):
     sublime.set_timeout(lambda: wait_for_window_callback(on_appear, seconds_to_wait), 0)
 
 
-def use_unicode_operators(s, force = False):
+def use_unicode_operators(s, force=False):
     """
     Set unicode symbols for some standard haskell operators
     """
@@ -197,7 +195,8 @@ def use_unicode_operators(s, force = False):
     ops = {
         '->': '\u2192',
         '=>': '\u21d2',
-        '::': '\u2237' }
+        '::': '\u2237'
+    }
     ops.update(dict((html.escape(o), v) for o, v in ops.items()))
     r = s
     for o, v in ops.items():
@@ -210,7 +209,7 @@ class SublimeHaskellOutputText(sublime_plugin.TextCommand):
     Helper command to output text to any view
     TODO: Is there any default command for this purpose?
     """
-    def run(self, edit, text = None, clear = None):
+    def run(self, edit, text=None, clear=None):
         if not text:
             return
         self.view.set_read_only(False)
@@ -224,7 +223,10 @@ class SublimeHaskellReplaceText(sublime_plugin.TextCommand):
     """
     Helper command to replace region
     """
-    def run(self, edit, text = None, begin = None, end = None):
+    def __init__(self, view):
+        super().__init__(view)
+
+    def run(self, edit, text=None, begin=None, end=None):
         if text is None or begin is None or end is None:
             return
         read_only = self.view.is_read_only()
@@ -234,18 +236,18 @@ class SublimeHaskellReplaceText(sublime_plugin.TextCommand):
 
 
 # Output some text to view (panel), possibly clearing
-def output_text(view, text = None, clear = False):
+def output_text(view, text=None, clear=False):
     view.run_command('sublime_haskell_output_text', {'text': (text or ''), 'clear': 'yes' if clear else ''})
 
 
 # Create new output panel
-def output_panel(window, text = '', panel_name = DEFAULT_PANEL_NAME, syntax = None, show_panel = True):
+def output_panel(window, text='', panel_name=DEFAULT_PANEL_NAME, syntax=None, show_panel=True):
     if not window:
         return None
     output_view = window.get_output_panel(panel_name)
     if syntax is not None:
         output_view.set_syntax_file('Packages/SublimeHaskell/Syntaxes/{0}.tmLanguage'.format(syntax))
-    output_text(output_view, text, clear = True)
+    output_text(output_view, text, clear=True)
     output_view.sel().clear()
     output_view.sel().add(sublime.Region(0, 0))
     if show_panel:
@@ -253,7 +255,7 @@ def output_panel(window, text = '', panel_name = DEFAULT_PANEL_NAME, syntax = No
     return output_view
 
 
-def hide_panel(window, panel_name = DEFAULT_PANEL_NAME):
+def hide_panel(window, panel_name=DEFAULT_PANEL_NAME):
     if not window:
         window = sublime.active_window()
     if not window:
@@ -261,7 +263,7 @@ def hide_panel(window, panel_name = DEFAULT_PANEL_NAME):
     window.run_command('hide_panel', {'panel': ('output.' + panel_name)})
 
 
-def show_panel(window, panel_name = DEFAULT_PANEL_NAME):
+def show_panel(window, panel_name=DEFAULT_PANEL_NAME):
     if not window:
         window = sublime.active_window()
     if not window:
@@ -270,7 +272,7 @@ def show_panel(window, panel_name = DEFAULT_PANEL_NAME):
 
 
 def output_error(window, text):
-    output_panel(window, text, panel_name = ERROR_PANEL_NAME)
+    output_panel(window, text, panel_name=ERROR_PANEL_NAME)
 
 
 def output_error_async(window, text):
@@ -279,6 +281,7 @@ def output_error_async(window, text):
 
 class SublimeHaskellError(RuntimeError):
     def __init__(self, what):
+        super().__init__()
         self.reason = what
 
 
@@ -321,7 +324,7 @@ def get_qualified_name(s):
 
 
 class QualifiedSymbol(object):
-    def __init__(self, name = None, module = None, module_as = None, is_import_list = False, is_operator = False):
+    def __init__(self, name=None, module=None, module_as=None, is_import_list=False, is_operator=False):
         self.name = name
         self.module = module
         self.module_as = module_as
@@ -349,21 +352,19 @@ def get_qualified_symbol(line):
     """
     res = IMPORT_SYMBOL_RE.search(line)
     if res:
-        return QualifiedSymbol(
-            name = next(i for i in [res.group('identifier'), res.group('operator')] if i is not None),
-            module = res.group('module'),
-            module_as = res.group('as'),
-            is_import_list = True,
-            is_operator = bool(res.group('operator')))
+        return QualifiedSymbol(name=next(i for i in [res.group('identifier'), res.group('operator')] if i is not None),
+                               module=res.group('module'),
+                               module_as=res.group('as'),
+                               is_import_list=True,
+                               is_operator=bool(res.group('operator')))
     res = IMPORT_MODULE_RE.search(line)
     if res:
-        return QualifiedSymbol(module = res.group('module'))
+        return QualifiedSymbol(module=res.group('module'))
     res = SYMBOL_RE.search(line)
     # res always match
-    return QualifiedSymbol(
-        module = res.group('module'),
-        name = next(i for i in [res.group('identifier'), res.group('operator')] if i is not None),
-        is_operator = bool(res.group('operator')))
+    return QualifiedSymbol(module=res.group('module'),
+                           name=next(i for i in [res.group('identifier'), res.group('operator')] if i is not None),
+                           is_operator=bool(res.group('operator')))
 
 
 def get_qualified_symbol_at_region(view, region):
@@ -412,7 +413,7 @@ class StatusMessage(object):
     # is_process — whether to show dots in message
     # is_ok — whether to show ✔ (True) or ✘ (False)
     # Note, that is is_ok is not None, dots will not be shown (is_process is ignored)
-    def __init__(self, msg, duration = 1, timeout = 300, priority = 0, is_process = True, is_ok = None):
+    def __init__(self, msg, duration=1, timeout=300, priority=0, is_process=True, is_ok=None):
         self.msg = msg
         self.duration = duration
         self.timeout = timeout
@@ -451,28 +452,28 @@ class StatusMessage(object):
     def fail(self):
         self.is_ok = False
 
-    def stop(self, is_ok = None):
+    def stop(self, is_ok=None):
         if is_ok is not None:
             self.is_ok = is_ok
         self.is_process = False
 
     @staticmethod
-    def process(msg, timeout = 300, duration = 1, priority = 0):
-        return StatusMessage(msg, duration = duration, timeout = timeout, priority = priority)
+    def process(msg, timeout=300, duration=1, priority=0):
+        return StatusMessage(msg, duration=duration, timeout=timeout, priority=priority)
 
     @staticmethod
-    def status(msg, duration = 1, priority = 0, is_ok = None):
-        return StatusMessage(msg, duration = duration, priority = priority, is_process = False, is_ok = is_ok)
+    def status(msg, duration=1, priority=0, is_ok=None):
+        return StatusMessage(msg, duration=duration, priority=priority, is_process=False, is_ok=is_ok)
 
 
-class StatusMessagesManager(threading.Thread):
+class StatusMessagesManager(threading.Thread, metaclass=Utils.Singleton):
     # msg ⇒ StatusMessage
     messages = LockedObject.LockedObject({})
     # [StatusMessage × time]
     priorities = LockedObject.LockedObject([])
 
     def __init__(self):
-        super(StatusMessagesManager, self).__init__()
+        super().__init__()
         self.daemon = True
         self.interval = 0.1
         self.event = threading.Event()
@@ -528,24 +529,26 @@ class StatusMessagesManager(threading.Thread):
         with StatusMessagesManager.priorities as ps:
             ps[:] = list(filter(lambda p: p[0].is_active(), ps))
             # Ended processes goes first, then by priority, and then by time of message addition
-            ps.sort(key = lambda x: (x[0].is_process, -x[0].priority, x[1]))
+            ps.sort(key=lambda x: (x[0].is_process, -x[0].priority, x[1]))
         with StatusMessagesManager.messages as ms:
             ums = dict(filter(lambda m: m[1].is_active(), ms.items()))
             ms.clear()
             ms.update(ums)
 
-status_message_manager = None
+# Iff status_message_manager hasn't been defined in the module yet (globals()), then go ahead and create it.
+if 'status_message_manager' not in globals():
+    status_message_manager = StatusMessagesManager()
+    status_message_manager.start()
 
-
-def show_status_message(msg, is_ok = None, priority = 0):
+def show_status_message(msg, is_ok=None, priority=0):
     """
     Show status message with check mark (is_ok = true), ballot x (is_ok = false)
     """
     global status_message_manager
-    status_message_manager.add(StatusMessage.status(msg, priority = priority, is_ok = is_ok))
+    status_message_manager.add(StatusMessage.status(msg, priority=priority, is_ok=is_ok))
 
 
-def show_status_message_process(msg, is_ok = None, timeout = 300, priority = 0):
+def show_status_message_process(msg, is_ok=None, timeout=300, priority=0):
     """
     Same as show_status_message, but shows permanently until called with is_ok not None
     There can be only one message process in time, message with highest priority is shown
@@ -555,12 +558,12 @@ def show_status_message_process(msg, is_ok = None, timeout = 300, priority = 0):
     if is_ok is not None:
         m = status_message_manager.get(msg)
         if m:
-            m.stop(is_ok = is_ok)
+            m.stop(is_ok=is_ok)
     else:
-        status_message_manager.add(StatusMessage.process(msg, timeout = timeout, priority = priority))
+        status_message_manager.add(StatusMessage.process(msg, timeout=timeout, priority=priority))
 
 
-def is_with_syntax(view = None, syntax = None):
+def is_with_syntax(view=None, syntax=None):
     if syntax is None:
         return False
 
@@ -576,24 +579,24 @@ def is_with_syntax(view = None, syntax = None):
     return True
 
 
-def is_cabal_source(view = None):
-    return is_with_syntax(view, syntax = "Cabal.tmLanguage")
+def is_cabal_source(view=None):
+    return is_with_syntax(view, syntax="Cabal.tmLanguage")
 
 
-def is_haskell_source(view = None):
-    return is_with_syntax(view, syntax = "Haskell.tmLanguage")
+def is_haskell_source(view=None):
+    return is_with_syntax(view, syntax="Haskell.tmLanguage")
 
 
-def is_inspected_source(view = None):
+def is_inspected_source(view=None):
     return is_haskell_source(view) or is_cabal_source(view)
 
 
-def is_haskell_repl(view = None):
-    return is_with_syntax(view, syntax = "HaskellRepl.tmLanguage")
+def is_haskell_repl(view=None):
+    return is_with_syntax(view, syntax="HaskellRepl.tmLanguage")
 
 
-def is_haskell_symbol_info(view = None):
-    return is_with_syntax(view, syntax = "HaskellSymbolInfo.tmLanguage")
+def is_haskell_symbol_info(view=None):
+    return is_with_syntax(view, syntax="HaskellSymbolInfo.tmLanguage")
 
 
 class with_status_message(object):
@@ -644,6 +647,9 @@ def sublime_haskell_cache_path():
 
 
 class SublimeHaskellWindowCommand(sublime_plugin.WindowCommand):
+    def __init__(self, view):
+        super().__init__(view)
+
     def is_enabled(self):
         return is_enabled_haskell_command(None, False)
 
@@ -652,6 +658,9 @@ class SublimeHaskellWindowCommand(sublime_plugin.WindowCommand):
 
 
 class SublimeHaskellTextCommand(sublime_plugin.TextCommand):
+    def __init__(self, view):
+        super().__init__(view)
+
     def is_enabled(self):
         return is_enabled_haskell_command(self.view, False)
 

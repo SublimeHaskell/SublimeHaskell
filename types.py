@@ -8,24 +8,14 @@ from functools import total_ordering
 import sublime
 import sublime_plugin
 
-if int(sublime.version()) < 3000:
-    import sublime_haskell_common as Common
-    import internals.settings as Settings
-    import internals.utils as Utils
-    import ghci_backend as GHCIMod
-    import hsdev
-    import hdevtools as HDevTools
-    from parseoutput import sublime_column_to_ghc_column, ghc_column_to_sublime_column
-    from symbols import unicode_operators
-else:
-    import SublimeHaskell.sublime_haskell_common as Common
-    import SublimeHaskell.internals.settings as Settings
-    import SublimeHaskell.internals.utils as Utils
-    import SublimeHaskell.ghci_backend as GHCIMod
-    import SublimeHaskell.hsdev as hsdev
-    import SublimeHaskell.hdevtools as HDevTools
-    from SublimeHaskell.parseoutput import sublime_column_to_ghc_column, ghc_column_to_sublime_column
-    from SublimeHaskell.symbols import unicode_operators
+import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.internals.utils as Utils
+import SublimeHaskell.ghci_backend as GHCIMod
+import SublimeHaskell.hsdev as hsdev
+import SublimeHaskell.hdevtools as HDevTools
+from SublimeHaskell.parseoutput import sublime_column_to_ghc_column, ghc_column_to_sublime_column
+from SublimeHaskell.symbols import unicode_operators
 
 # Used to find out the module name.
 MODULE_RE_STR = r'module\s+([^\s\(]*)'  # "module" followed by everything that is neither " " nor "("

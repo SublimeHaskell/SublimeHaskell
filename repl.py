@@ -6,28 +6,16 @@ import re
 
 has_sublime_repl = True
 
-if int(sublime.version()) < 3000:
-    import sublime_haskell_common as Common
-    import autocomplete
-    import internals.logging as Logging
-    import internals.settings as Settings
-    import hsdev
-    try:
-        import SublimeREPL.sublimerepl as sublimerepl
-    except ImportError:
-        Logging.log('SublimeREPL is not installed, ghci/repl commands disabled', Logging.LOG_INFO)
-        has_sublime_repl = False
-else:
-    import SublimeHaskell.sublime_haskell_common as Common
-    import SublimeHaskell.autocomplete as autocomplete
-    import SublimeHaskell.internals.logging as Logging
-    import SublimeHaskell.internals.settings as Settings
-    import SublimeHaskell.hsdev as hsdev
-    try:
-        import SublimeREPL.sublimerepl as sublimerepl
-    except ImportError:
-        Logging.log('SublimeREPL is not installed, ghci/repl commands disabled', Logging.LOG_INFO)
-        has_sublime_repl = False
+import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.autocomplete as autocomplete
+import SublimeHaskell.internals.logging as Logging
+import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.hsdev as hsdev
+try:
+    import SublimeREPL.sublimerepl as sublimerepl
+except ImportError:
+    Logging.log('SublimeREPL is not installed, ghci/repl commands disabled', Logging.LOG_INFO)
+    has_sublime_repl = False
 
 
 COMMAND_RE = re.compile(r'^.*:[a-z]*$')

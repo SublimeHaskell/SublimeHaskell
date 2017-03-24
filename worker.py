@@ -7,15 +7,12 @@ try:
 except ImportError:
     import Queue as queue
 
-if int(sublime.version()) < 3000:
-    import internals.logging as Logging
-else:
-    import SublimeHaskell.internals.logging as Logging
+import SublimeHaskell.internals.logging as Logging
 
 # Background worker
 class Worker(threading.Thread):
     def __init__(self):
-        super(Worker, self).__init__()
+        super().__init__()
         self.jobs = queue.Queue()
 
     def run(self):

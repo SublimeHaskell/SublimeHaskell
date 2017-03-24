@@ -5,19 +5,14 @@ import sublime_plugin
 import threading
 import time
 
-if int(sublime.version()) < 3000:
-    import sublime_haskell_common as Common
-    import internals.locked_object as LockedObject
-    import internals.settings as Settings
-else:
-    import SublimeHaskell.sublime_haskell_common as Common
-    import SublimeHaskell.internals.locked_object as LockedObject
-    import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.internals.locked_object as LockedObject
+import SublimeHaskell.internals.settings as Settings
 
 
 class SublimeHaskellAutobuild(sublime_plugin.EventListener):
     def __init__(self):
-        super(SublimeHaskellAutobuild, self).__init__()
+        super().__init__()
         self.fly_agent = FlyCheckLint()
         self.fly_agent.start()
 
@@ -51,7 +46,7 @@ class SublimeHaskellAutobuild(sublime_plugin.EventListener):
 
 class FlyCheckLint(threading.Thread):
     def __init__(self):
-        super(FlyCheckLint, self).__init__()
+        super().__init__()
         self.daemon = True
         self.view = LockedObject.LockedObject({'view':None, 'mtime':None})
         self.event = threading.Event()
@@ -98,7 +93,7 @@ class FlyCheckLint(threading.Thread):
                 auto_check_enabled = Settings.get_setting_async('enable_auto_check')
                 auto_lint_enabled = Settings.get_setting_async('enable_auto_lint')
                 sublime.set_timeout(lambda: fly_window.run_command('sublime_haskell_scan_contents'), 0)
-                
+
                 if auto_check_enabled and auto_lint_enabled:
                     sublime.set_timeout(lambda: fly_window.run_command('sublime_haskell_check_and_lint', {'fly': True}), 0)
                 elif auto_check_enabled:

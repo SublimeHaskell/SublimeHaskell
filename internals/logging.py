@@ -1,9 +1,6 @@
 import sublime
 
-if int(sublime.version()) < 3000:
-    import internals.settings as Settings
-else:
-    import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.internals.settings as Settings
 
 # Logging primitives
 LOG_ERROR = 1

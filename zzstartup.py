@@ -1,16 +1,9 @@
 
 import os
 
-import sublime
-
-if int(sublime.version()) < 3000:
-    import sublime_haskell_common as Common
-    import internals.settings as Settings
-    import internals.proc_helper as ProcHelper
-else:
-    import SublimeHaskell.sublime_haskell_common as Common
-    import SublimeHaskell.internals.settings as Settings
-    import SublimeHaskell.internals.proc_helper as ProcHelper
+import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.internals.proc_helper as ProcHelper
 
 # Can't retrieve settings from child threads, only from the main thread.
 #
@@ -25,6 +18,7 @@ def preload_settings():
     def change_func(key):
         return lambda: Settings.on_changed_setting(str(key))
 
+    subl_settings = Settings.get_settings()
     for key in ['add_standard_dirs'
                 , 'add_to_PATH'
                 , 'enable_auto_build'
@@ -45,7 +39,6 @@ def preload_settings():
                 , 'use_improved_syntax'
                ]:
         with Settings.sublime_haskell_settings as settings:
-            subl_settings = Settings.get_settings()
             settings[key] = subl_settings.get(key)
 
             subl_settings.add_on_change(key, change_func(key))
@@ -61,14 +54,7 @@ def preload_settings():
 def plugin_loaded():
     cache_path = Common.sublime_haskell_cache_path()
 
-    if Common.status_message_manager is None:
-        Common.status_message_manager = Common.StatusMessagesManager()
-        Common.status_message_manager.start()
-
     if not os.path.exists(cache_path):
         os.makedirs(cache_path)
 
     preload_settings()
-
-if int(sublime.version()) < 3000:
-    plugin_loaded()

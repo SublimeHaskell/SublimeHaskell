@@ -1,12 +1,8 @@
 
 import sublime
 
-if int(sublime.version()) < 3000:
-    import sublime_haskell_common as Common
-    import internals.proc_helper as ProcHelper
-else:
-    import SublimeHaskell.sublime_haskell_common as Common
-    import SublimeHaskell.internals.proc_helper as ProcHelper
+import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.internals.proc_helper as ProcHelper
 
 class SublimeHaskellFilterCommand(Common.SublimeHaskellTextCommand):
     """Utility class to run filter-like commands, for example, 'stylish-haskell' and 'hindent'. Error/diagnostic
@@ -14,7 +10,7 @@ class SublimeHaskellFilterCommand(Common.SublimeHaskellTextCommand):
     OUTPUT_PANEL_NAME = 'haskell_run_output'
 
     def __init__(self, view):
-        super(SublimeHaskellFilterCommand, self).__init__(view)
+        super().__init__(view)
         self.indenter = None
 
     def run(self, edit):
@@ -40,7 +36,8 @@ class SublimeHaskellFilterCommand(Common.SublimeHaskellTextCommand):
                         if err is None or len(err) == 0:
                             self.view.replace(edit, selection, out)
                         else:
-                            stderr_out = '\n'.join(["{0} failed, stderr contents:".format(' '.join(self.indenter)), "-" * 40, ""]) + err
+                            indent_err = ' '.join(self.indenter)
+                            stderr_out = '\n'.join(["{0} failed, stderr contents:".format(indent_err), "-" * 40, ""]) + err
                             self.report_error(stderr_out)
                     else:
                         self.report_error(p.process_err)

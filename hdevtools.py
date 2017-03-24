@@ -5,20 +5,12 @@ import re
 import sublime
 import threading
 
-if int(sublime.version()) < 3000:
-    import internals.proc_helper as ProcHelper
-    import internals.logging as Logging
-    import internals.settings as Settings
-    from internals.output_collector import DescriptorDrain
-    from parseoutput import parse_info
-    import ghci_backend as GHCIMod
-else:
-    import SublimeHaskell.internals.proc_helper as ProcHelper
-    import SublimeHaskell.internals.logging as Logging
-    import SublimeHaskell.internals.settings as Settings
-    from SublimeHaskell.internals.output_collector import DescriptorDrain
-    from SublimeHaskell.parseoutput import parse_info
-    import SublimeHaskell.ghci_backend as GHCIMod
+import SublimeHaskell.internals.proc_helper as ProcHelper
+import SublimeHaskell.internals.logging as Logging
+import SublimeHaskell.internals.settings as Settings
+from SublimeHaskell.internals.output_collector import DescriptorDrain
+from SublimeHaskell.parseoutput import parse_info
+import SublimeHaskell.ghci_backend as GHCIMod
 
 
 def show_hdevtools_error_and_disable():

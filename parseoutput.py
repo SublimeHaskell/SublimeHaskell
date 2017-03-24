@@ -8,28 +8,17 @@ import time
 from threading import Thread
 from collections import defaultdict
 
-if int(sublime.version()) < 3000:
-    import sublime_haskell_common as Common
-    import internals.logging as Logging
-    import internals.settings as Settings
-    from internals.utils import decode_bytes, PyV3
-    import internals.output_collector as OutputCollector
-    import symbols
-else:
-    import SublimeHaskell.sublime_haskell_common as Common
-    import SublimeHaskell.internals.logging as Logging
-    import SublimeHaskell.internals.settings as Settings
-    from SublimeHaskell.internals.utils import decode_bytes, PyV3
-    import SublimeHaskell.internals.output_collector as OutputCollector
-    import SublimeHaskell.symbols as symbols
+import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.internals.logging as Logging
+import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.internals.output_collector as OutputCollector
+import SublimeHaskell.symbols as symbols
 
 # This regex matches an unindented line, followed by zero or more
 # indented, non-empty lines.
 # It also eats whitespace before the first line.
 # The first line is divided into a filename, a line number, and a column.
-output_regex = re.compile(
-    r'\s*^(\S*):(\d+):(\d+):(.*$(?:\n^[ \t].*$)*)',
-    re.MULTILINE)
+output_regex = re.compile(r'\s*^(\S*):(\d+):(\d+):(.*$(?:\n^[ \t].*$)*)', re.MULTILINE)
 
 # Extract the filename, line, column, and description from an error message:
 result_file_regex = r'^\s{2}(\S*?): line (\d+), column (\d+):$'
@@ -45,11 +34,11 @@ ERRORS = []
 error_view = None
 
 
-def filename_of_path(p):
+def filename_of_path(path):
     """Returns everything after the last slash or backslash."""
     # Not using os.path here because we don't know/care here if
     # we have forward or backslashes on Windows.
-    return re.match(r'(.*[/\\])?(.*)', p).groups()[1]
+    return re.match(r'(.*[/\\])?(.*)', path).groups()[1]
 
 
 class OutputMessage(object):
@@ -174,28 +163,17 @@ def format_output_messages(messages):
         summary['hint'])
 
     def messages_level(name, level):
-        if PyV3:
-            if not summary[level]:
-                return ''
-            count = '{0}: {1}'.format(name, summary[level])
-            msgs = '\n'.join(str(m) for m in messages if m.level == level)
-            return '{0}\n\n{1}'.format(count, msgs)
-        else:
-            if not summary[level]:
-                return u''
-            count = u'{0}: {1}'.format(name, summary[level])
-            msgs = u'\n'.join(unicode(m) for m in messages if m.level == level)
-            return u'{0}\n\n{1}'.format(count, msgs)
+        if not summary[level]:
+            return ''
+        count = '{0}: {1}'.format(name, summary[level])
+        msgs = '\n'.join(str(m) for m in messages if m.level == level)
+        return '{0}\n\n{1}'.format(count, msgs)
 
     errors = messages_level('Errors', 'error')
     warnings = messages_level('Warnings', 'warning')
     hints = messages_level('Hints', 'hint')
 
-    parts = filter(lambda s: s, [summary_line, errors, warnings, hints])
-    if PyV3:
-        return '\n\n'.join(parts)
-    else:
-        return u'\n\n'.join(parts)
+    return '\n\n'.join(filter(lambda s: s, [summary_line, errors, warnings, hints]))
 
 
 def show_output_result_text(view, msg, text, exit_code, base_dir):
