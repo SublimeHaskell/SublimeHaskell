@@ -1145,12 +1145,25 @@ class HsDevProcess(threading.Thread):
         self.stop_event.set()
 
 
+### HACK ALERT: If agent, client and client_back are already present in the
+### module's globals, don't redefine them. Otherwise, you will end up with
+### multiple instances of hsdev if the plugin is reloaded.
+
+# global hsdev agent
 if 'agent' not in globals():
-    agent = None  # global hsdev agent
+    agent = None
+else:
+    agent = globals()['agent']
+# global hsdev agent's hsdev client for command tasks
 if 'client' not in globals():
-    client = None  # global hsdev agent's hsdev client for command tasks
+    client = None
+else:
+    client = globals()['client']
+# global hsdev agent's hsdev client for background tasks (commonly scanning)
 if 'client_back' not in globals():
-    client_back = None  # global hsdev agent's hsdev client for background tasks (commonly scanning)
+    client_back = None
+else:
+    client_back = globals()['client_back']
 
 
 # Show scan progress in status bar
