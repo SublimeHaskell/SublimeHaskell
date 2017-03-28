@@ -11,11 +11,12 @@ import sublime_plugin
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.utils as Utils
+import SublimeHaskell.internals.unicode_opers as UnicodeOpers
 import SublimeHaskell.ghci_backend as GHCIMod
 import SublimeHaskell.hsdev as hsdev
 import SublimeHaskell.hdevtools as HDevTools
-from SublimeHaskell.parseoutput import sublime_column_to_ghc_column, ghc_column_to_sublime_column
-from SublimeHaskell.symbols import unicode_operators
+import SublimeHaskell.parseoutput as ParseOutput
+import SublimeHaskell.symbols as Symbols
 
 # Used to find out the module name.
 MODULE_RE_STR = r'module\s+([^\s\(]*)'  # "module" followed by everything that is neither " " nor "("
@@ -70,7 +71,7 @@ class FilePosition(object):
 
     @staticmethod
     def from_type_pos(view, l, c):
-        return FilePosition(int(l) - 1, ghc_column_to_sublime_column(view, int(l), int(c)))
+        return FilePosition(int(l) - 1, ParseOutput.ghc_column_to_sublime_column(view, int(l), int(c)))
 
     # From one-based line-column
     @staticmethod
@@ -97,7 +98,7 @@ class RegionType(object):
     def substr(self, view):
         return view.substr(self.region(view))
 
-    @unicode_operators
+    @Symbols.unicode_operators
     def show(self, view):
         expr = self.substr(view)
         fmt = '{0} :: {1}' if len(expr.splitlines()) == 1 else '{0}\n\t:: {1}'
@@ -120,7 +121,7 @@ class TypedRegion(object):
         self.region = region
         self.typename = typename
 
-    @unicode_operators
+    @Symbols.unicode_operators
     def show(self, view):
         fmt = '{0} :: {1}' if len(self.expr.splitlines()) == 1 else '{0}\n\t:: {1}'
         return fmt.format(self.expr, self.typename)
@@ -171,7 +172,7 @@ def get_type(view, filename, module_name, line, column, cabal=None):
         ts = get_types(filename, cabal=cabal) or []
         pt = FilePosition(line, column).point(view)
         return sorted_types(view, ts, pt)
-    column = sublime_column_to_ghc_column(view, line, column)
+    column = ParseOutput.sublime_column_to_ghc_column(view, line, column)
     line = line + 1
     if Settings.get_setting_async('enable_hdevtools'):
         result = HDevTools.hdevtools_type(filename, line, column, cabal=cabal)
@@ -336,7 +337,7 @@ class SublimeHaskellShowTypes(SublimeHaskellShowType):
         regions = []
         for t in self.types:
             Common.output_text(self.output_view, '{0}\n'.format(t.show(self.view)), clear = False)
-            regions.append(sublime.Region(self.output_view.size() - 1 - len(Common.use_unicode_operators(t.typename)), self.output_view.size() - 1))
+            regions.append(sublime.Region(self.output_view.size() - 1 - len(UnicodeOpers.use_unicode_operators(t.typename)), self.output_view.size() - 1))
         self.output_view.add_regions('types', regions, 'comment', '', sublime.DRAW_OUTLINED)
         Common.show_panel(self.view.window(), panel_name = TYPES_PANEL_NAME)
 
@@ -380,7 +381,7 @@ class SublimeHaskellShowAllTypes(Common.SublimeHaskellTextCommand):
         regions = []
         for t in types:
             Common.output_text(self.output_view, '{0}\n'.format(t.show(self.view)), clear = False)
-            regions.append(sublime.Region(self.output_view.size() - 1 - len(Common.use_unicode_operators(t.typename)), self.output_view.size() - 1))
+            regions.append(sublime.Region(self.output_view.size() - 1 - len(UnicodeOpers.use_unicode_operators(t.typename)), self.output_view.size() - 1))
         self.output_view.add_regions('types', regions, 'comment', '', sublime.DRAW_OUTLINED)
         Common.show_panel(self.view.window(), panel_name = TYPES_PANEL_NAME)
 
@@ -492,7 +493,7 @@ class SublimeHaskellExpandSelectionExpression(SublimeHaskellShowType):
         self.view.sel().add_all([t.region for t in tr])
 
         Common.output_panel(self.view.window(),
-                            '\n'.join([Common.use_unicode_operators(t.typename) for t in tr]),
+                            '\n'.join([UnicodeOpers.use_unicode_operators(t.typename) for t in tr]),
                             panel_name='sublime_haskell_expand_selection_expression',
                             syntax='Haskell-SublimeHaskell')
 

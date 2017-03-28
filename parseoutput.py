@@ -5,8 +5,7 @@ import os.path
 import re
 import sublime
 import time
-from threading import Thread
-from collections import defaultdict
+import threading
 
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.logging as Logging
@@ -18,10 +17,10 @@ import SublimeHaskell.symbols as symbols
 # indented, non-empty lines.
 # It also eats whitespace before the first line.
 # The first line is divided into a filename, a line number, and a column.
-output_regex = re.compile(r'\s*^(\S*):(\d+):(\d+):(.*$(?:\n^[ \t].*$)*)', re.MULTILINE)
+OUTPUT_REGEX = re.compile(r'\s*^(\S*):(\d+):(\d+):(.*$(?:\n^[ \t].*$)*)', re.MULTILINE)
 
 # Extract the filename, line, column, and description from an error message:
-result_file_regex = r'^\s{2}(\S*?): line (\d+), column (\d+):$'
+RESULT_FILE_REGEX = r'^\s{2}(\S*?): line (\d+), column (\d+):$'
 
 OUTPUT_PANEL_NAME = 'sublime_haskell_output_panel'
 
@@ -31,7 +30,7 @@ BUILD_LOG_PANEL_NAME = 'sublime_haskell_build_log_panel'
 ERRORS = []
 
 # Global ref to view with errors
-error_view = None
+ERROR_VIEW = None
 
 
 def filename_of_path(path):
@@ -43,7 +42,7 @@ def filename_of_path(path):
 
 class OutputMessage(object):
     "Describe an error or warning message produced by GHC."
-    def __init__(self, filename, region, message, level, correction = None):
+    def __init__(self, filename, region, message, level, correction=None):
         self.filename = filename
         self.region = region
         self.message = message.replace(os.linesep, "\n")
@@ -51,7 +50,7 @@ class OutputMessage(object):
         self.correction = correction
 
     def __unicode__(self):
-        # must match result_file_regex
+        # must match RESULT_FILE_REGEX
         # TODO: Columns must be recalculated, such that one tab is of tab_size length
         # We can do this for opened views, but how to do this for files, that are not open?
         return u'  {0}: line {1}, column {2}:\n    {3}'.format(
@@ -90,8 +89,8 @@ class OutputMessage(object):
 
 def clear_error_marks():
     global ERRORS
-    for e in ERRORS:
-        e.erase_from_view()
+    for err in ERRORS:
+        err.erase_from_view()
     ERRORS = []
 
 
@@ -107,9 +106,7 @@ def run_build_thread(view, cabal_project_dir, msg, cmd, on_done):
 
 def run_chain_build_thread(view, cabal_project_dir, msg, cmds, on_done):
     Common.show_status_message_process(msg, priority = 3)
-    thread = Thread(
-        target=wait_for_chain_to_complete,
-        args=(view, cabal_project_dir, msg, cmds, on_done))
+    thread = threading.Thread(target=wait_for_chain_to_complete, args=(view, cabal_project_dir, msg, cmds, on_done))
     thread.start()
 
 
@@ -197,7 +194,7 @@ def parse_output_messages_and_show(view, msg, base_dir, exit_code, stderr):
     # The process has terminated; parse and display the output:
     parsed_messages = parse_output_messages(view, base_dir, stderr)
     # The unparseable part (for other errors)
-    unparsable = output_regex.sub('', stderr).strip()
+    unparsable = OUTPUT_REGEX.sub('', stderr).strip()
 
     # Set global error list
     set_global_error_messages(parsed_messages)
@@ -287,14 +284,14 @@ def goto_error(view, error):
     line = error.region.start.line + 1
     column = error.region.start.column + 1
     filename = error.filename
-    global error_view
-    if error_view:
+    global ERROR_VIEW
+    if ERROR_VIEW:
         show_output(view)
-        # error_region = error_view.find('{0}: line {1}, column \\d+:(\\n\\s+.*)*'.format(re.escape(filename), line), 0)
-        error_region = error_view.find(re.escape(str(error)), 0)
-        # error_region = error_view.find('\\s{{2}}{0}: line {1}, column {2}:(\\n\\s+.*)*'.format(re.escape(filename), line, column), 0)
-        error_view.add_regions("current_error", [error_region], 'string', 'dot', sublime.HIDDEN)
-        error_view.show(error_region.a)
+        # error_region = ERROR_VIEW.find('{0}: line {1}, column \\d+:(\\n\\s+.*)*'.format(re.escape(filename), line), 0)
+        error_region = ERROR_VIEW.find(re.escape(str(error)), 0)
+        # error_region = ERROR_VIEW.find('\\s{{2}}{0}: line {1}, column {2}:(\\n\\s+.*)*'.format(re.escape(filename), line, column), 0)
+        ERROR_VIEW.add_regions("current_error", [error_region], 'string', 'dot', sublime.HIDDEN)
+        ERROR_VIEW.show(error_region.a)
     view.window().open_file("{0}:{1}:{2}".format(filename, line, column), sublime.ENCODED_POSITION)
 
 
@@ -373,10 +370,10 @@ def mark_messages_in_view(messages, view):
 
 def write_output(view, text, cabal_project_dir, show_panel = True):
     "Write text to Sublime's output panel."
-    global error_view
-    error_view = Common.output_panel(view.window(), text, panel_name = OUTPUT_PANEL_NAME, syntax = 'HaskellOutputPanel', show_panel = show_panel)
-    error_view.settings().set("result_file_regex", result_file_regex)
-    error_view.settings().set("result_base_dir", cabal_project_dir)
+    global ERROR_VIEW
+    ERROR_VIEW = Common.output_panel(view.window(), text, panel_name = OUTPUT_PANEL_NAME, syntax = 'HaskellOutputPanel', show_panel = show_panel)
+    ERROR_VIEW.settings().set("RESULT_FILE_REGEX", RESULT_FILE_REGEX)
+    ERROR_VIEW.settings().set("result_base_dir", cabal_project_dir)
 
 
 def hide_output(view, panel_name = OUTPUT_PANEL_NAME):
@@ -421,7 +418,7 @@ def ghc_column_to_sublime_column(view, line, column):
 
 def parse_output_messages(view, base_dir, text):
     "Parse text into a list of OutputMessage objects."
-    matches = output_regex.finditer(text)
+    matches = OUTPUT_REGEX.finditer(text)
 
     def to_error(m):
         filename, line, column, messy_details = m.groups()

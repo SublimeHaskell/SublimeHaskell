@@ -7,6 +7,7 @@ import os.path
 from functools import total_ordering
 
 import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.internals.unicode_opers as UnicodeOpers
 from functools import reduce
 
 
@@ -391,23 +392,23 @@ def escape_text(txt):
     for line in txt.splitlines():
         m = re.match(r'^\s+', line)
         if m:  # Replace leading spaces with non-breaking ones
-            lines.append(m.end() * '&nbsp;' + html.escape(line[m.end():], quote = False))
+            lines.append(m.end() * '&nbsp;' + html.escape(line[m.end():], quote=False))
         else:
-            lines.append(html.escape(line, quote = False))
+            lines.append(html.escape(line, quote=False))
 
     return '<br>'.join(lines)
 
 
 def unicode_operators(fn):
-    def wrapped(*args, use_unicode = None, **kwargs):
+    def wrapped(*args, use_unicode=None, **kwargs):
         if use_unicode is False:
             return fn(*args, **kwargs)
-        return Common.use_unicode_operators(fn(*args, **kwargs), force = use_unicode is True)
+        return UnicodeOpers.use_unicode_operators(fn(*args, **kwargs), force=(use_unicode is True))
     return wrapped
 
 
 class Declaration(Symbol):
-    def __init__(self, name, decl_type = 'declaration', docs = None, imported = [], defined = None, position = None, module = None):
+    def __init__(self, name, decl_type='declaration', docs=None, imported=[], defined=None, position=None, module=None):
         super().__init__(decl_type, name)
         self.docs = docs
         self.imported = imported[:]
@@ -460,7 +461,7 @@ class Declaration(Symbol):
         """ Returns suggestion for this declaration """
         return ('{0}\t{1}'.format(self.name, self.imported_from_name()), self.name)
 
-    def brief(self, short = False):
+    def brief(self, short=False):
         """ Brief information, just a name by default """
         return self.name
 
@@ -571,7 +572,7 @@ class Function(Declaration):
         self.type = function_type
 
     def suggest(self):
-        return (Common.use_unicode_operators(u'{0} :: {1}\t{2}'.format(wrap_operator(self.name), self.type, self.imported_from_name())), self.name)
+        return (UnicodeOpers.use_unicode_operators(u'{0} :: {1}\t{2}'.format(wrap_operator(self.name), self.type, self.imported_from_name())), self.name)
 
     @unicode_operators
     def brief(self, short = False):
@@ -598,7 +599,7 @@ class TypeBase(Declaration):
         self.definition = definition
 
     def suggest(self):
-        return (Common.use_unicode_operators(u'{0} {1}\t{2}'.format(self.name, ' '.join(self.args), self.imported_from_name())), self.name)
+        return (UnicodeOpers.use_unicode_operators(u'{0} {1}\t{2}'.format(self.name, ' '.join(self.args), self.imported_from_name())), self.name)
 
     @unicode_operators
     def brief(self, short = False):

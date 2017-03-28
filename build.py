@@ -4,7 +4,7 @@
 import os
 import os.path
 import sublime
-from threading import Thread
+import threading
 
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.proc_helper as ProcHelper
@@ -353,10 +353,7 @@ class SublimeHaskellRunCommand(SublimeHaskellBaseCommand):
         hide_output(self.window)
 
         # Run in thread
-        thread = Thread(
-            target=run_binary,
-            args=(name, bin_file, base_dir))
-        thread.start()
+        threading.Thread(target=run_binary, args=(name, bin_file, base_dir)).start()
 
 
 def run_binary(name, bin_file, base_dir):

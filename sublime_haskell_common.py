@@ -13,6 +13,7 @@ import string
 import subprocess
 import sys
 import threading
+import traceback
 import time
 
 import sublime
@@ -183,25 +184,6 @@ def wait_for_window(on_appear, seconds_to_wait=MAX_WAIT_FOR_WINDOW):
     It's dirty hack, but I have no idea how to make it better
     """
     sublime.set_timeout(lambda: wait_for_window_callback(on_appear, seconds_to_wait), 0)
-
-
-def use_unicode_operators(s, force=False):
-    """
-    Set unicode symbols for some standard haskell operators
-    """
-    if not force and not Settings.get_setting_async('unicode_symbol_info'):
-        return s
-
-    ops = {
-        '->': '\u2192',
-        '=>': '\u21d2',
-        '::': '\u2237'
-    }
-    ops.update(dict((html.escape(o), v) for o, v in ops.items()))
-    r = s
-    for o, v in ops.items():
-        r = r.replace(o, v)
-    return r
 
 
 class SublimeHaskellOutputText(sublime_plugin.TextCommand):
@@ -466,7 +448,7 @@ class StatusMessage(object):
         return StatusMessage(msg, duration=duration, priority=priority, is_process=False, is_ok=is_ok)
 
 
-class StatusMessagesManager(threading.Thread, metaclass=Utils.Singleton):
+class StatusMessagesManager(threading.Thread):
     # msg ⇒ StatusMessage
     messages = LockedObject.LockedObject({})
     # [StatusMessage × time]
@@ -491,8 +473,9 @@ class StatusMessagesManager(threading.Thread, metaclass=Utils.Singleton):
                     self.timer = threading.Timer(self.interval, self.tick)
                     self.timer.start()
                     self.timer.join()
-            except Exception as e:
-                Logging.log('Exception in status message: {0}'.format(e), Logging.LOG_ERROR)
+            except:
+                Logging.log('Exception in StatusMessageManager, see console window for traceback', Logging.LOG_ERROR)
+                print(traceback.format_exc())
 
     def show(self):
         # Show current message, clear event if no events

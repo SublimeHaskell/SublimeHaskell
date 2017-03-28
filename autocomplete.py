@@ -1,5 +1,5 @@
 # -*- coding: UTF-8 -*-
-# pyline: disable=todo
+# pylint: disable=fixme
 
 """SublimeHaskell autocompletion support."""
 
@@ -13,10 +13,10 @@ import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.locked_object as LockedObject
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.utils as Utils
-from SublimeHaskell.hdevtools import start_hdevtools, stop_hdevtools
+import SublimeHaskell.hdevtools as HDevTools
 import SublimeHaskell.ghci_backend as GHCIMod
 import SublimeHaskell.hsdev as hsdev
-from SublimeHaskell.worker import run_async
+import SublimeHaskell.worker as Worker
 
 
 # Checks if we are in a LANGUAGE pragma.
@@ -390,11 +390,11 @@ def can_complete_qualified_symbol(info):
 
 def update_completions_async(files=[], drop_all=False):
     if drop_all:
-        run_async('drop all completions', autocompletion.drop_completions_async)
+        Worker.run_async('drop all completions', autocompletion.drop_completions_async)
     else:
         for f in files:
-            run_async('drop completions', autocompletion.drop_completions_async, f)
-    run_async('init completions', autocompletion.init_completions_async)
+            Worker.run_async('drop completions', autocompletion.drop_completions_async, f)
+    Worker.run_async('init completions', autocompletion.init_completions_async)
 
 
 class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
@@ -451,7 +451,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         if Common.is_haskell_source(view):
             filename = view.file_name()
             if filename:
-                run_async('get completions for {0}'.format(filename), autocompletion.get_completions_async, filename)
+                Worker.run_async('get completions for {0}'.format(filename), autocompletion.get_completions_async, filename)
 
     def on_new(self, view):
         hsdev.start_agent()
@@ -506,9 +506,9 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 
 def plugin_loaded():
     # TODO: How to stop_hdevtools() in Sublime Text 2?
-    start_hdevtools()
+    HDevTools.start_hdevtools()
 
 
 def plugin_unloaded():
     # Does this work properly on exit?
-    stop_hdevtools()
+    HDevTools.stop_hdevtools()

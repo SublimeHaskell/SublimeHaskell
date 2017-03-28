@@ -19,8 +19,8 @@ import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.locked_object as LockedObject
 import SublimeHaskell.internals.proc_helper as ProcHelper
 import SublimeHaskell.internals.settings as Settings
-from SublimeHaskell.internals.output_collector import DescriptorDrain
-from SublimeHaskell.worker import run_async
+import SublimeHaskell.internals.output_collector as OutputCollector
+import SublimeHaskell.worker as Worker
 
 
 def concat_args(args):
@@ -1119,8 +1119,8 @@ class HsDevProcess(threading.Thread):
                     Logging.log('failed to create hsdev process', Logging.LOG_ERROR)
                     self.stop_event.set()
                 else:
-                    self.drain_stdout = DescriptorDrain('hsdev stdout', self.process.stdout)
-                    self.drain_stderr = DescriptorDrain('hsdev stderr', self.process.stderr)
+                    self.drain_stdout = OutputCollector.DescriptorDrain('hsdev stdout', self.process.stdout)
+                    self.drain_stderr = OutputCollector.DescriptorDrain('hsdev stderr', self.process.stderr)
                     self.drain_stdout.start()
                     self.drain_stderr.start()
                     call_callback(self.on_start, name='HsDevProcess.on_start')
@@ -1356,7 +1356,7 @@ class HsDevAgent(threading.Thread):
                 cabal_to_load[:] = []
 
             for c in load_cabal:
-                run_async('inspect cabal {0}'.format(c), self.inspect_cabal, c)
+                Worker.run_async('inspect cabal {0}'.format(c), self.inspect_cabal, c)
 
             if files_to_reinspect:
                 if Settings.get_setting_async('enable_hdocs'):

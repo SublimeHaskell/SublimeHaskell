@@ -3,7 +3,7 @@
 import os
 import re
 import sublime
-from threading import Thread
+import threading
 
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.settings as Settings
@@ -226,9 +226,7 @@ def run_ghcmod(cmd, msg, alter_messages_cb=None):
 
 def run_ghcmods_thread(view, filename, msg, cmds_with_args, alter_messages_cb):
     sublime.status_message(msg + '...')
-    thread = Thread(
-        target=wait_ghcmod_and_parse,
-        args=(view, filename, msg, cmds_with_args, alter_messages_cb))
+    thread = threading.Thread(target=wait_ghcmod_and_parse, args=(view, filename, msg, cmds_with_args, alter_messages_cb))
     thread.start()
 
 

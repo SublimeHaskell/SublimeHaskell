@@ -2,14 +2,16 @@
 
 import errno
 import re
-import sublime
 import threading
+import traceback
+
+import sublime
 
 import SublimeHaskell.internals.proc_helper as ProcHelper
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.settings as Settings
-from SublimeHaskell.internals.output_collector import DescriptorDrain
-from SublimeHaskell.parseoutput import parse_info
+import SublimeHaskell.internals.output_collector as OutputCollector
+import SublimeHaskell.parseoutput as ParseOutput
 import SublimeHaskell.ghci_backend as GHCIMod
 
 
@@ -49,11 +51,11 @@ def call_hdevtools_and_wait(arg_list, filename=None, cabal=None):
     except OSError as os_exc:
         if os_exc.errno == errno.ENOENT:
             show_hdevtools_error_and_disable()
-
         return None
 
-    except Exception as e:
-        Logging.log('calling to hdevtools fails with {0}'.format(e), Logging.LOG_ERROR)
+    except:
+        Logging.log('calling to hdevtools fails, see traceback in console window (<ctrl>-<backtick>)', Logging.LOG_ERROR)
+        print(traceback.format_exc())
         return None
 
 
@@ -74,8 +76,8 @@ def admin(cmds, wait=False, **popen_kwargs):
             return stdout if exit_code == 0 else 'error running {0}: {1}'.format(command, stderr)
         else:
             p = ProcHelper.ProcHelper(command, '', **popen_kwargs)
-            DescriptorDrain('hdevtools stdout', p.process.stdout).start()
-            DescriptorDrain('hdevtools stderr', p.process.stderr).start()
+            OutputCollector.DescriptorDrain('hdevtools stdout', p.process.stdout).start()
+            OutputCollector.DescriptorDrain('hdevtools stderr', p.process.stderr).start()
             return ''
 
     except OSError as os_exc:
@@ -104,22 +106,22 @@ def hdevtools_info(filename, symbol_name, cabal=None):
     """
     Uses hdevtools info filename symbol_name to get symbol info
     """
-    contents = call_hdevtools_and_wait(['info', filename, symbol_name], filename = filename, cabal = cabal)
-    return parse_info(symbol_name, contents) if contents else None
+    contents = call_hdevtools_and_wait(['info', filename, symbol_name], filename=filename, cabal=cabal)
+    return ParseOutput.parse_info(symbol_name, contents) if contents else None
 
 
-def hdevtools_check(filename, cabal = None):
+def hdevtools_check(filename, cabal=None):
     """
     Uses hdevtools to check file
     """
-    return call_hdevtools_and_wait(['check', filename], filename = filename, cabal = cabal)
+    return call_hdevtools_and_wait(['check', filename], filename=filename, cabal=cabal)
 
 
-def hdevtools_type(filename, line, column, cabal = None):
+def hdevtools_type(filename, line, column, cabal=None):
     """
     Uses hdevtools to infer type
     """
-    return call_hdevtools_and_wait(['type', filename, str(line), str(column)], filename = filename, cabal = cabal)
+    return call_hdevtools_and_wait(['type', filename, str(line), str(column)], filename=filename, cabal=cabal)
 
 
 def start_hdevtools():
