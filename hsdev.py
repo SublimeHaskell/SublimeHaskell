@@ -31,35 +31,6 @@ def concat_args(args):
     return reduce(cat, args, (True, []))[1]
 
 
-def concat_opts(opts):
-    def cat(x, y):
-        (px, ex) = x
-        (py, ey) = y
-        v = (ex if px else {}).copy()
-        v.update((ey if py else {}).copy())
-        return (px or py, v)
-    return reduce(cat, opts, (True, {}))[1]
-
-
-# {'x': ['1','2'], 'y': None} ⇒ ['--x', '1', '--x', '2', '--y']
-def flatten_opts(opts):
-    r = []
-
-    def to_opt(x):
-        return '--{0}'.format(x)
-
-    for k, v in opts.items():
-        if v is None:
-            r.append(to_opt(k))
-        elif type(v) is list:
-            for n in v:
-                r.extend([to_opt(k), str(n)])
-        else:
-            r.extend([to_opt(k), str(v)])
-
-    return r
-
-
 def hsdev_version():
     try:
         exit_code, out, err = ProcHelper.ProcHelper.run_process(['hsdev', 'version'])
@@ -90,58 +61,6 @@ def check_version(ver, minimal=[0, 0, 0, 0], maximal=None):
     if maximal and ver >= maximal:
         return False
     return True
-
-
-def if_some(x, lst):
-    return lst if x is not None else []
-
-
-def cabal_path(cabal):
-    if not cabal:
-        return []
-    return ["--cabal"] if cabal == 'cabal' else ["--sandbox={0}".format(cabal)]
-
-
-def hsinspect(module=None, file=None, cabal=None, ghc_opts=[]):
-    cmd = ['hsinspect']
-    on_result = None
-    if module:
-        cmd.extend([module])
-        on_result = parse_module
-    elif file:
-        cmd.extend([file])
-        on_result = parse_module
-    elif cabal:
-        cmd.extend([cabal])
-    else:
-        Logging.log('hsinspect must specify module, file or cabal', Logging.LOG_DEBUG)
-        return None
-
-    for opt in ghc_opts:
-        cmd.extend(['-g', opt])
-
-    with ProcHelper.ProcHelper(cmd, 'hsinspect', lambda s: json.loads(s), file, None) as p:
-        if p.process is not None:
-            err_code, stdout, stderr = p.wait()
-            if 'error' in stdout:
-                Logging.log('hsinspect returns error: {0}'.format(stdout), Logging.LOG_ERROR)
-            elif 'error' in stderr:
-                Logging.log('hsinspect returns error: {0}'.format(stderr), Logging.LOG_ERROR)
-            else:
-                return on_result(stdout) if on_result else stdout
-    return None
-
-
-def print_status(s):
-    print(s['status'])
-
-
-def parse_database(s):
-    if not s:
-        return None
-    if s and 'projects' in s and 'modules' in s:
-        return (s['projects'], [parse_module(m) for m in s['modules']])
-    return None
 
 
 def parse_decls(s):
@@ -249,51 +168,29 @@ def parse_declaration(decl):
 
         if what == 'function':
             return symbols.Function(name, the_decl.get('type'), docs, imported, defined, pos)
-        elif what == 'type':
-            return symbols.Type(name,
-                                decl_info.get('ctx'),
-                                decl_info.get('args', []),
-                                decl_info.get('def'),
-                                docs,
-                                imported,
-                                defined,
-                                pos)
-        elif what == 'newtype':
-            return symbols.Newtype(name,
-                                   decl_info.get('ctx'),
-                                   decl_info.get('args', []),
-                                   decl_info.get('def'),
-                                   docs,
-                                   imported,
-                                   defined,
-                                   pos)
-        elif what == 'data':
-            return symbols.Data(name,
-                                decl_info.get('ctx'),
-                                decl_info.get('args', []),
-                                decl_info.get('def'),
-                                docs,
-                                imported,
-                                defined,
-                                pos)
-        elif what == 'class':
-            return symbols.Class(name,
-                                 decl_info.get('ctx'),
-                                 decl_info.get('args', []),
-                                 decl_info.get('def'),
-                                 docs,
-                                 imported,
-                                 defined,
-                                 pos)
         else:
-            return None
-    except Exception as e:
-        Logging.log('Error pasring declaration: {0}'.format(e), Logging.LOG_ERROR)
+            decl_ctx = decl_info.get('ctx')
+            decl_args = decl_info.get('args', [])
+            decl_def = decl_info.get('def')
+
+            if what == 'type':
+                return symbols.Type(name, decl_ctx, decl_args, decl_def, docs, imported, defined, pos)
+            elif what == 'newtype':
+                return symbols.Newtype(name, decl_ctx, decl_args, decl_def, docs, imported, defined, pos)
+            elif what == 'data':
+                return symbols.Data(name, decl_ctx, decl_args, decl_def, docs, imported, defined, pos)
+            elif what == 'class':
+                return symbols.Class(name, decl_ctx, decl_args, decl_def, docs, imported, defined, pos)
+            else:
+                return None
+    except:
+        Logging.log('Error pasring declaration, see console window traceback', Logging.LOG_ERROR)
+        print(traceback.format_exc())
         return None
 
 
 def parse_declarations(decls):
-    return [parse_declaration(d) for d in decls] if decls is not None else []
+    return list(map(parse_declaration, decls)) if decls is not None else []
 
 
 def parse_module_declaration(d, parse_module_info=True):
@@ -304,13 +201,11 @@ def parse_module_declaration(d, parse_module_info=True):
 
         # loc = parse_location(d['module-id'].get('location'))
         decl = parse_declaration(d['declaration'])
-
-        if not decl:
+        if decl:
+            decl.module = m
+            return decl
+        else:
             return None
-
-        decl.module = m
-
-        return decl
     except:
         return None
 
@@ -345,28 +240,23 @@ def parse_cabal_package(d):
 
 
 def parse_corrections(d):
-    if d is None:
-        return None
-    return [parse_correction(c) for c in d]
+    return list(map(parse_correction, d)) if d is not None else d
 
 
 def parse_correction(d):
-    return symbols.Correction(
-        d['source']['file'],
-        d['level'],
-        d['note']['message'],
-        parse_corrector(d['note']['corrector']),
-        parse_region(d.get('region')))
+    return symbols.Correction(d['source']['file']
+                              , d['level']
+                              , d['note']['message']
+                              , parse_corrector(d['note']['corrector'])
+                              , parse_region(d.get('region')))
 
 
 def parse_corrector(d):
-    return symbols.Corrector(
-        parse_region(d['region']),
-        d['contents'])
+    return symbols.Corrector(parse_region(d['region']), d['contents'])
 
 
-def encode_corrections(cs):
-    return [encode_correction(c) for c in cs]
+def encode_corrections(corrections):
+    return list(map(encode_correction, corrections))
 
 
 def encode_correction(c):
@@ -781,8 +671,9 @@ class HsDev(object):
                 return x.get('result')
 
             return True
-        except Exception as e:
-            Logging.log('{0} fails with exception: {1}'.format(call_cmd, e), Logging.LOG_ERROR)
+        except:
+            Logging.log('{0} fails with exception, see traceback in console window.'.format(call_cmd), Logging.LOG_ERROR)
+            print(traceback.format_exc())
             self.connection_lost('call', e)
             return False
 

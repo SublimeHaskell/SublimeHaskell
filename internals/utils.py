@@ -5,7 +5,7 @@ Miscelaneous glue, mostly for interoperability between Python2 and Python3.
 import os
 
 def decode_bytes(src):
-    return src.decode('utf-8').data.replace('\r\n', '\n').replace('\r', '\n') if src is not None else None
+    return src.decode('utf-8').replace('\r\n', '\n').replace('\r', '\n') if src is not None else None
 
 
 def encode_bytes(src):
@@ -13,10 +13,7 @@ def encode_bytes(src):
 
 
 def head_of(lst):
-    if lst is not None and len(lst) > 0:
-        return lst[0]
-    else:
-        return None
+    return lst[0] if lst is not None and len(lst) > 0 else None
 
 
 def tool_enabled(feature):

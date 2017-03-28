@@ -10,6 +10,7 @@ import os
 import os.path
 import re
 import platform
+import traceback
 
 import sublime
 
@@ -32,7 +33,7 @@ class ProcHelper(object):
     # to augment the user's PATH used to search for executables and tools:
     augmented_env = None
 
-    def __init__(self, command, input_string='', **popen_kwargs):
+    def __init__(self, command, **popen_kwargs):
         """Open a pipe to a command or tool."""
 
         if ProcHelper.augmented_env is None:
@@ -60,8 +61,6 @@ class ProcHelper(object):
                                                 , stdin=subprocess.PIPE
                                                 , env=ProcHelper.augmented_env
                                                 , **popen_kwargs)
-
-                self.process.stdin.write(Utils.encode_bytes(input_string))
             else:
                 self.process = None
                 self.process_err = "SublimeHaskell.ProcHelper: {0} was not found on PATH!".format(command[0])
@@ -106,11 +105,11 @@ class ProcHelper(object):
                 # stderr can be None if it is tied to stdout (i.e., 'stderr=subprocess.STDOUT')
                 self.process.stderr.close()
 
-    def wait(self):
+    def wait(self, input_str=None):
         """Wait for subprocess to complete and exit, collect and decode ``stdout`` and ``stderr``,
         returning the tuple ``(exit_code, stdout, stderr)```"""
         if self.process is not None:
-            stdout, stderr = self.process.communicate()
+            stdout, stderr = self.process.communicate(Utils.encode_bytes(input_str) if input_str is not None else '')
             exit_code = self.process.wait()
             # Ensure that we reap the file descriptors.
             self.cleanup()
@@ -130,8 +129,8 @@ class ProcHelper(object):
     # current process environment and updates PATH with `add_to_PATH` extras.
     @staticmethod
     def get_extended_env():
-        def normalize_path(dir):
-            return os.path.normpath(os.path.expandvars(os.path.expanduser(dir)))
+        def normalize_path(dpath):
+            return os.path.normpath(os.path.expandvars(os.path.expanduser(dpath)))
 
         def cabal_config():
             cconfig = os.environ.get('CABAL_CONFIG') or \
@@ -242,8 +241,8 @@ class ProcHelper(object):
     @staticmethod
     def run_process(command, input_string='', **popen_kwargs):
         """Execute a subprocess, wait for it to complete, returning a ``(exit_code, stdout, stderr)``` tuple."""
-        with ProcHelper(command, input_string, **popen_kwargs) as proc:
-            return proc.wait()
+        with ProcHelper(command, **popen_kwargs) as proc:
+            return proc.wait(input_string)
 
     @staticmethod
     def invoke_tool(command, tool_name, input='', on_result=None, filename=None, on_line=None, check_enabled=True, **popen_kwargs):
@@ -256,8 +255,8 @@ class ProcHelper(object):
             return on_result(s) if on_result else s
 
         try:
-            with ProcHelper(command, input, cwd = source_dir, **popen_kwargs) as p:
-                exit_code, stdout, stderr = p.wait()
+            with ProcHelper(command, cwd=source_dir, **popen_kwargs) as proc:
+                exit_code, stdout, stderr = prpc.wait(input)
                 if exit_code != 0:
                     raise Exception('{0} exited with exit code {1} and stderr: {2}'.format(tool_name, exit_code, stderr))
 
@@ -276,8 +275,9 @@ class ProcHelper(object):
 
             return None
 
-        except Exception as e:
-            Logging.log('{0} fails with {1}, command: {2}'.format(tool_name, e, command), Logging.LOG_ERROR)
+        except:
+            Logging.log('{0} fails, command: {1}'.format(tool_name, command), Logging.LOG_ERROR)
+            print(traceback.format_exc())
 
         return None
 

@@ -75,7 +75,7 @@ def admin(cmds, wait=False, **popen_kwargs):
             exit_code, stdout, stderr = ProcHelper.ProcHelper.run_process(command, **popen_kwargs)
             return stdout if exit_code == 0 else 'error running {0}: {1}'.format(command, stderr)
         else:
-            p = ProcHelper.ProcHelper(command, '', **popen_kwargs)
+            p = ProcHelper.ProcHelper(command, **popen_kwargs)
             OutputCollector.DescriptorDrain('hdevtools stdout', p.process.stdout).start()
             OutputCollector.DescriptorDrain('hdevtools stderr', p.process.stderr).start()
             return ''
