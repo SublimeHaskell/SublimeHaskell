@@ -1,27 +1,24 @@
-# -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
-# Miscelaneous glue, mostly for interoperability between Python2 and Python3.
-# -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+"""
+Miscelaneous glue, mostly for interoperability between Python2 and Python3.
+"""
 
 import os
 
-def decode_bytes(s):
-    return s.decode('utf-8').replace(os.linesep, '\n') if s is not None else None
+def decode_bytes(src):
+    return src.decode('utf-8').data.replace('\r\n', '\n').replace('\r', '\n') if src is not None else None
 
 
-def encode_bytes(s):
-    return s.replace('\n', os.linesep).encode('utf-8') if s is not None else None
+def encode_bytes(src):
+    return src.replace('\r\n', os.linesep).replace('\n', os.linesep).encode('utf-8') if src is not None else None
 
 
-# unicode function
-def to_unicode(s):
-    return s
-
-
-def head_of(l):
-    if l is None or not len(l):
+def head_of(lst):
+    if lst is not None and len(lst) > 0:
+        return lst[0]
+    else:
         return None
-    return l[0]
 
 
 def tool_enabled(feature):
-    return 'enable_{0}'.format(feature)
+    """Generate the name of a feature to test whether it is enabled."""
+    return 'enable_' + str(feature)

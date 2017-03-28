@@ -312,7 +312,6 @@ class AutoCompletion(object):
         return []
 
     def get_special_completions(self, view, prefix, locations):
-
         # Contents of the current line up to the cursor
         line_contents = Common.get_line_contents(view, locations[0])
 
@@ -323,12 +322,12 @@ class AutoCompletion(object):
             if match_language:
                 if not self.language_pragmas:
                     self.language_pragmas = get_language_pragmas()
-                return [(Utils.to_unicode(c),) * 2 for c in self.language_pragmas]
+                return [(c,) * 2 for c in self.language_pragmas]
             match_options = OPTIONS_GHC_RE.match(line_contents)
             if match_options:
                 if not self.flags_pragmas:
                     self.flags_pragmas = get_flags_pragmas()
-                return [(Utils.to_unicode(c),) * 2 for c in self.flags_pragmas]
+                return [(c,) * 2 for c in self.flags_pragmas]
 
         return []
 

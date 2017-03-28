@@ -59,8 +59,7 @@ class ProcHelper(object):
                 self.process = subprocess.Popen(normcmd
                                                 , stdin=subprocess.PIPE
                                                 , env=ProcHelper.augmented_env
-                                                , **popen_kwargs
-                                               )
+                                                , **popen_kwargs)
 
                 self.process.stdin.write(Utils.encode_bytes(input_string))
             else:

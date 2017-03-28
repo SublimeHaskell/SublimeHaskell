@@ -1,10 +1,11 @@
 # -*- coding: UTF-8 -*-
 
+import traceback
+
 import sublime
 
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.proc_helper as ProcHelper
-import SublimeHaskell.filter_command as Filtercommand
 
 class SublimeHaskellFilterCommand(Common.SublimeHaskellTextCommand):
     """Utility class to run filter-like commands, for example, 'stylish-haskell' and 'hindent'. Error/diagnostic
@@ -51,8 +52,9 @@ class SublimeHaskellFilterCommand(Common.SublimeHaskellTextCommand):
             for region in regions:
                 self.view.sel().add(region)
 
-        except OSError as e:
-            self.report_error('Exception executing {0}: {1}'.format(' '.join(self.indenter), e))
+        except:
+            self.report_error('Exception executing {0}'.format(' '.join(self.indenter)))
+            print(traceback.format_exc())
 
     def report_error(self, errmsg):
         window = self.view.window()
