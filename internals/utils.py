@@ -9,7 +9,7 @@ def decode_bytes(s):
 
 
 def encode_bytes(s):
-    return s or s.replace('\n', os.linesep).encode('utf-8') if s is not None else None
+    return s.replace('\n', os.linesep).encode('utf-8') if s is not None else None
 
 
 # unicode function
