@@ -263,7 +263,7 @@ class ProcHelper(object):
         if check_enabled and not Settings.get_setting_async(Utils.tool_enabled(tool_name)):
             return None
 
-        source_dir = Common.get_source_dir(filename)
+        source_dir = get_source_dir(filename)
 
         def mk_result(s):
             return on_result(s) if on_result else s
