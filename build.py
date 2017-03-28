@@ -215,8 +215,14 @@ def run_build(view, project_name, project_dir, config):
     # Tool arguments (commands): build, clean, etc.
     tool_steps = config['steps'][BUILD_TOOL_name]
 
+    # Config override
+    override_config = view.window().project_data().get('stack_config_file', None)
+
+    override_args = []
+    if override_config:
+        override_args = ['--stack-yaml', override_config]
     # Assemble command lines to run (possibly multiple steps)
-    commands = [[tool_name] + step for step in tool_steps]
+    commands = [[tool_name] + step + override_args for step in tool_steps]
 
     Logging.log('running build commands: {0}'.format(commands), Logging.LOG_TRACE)
 
