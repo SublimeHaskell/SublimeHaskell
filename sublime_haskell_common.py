@@ -539,6 +539,8 @@ class StatusMessagesManager(threading.Thread, metaclass=Utils.Singleton):
 if 'status_message_manager' not in globals():
     status_message_manager = StatusMessagesManager()
     status_message_manager.start()
+else:
+    status_message_manager = globals()['status_message_manager']
 
 def show_status_message(msg, is_ok=None, priority=0):
     """
