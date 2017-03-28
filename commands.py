@@ -1228,16 +1228,16 @@ class SublimeHaskellStackExec(sublime_plugin.TextCommand):
 
     def run(self, edit):
         win = self.view.window()
-        win.show_input_panel('stack exec --', '', self.stack_exec, None, None)
+        win.show_input_panel('stack exec', '', self.stack_exec, None, None)
 
     def stack_exec(self, arg):
-        cmdargs = ['stack', 'exec', '--'] + shlex.split(arg)
+        cmdargs = ['stack', 'exec'] + shlex.split(arg)
         window = self.view.window()
         runv = Common.output_panel(window, panel_name=SublimeHaskellStackExec.OUTPUT_PANEL_NAME)
         pretty_cmdargs = 'Running \'{0}\''.format(' '.join(cmdargs))
         runv.run_command('insert', {'characters': '{0}\n{1}\n'.format(pretty_cmdargs, '-' * len(pretty_cmdargs))})
 
-        sthread = SExecRunner(runv, cmdargs).start()
+        sthread = SublimeHaskellStackExec.SExecRunner(runv, cmdargs).start()
 
     def show_output_panel(self):
         return output_view
