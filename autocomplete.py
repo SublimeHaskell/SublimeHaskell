@@ -237,23 +237,22 @@ class AutoCompletion(object):
                 if qsymbol.is_import_list:
                     if current_project:
                         # Search for declarations of qsymbol.module within current project
-                        q_module = head_of(hsdev.client.scope_modules(file=current_file_name,
-                                                                      input=qsymbol.module,
-                                                                      search_type='exact'))
+                        q_module = Utils.head_of(hsdev.client.scope_modules(file=current_file_name,
+                                                                            input=qsymbol.module,
+                                                                            search_type='exact'))
                         if q_module.by_source():
                             proj_module = hsdev.client.resolve(file=q_module.location.filename,
                                                                exports=True)
                             if proj_module:
                                 suggestions = proj_module.declarations.values()
                         elif q_module.by_cabal():
-                            cabal_module = head_of(hsdev.client.module(q_module.name,
-                                                                       search_type='exact',
-                                                                       package=q_module.location.package.name))
+                            cabal_module = Utils.head_of(hsdev.client.module(q_module.name,
+                                                                             search_type='exact',
+                                                                             package=q_module.location.package.name))
                             if cabal_module:
                                 suggestions = cabal_module.declarations.values()
                 else:
-                    suggestions = hsdev.client.complete(qualified_prefix, current_file_name,
-                                                        wide=wide)
+                    suggestions = hsdev.client.complete(qualified_prefix, current_file_name, wide=wide)
             return self.keyword_completions + make_completions(suggestions)
         else:
             with self.cache as cache_:
@@ -273,12 +272,11 @@ class AutoCompletion(object):
         ms = []
         if filename:
             ms = hsdev.client.scope_modules(filename, input=module, search_type='exact')
-        m = head_of(hsdev.client.module(
-            input=module,
-            search_type='exact',
-            file=ms[0].location.filename if ms and ms[0].by_source() else None,
-            db=ms[0].location.db if ms and ms[0].by_cabal() else None,
-            package=ms[0].location.package.name if ms and ms[0].by_cabal() else None))
+        m = Utils.head_of(hsdev.client.module(input=module,
+                                              search_type='exact',
+                                              file=ms[0].location.filename if ms and ms[0].by_source() else None,
+                                              db=ms[0].location.db if ms and ms[0].by_cabal() else None,
+                                              package=ms[0].location.package.name if ms and ms[0].by_cabal() else None))
         if not m:
             return []
         return make_completions(m.declarations.values())
