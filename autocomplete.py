@@ -4,9 +4,10 @@
 """SublimeHaskell autocompletion support."""
 
 import re
+import time
+
 import sublime
 import sublime_plugin
-import time
 
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.logging as Logging
@@ -80,6 +81,7 @@ class CompletionCache(object):
         self.cabal = []
         self.sources = []
         self.global_comps = []
+        self.source_locs = None
 
     def set_files(self, filename, comps):
         self.files[filename] = comps
@@ -128,9 +130,10 @@ class AutoCompletion(object):
 
     @hsdev.use_hsdev([])
     def get_completions_async(self, file_name=None):
-        def log_result(r):
-            Logging.log('completions: {0}'.format(len(r or [])), Logging.LOG_TRACE)
-            return r or []
+        def log_result(result):
+            Logging.log('completions: {0}'.format(len(result or [])), Logging.LOG_TRACE)
+            return result or []
+
         none_comps = []
         update_cabal = False
         update_sources = False
@@ -156,8 +159,7 @@ class AutoCompletion(object):
             Logging.log('preparing completions for {0}'.format(file_name), Logging.LOG_DEBUG)
             current_module = Utils.head_of(hsdev.client_back.module(file=file_name))
             if current_module:
-                comps = make_completions(
-                    hsdev.client_back.complete('', file_name, timeout=None))
+                comps = make_completions(hsdev.client_back.complete('', file_name, timeout=None))
 
                 # Get import names
                 #
@@ -200,7 +202,7 @@ class AutoCompletion(object):
 
     @hsdev.use_hsdev([])
     def get_completions(self, view, prefix, locations):
-        "Get all the completions that related to the current file."
+        "Get all the completions related to the current file."
 
         current_file_name = view.file_name()
 
@@ -226,23 +228,21 @@ class AutoCompletion(object):
                 if qsymbol.is_import_list:
                     if current_project:
                         # Search for declarations of qsymbol.module within current project
-                        q_module = head_of(hsdev.client.scope_modules(file=current_file_name,
-                                                                      input=qsymbol.module,
-                                                                      search_type='exact'))
+                        q_module = Utils.head_of(hsdev.client.scope_modules(file=current_file_name,
+                                                                            input=qsymbol.module,
+                                                                            search_type='exact'))
                         if q_module.by_source():
-                            proj_module = hsdev.client.resolve(file=q_module.location.filename,
-                                                               exports=True)
+                            proj_module = hsdev.client.resolve(file=q_module.location.filename, exports=True)
                             if proj_module:
                                 suggestions = proj_module.declarations.values()
                         elif q_module.by_cabal():
-                            cabal_module = head_of(hsdev.client.module(q_module.name,
-                                                                       search_type='exact',
-                                                                       package=q_module.location.package.name))
+                            cabal_module = Utils.head_of(hsdev.client.module(q_module.name,
+                                                                             search_type='exact',
+                                                                             package=q_module.location.package.name))
                             if cabal_module:
                                 suggestions = cabal_module.declarations.values()
                 else:
-                    suggestions = hsdev.client.complete(qualified_prefix, current_file_name,
-                                                        wide=wide)
+                    suggestions = hsdev.client.complete(qualified_prefix, current_file_name, wide=wide)
             return self.keyword_completions + make_completions(suggestions)
         else:
             with self.cache as cache_:
@@ -262,12 +262,11 @@ class AutoCompletion(object):
         ms = []
         if filename:
             ms = hsdev.client.scope_modules(filename, input=module, search_type='exact')
-        m = head_of(hsdev.client.module(
-            input=module,
-            search_type='exact',
-            file=ms[0].location.filename if ms and ms[0].by_source() else None,
-            db=ms[0].location.db if ms and ms[0].by_cabal() else None,
-            package=ms[0].location.package.name if ms and ms[0].by_cabal() else None))
+        m = Utils.head_of(hsdev.client.module(input=module,
+                                              search_type='exact',
+                                              file=ms[0].location.filename if ms and ms[0].by_source() else None,
+                                              db=ms[0].location.db if ms and ms[0].by_cabal() else None,
+                                              package=ms[0].location.package.name if ms and ms[0].by_cabal() else None))
         if not m:
             return []
         return make_completions(m.declarations.values())

@@ -95,7 +95,7 @@ def clear_error_marks():
 
 
 def set_global_error_messages(messages):
-    global ERRORS
+    # global ERRORS
     clear_error_marks()
     ERRORS.extend(messages)
 
@@ -105,7 +105,7 @@ def run_build_thread(view, cabal_project_dir, msg, cmd, on_done):
 
 
 def run_chain_build_thread(view, cabal_project_dir, msg, cmds, on_done):
-    Common.show_status_message_process(msg, priority = 3)
+    Common.show_status_message_process(msg, priority=3)
     thread = threading.Thread(target=wait_for_chain_to_complete, args=(view, cabal_project_dir, msg, cmds, on_done))
     thread.start()
 
@@ -127,7 +127,9 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
     # run and wait commands, fail on first fail
     # stdout = ''
     collected_out = []
-    output_log = Common.output_panel(view.window(), '', panel_name=BUILD_LOG_PANEL_NAME, show_panel=Settings.get_setting_async('show_output_window'))
+    output_log = Common.output_panel(view.window(), '',
+                                     panel_name=BUILD_LOG_PANEL_NAME,
+                                     show_panel=Settings.get_setting_async('show_output_window'))
     for cmd in cmds:
         Common.output_text(output_log, ' '.join(cmd) + '...\n')
 
@@ -152,12 +154,9 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
 def format_output_messages(messages):
     """Formats list of messages"""
     summary = {'error': 0, 'warning': 0, 'hint': 0}
-    for m in messages:
-        summary[m.level] = summary[m.level] + 1
-    summary_line = 'Errors: {0}, Warnings: {1}, Hints: {2}'.format(
-        summary['error'],
-        summary['warning'],
-        summary['hint'])
+    for msg in messages:
+        summary[msg.level] = summary[msg.level] + 1
+    summary_line = 'Errors: {0}, Warnings: {1}, Hints: {2}'.format(summary['error'], summary['warning'], summary['hint'])
 
     def messages_level(name, level):
         if not summary[level]:
@@ -218,50 +217,46 @@ def mark_messages_in_views(errors):
     "Mark the regions in open views where errors were found."
     begin_time = time.clock()
     # Mark each diagnostic in each open view in all windows:
-    for w in sublime.windows():
-        for v in w.views():
-            view_filename = v.file_name()
+    for win in sublime.windows():
+        for view in win.views():
+            view_filename = view.file_name()
             # Unsaved files have no file name
             if view_filename is None:
                 continue
-            errors_in_view = list(filter(
-                lambda x: os.path.samefile(view_filename, x.filename),
-                errors))
-            mark_messages_in_view(errors_in_view, v)
+            errors_in_view = list(filter(lambda x: os.path.samefile(view_filename, x.filename), errors))
+            mark_messages_in_view(errors_in_view, view)
     end_time = time.clock()
-    Logging.log('total time to mark {0} diagnostics: {1} seconds'.format(
-        len(errors), end_time - begin_time), Logging.LOG_DEBUG)
+    Logging.log('total time to mark {0} diagnostics: {1} seconds'.format(len(errors), end_time - begin_time),
+                Logging.LOG_DEBUG)
 
 
-message_levels = {
+MESSAGE_LEVELS = {
     'hint': {
         'style': 'sublimehaskell.mark.hint',
-        'icon': {
-            'normal': 'haskell-hint.png',
-            'fix': 'haskell-hint-fix.png' }
+        'icon': {'normal': 'haskell-hint.png',
+                 'fix': 'haskell-hint-fix.png'
+                }
     },
-    'warning': {
-        'style': 'sublimehaskell.mark.warning',
-        'icon': {
-            'normal': 'haskell-warning.png',
-            'fix': 'haskell-warning-fix.png' }
-    },
-    'error': {
-        'style': 'sublimehaskell.mark.error',
-        'icon': {
-            'normal': 'haskell-error.png',
-            'fix': 'haskell-error-fix.png' }
-    }
+    'warning': {'style': 'sublimehaskell.mark.warning',
+                'icon': {'normal': 'haskell-warning.png',
+                         'fix': 'haskell-warning-fix.png'
+                        }
+               },
+    'error': {'style': 'sublimehaskell.mark.error',
+              'icon': {'normal': 'haskell-error.png',
+                       'fix': 'haskell-error-fix.png'
+                      }
+             }
 }
 
 
 def errors_for_view(view):
     errs = []
-    for e in ERRORS:
-        if os.path.samefile(e.filename, view.file_name()):
-            e.update_region()
-            errs.append(e)
-    return sorted(errs, key = lambda e: e.region)
+    for err in ERRORS:
+        if os.path.samefile(err.filename, view.file_name()):
+            err.update_region()
+            errs.append(err)
+    return sorted(errs, key=lambda e: e.region)
 
 
 def update_messages_in_view(view, errors):
@@ -272,19 +267,11 @@ def update_messages_in_view(view, errors):
 # from the great SublimeClang plugin.
 
 
-def get_error_at(filename, line, column):
-    global ERRORS
-    for err in ERRORS:
-        if err.filename == filename and err.region.start.line == line and err.region.start.column :
-            return err
-    return None
-
-
 def goto_error(view, error):
     line = error.region.start.line + 1
     column = error.region.start.column + 1
     filename = error.filename
-    global ERROR_VIEW
+    # global ERROR_VIEW
     if ERROR_VIEW:
         show_output(view)
         # error_region = ERROR_VIEW.find('{0}: line {1}, column \\d+:(\\n\\s+.*)*'.format(re.escape(filename), line), 0)
@@ -295,25 +282,25 @@ def goto_error(view, error):
     view.window().open_file("{0}:{1}:{2}".format(filename, line, column), sublime.ENCODED_POSITION)
 
 
-def get_next_value(lst, p, cycle = True):
-    # Get first value satisfying `p`, if no such values and `cycle`, return first element
-    for x in filter(p, lst):
-        return x
+def get_next_value(lst, pred, cycle=True):
+    # Get first value satisfying `pred`, if no such values and `cycle`, return first element
+    for elem in filter(pred, lst):
+        return elem
     if cycle and len(lst):
         return lst[0]
     return None
 
 
-def get_prev_value(lst, p, cycle = True):
+def get_prev_value(lst, pred, cycle=True):
     # Inverse of `get_next_value`, goes back and finds value satisfying `p`
-    return get_next_value(reversed(lst), p, cycle)
+    return get_next_value(reversed(lst), pred, cycle)
 
 
 class SublimeHaskellNextError(Common.SublimeHaskellTextCommand):
     def run(self, edit):
         errs = errors_for_view(self.view)
         if not errs:
-            Common.show_status_message('No errors or warnings!', priority = 5)
+            Common.show_status_message('No errors or warnings!', priority=5)
         next_err = get_next_value(errs, lambda e: e.region > v.sel()[0])
         v.sel().clear()
         v.sel().add(next_err.region.to_region(self.view))
@@ -324,14 +311,14 @@ class SublimeHaskellPreviousError(Common.SublimeHaskellTextCommand):
     def run(self, edit):
         errs = errors_for_view(self.view)
         if not errs:
-            Common.show_status_message("No errors or warnings!", priority = 5)
+            Common.show_status_message("No errors or warnings!", priority=5)
         prev_err = get_prev_value(errs, lambda e: e.region < v.sel()[0])
         v.sel().clear()
         v.sel().add(prev_err.region.to_region(self.view))
         goto_error(self.view, prev_err)
 
 
-def region_key(name, is_fix = False):
+def region_key(name, is_fix=False):
     if is_fix:
         return 'output-{0}s-fix'.format(name)
     else:
@@ -355,8 +342,8 @@ def mark_messages_in_view(messages, view):
         view.add_regions(
             m.region.region_key,
             [m.to_region(view)],
-            message_levels[m.level]['style'],
-            get_icon(message_levels[m.level]['icon']['fix' if m.correction is not None else 'normal']),
+            MESSAGE_LEVELS[m.level]['style'],
+            get_icon(MESSAGE_LEVELS[m.level]['icon']['fix' if m.correction is not None else 'normal']),
             sublime.DRAW_OUTLINED)
         if m.correction and m.correction.corrector:
             m.correction.corrector.region.save(view, 'autofix-{0}'.format(str(i)))
@@ -368,19 +355,22 @@ def mark_messages_in_view(messages, view):
                 sublime.HIDDEN)
 
 
-def write_output(view, text, cabal_project_dir, show_panel = True):
+def write_output(view, text, cabal_project_dir, show_panel=True):
     "Write text to Sublime's output panel."
     global ERROR_VIEW
-    ERROR_VIEW = Common.output_panel(view.window(), text, panel_name = OUTPUT_PANEL_NAME, syntax = 'HaskellOutputPanel', show_panel = show_panel)
+    ERROR_VIEW = Common.output_panel(view.window(), text,
+                                     panel_name=OUTPUT_PANEL_NAME,
+                                     syntax='HaskellOutputPanel',
+                                     show_panel=show_panel)
     ERROR_VIEW.settings().set("RESULT_FILE_REGEX", RESULT_FILE_REGEX)
     ERROR_VIEW.settings().set("result_base_dir", cabal_project_dir)
 
 
-def hide_output(view, panel_name = OUTPUT_PANEL_NAME):
+def hide_output(view, panel_name=OUTPUT_PANEL_NAME):
     view.window().run_command('hide_panel', {'panel': 'output.' + panel_name})
 
 
-def show_output(view, panel_name = OUTPUT_PANEL_NAME):
+def show_output(view, panel_name=OUTPUT_PANEL_NAME):
     view.window().run_command('show_panel', {'panel': 'output.' + panel_name})
 
 
@@ -460,9 +450,10 @@ def parse_info(name, contents):
     """
     Parses result of :i <name> command of ghci and returns derived symbols.Declaration
     """
-    functionRegex = '{0}\s+::\s+(?P<type>.*?)(\s+--(.*))?$'.format(name)
-    dataRegex = '(?P<what>(newtype|type|data))\s+((?P<ctx>(.*))=>\s+)?(?P<name>\S+)\s+(?P<args>(\w+\s+)*)=(\s*(?P<def>.*)\s+-- Defined)?'
-    classRegex = '(?P<what>class)\s+((?P<ctx>(.*))=>\s+)?(?P<name>\S+)\s+(?P<args>(\w+\s+)*)(.*)where$'
+    functionRegex = r'{0}\s+::\s+(?P<type>.*?)(\s+--(.*))?$'.format(name)
+    dataRegex = r'(?P<what>(newtype|type|data))\s+((?P<ctx>(.*))=>\s+)?(?P<name>\S+)\s+' + \
+                r'(?P<args>(\w+\s+)*)=(\s*(?P<def>.*)\s+-- Defined)?'
+    classRegex = r'(?P<what>class)\s+((?P<ctx>(.*))=>\s+)?(?P<name>\S+)\s+(?P<args>(\w+\s+)*)(.*)where$'
 
     if name[0].isupper():
         # data, class, type or newtype

@@ -48,13 +48,13 @@ def parse_position(d):
     return None
 
 
-def parse_region(d):
-    if not d:
-        return None
-    start = parse_position(d.get('from'))
-    end = parse_position(d.get('to'))
-    if start is not None and end is not None:
-        return symbols.Region(start, end)
+def parse_region(rgn):
+    if rgn is not None:
+        start = parse_position(rgn.get('from'))
+        end = parse_position(rgn.get('to'))
+        if start is not None and end is not None:
+            return symbols.Region(start, end)
+
     return None
 
 

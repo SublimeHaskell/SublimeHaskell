@@ -1,10 +1,11 @@
 # -*- coding: UTF-8 -*-
-# pylint: disable=fixme
+# pylinee: disable=fixme
 
 import os
 import os.path
-import sublime
 import threading
+
+import sublime
 
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.proc_helper as ProcHelper
@@ -113,9 +114,9 @@ def is_stack_project(project_dir):
 def stack_dist_path(project_dir):
     exit_code, out, _err = ProcHelper.ProcHelper.run_process(['stack', 'path'], cwd=project_dir)
     if exit_code == 0:
-        ds = [d for d in out.splitlines() if d.startswith('dist-dir: ')]
-        if len(ds):
-            dist_dir = ds[0][10:]
+        distdirs = [d for d in out.splitlines() if d.startswith('dist-dir: ')]
+        if len(distdirs) > 0:
+            dist_dir = distdirs[0][10:]
             return os.path.join(project_dir, dist_dir)
 
 
@@ -127,11 +128,11 @@ def get_projects():
                       if (Common.is_haskell_source(v) or Common.is_cabal_source(v)) and v.file_name()
                      ]
 
-        def npath(p):
-            return os.path.normcase(os.path.normpath(p))
+        def npath(path):
+            return os.path.normcase(os.path.normpath(path))
 
-        def childof(c, p):
-            return npath(c).startswith(npath(p))
+        def childof(path, prefix):
+            return npath(path).startswith(npath(prefix))
 
         return dict((info['name'], info) for info in filter(
             lambda p: any([childof(p['path'], f) for f in folders]) or any([childof(src, p['path']) for src in view_files]),
@@ -160,31 +161,31 @@ def get_projects():
 # filter_project accepts name of project and project-info as it appears in AutoCompletion object
 #   and returns whether this project must appear in selection list
 def select_project(window, on_selected, filter_project=None):
-    ps = [(name, info) for (name, info) in get_projects().items() if not filter_project or filter_project(name, info)]
+    projs = [(name, info) for (name, info) in get_projects().items() if not filter_project or filter_project(name, info)]
 
     def run_selected(psel):
         on_selected(psel[0], psel[1]['path'])
 
-    if len(ps) == 0:
+    if len(projs) == 0:
         Common.show_status_message("No projects found, did you add a '.cabal' file?", is_ok=False, priority=5)
         return
-    if len(ps) == 1:  # There's only one project, build it
-        run_selected(ps[0])
+    if len(projs) == 1:  # There's only one project, build it
+        run_selected(projs[0])
         return
 
-    cabal_project_dir, cabal_project_name = Common.get_cabal_project_dir_and_name_of_view(window.active_view())
+    _, cabal_project_name = Common.get_cabal_project_dir_and_name_of_view(window.active_view())
     Logging.log('Current project: {0}'.format(cabal_project_name))
 
     # Sort by name
-    ps.sort(key=lambda p: p[0])
+    projs.sort(key=lambda p: p[0])
 
-    current_project_idx = next((i for i, p in enumerate(ps) if p[0] == cabal_project_name), -1)
+    current_project_idx = next((i for i, p in enumerate(projs) if p[0] == cabal_project_name), -1)
 
     def on_done(idx):
         if idx != -1:
-            run_selected(ps[idx])
+            run_selected(projs[idx])
 
-    window.show_quick_panel(list(map(lambda m: [m[0], m[1]['path']], ps)), on_done, 0, current_project_idx)
+    window.show_quick_panel(list(map(lambda m: [m[0], m[1]['path']], projs)), on_done, 0, current_project_idx)
 
 
 def run_build(view, project_name, project_dir, config):
@@ -200,11 +201,11 @@ def run_build(view, project_name, project_dir, config):
     # Set project as building
     PROJECTS_BEING_BUILT.add(project_name)
 
-    BUILD_TOOL_name = Settings.get_setting_async('haskell_BUILD_TOOL', 'stack')
-    if BUILD_TOOL_name == 'stack' and not is_stack_project(project_dir):  # rollback to cabal
-        BUILD_TOOL_name = 'cabal'
+    build_tool_name = Settings.get_setting_async('haskell_BUILD_TOOL', 'stack')
+    if build_tool_name == 'stack' and not is_stack_project(project_dir):  # rollback to cabal
+        build_tool_name = 'cabal'
 
-    tool = BUILD_TOOL[BUILD_TOOL_name]
+    tool = BUILD_TOOL[build_tool_name]
 
     # Title of tool: Cabal, Stack
     tool_title = tool['name']
@@ -213,7 +214,7 @@ def run_build(view, project_name, project_dir, config):
     # Tool name: cabal
     tool_name = tool['command']
     # Tool arguments (commands): build, clean, etc.
-    tool_steps = config['steps'][BUILD_TOOL_name]
+    tool_steps = config['steps'][build_tool_name]
 
     # Assemble command lines to run (possibly multiple steps)
     commands = [[tool_name] + step for step in tool_steps]
@@ -266,7 +267,7 @@ class SublimeHaskellInstallCommand(SublimeHaskellBaseCommand):
 
 class SublimeHaskellTestCommand(SublimeHaskellBaseCommand):
     def run(self):
-        def has_tests(name, info):
+        def has_tests(_, info):
             return len(info['description']['tests']) > 0
 
         self.build('test', filter_project=has_tests)
@@ -316,31 +317,35 @@ def project_dist_path(project_dir):
 
 
 class SublimeHaskellRunCommand(SublimeHaskellBaseCommand):
+    def __init__(self, view):
+        super().__init__(view)
+        self.executables = []
+
     def run(self):
         self.executables = []
-        ps = []
+        projs = []
         projects = get_projects()
-        for p, info in projects.items():
+        for proj, info in projects.items():
             if 'description' in info:
-                for e in info['description']['executables']:
-                    ps.append((p + ": " + e['name'], {
+                for exes in info['description']['executables']:
+                    projs.append((proj + ": " + exes['name'], {
                         'dir': info['path'],
                         'dist': project_dist_path(info['path']),
-                        'name': e['name']
+                        'name': exes['name']
                         }))
 
         # Nothing to run
-        if len(ps) == 0:
+        if len(projs) == 0:
             Common.sublime_status_message('Nothing to run')
             return
 
-        cabal_project_dir, cabal_project_name = Common.get_cabal_project_dir_and_name_of_view(self.window.active_view())
+        _, cabal_project_name = Common.get_cabal_project_dir_and_name_of_view(self.window.active_view())
 
         # Show current project first
-        ps.sort(key=lambda s: (not s[0].startswith(cabal_project_name), s[0]))
+        projs.sort(key=lambda s: (not s[0].startswith(cabal_project_name), s[0]))
 
-        self.executables = list(map(lambda m: m[1], ps))
-        self.window.show_quick_panel(list(map(lambda m: m[0], ps)), self.on_done)
+        self.executables = list(map(lambda m: m[1], projs))
+        self.window.show_quick_panel(list(map(lambda m: m[0], projs)), self.on_done)
 
     def on_done(self, idx):
         if idx == -1:
@@ -357,16 +362,16 @@ class SublimeHaskellRunCommand(SublimeHaskellBaseCommand):
 
 
 def run_binary(name, bin_file, base_dir):
-    with Common.status_message_process('Running {0}'.format(name), priority=5) as s:
+    with Common.status_message_process('Running {0}'.format(name), priority=5) as smsg:
         exit_code, out, err = ProcHelper.ProcHelper.run_process([bin_file], cwd=base_dir)
         window = sublime.active_window()
         if not window:
             return
         if exit_code == 0:
-            s.ok()
+            smsg.ok()
             sublime.set_timeout(lambda: write_output(window, out, base_dir), 0)
         else:
-            s.fail()
+            smsg.fail()
             sublime.set_timeout(lambda: write_output(window, err, base_dir), 0)
 
 
@@ -378,23 +383,3 @@ def write_output(window, text, base_dir, show_panel=True):
 
 def hide_output(window):
     window.run_command('hide_panel', {'panel': 'output.' + OUTPUT_PANEL_NAME})
-
-
-def run_build_commands_with(msg, cmds):
-    """Run general build commands"""
-    window, view, file_shown_in_view = Common.get_haskell_command_window_view_file_project()
-    if not file_shown_in_view:
-        return
-    syntax_file_for_view = view.settings().get('syntax').lower()
-    if 'haskell' not in syntax_file_for_view:
-        return
-    cabal_project_dir, cabal_project_name = Common.get_cabal_project_dir_and_name_of_view(view)
-    if not cabal_project_dir:
-        return
-
-    ParseOutput.run_chain_build_thread(view, cabal_project_dir, msg(cabal_project_name), cmds)
-
-
-def run_build_command_with(msg, cmd):
-    """Run one command"""
-    run_build_commands_with(msg, [cmd])

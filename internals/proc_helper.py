@@ -167,7 +167,7 @@ class ProcHelper(object):
                             p_state = 1
                         elif re_global_dirs.match(l1):
                             p_state = 2
-                        elif re.match('^\s+\w', l1):
+                        elif re.match(r'^\s+\w', l1):
                             # prefix attribute?
                             m = re_prefix.search(l1)
                             if m:
@@ -245,7 +245,8 @@ class ProcHelper(object):
             return proc.wait(input_string)
 
     @staticmethod
-    def invoke_tool(command, tool_name, input='', on_result=None, filename=None, on_line=None, check_enabled=True, **popen_kwargs):
+    def invoke_tool(command, tool_name, input='', on_result=None, filename=None, on_line=None, check_enabled=True,
+                    **popen_kwargs):
         if check_enabled and not Settings.get_setting_async(Utils.tool_enabled(tool_name)):
             return None
 
@@ -266,9 +267,11 @@ class ProcHelper(object):
                 else:
                     return mk_result(io.TextIOWrapper(stdout, encoding='utf-8'))
 
-        except OSError as e:
-            if e.errno == errno.ENOENT:
-                Common.output_error_async(sublime.active_window(), "SublimeHaskell: {0} was not found!\n'{1}' is set to False".format(tool_name, Utils.tool_enabled(tool_name)))
+        except OSError as os_exc:
+            if os_exc.errno == errno.ENOENT:
+                errmsg = "SublimeHaskell: {0} was not found!\n'{1}' is set to False".format(tool_name,
+                                                                                            Utils.tool_enabled(tool_name))
+                Common.output_error_async(sublime.active_window(), errmsg)
                 Settings.set_setting_async(Utils.tool_enabled(tool_name), False)
             else:
                 Logging.log('{0} fails with {1}, command: {2}'.format(tool_name, e, command), Logging.LOG_ERROR)

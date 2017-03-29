@@ -8,6 +8,7 @@ import traceback
 import sublime
 
 import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.hsdev_refactor.result_parse as HsResultParse
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.ghci_backend as GHCIMod
@@ -100,7 +101,7 @@ class SublimeHaskellHsDevChain(Common.SublimeHaskellTextCommand):
     def on_autofix(self, corrections):
         output_messages = [ParseOutput.OutputMessage(
             m['source']['file'],
-            hsdev.parse_region(m['region']).to_zero_based(),
+            HsResultParse.parse_region(m['region']).to_zero_based(),
             m['level'].capitalize() + ': ' + m['note']['message'].replace('\n', '\n  '),
             m['level']) for m in self.messages]
 
