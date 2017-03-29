@@ -15,6 +15,8 @@ import sublime
 
 import SublimeHaskell.symbols as symbols
 import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.hsdev_refactor.callback as HsCallback
+import SublimeHaskell.hsdev_refactor.decorators as HsDecorator
 import SublimeHaskell.hsdev_refactor.result_parse as ResultParse
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.locked_object as LockedObject
@@ -33,9 +35,9 @@ def concat_args(args):
 
 
 def hsdev_version():
+    retval = None
     try:
         exit_code, out, err = ProcHelper.ProcHelper.run_process(['hsdev', 'version'])
-        retval = None
         if exit_code == 0:
             m = re.match(r'(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)\.(?P<build>\d+)', out)
             if m:
@@ -63,138 +65,6 @@ def check_version(ver, minimal, maximal):
     return True
 
 
-def reconnect_function(fn):
-    def wrapped(self, *args, **kwargs):
-        autoconnect_ = kwargs.pop('autoconnect', False)
-        on_reconnect_ = kwargs.pop('on_reconnect', None)
-        just_connect_ = kwargs.pop('just_connect', False)
-
-        def run_fn():
-            if not just_connect_:
-                self.autoconnect = autoconnect_
-                self.on_reconnect = on_reconnect_
-            return fn(self, *args, **kwargs)
-        if not just_connect_:
-            self.set_reconnect_function(run_fn)
-        return run_fn()
-    return wrapped
-
-
-class begin_connecting(object):
-    def __init__(self, agent):
-        self.agent = agent
-
-    def __enter__(self):
-        self.agent.set_connecting()
-        return self
-
-    def __exit__(self, type, value, traceback):
-        if type:
-            self.agent.set_unconnected()
-        else:
-            if self.agent.is_connecting():
-                self.agent.set_unconnected()
-
-
-def connect_function(fn):
-    def wrapped(self, *args, **kwargs):
-        if self.is_unconnected():
-            with begin_connecting(self):
-                return fn(self, *args, **kwargs)
-        else:
-            Logging.log('hsdev already connected', Logging.LOG_WARNING)
-    return wrapped
-
-
-def hsdev_command(async=False, timeout=None, is_list=False):
-    def wrap_function(fn):
-        def wrapped(self, *args, **kwargs):
-            wait_flag = kwargs.pop('wait', not async)
-            timeout_arg = kwargs.pop('timeout', timeout)
-            on_resp = kwargs.pop('on_response', None)
-            on_not = kwargs.pop('on_notify', None)
-            on_err = kwargs.pop('on_error', None)
-            on_res_part = kwargs.pop('on_result_part', None)
-            split_res = kwargs.pop('split_result', on_res_part is not None)
-
-            (name_, opts_, on_result_) = fn(self, *args, **kwargs)
-
-            if is_list and split_res:
-                result = []
-
-                def on_notify(n):
-                    if 'result-part' in n:
-                        rp = on_result_([n['result-part']])[0]
-                        call_callback(on_res_part, rp)
-                        result.append(rp)
-                    else:
-                        call_callback(on_not, n)
-
-                def on_response(r):
-                    on_resp(result)
-
-                opts_.update({'split-result': None})  # FIXME: Is this option still used?
-                r = self.call(name_,
-                              opts_,
-                              on_response=on_response if on_resp else None,
-                              on_notify=on_notify,
-                              on_error=on_err,
-                              wait=wait_flag,
-                              timeout=timeout_arg)
-                if wait_flag:
-                    return result
-                return r
-
-            else:
-                def on_response(r):
-                    on_resp(on_result_(r))
-                r = self.call(name_,
-                              opts_,
-                              on_response=on_response if on_resp else None,
-                              on_notify=on_not,
-                              on_error=on_err,
-                              wait=wait_flag,
-                              timeout=timeout_arg)
-                if wait_flag:
-                    return on_result_(r)
-                return r
-        return wrapped
-    return wrap_function
-
-
-def command(fn):
-    return hsdev_command(async=False, timeout=1)(fn)
-
-
-def async_command(fn):
-    return hsdev_command(async=True)(fn)
-
-
-def list_command(fn):
-    return hsdev_command(async=False, timeout=1, is_list=True)(fn)
-
-
-def async_list_command(fn):
-    return hsdev_command(async=True, is_list=True)(fn)
-
-
-def cmd(name_, opts_={}, on_result=lambda r: r):
-    return (name_, opts_, on_result)
-
-
-def call_callback(fn, *args, **kwargs):
-    name = kwargs.get('name')
-    if name:
-        del kwargs['name']
-    try:
-        if fn is not None:
-            fn(*args, **kwargs)
-    except:
-        Logging.log('callback \'{0}\' throws exception, see console window traceback'.format(name or '<unnamed>'),
-                    Logging.LOG_ERROR)
-        print(traceback.format_exc())
-
-
 def format_error_details(ds):
     return ', '.join(['{}: {}'.format(k, v) for k, v in ds.items()])
 
@@ -216,15 +86,15 @@ class HsDevCallbacks(object):
 
     def call_response(self, r):
         self.log_time()
-        call_callback(self.on_response, r)
+        HsCallback.call_callback(self.on_response, r)
 
     def call_notify(self, n):
-        call_callback(self.on_notify, n)
+        HsCallback.call_callback(self.on_notify, n)
 
     def call_error(self, e, ds):
         self.log_time()
         Logging.log('{0} returns error: {1}, {2}'.format(self.command, e, format_error_details(ds)), Logging.LOG_ERROR)
-        call_callback(self.on_error, e, ds)
+        HsCallback.call_callback(self.on_error, e, ds)
 
 
 # hsdev client
@@ -260,7 +130,7 @@ class HsDev(object):
     def reconnect(self):
         if self.connect_fun is not None:
             Logging.log('Reconnecting to hsdev...', Logging.LOG_INFO)
-            call_callback(self.on_reconnect, name='HsDev.on_reconnect')
+            HsCallback.call_callback(self.on_reconnect, name='HsDev.on_reconnect')
             self.connect_fun()
         else:
             Logging.log('No reconnect function')
@@ -295,8 +165,8 @@ class HsDev(object):
 
     # Socket functions
 
-    @connect_function
-    @reconnect_function
+    @HsDecorator.connect_function
+    @HsDecorator.reconnect_function
     def connect(self, tries=10, delay=1.0):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -310,7 +180,7 @@ class HsDev(object):
                 self.listener = threading.Thread(target=self.listen)
                 self.listener.start()
                 Logging.log('connected to hsdev server', Logging.LOG_INFO)
-                call_callback(self.on_connected, name='HsDev.on_connected')
+                HsCallback.call_callback(self.on_connected, name='HsDev.on_connected')
                 return True
             except Exception:
                 Logging.log('failed to connect to hsdev server ({0})'.format(n), Logging.LOG_WARNING)
@@ -318,7 +188,7 @@ class HsDev(object):
 
         return False
 
-    @reconnect_function
+    @HsDecorator.reconnect_function
     def connect_async(self, tries=10, delay=1.0):
         thread = threading.Thread(target=self.connect,
                                   kwargs={'tries': tries, 'delay': delay, 'just_connect': True})
@@ -378,7 +248,7 @@ class HsDev(object):
             return
         self.close()
         Logging.log('{0}: connection to hsdev lost: {1}'.format(fn, e), Logging.LOG_ERROR)
-        call_callback(self.on_disconnected, name='HsDev.on_disconnected')
+        HsCallback.call_callback(self.on_disconnected, name='HsDev.on_disconnected')
 
         # send error to callbacks
         with self.map as m:
@@ -407,12 +277,12 @@ class HsDev(object):
 
             def on_response_(r):
                 x['result'] = r
-                call_callback(on_response, r)
+                HsCallback.call_callback(on_response, r)
                 if wait_receive:
                     wait_receive.set()
 
             def on_error_(e, ds):
-                call_callback(on_error, e, ds)
+                HsCallback.call_callback(on_error, e, ds)
                 if wait_receive:
                     wait_receive.set()
 
@@ -478,17 +348,17 @@ class HsDev(object):
 
     # Commands
 
-    @command
+    @HsDecorator.command
     def link(self, hold=False, **kwargs):
-        return cmd('link', {'hold': hold})
+        return HsDecorator.cmd('link', {'hold': hold})
 
-    @command
+    @HsDecorator.command
     def ping(self):
-        return cmd('ping', {}, lambda r: r and ('message' in r) and (r['message'] == 'pong'))
+        return HsDecorator.cmd('ping', {}, lambda r: r and ('message' in r) and (r['message'] == 'pong'))
 
-    @async_command
+    @HsDecorator.async_command
     def scan(self, cabal=False, sandboxes=[], projects=[], files=[], paths=[], ghc=[], contents={}, docs=False, infer=False):
-        return cmd('scan', {
+        return HsDecorator.cmd('scan', {
             'projects': projects,
             'cabal': cabal,
             'sandboxes': sandboxes,
@@ -499,34 +369,34 @@ class HsDev(object):
             'docs': docs,
             'infer': infer})
 
-    @async_command
+    @HsDecorator.async_command
     def docs(self, projects=[], files=[], modules=[]):
-        return cmd('docs', {
+        return HsDecorator.cmd('docs', {
             'projects': projects,
             'files': files,
             'modules': modules})
 
-    @async_command
+    @HsDecorator.async_command
     def infer(self, projects=[], files=[], modules=[]):
-        return cmd('infer', {
+        return HsDecorator.cmd('infer', {
             'projects': projects,
             'files': files,
             'modules': modules})
 
-    @async_list_command
+    @HsDecorator.async_list_command
     def remove(self, cabal=False, sandboxes=[], projects=[], files=[], packages=[]):
-        return cmd('remove', {
+        return HsDecorator.cmd('remove', {
             'projects': projects,
             'cabal': cabal,
             'sandboxes': sandboxes,
             'files': files,
             'packages': packages})
 
-    @command
+    @HsDecorator.command
     def remove_all(self):
-        return cmd('remove-all', {})
+        return HsDecorator.cmd('remove-all', {})
 
-    @list_command
+    @HsDecorator.list_command
     def list_modules(self, project=None, file=None, module=None, deps=None, sandbox=None, cabal=False, db=None, package=None,
                      source=False, standalone=False):
         fs = []
@@ -551,17 +421,17 @@ class HsDev(object):
         if standalone:
             fs.append('standalone')
 
-        return cmd('modules', {'filters': fs}, ResultParse.parse_modules_brief)
+        return HsDecorator.cmd('modules', {'filters': fs}, ResultParse.parse_modules_brief)
 
-    @list_command
+    @HsDecorator.list_command
     def list_packages(self):
-        return cmd('packages', {})
+        return HsDecorator.cmd('packages', {})
 
-    @list_command
+    @HsDecorator.list_command
     def list_projects(self):
-        return cmd('projects', {})
+        return HsDecorator.cmd('projects', {})
 
-    @list_command
+    @HsDecorator.list_command
     def symbol(self, input="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
                cabal=False, db=None, package=None, source=False, standalone=False, locals=False):
         # search_type is one of: exact, prefix, infix, suffix, regex
@@ -589,9 +459,9 @@ class HsDev(object):
         if standalone:
             fs.append('standalone')
 
-        return cmd('symbol', {'query': q, 'filters': fs, 'locals': locals}, ResultParse.parse_decls)
+        return HsDecorator.cmd('symbol', {'query': q, 'filters': fs, 'locals': locals}, ResultParse.parse_decls)
 
-    @command
+    @HsDecorator.command
     def module(self, input="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
                cabal=False, db=None, package=None, source=False, standalone=False):
         q = {'input': input, 'type': search_type}
@@ -618,104 +488,111 @@ class HsDev(object):
         if standalone:
             fs.append('standalone')
 
-        return cmd('module', {'query': q, 'filters': fs}, ResultParse.parse_modules)
+        return HsDecorator.cmd('module', {'query': q, 'filters': fs}, ResultParse.parse_modules)
 
-    @command
+    @HsDecorator.command
     def resolve(self, file, exports=False):
-        return cmd('resolve', {'file': file, 'exports': exports}, ResultParse.parse_module)
+        return HsDecorator.cmd('resolve', {'file': file, 'exports': exports}, ResultParse.parse_module)
 
-    @command
+    @HsDecorator.command
     def project(self, project=None, path=None):
-        return cmd('project', {'name': project} if project else {'path': path})
+        return HsDecorator.cmd('project', {'name': project} if project else {'path': path})
 
-    @command
+    @HsDecorator.command
     def sandbox(self, path):
-        return cmd('sandbox', {'path': path})
+        return HsDecorator.cmd('sandbox', {'path': path})
 
-    @list_command
+    @HsDecorator.list_command
     def lookup(self, name, file):
-        return cmd('lookup', {'name': name, 'file': file}, ResultParse.parse_decls)
+        return HsDecorator.cmd('lookup', {'name': name, 'file': file}, ResultParse.parse_decls)
 
-    @list_command
+    @HsDecorator.list_command
     def whois(self, name, file):
-        return cmd('whois', {'name': name, 'file': file}, ResultParse.parse_declarations)
+        return HsDecorator.cmd('whois', {'name': name, 'file': file}, ResultParse.parse_declarations)
 
-    @list_command
+    @HsDecorator.list_command
     def scope_modules(self, file, input='', search_type='prefix'):
-        return cmd('scope modules', {'query': {'input': input, 'type': search_type}, 'file': file}, ResultParse.parse_modules_brief)
+        return HsDecorator.cmd('scope modules', {'query': {'input': input, 'type': search_type}, 'file': file},
+                               ResultParse.parse_modules_brief)
 
-    @list_command
+    @HsDecorator.list_command
     def scope(self, file, input='', search_type='prefix', global_scope=False):
-        return cmd('scope', {'query': {'input': input, 'type': search_type},
-                             'global': global_scope, 'file': file}, ResultParse.parse_declarations)
+        return HsDecorator.cmd('scope',
+                               {'query': {'input': input
+                                          , 'type': search_type
+                                         }
+                                , 'global': global_scope
+                                , 'file': file
+                               }, ResultParse.parse_declarations)
 
-    @list_command
+    @HsDecorator.list_command
     def complete(self, input, file, wide=False):
-        return cmd('complete', {'prefix': input, 'wide': wide, 'file': file}, ResultParse.parse_declarations)
+        return HsDecorator.cmd('complete', {'prefix': input, 'wide': wide, 'file': file}, ResultParse.parse_declarations)
 
-    @list_command
+    @HsDecorator.list_command
     def hayoo(self, query, page=None, pages=None):
-        return cmd('hayoo', {'query': query, 'page': page or 0, 'pages': pages or 1}, ResultParse.parse_decls)
+        return HsDecorator.cmd('hayoo', {'query': query, 'page': page or 0, 'pages': pages or 1}, ResultParse.parse_decls)
 
-    @list_command
+    @HsDecorator.list_command
     def cabal_list(self, packages):
-        cmd('cabal list', {'packages': packages}, lambda r: [ResultParse.parse_cabal_package(s) for s in r] if r else None)
+        HsDecorator.cmd('cabal list', {'packages': packages},
+                        lambda r: [ResultParse.parse_cabal_package(s) for s in r] if r else None)
 
-    @list_command
+    @HsDecorator.list_command
     def lint(self, files=[], contents={}, hlint=[]):
-        return cmd('lint', {
+        return HsDecorator.cmd('lint', {
             'files': [{'file': f, 'contents': None} for f in files] + \
                      [{'file': f, 'contents': cts} for f, cts in contents.items()],
             'hlint-opts': hlint})
 
-    @list_command
+    @HsDecorator.list_command
     def check(self, files=[], contents={}, ghc=[]):
-        return cmd('check', {
+        return HsDecorator.cmd('check', {
             'files': [{'file': f, 'contents': None} for f in files] + \
                      [{'file': f, 'contents': cts} for f, cts in contents.items()],
             'ghc-opts': ghc})
 
-    @list_command
+    @HsDecorator.list_command
     def check_lint(self, files=[], contents={}, ghc=[], hlint=[]):
-        return cmd('check-lint', {
+        return HsDecorator.cmd('check-lint', {
             'files': [{'file': f, 'contents': None} for f in files] + \
                      [{'file': f, 'contents': cts} for f, cts in contents.items()],
             'ghc-opts': ghc,
             'hlint-opts': hlint})
 
-    @list_command
+    @HsDecorator.list_command
     def types(self, files=[], contents={}, ghc=[]):
-        return cmd('types', {
+        return HsDecorator.cmd('types', {
             'files': [{'file': f, 'contents': None} for f in files] + \
                      [{'file': f, 'contents': cts} for f, cts in contents.items()],
             'ghc-opts': ghc})
 
-    @command
+    @HsDecorator.command
     def langs(self):
-        return cmd('langs')
+        return HsDecorator.cmd('langs', {})
 
-    @command
+    @HsDecorator.command
     def flags(self):
-        return cmd('flags')
+        return HsDecorator.cmd('flags', {})
 
-    @list_command
+    @HsDecorator.list_command
     def autofix_show(self, messages):
-        return cmd('autofix show', {'messages': messages}, ResultParse.parse_corrections)
+        return HsDecorator.cmd('autofix show', {'messages': messages}, ResultParse.parse_corrections)
 
-    @list_command
+    @HsDecorator.list_command
     def autofix_fix(self, messages, rest=[], pure=False):
-        return cmd('autofix fix', {'messages': messages, 'rest': rest, 'pure': pure}, ResultParse.parse_corrections)
+        return HsDecorator.cmd('autofix fix', {'messages': messages, 'rest': rest, 'pure': pure}, ResultParse.parse_corrections)
 
-    @list_command
+    @HsDecorator.list_command
     def ghc_eval(self, exprs, file=None, source=None):
         f = None
         if file is not None:
             f = {'file': f, 'contents': source}
-        return cmd('ghc eval', {'exprs': exprs, 'file': f})
+        return HsDecorator.cmd('ghc eval', {'exprs': exprs, 'file': f})
 
-    @command
+    @HsDecorator.command
     def exit(self):
-        return cmd('exit', {})
+        return HsDecorator.cmd('exit', {})
 
 
 def wait_result(fn, *args, **kwargs):
@@ -781,13 +658,13 @@ class HsDevProcess(threading.Thread):
                     self.drain_stderr = OutputCollector.DescriptorDrain('hsdev stderr', self.process.stderr)
                     self.drain_stdout.start()
                     self.drain_stderr.start()
-                    call_callback(self.on_start, name='HsDevProcess.on_start')
+                    HsCallback.call_callback(self.on_start, name='HsDevProcess.on_start')
                 self.process.wait()
                 if self.drain_stdout:
                     self.drain_stdout.stop()
                 if self.drain_stderr:
                     self.drain_stderr.stop()
-                call_callback(self.on_exit, name='HsDevProcess.on_exit')
+                HsCallback.call_callback(self.on_exit, name='HsDevProcess.on_exit')
             self.stop_event.clear()
 
     def active(self):

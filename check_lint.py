@@ -2,8 +2,10 @@
 
 import os
 import re
-import sublime
 import threading
+import traceback
+
+import sublime
 
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.settings as Settings
@@ -89,8 +91,9 @@ class SublimeHaskellHsDevChain(Common.SublimeHaskellTextCommand):
                    wait=False,
                    on_response=on_resp,
                    on_error=on_err, **kwargs)
-        except Exception as e:
-            Logging.log('hsdev chain fails with: {0}'.format(e), Logging.LOG_ERROR)
+        except:
+            Logging.log('hsdev chain fails, see traceback', Logging.LOG_ERROR)
+            print(traceback.format_exc())
             self.status_msg.fail()
             self.status_msg.stop()
 
