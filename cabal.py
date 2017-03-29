@@ -3,7 +3,7 @@
 import sublime
 
 import SublimeHaskell.sublime_haskell_common as Common
-import SublimeHaskell.hsdev as hsdev
+import SublimeHaskell.hsdev.agent as hsdev
 
 
 class SublimeHaskellCabalList(Common.SublimeHaskellWindowCommand):

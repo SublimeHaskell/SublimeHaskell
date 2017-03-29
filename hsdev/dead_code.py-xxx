@@ -5,7 +5,7 @@ import json
 
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.proc_helper as ProcHelper
-import SublimeHaskell.hsdev as hsdev
+import SublimeHaskell.hsdev.agent as hsdev
 
 
 def concat_opts(opts):

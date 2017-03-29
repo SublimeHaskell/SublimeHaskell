@@ -16,7 +16,7 @@ import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.hdevtools as HDevTools
 import SublimeHaskell.ghci_backend as GHCIMod
-import SublimeHaskell.hsdev as hsdev
+import SublimeHaskell.hsdev.agent as hsdev
 import SublimeHaskell.worker as Worker
 
 

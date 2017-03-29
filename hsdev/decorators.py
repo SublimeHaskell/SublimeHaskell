@@ -1,6 +1,6 @@
 
 
-import SublimeHaskell.hsdev_refactor.callback as HsCallback
+import SublimeHaskell.hsdev.callback as HsCallback
 import SublimeHaskell.internals.logging as Logging
 
 def reconnect_function(conn_fn):

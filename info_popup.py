@@ -8,7 +8,7 @@ import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.internals.unicode_opers as UnicodeOpers
 import SublimeHaskell.symbols as symbols
-import SublimeHaskell.hsdev as hsdev
+import SublimeHaskell.hsdev.agent as hsdev
 import SublimeHaskell.parseoutput as parseoutput
 import SublimeHaskell.types as types
 

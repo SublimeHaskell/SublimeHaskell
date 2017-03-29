@@ -15,7 +15,7 @@ import SublimeHaskell.internals.output_collector as OutputCollector
 import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.autocomplete as autocomplete
 import SublimeHaskell.symbols as symbols
-import SublimeHaskell.hsdev as hsdev
+import SublimeHaskell.hsdev.agent as hsdev
 
 # Extract the filename, line, column from symbol info
 symbol_file_regex = r'^Defined at: (.*):(\d+):(\d+)$'

@@ -8,14 +8,14 @@ from functools import total_ordering
 import sublime
 import sublime_plugin
 
-import SublimeHaskell.sublime_haskell_common as Common
-import SublimeHaskell.internals.settings as Settings
-import SublimeHaskell.internals.utils as Utils
-import SublimeHaskell.internals.unicode_opers as UnicodeOpers
 import SublimeHaskell.ghci_backend as GHCIMod
-import SublimeHaskell.hsdev as hsdev
 import SublimeHaskell.hdevtools as HDevTools
+import SublimeHaskell.hsdev.agent as hsdev
+import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.internals.unicode_opers as UnicodeOpers
+import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.parseoutput as ParseOutput
+import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.symbols as Symbols
 
 # Used to find out the module name.

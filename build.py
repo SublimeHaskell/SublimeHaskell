@@ -12,7 +12,7 @@ import SublimeHaskell.internals.proc_helper as ProcHelper
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.parseoutput as ParseOutput
-import SublimeHaskell.hsdev as hsdev
+import SublimeHaskell.hsdev.agent as hsdev
 
 OUTPUT_PANEL_NAME = "haskell_run_output"
 
