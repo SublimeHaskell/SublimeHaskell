@@ -1,5 +1,6 @@
 # -*- coding: UTF-8 -*-
 
+from functools import reduce
 import io
 import json
 import os
@@ -8,7 +9,7 @@ import sys
 import socket
 import threading
 import time
-import traceback
+# import traceback
 
 import sublime
 
@@ -24,28 +25,29 @@ import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.output_collector as OutputCollector
 import SublimeHaskell.worker as Worker
 
+HSDEV_DEFAULT_PORT=4567
 
 def hsdev_version():
     retval = None
     try:
-        exit_code, out, err = ProcHelper.ProcHelper.run_process(['hsdev', 'version'])
+        exit_code, out, _ = ProcHelper.ProcHelper.run_process(['hsdev', 'version'])
         if exit_code == 0:
-            m = re.match(r'(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)\.(?P<build>\d+)', out)
-            if m:
-                major = int(m.group('major'))
-                minor = int(m.group('minor'))
-                revision = int(m.group('revision'))
-                build = int(m.group('build'))
+            hsver = re.match(r'(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)\.(?P<build>\d+)', out)
+            if hsver:
+                major = int(hsver.group('major'))
+                minor = int(hsver.group('minor'))
+                revision = int(hsver.group('revision'))
+                build = int(hsver.group('build'))
                 retval = [major, minor, revision, build]
     except:
         Logging.log('Could not get hsdev version, see console window traceback', Logging.LOG_ERROR)
         print(traceback.format_exc())
-    finally:
-        return retval
+
+    return retval
 
 
 def show_version(ver):
-    return '.'.join(map(lambda i: str(i), ver))
+    return '.'.join(map(str, ver))
 
 
 def check_version(ver, minimal, maximal):
@@ -86,9 +88,20 @@ def wait_result(fn, *args, **kwargs):
     return x['result']
 
 
-# hsdev server process with auto-restart
+def concat_args(args):
+    def cat(x, y):
+        (px, ex) = x
+        (py, ey) = y
+        return (px or py, (ex if px else []) + (ey if py else []))
+    return reduce(cat, args, (True, []))[1]
+
+
 class HsDevProcess(threading.Thread):
-    def __init__(self, port=4567, cache=None, log_file=None, log_config=None):
+    """A container for the `hsdev` process, when running `hsdev` locally. Handles draining `hsdev`'s `stdout` and
+    `stderr` file objects -- `hsdev` can be quite chatty, which leads to deadlock when `hsdev` has filled the pipe
+    between SublimeText and itself.
+    """
+    def __init__(self, port=HSDEV_DEFAULT_PORT, cache=None, log_file=None, log_config=None):
         super().__init__()
         self.process = None
         self.drain_stdout = None
@@ -107,24 +120,39 @@ class HsDevProcess(threading.Thread):
             self.create_event.wait()
             self.create_event.clear()
             while not self.stop_event.is_set():
-                self.process = HsDevClient.HsDev.create_server(port=self.port,
-                                                               cache=self.cache,
-                                                               log_file=self.log_file,
-                                                               log_config=self.log_config)
-                if not self.process:
-                    Logging.log('failed to create hsdev process', Logging.LOG_ERROR)
-                    self.stop_event.set()
-                else:
-                    self.drain_stdout = OutputCollector.DescriptorDrain('hsdev stdout', self.process.stdout)
-                    self.drain_stderr = OutputCollector.DescriptorDrain('hsdev stderr', self.process.stderr)
-                    self.drain_stdout.start()
-                    self.drain_stderr.start()
-                    HsCallback.call_callback(self.on_start, name='HsDevProcess.on_start')
+                cmd = concat_args([(True, ["hsdev", "run"]),
+                                   (self.port, ["--port", str(self.port)]),
+                                   (self.cache, ["--cache", self.cache]),
+                                   (self.log_file, ["--log", self.log_file]),
+                                   (self.log_config, ["--log-config", self.log_config])])
+
+                Logging.log('Starting hsdev server', Logging.LOG_INFO)
+                hsdev_proc = ProcHelper.ProcHelper(cmd)
+                if hsdev_proc.process is None:
+                    Logging.log('Failed to create hsdev process', Logging.LOG_ERROR)
+                    return None
+
+                # Use TextIOWrapper here because it combines decoding with newline handling,
+                # which means less to maintain.
+                hsdev_proc.process.stdout = io.TextIOWrapper(hsdev_proc.process.stdout, 'utf-8')
+                hsdev_proc.process.stderr = io.TextIOWrapper(hsdev_proc.process.stderr, 'utf-8')
+
+                while True:
+                    srvout = hsdev_proc.process.stdout.readline()
+                    start_confirm = re.match(r'^.*?hsdev> Server started at port (?P<port>\d+)$', srvout)
+                    if start_confirm:
+                        Logging.log('hsdev server started at port {0}'.format(start_confirm.group('port')))
+                        break
+
+                self.process = hsdev_proc.process
+                self.drain_stdout = OutputCollector.DescriptorDrain('hsdev stdout', self.process.stdout)
+                self.drain_stderr = OutputCollector.DescriptorDrain('hsdev stderr', self.process.stderr)
+                self.drain_stdout.start()
+                self.drain_stderr.start()
+                HsCallback.call_callback(self.on_start, name='HsDevProcess.on_start')
                 self.process.wait()
-                if self.drain_stdout:
-                    self.drain_stdout.stop()
-                if self.drain_stderr:
-                    self.drain_stderr.stop()
+                self.drain_stdout.stop()
+                self.drain_stderr.stop()
                 HsCallback.call_callback(self.on_exit, name='HsDevProcess.on_exit')
             self.stop_event.clear()
 
@@ -139,7 +167,6 @@ class HsDevProcess(threading.Thread):
 
     def stop(self):
         self.stop_event.set()
-
 
 ### HACK ALERT: If agent, client and client_back are already present in the
 ### module's globals, don't redefine them. Otherwise, you will end up with
@@ -167,11 +194,12 @@ class scan_status(object):
     def __init__(self, status_message):
         self.status_message = status_message
 
-    def __call__(self, msg):
+    def __call__(self, msgs):
         statuses = []
-        for m in msg:
-            p = m['progress']
-            statuses.append('{0} ({1}/{2})'.format(m['name'], p['current'], p['total']) if p else m['name'])
+        for msg in msgs:
+            progress = msg['progress']
+            statuses.append('{0} ({1}/{2})'.format(msg['name'], progress['current'], progress['total'])
+                            if progress else msg['name'])
         self.status_message.change_message('Inspecting {0}'.format(' / '.join(statuses)))
 
 
@@ -201,8 +229,9 @@ def agent_connected():
     return agent.is_connected()
 
 
-# Return default value if hsdev is not enabled/connected
 def use_hsdev(def_val=None):
+    """Return a default value if hsdev is not enabled/connected
+    """
     def wrap(fn):
         def wrapped(*args, **kwargs):
             if Settings.get_setting_async('enable_hsdev') and agent_connected():
@@ -230,8 +259,8 @@ class HsDevAgent(threading.Thread):
         self.hsdev_process = HsDevProcess(cache=os.path.join(Common.sublime_haskell_cache_path(), 'hsdev'),
                                           log_file=os.path.join(Common.sublime_haskell_cache_path(), 'hsdev', 'hsdev.log'),
                                           log_config=Settings.get_setting_async('hsdev_log_config'))
-        self.client = HsDevClient.HsDev()
-        self.client_back = HsDevClient.HsDev()
+        self.client = HsDevClient.HsDev(HSDEV_DEFAULT_PORT)
+        self.client_back = HsDevClient.HsDev(HSDEV_DEFAULT_PORT)
 
         self.reinspect_event = threading.Event()
 
@@ -300,9 +329,8 @@ class HsDevAgent(threading.Thread):
                 self.client_back.close()
 
     def on_inspect_modules_changed(self, key, value):
-        if key == 'inspect_modules':
-            if value:
-                self.mark_all_files()
+        if key == 'inspect_modules' and value:
+            self.mark_all_files()
 
     def run(self):
         Settings.subscribe_setting('enable_hsdev', self.on_hsdev_enabled)
@@ -381,10 +409,9 @@ class HsDevAgent(threading.Thread):
     @dirty
     @use_inspect_modules
     def mark_file_dirty(self, filename):
-        if filename is None:
-            return
-        with self.dirty_files as dirty_files:
-            dirty_files.append(filename)
+        if filename is not None:
+            with self.dirty_files as dirty_files:
+                dirty_files.append(filename)
 
     @dirty
     def mark_cabal(self, cabal_name=None):
