@@ -26,7 +26,7 @@ def show_hdevtools_error_and_disable():
         "or adjust the 'add_to_PATH' setting for a custom location.\n"
         "'enable_hdevtools' automatically set to False in the User settings."), 0)
 
-    Settings.set_setting_async('enable_hdevtools', False)
+    Settings.PLUGIN_SETTINGS.enable_hdevtools = False
 
 
 def call_hdevtools_and_wait(arg_list, filename=None, cabal=None):
@@ -35,7 +35,7 @@ def call_hdevtools_and_wait(arg_list, filename=None, cabal=None):
     Shows a sublime error message if hdevtools is not available.
     """
     ghc_opts_args = GHCIMod.get_ghc_opts_args(filename, cabal=cabal)
-    hdevtools_socket = Settings.get_setting_async('hdevtools_socket')
+    hdevtools_socket = Settings.PLUGIN_SETTINGS.hdevtools_socket
     source_dir = ProcHelper.get_source_dir(filename)
 
     if hdevtools_socket:
@@ -60,10 +60,10 @@ def call_hdevtools_and_wait(arg_list, filename=None, cabal=None):
 
 
 def admin(cmds, wait=False, **popen_kwargs):
-    if not Settings.get_setting_async('enable_hdevtools'):
+    if not Settings.PLUGIN_SETTINGS.enable_hdevtools:
         return None
 
-    hdevtools_socket = Settings.get_setting_async('hdevtools_socket')
+    hdevtools_socket = Settings.PLUGIN_SETTINGS.hdevtools_socket
 
     if hdevtools_socket:
         cmds.append('--socket={0}'.format(hdevtools_socket))
@@ -84,7 +84,7 @@ def admin(cmds, wait=False, **popen_kwargs):
         if os_exc.errno == errno.ENOENT:
             show_hdevtools_error_and_disable()
 
-        Settings.set_setting_async('enable_hdevtools', False)
+        Settings.PLUGIN_SETTINGS.enable_hdevtools = False
 
         return None
     except Exception as exc:

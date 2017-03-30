@@ -189,8 +189,6 @@ def select_project(window, on_selected, filter_project=None):
 
 
 def run_build(view, project_name, project_dir, config):
-    global PROJECTS_BEING_BUILT
-
     # Don't build if a build is already running for this project
     # We compare the project_name for simplicity (projects with same
     # names are of course possible, but unlikely, so we let them wait)
@@ -201,7 +199,7 @@ def run_build(view, project_name, project_dir, config):
     # Set project as building
     PROJECTS_BEING_BUILT.add(project_name)
 
-    build_tool_name = Settings.get_setting_async('haskell_BUILD_TOOL', 'stack')
+    build_tool_name = Settings.PLUGIN_SETTINGS.haskell_build_tool
     if build_tool_name == 'stack' and not is_stack_project(project_dir):  # rollback to cabal
         build_tool_name = 'cabal'
 
@@ -278,8 +276,8 @@ class SublimeHaskellBuildAutoCommand(SublimeHaskellBaseCommand):
     def run(self):
         current_project_dir, current_project_name = Common.get_cabal_project_dir_and_name_of_view(self.window.active_view())
         if current_project_name and current_project_dir:
-            build_mode = Settings.get_setting('auto_build_mode')
-            # run_tests = Settings.get_setting('auto_run_tests')
+            build_mode = Settings.PLUGIN_SETTINGS.auto_build_mode
+            # run_tests = Settings.PLUGIN_SETTINGS.auto_run_tests
 
             build_command = {
                 'normal': 'build',

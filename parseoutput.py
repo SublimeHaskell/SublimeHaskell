@@ -129,7 +129,7 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
     collected_out = []
     output_log = Common.output_panel(view.window(), '',
                                      panel_name=BUILD_LOG_PANEL_NAME,
-                                     show_panel=Settings.get_setting_async('show_output_window'))
+                                     show_panel=Settings.PLUGIN_SETTINGS.show_output_window)
     for cmd in cmds:
         Common.output_text(output_log, ' '.join(cmd) + '...\n')
 
@@ -183,7 +183,7 @@ def show_output_result_text(view, msg, text, exit_code, base_dir):
     Common.show_status_message_process(msg, success)
     # Show panel if there is any text to show (without the part that we add)
     if text:
-        if Settings.get_setting_async('show_error_window'):
+        if Settings.PLUGIN_SETTINGS.show_error_window:
             sublime.set_timeout(lambda: write_output(view, output, base_dir), 0)
 
 

@@ -1,9 +1,10 @@
 # -*- coding: UTF-8 -*-
 
-import sublime
-import sublime_plugin
 import threading
 import time
+
+import sublime
+import sublime_plugin
 
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.locked_object as LockedObject
@@ -17,28 +18,25 @@ class SublimeHaskellAutobuild(sublime_plugin.EventListener):
         self.fly_agent.start()
 
     def on_post_save(self, view):
-        auto_build_enabled = Settings.get_setting('enable_auto_build')
-        auto_check_enabled = Settings.get_setting('enable_auto_check')
-        auto_lint_enabled = Settings.get_setting('enable_auto_lint')
-        cabal_project_dir, cabal_project_name = Common.get_cabal_project_dir_and_name_of_view(view)
+        cabal_project_dir, _ = Common.get_cabal_project_dir_and_name_of_view(view)
 
         # don't flycheck
         self.fly_agent.nofly()
 
         # auto build enabled and file within a cabal project
-        if auto_build_enabled and cabal_project_dir is not None:
+        if Settings.PLUGIN_SETTINGS.enable_auto_build and cabal_project_dir is not None:
             view.window().run_command('sublime_haskell_build_auto')
-        elif auto_check_enabled and auto_lint_enabled:
+        elif Settings.PLUGIN_SETTINGS.enable_auto_check and Settings.PLUGIN_SETTINGS.enable_auto_lint:
             view.window().run_command('sublime_haskell_check_and_lint')
             view.window().run_command('sublime_haskell_get_types')
-        elif auto_check_enabled:
+        elif Settings.PLUGIN_SETTINGS.enable_auto_check:
             view.window().run_command('sublime_haskell_check')
             view.window().run_command('sublime_haskell_get_types')
-        elif auto_lint_enabled:
+        elif Settings.PLUGIN_SETTINGS.enable_auto_lint:
             view.window().run_command('sublime_haskell_lint')
 
     def on_modified(self, view):
-        lint_check_fly = Settings.get_setting('lint_check_fly')
+        lint_check_fly = Settings.PLUGIN_SETTINGS.lint_check_fly
 
         if lint_check_fly and Common.is_haskell_source(view) and view.file_name():
             self.fly_agent.fly(view)
@@ -52,26 +50,26 @@ class FlyCheckLint(threading.Thread):
         self.event = threading.Event()
 
     def fly(self, view):
-        with self.view as v:
-            v['view'] = view
-            v['mtime'] = time.time()
+        with self.view as view:
+            view['view'] = view
+            view['mtime'] = time.time()
         self.event.set()
 
     def nofly(self):
-        with self.view as v:
-            v['view'] = None
-            v['mtime'] = None
+        with self.view as view:
+            view['view'] = None
+            view['mtime'] = None
         self.event.set()
 
     def run(self):
         while True:
             view_ = None
             mtime_ = None
-            delay = Settings.get_setting_async('lint_check_fly_idle', 5)
+            delay = Settings.PLUGIN_SETTINGS.lint_check_fly_idle
 
-            with self.view as v:
-                view_ = v['view']
-                mtime_ = v['mtime']
+            with self.view as view:
+                view_ = view['view']
+                mtime_ = view['mtime']
 
             if not view_:  # Wait for signal
                 self.event.wait()
@@ -83,15 +81,15 @@ class FlyCheckLint(threading.Thread):
                 time.sleep(delay)
                 continue
             else:
-                with self.view as v:
-                    v['view'] = None
-                    v['mtime'] = None
+                with self.view as view:
+                    view['view'] = None
+                    view['mtime'] = None
 
                 fly_view = view_
                 fly_window = fly_view.window()
 
-                auto_check_enabled = Settings.get_setting_async('enable_auto_check')
-                auto_lint_enabled = Settings.get_setting_async('enable_auto_lint')
+                auto_check_enabled = Settings.PLUGIN_SETTINGS.enable_auto_check
+                auto_lint_enabled = Settings.PLUGIN_SETTINGS.enable_auto_lint
                 sublime.set_timeout(lambda: fly_window.run_command('sublime_haskell_scan_contents'), 0)
 
                 if auto_check_enabled and auto_lint_enabled:

@@ -1,3 +1,6 @@
+[MESSAGES CONTROL]
+disable=R0201,R0903,W0511,W0603,C0111
+
 [FORMAT]
 max-line-length=128
 
@@ -5,4 +8,10 @@ max-line-length=128
 ignored-modules: functools, traceback
 
 [DESIGN]
+# SublimeHaskell has functions that take a healthy number of keyword arguments.
+max-args = 12
 max-locals = 20
+# Settings.PLUGIN_SETTINGS has a really large set of attributes.
+max-attributes = 30
+# SublimeHaskell has a couple of classes with a lot of public methods.
+max-public-methods = 55

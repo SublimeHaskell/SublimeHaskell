@@ -194,18 +194,18 @@ class ProcHelper(object):
                    ]
 
         ext_env = dict(os.environ)
-        PATH = os.getenv('PATH') or ""
+        env_path = os.getenv('PATH') or ""
         std_places = []
-        if Settings.get_setting_async('add_standard_dirs', True):
+        if Settings.PLUGIN_SETTINGS.add_standard_dirs:
             std_places = ["$HOME/.local/bin" if not isWinXX() else "%APPDATA%/local/bin"] + cabal_config()
             std_places = list(filter(os.path.isdir, map(normalize_path, std_places)))
 
-        add_to_PATH = list(filter(os.path.isdir, map(normalize_path, Settings.get_setting_async('add_to_PATH', []))))
+        add_to_path = list(filter(os.path.isdir, map(normalize_path, Settings.PLUGIN_SETTINGS.add_to_path, [])))
 
         Logging.log("std_places = {0}".format(std_places), Logging.LOG_INFO)
-        Logging.log("add_to_PATH = {0}".format(add_to_PATH), Logging.LOG_INFO)
+        Logging.log("add_to_PATH = {0}".format(add_to_path), Logging.LOG_INFO)
 
-        ext_env['PATH'] = os.pathsep.join(add_to_PATH + std_places + [PATH])
+        ext_env['PATH'] = os.pathsep.join(add_to_path + std_places + [env_path])
         return ext_env
 
     @staticmethod
@@ -213,27 +213,27 @@ class ProcHelper(object):
         def is_exe(fpath):
             return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 
-        with ProcHelper.which_cache as c:
-            cval = c.get(args[0])
+        with ProcHelper.which_cache as cache:
+            cval = cache.get(args[0])
 
         if cval is not None:
             return [cval] + args[1:]
         else:
-            exeExts = [''] if not isWinXX() else ['.exe', '.cmd', '.bat']
+            exe_exts = [''] if not isWinXX() else ['.exe', '.cmd', '.bat']
 
             program = args[0]
-            fpath, fname = os.path.split(program)
+            fpath, _ = os.path.split(program)
             if fpath:
                 if is_exe(program):
                     return args
             else:
                 for path in env_path.split(os.pathsep):
                     path = path.strip('"')
-                    for ext in exeExts:
+                    for ext in exe_exts:
                         exe_file = os.path.join(path, program)
                         if is_exe(exe_file + ext):
-                            with ProcHelper.which_cache as c:
-                                c[program] = exe_file
+                            with ProcHelper.which_cache as cache:
+                                cache[program] = exe_file
                             return [exe_file] + args[1:]
 
         return None
@@ -245,25 +245,25 @@ class ProcHelper(object):
             return proc.wait(input_string)
 
     @staticmethod
-    def invoke_tool(command, tool_name, input='', on_result=None, filename=None, on_line=None, check_enabled=True,
+    def invoke_tool(command, tool_name, inp='', on_result=None, filename=None, on_line=None, check_enabled=True,
                     **popen_kwargs):
-        if check_enabled and not Settings.get_setting_async(Utils.tool_enabled(tool_name)):
+        if check_enabled and not Settings.PLUGIN_SETTINGS.__getattribute__(Utils.tool_enabled(tool_name)):
             return None
 
         source_dir = get_source_dir(filename)
 
-        def mk_result(s):
-            return on_result(s) if on_result else s
+        def mk_result(result):
+            return on_result(result) if on_result else result
 
         try:
             with ProcHelper(command, cwd=source_dir, **popen_kwargs) as proc:
-                exit_code, stdout, stderr = prpc.wait(input)
+                exit_code, stdout, stderr = proc.wait(inp)
                 if exit_code != 0:
                     raise Exception('{0} exited with exit code {1} and stderr: {2}'.format(tool_name, exit_code, stderr))
 
                 if on_line:
-                    for l in io.TextIOWrapper(stdout, encoding='utf-8'):
-                        on_line(mk_result(l))
+                    for line in io.TextIOWrapper(stdout, encoding='utf-8'):
+                        on_line(mk_result(line))
                 else:
                     return mk_result(io.TextIOWrapper(stdout, encoding='utf-8'))
 
@@ -272,15 +272,11 @@ class ProcHelper(object):
                 errmsg = "SublimeHaskell: {0} was not found!\n'{1}' is set to False".format(tool_name,
                                                                                             Utils.tool_enabled(tool_name))
                 Common.output_error_async(sublime.active_window(), errmsg)
-                Settings.set_setting_async(Utils.tool_enabled(tool_name), False)
+                Settings.PLUGIN_SETTINGS.__setattr__(Utils.tool_enabled(tool_name), False)
             else:
-                Logging.log('{0} fails with {1}, command: {2}'.format(tool_name, e, command), Logging.LOG_ERROR)
+                Logging.log('{0} fails with {1}, command: {2}'.format(tool_name, os_exc, command), Logging.LOG_ERROR)
 
             return None
-
-        except:
-            Logging.log('{0} fails, command: {1}'.format(tool_name, command), Logging.LOG_ERROR)
-            print(traceback.format_exc())
 
         return None
 

@@ -10,7 +10,6 @@
 
 import os
 
-import sublime
 import sublime_plugin
 
 import SublimeHaskell.internals.settings as Settings
@@ -19,7 +18,7 @@ import SublimeHaskell.internals.settings as Settings
 class DetectFileTypeCommand(sublime_plugin.EventListener):
 
     def on_load(self, view):
-        if Settings.get_setting_async('use_improved_syntax', True):
+        if Settings.PLUGIN_SETTINGS.use_improved_syntax:
             filename = view.file_name()
             if not filename:  # buffer has never been saved
                 return
@@ -32,4 +31,4 @@ class DetectFileTypeCommand(sublime_plugin.EventListener):
 
 def set_our_syntax(view, filename):
     view.settings().set('syntax', 'Packages/SublimeHaskell/Syntaxes/Haskell-SublimeHaskell.tmLanguage')
-    print("Switched syntax to SublimeHaskell's fixed Haskell syntax: " + filename)
+    # print("Switched syntax to SublimeHaskell's fixed Haskell syntax: " + filename)

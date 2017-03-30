@@ -7,6 +7,10 @@ import SublimeHaskell.hsdev.agent as hsdev
 
 
 class SublimeHaskellCabalList(Common.SublimeHaskellWindowCommand):
+    def __init__(self, view):
+        super().__init__(view)
+        self.packages = []
+
     def run(self):
         self.window.show_input_panel("Cabal list", "", self.on_done, self.on_change, self.on_cancel)
 

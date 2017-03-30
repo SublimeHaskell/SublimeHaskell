@@ -1,5 +1,6 @@
 import json
 import os.path
+import re
 import shlex
 import threading
 import webbrowser
@@ -7,15 +8,16 @@ import webbrowser
 import sublime
 import sublime_plugin
 
-import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.autocomplete as autocomplete
+import SublimeHaskell.hsdev.agent as hsdev
+import SublimeHaskell.hsdev.result_parse as HsDevResultParse
 import SublimeHaskell.internals.logging as Logging
+import SublimeHaskell.internals.output_collector as OutputCollector
 import SublimeHaskell.internals.proc_helper as ProcHelper
 import SublimeHaskell.internals.settings as Settings
-import SublimeHaskell.internals.output_collector as OutputCollector
 import SublimeHaskell.internals.utils as Utils
-import SublimeHaskell.autocomplete as autocomplete
+import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.symbols as symbols
-import SublimeHaskell.hsdev.agent as hsdev
 
 # Extract the filename, line, column from symbol info
 symbol_file_regex = r'^Defined at: (.*):(\d+):(\d+)$'
@@ -77,7 +79,7 @@ class SublimeHaskellContext(sublime_plugin.EventListener):
         if key == 'haskell_autofix':
             return view.settings().get('autofix')
         if key == 'auto_completion_popup':
-            return Settings.get_setting('auto_completion_popup')
+            return Settings.PLUGIN_SETTINGS.auto_completion_popup
         elif key == 'haskell_source':
             return Common.is_haskell_source(view)
         elif key == 'haskell_source_or_repl':
@@ -358,31 +360,24 @@ class SublimeHaskellGoToHackageModule(hsdev.HsDevTextCommand):
             if qsymbol.is_module():  # module
                 scope = self.view.file_name()
                 if scope:
-                    ms = [m for m in hsdev.client.scope_modules(
-                        scope, input=qsymbol.module, search_type='exact') if m.by_cabal()]
+                    ms = [m for m in hsdev.client.scope_modules(scope, input=qsymbol.module, search_type='exact') if m.by_cabal()]
                 else:
                     ms = [m for m in hsdev.client.list_modules(db=m.location.db) if m.name == qsymbol.module and m.by_cabal()]
             else:  # symbol
                 scope = self.view.file_name()
                 if scope:
-                    decls = hsdev.client.whois(
-                        qsymbol.qualified_name(),
-                        file=scope)
+                    decls = hsdev.client.whois(qsymbol.qualified_name(), file=scope)
                     if not decls:
-                        decls = hsdev.client.lookup(
-                            qsymbol.full_name(),
-                            file=scope)
+                        decls = hsdev.client.lookup(qsymbol.full_name(), file=scope)
                     if not decls:
-                        decls = hsdev.client.symbol(
-                            input=qsymbol.full_name(),
-                            search_type='exact')
+                        decls = hsdev.client.symbol(input=qsymbol.full_name(), search_type='exact')
                     if not decls:
                         Common.show_status_message('Module for symbol {0} not found'.format(qsymbol.full_name()))
                         return
                     ms = [decl.defined_module() for decl in decls]
 
             if len(ms) == 0:
-                Common.show_status_message('Module {0} not found'.format(module_name))
+                Common.show_status_message('Module {0} not found'.format(qsymbol.module))
                 return
             if len(ms) == 1:
                 webbrowser.open('http://hackage.haskell.org/package/{0}/docs/{1}.html'.format(ms[0].location.package.package_id(), ms[0].name.replace('.', '-')))
@@ -626,7 +621,9 @@ class SublimeHaskellInsertImportForSymbol(hsdev.HsDevTextCommand):
         ProcHelper.ProcHelper.invoke_tool(['hsinspect'], 'hsinspect', contents_part, self.on_inspected, check_enabled=False)
 
     def on_inspected(self, result):
-        cur_module = hsdev.parse_module(json.loads(result)['module']) if self.view.is_dirty() else Utils.head_of(hsdev.client.module(file=self.current_file_name))
+        cur_module = HsDevResultParse.parse_module(json.loads(result)['module']) \
+                     if self.view.is_dirty() \
+                     else Utils.head_of(hsdev.client.module(file=self.current_file_name))
         imports = sorted(cur_module.imports, key=lambda i: i.position.line)
         after = [i for i in imports if i.module > self.module_name]
 
@@ -734,15 +731,15 @@ class SublimeHaskellBrowseModule(hsdev.HsDevWindowCommand):
                 return
             if len(ms) == 1:
                 if ms[0].by_source():
-                    m = head_of(hsdev.client.module(module_name, search_type='exact', file=ms[0].location.filename))
+                    m = Utils.head_of(hsdev.client.module(module_name, search_type='exact', file=ms[0].location.filename))
                 elif ms[0].by_cabal():
-                    m = head_of(hsdev.client.module(
+                    m = Utils.head_of(hsdev.client.module(
                         module_name,
                         search_type='exact',
                         db=ms[0].location.db,
                         package=ms[0].location.package.name))
                 else:
-                    m = head_of(hsdev.client.module(module_name, search_type='exact'))
+                    m = Utils.head_of(hsdev.client.module(module_name, search_type='exact'))
             else:
                 self.candidates.extend([(m, [m.name, m.location.to_string()]) for m in ms])
 
@@ -1046,7 +1043,9 @@ class AutoFixState(object):
         self.undo_history.append((self.corrections[:], self.selected))
         self.redo_history.clear()
         (cur, corrs) = self.get_corrections()
-        self.corrections = hsdev.client.autofix_fix(hsdev.encode_corrections([cur]), rest=hsdev.encode_corrections(corrs), pure=True)
+        self.corrections = hsdev.client.autofix_fix(HsDevResultParse.encode_corrections([cur]),
+                                                    rest=HsDevResultParse.encode_corrections(corrs),
+                                                    pure=True)
         if not self.corrections:
             self.selected = 0
             self.clear()
@@ -1102,7 +1101,7 @@ class SublimeHaskellAutoFix(hsdev.HsDevWindowCommand):
 
             self.status_msg = Common.status_message_process('Autofix: ' + self.window.active_view().file_name(), priority=3)
             self.status_msg.start()
-            hsdev.client.check_lint(files=[self.window.active_view().file_name()], ghc=Settings.get_setting_async('ghc_opts'), wait=False, on_response=on_resp, on_error=on_err, timeout=0)
+            hsdev.client.check_lint(files=[self.window.active_view().file_name()], ghc=Settings.PLUGIN_SETTINGS.ghc_opts, wait=False, on_response=on_resp, on_error=on_err, timeout=0)
 
     def on_got_messages(self):
         self.corrections = list(filter(lambda corr: os.path.samefile(corr.file, self.window.active_view().file_name()), hsdev.client.autofix_show(self.messages)))
@@ -1159,7 +1158,7 @@ class SublimeHaskellAutoFixFixIt(SublimeHaskellAutoFixTextBase):
             rgns = [c[0] for c in corrs]
             # self.view.add_regions('autofix_fix', [c[0] for c in corrs], 'warning', 'dot', sublime.HIDDEN)
 
-            for rgn, cts in corrs:
+            for _, cts in corrs:
                 if rgns:
                     self.view.add_regions('autofix_fix', rgns, 'warning', 'dot', sublime.HIDDEN)
                     self.view.replace(edit, rgns[0], cts)
@@ -1231,13 +1230,13 @@ class SublimeHaskellStackExec(sublime_plugin.TextCommand):
         win.show_input_panel('stack exec', '', self.stack_exec, None, None)
 
     def stack_exec(self, arg):
-        cmdargs = ['stack', 'exec'] + shlex.split(arg)
+        args = shlex.split(arg)
+        if any(map(lambda arg: arg.startswith('-'), args)) and '--' not in args:
+            args.insert(0, '--')
+        cmdargs = ['stack', 'exec'] + args
         window = self.view.window()
         runv = Common.output_panel(window, panel_name=SublimeHaskellStackExec.OUTPUT_PANEL_NAME)
         pretty_cmdargs = 'Running \'{0}\''.format(' '.join(cmdargs))
         runv.run_command('insert', {'characters': '{0}\n{1}\n'.format(pretty_cmdargs, '-' * len(pretty_cmdargs))})
 
-        sthread = SublimeHaskellStackExec.SExecRunner(runv, cmdargs).start()
-
-    def show_output_panel(self):
-        return output_view
+        SublimeHaskellStackExec.SExecRunner(runv, cmdargs).start()

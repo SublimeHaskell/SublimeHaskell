@@ -1,8 +1,7 @@
+"""
+"""
 
-
-import io
 import json
-import re
 import socket
 import sys
 import threading
@@ -14,14 +13,13 @@ import SublimeHaskell.hsdev.callback as HsCallback
 import SublimeHaskell.hsdev.decorators as HsDecorator
 import SublimeHaskell.hsdev.result_parse as ResultParse
 import SublimeHaskell.internals.logging as Logging
-import SublimeHaskell.internals.proc_helper as ProcHelper
 
 
 def cmd(name_, opts_, on_result=lambda r: r):
     return (name_, opts_, on_result)
 
 
-def file_contents(files, contents):
+def files_and_contents(files, contents):
     return [{'file': f, 'contents': None} for f in files] + [{'file': f, 'contents': cts} for f, cts in contents.items()]
 
 # hsdev client
@@ -36,8 +34,8 @@ class HsDev(object):
         self.hsdev_socket = None
         self.hsdev_address = None
         self.autoconnect = True
-        self.map = LockedObject.LockedObject({})
-        self.id = 1
+        self.request_map = LockedObject.LockedObject({})
+        self.request_serial = 1
 
         self.connect_fun = None
 
@@ -51,9 +49,9 @@ class HsDev(object):
         self.close()
 
     # Autoconnect
-    def set_reconnect_function(self, f):
+    def set_reconnect_function(self, reconnect_fn):
         if self.connect_fun is None:
-            self.connect_fun = f
+            self.connect_fun = reconnect_fn
 
     def reconnect(self):
         if self.connect_fun is not None:
@@ -68,24 +66,28 @@ class HsDev(object):
     @HsDecorator.connect_function
     @HsDecorator.reconnect_function
     def connect(self, tries=10, delay=1.0):
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            for retry in range(0, tries):
+                Logging.log('connecting to hsdev server ({0})...'.format(retry), Logging.LOG_INFO)
 
-        for n in range(0, tries):
-            try:
-                Logging.log('connecting to hsdev server ({0})...'.format(n), Logging.LOG_INFO)
-                self.socket.connect(('127.0.0.1', self.port))
+                # Use 'localhost' instead of the IP dot-quad for systems (and they exist) that are solely
+                # IPv6. Makes this code friendlier to IPv4 and IPv6 hybrid systems.
+                self.socket = socket.create_connection(('localhost', self.port))
                 self.hsdev_socket = self.socket
-                self.hsdev_address = '127.0.0.1'
+                self.hsdev_address = 'localhost'
                 self.set_connected()
                 self.listener = threading.Thread(target=self.listen)
                 self.listener.start()
+
                 Logging.log('connected to hsdev server', Logging.LOG_INFO)
                 HsCallback.call_callback(self.on_connected, name='HsDev.on_connected')
                 return True
-            except:
-                Logging.log('Failed to connect to hsdev server:', Logging.LOG_WARNING)
-                print(traceback.format_exc())
-                time.sleep(delay)
+
+        except OSError:
+            # Captures all of the socket exceptions:
+            Logging.log('Failed to connect to hsdev server:', Logging.LOG_WARNING)
+            print(traceback.format_exc())
+            time.sleep(delay)
 
         return False
 
@@ -133,9 +135,9 @@ class HsDev(object):
         else:
             Logging.log('HsDev.set_connected called while not in connecting state', Logging.LOG_DEBUG)
 
-    def on_receive(self, id, command, on_response=None, on_notify=None, on_error=None):
-        with self.map as m:
-            m[id] = HsCallback.HsDevCallbacks(id, command, on_response, on_notify, on_error)
+    def on_receive(self, ident, command, on_response=None, on_notify=None, on_error=None):
+        with self.request_map as requests:
+            requests[ident] = HsCallback.HsDevCallbacks(id, command, on_response, on_notify, on_error)
 
     def verify_connected(self):
         if self.is_connected():
@@ -144,26 +146,26 @@ class HsDev(object):
             self.connection_lost('verify_connected', 'no connection')
             return self.is_connected()
 
-    def connection_lost(self, fn, e):
+    def connection_lost(self, func_name, reason):
         if self.is_unconnected():
             return
         self.close()
-        Logging.log('{0}: connection to hsdev lost: {1}'.format(fn, e), Logging.LOG_ERROR)
+        Logging.log('{0}: connection to hsdev lost: {1}'.format(func_name, reason), Logging.LOG_ERROR)
         HsCallback.call_callback(self.on_disconnected, name='HsDev.on_disconnected')
 
         # send error to callbacks
-        with self.map as m:
-            for on_msg in m.values():
+        with self.request_map as requests:
+            for on_msg in requests.values():
                 on_msg.on_error('connection lost', {})
-            m.clear()
+            requests.clear()
 
-        self.id = 1
+        self.request_serial = 1
         self.part = ''
 
         if self.autoconnect:
             self.reconnect()
 
-    def call(self, command, opts={}, on_response=None, on_notify=None, on_error=None, wait=False, timeout=None, id=None):
+    def call(self, command, opts=None, on_response=None, on_notify=None, on_error=None, wait=False, timeout=None):
         # log
         args_cmd = 'hsdev {0}'.format(command)
         call_cmd = 'hsdev {0} with {1}'.format(command, opts)
@@ -172,29 +174,29 @@ class HsDev(object):
             return None if wait else False
 
         try:
+            opts = opts or {}
             wait_receive = threading.Event() if wait else None
+            result_dict = {}
 
-            x = {}
-
-            def on_response_(r):
-                x['result'] = r
-                HsCallback.call_callback(on_response, r)
+            def on_response_(resp):
+                result_dict['result'] = resp
+                HsCallback.call_callback(on_response, resp)
                 if wait_receive:
                     wait_receive.set()
 
-            def on_error_(e, ds):
-                HsCallback.call_callback(on_error, e, ds)
+            def on_error_(exc, details):
+                HsCallback.call_callback(on_error, exc, details)
                 if wait_receive:
                     wait_receive.set()
+
+            req_serial = str(self.request_serial)
+            self.request_serial = self.request_serial + 1
 
             if wait or on_response or on_notify or on_error:
-                if id is None:
-                    id = str(self.id)
-                    self.id = self.id + 1
-                self.on_receive(id, args_cmd, on_response_, on_notify, on_error_)
+                self.on_receive(req_serial, args_cmd, on_response_, on_notify, on_error_)
 
             opts.update({'no-file': True})
-            opts.update({'id': id, 'command': command})
+            opts.update({'id': req_serial, 'command': command})
             msg = json.dumps(opts, separators=(',', ':'))
 
             # Seems, that first sendall doesn't throw error on closed socket
@@ -206,13 +208,13 @@ class HsDev(object):
 
             if wait:
                 wait_receive.wait(timeout)
-                return x.get('result')
-
-            return True
-        except:
+                return result_dict.get('result')
+            else:
+                return True
+        except OSError:
             Logging.log('{0} fails with exception, see traceback in console window.'.format(call_cmd), Logging.LOG_ERROR)
             print(traceback.format_exc())
-            self.connection_lost('call', sys.exc_info[1])
+            self.connection_lost('call', sys.exc_info()[1])
             return False
 
     def listen(self):
@@ -221,23 +223,23 @@ class HsDev(object):
                 resp = json.loads(self.get_response())
                 if 'id' in resp:
                     callbacks = None
-                    with self.map as m:
-                        if resp['id'] in m:
-                            callbacks = m[resp['id']]
+                    with self.request_map as requests:
+                        if resp['id'] in requests:
+                            callbacks = requests[resp['id']]
                     if callbacks:
                         if 'notify' in resp:
                             callbacks.call_notify(resp['notify'])
                         if 'error' in resp:
                             err = resp.pop("error")
                             callbacks.call_error(err, resp)
-                            with self.map as m:
-                                m.pop(resp['id'])
+                            with self.request_map as requests:
+                                requests.pop(resp['id'])
                         if 'result' in resp:
                             callbacks.call_response(resp['result'])
-                            with self.map as m:
-                                m.pop(resp['id'])
-            except Exception as e:
-                self.connection_lost('listen', e)
+                            with self.request_map as requests:
+                                requests.pop(resp['id'])
+            except IOError:
+                self.connection_lost('listen', sys.exc_info()[1])
                 return
 
     def get_response(self):
@@ -250,7 +252,7 @@ class HsDev(object):
     # Commands
 
     @HsDecorator.command
-    def link(self, hold=False, **kwargs):
+    def link(self, hold=False):
         return cmd('link', {'hold': hold})
 
     @HsDecorator.command
@@ -262,7 +264,7 @@ class HsDev(object):
         return cmd('scan', {'projects': projects,
                             'cabal': cabal,
                             'sandboxes': sandboxes,
-                            'files': file_contents(files, contents),
+                            'files': files_and_contents(files, contents),
                             'paths': paths,
                             'ghc-opts': ghc,
                             'docs': docs,
@@ -436,19 +438,19 @@ class HsDev(object):
 
     @HsDecorator.list_command
     def lint(self, files=[], contents={}, hlint=[]):
-        return cmd('lint', {'files': file_contents(files, contents), 'hlint-opts': hlint})
+        return cmd('lint', {'files': files_and_contents(files, contents), 'hlint-opts': hlint})
 
     @HsDecorator.list_command
     def check(self, files=[], contents={}, ghc=[]):
-        return cmd('check', {'files': file_contents(files, contents), 'ghc-opts': ghc})
+        return cmd('check', {'files': files_and_contents(files, contents), 'ghc-opts': ghc})
 
     @HsDecorator.list_command
     def check_lint(self, files=[], contents={}, ghc=[], hlint=[]):
-        return cmd('check-lint', {'files': file_contents(files, contents), 'ghc-opts': ghc, 'hlint-opts': hlint})
+        return cmd('check-lint', {'files': files_and_contents(files, contents), 'ghc-opts': ghc, 'hlint-opts': hlint})
 
     @HsDecorator.list_command
     def types(self, files=[], contents={}, ghc=[]):
-        return cmd('types', {'files': file_contents(files, contents), 'ghc-opts': ghc})
+        return cmd('types', {'files': files_and_contents(files, contents), 'ghc-opts': ghc})
 
     @HsDecorator.command
     def langs(self):

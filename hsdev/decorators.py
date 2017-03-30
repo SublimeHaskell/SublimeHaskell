@@ -49,7 +49,7 @@ def connect_function(conn_fn):
 
 
 def hsdev_command(async=False, timeout=None, is_list=False):
-    def wrap_function(fn):
+    def wrap_function(cmd_fn):
         def wrapped(self, *args, **kwargs):
             wait_flag = kwargs.pop('wait', not async)
             timeout_arg = kwargs.pop('timeout', timeout)
@@ -59,18 +59,18 @@ def hsdev_command(async=False, timeout=None, is_list=False):
             on_res_part = kwargs.pop('on_result_part', None)
             split_res = kwargs.pop('split_result', on_res_part is not None)
 
-            (name_, opts_, on_result_) = fn(self, *args, **kwargs)
+            (name_, opts_, on_result_) = cmd_fn(self, *args, **kwargs)
 
             if is_list and split_res:
                 result = []
 
-                def on_notify(n):
-                    if 'result-part' in n:
-                        rp = on_result_([n['result-part']])[0]
-                        HsCallback.call_callback(on_res_part, rp)
-                        result.append(rp)
+                def on_notify(reply):
+                    if 'result-part' in reply:
+                        notify_result = on_result_([reply['result-part']])[0]
+                        HsCallback.call_callback(on_res_part, notify_result)
+                        result.append(notify_result)
                     else:
-                        HsCallback.call_callback(on_not, n)
+                        HsCallback.call_callback(on_not, reply)
 
                 def on_response(_):
                     on_resp(result)
@@ -117,7 +117,3 @@ def list_command(list_fn):
 
 def async_list_command(list_fn):
     return hsdev_command(async=True, is_list=True)(list_fn)
-
-
-def cmd(name_, opts_, on_result=lambda r: r):
-    return (name_, opts_, on_result)

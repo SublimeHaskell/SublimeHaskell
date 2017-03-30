@@ -22,7 +22,7 @@ def get_ghc_opts(filename=None, add_package_db=True, cabal=None):
     """
     Gets ghc_opts, used in several tools, as list with extra '-package-db' option and '-i' option if filename passed
     """
-    ghc_opts = Settings.get_setting_async('ghc_opts')
+    ghc_opts = Settings.PLUGIN_SETTINGS.ghc_opts
     if not ghc_opts:
         ghc_opts = []
     if add_package_db:

@@ -40,9 +40,9 @@ EXPORT_MODULE_RE = re.compile(r'\bmodule\s+[\w\d\.]*$')
 # Gets available LANGUAGE options and import modules from ghc-mod
 def get_language_pragmas():
 
-    if Settings.get_setting_async('enable_hsdev'):
+    if Settings.PLUGIN_SETTINGS.enable_hsdev:
         return hsdev.client.langs()
-    elif Settings.get_setting_async('enable_ghc_mod'):
+    elif Settings.PLUGIN_SETTINGS.enable_ghc_mod:
         return GHCIMod.call_ghcmod_and_wait(['lang']).splitlines()
 
     return []
@@ -50,9 +50,9 @@ def get_language_pragmas():
 
 def get_flags_pragmas():
 
-    if Settings.get_setting_async('enable_hsdev'):
+    if Settings.PLUGIN_SETTINGS.enable_hsdev:
         return hsdev.client.flags()
-    elif Settings.get_setting_async('enable_ghc_mod'):
+    elif Settings.PLUGIN_SETTINGS.enable_ghc_mod:
         return GHCIMod.call_ghcmod_and_wait(['flag']).splitlines()
 
     return []
@@ -284,7 +284,7 @@ class AutoCompletion(object):
         line_contents = Common.get_line_contents(view, locations[0])
 
         # Autocompletion for import statements
-        if Settings.get_setting('auto_complete_imports'):
+        if Settings.PLUGIN_SETTINGS.auto_complete_imports:
             match_import_list = Common.IMPORT_SYMBOL_RE.search(line_contents)
             if match_import_list:
                 module_name = match_import_list.group('module')
@@ -315,7 +315,7 @@ class AutoCompletion(object):
         line_contents = Common.get_line_contents(view, locations[0])
 
         # Autocompletion for LANGUAGE pragmas
-        if Settings.get_setting('auto_complete_language_pragmas'):
+        if Settings.PLUGIN_SETTINGS.auto_complete_language_pragmas:
             # TODO handle multiple selections
             match_language = LANGUAGE_RE.match(line_contents)
             if match_language:
@@ -429,11 +429,11 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
         # TODO: work around this
         # comp = [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0].split('\t')[0])]
-        # if Settings.get_setting('inhibit_completions') and len(comp) != 0:
+        # if Settings.PLUGIN_SETTINGS.inhibit_completions and len(comp) != 0:
         #     return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         # return comp
 
-        if Settings.get_setting('inhibit_completions') and len(completions) != 0:
+        if Settings.PLUGIN_SETTINGS.inhibit_completions and len(completions) != 0:
             return (completions, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         return completions
 

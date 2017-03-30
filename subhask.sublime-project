@@ -7,6 +7,14 @@
 	],
   "SublimeLinter":
    {
-        "@python": 3
+      "@python": 3,
+      "linters": {
+        "pylint" : {
+          "paths": [
+            "C:\\Users\\bsm21317\\Sublime",
+            "C:\\Users\\bsm21317\\Sublime\\Data\\Packages"
+          ],
+        }
+      }
    }
 }
