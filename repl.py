@@ -1,21 +1,24 @@
 # -*- coding: UTF-8 -*-
 
-import sublime
-import sublime_plugin
+import os
 import re
 
-has_sublime_repl = True
+import sublime
+import sublime_plugin
 
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.autocomplete as autocomplete
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.hsdev.agent as hsdev
+
+HAS_SUBLIME_REPL = True
+
 try:
     import SublimeREPL.sublimerepl as sublimerepl
 except ImportError:
     Logging.log('SublimeREPL is not installed, ghci/repl commands disabled', Logging.LOG_INFO)
-    has_sublime_repl = False
+    HAS_SUBLIME_REPL = False
 
 
 COMMAND_RE = re.compile(r'^.*:[a-z]*$')
@@ -23,22 +26,22 @@ IMPORT_RE = re.compile(r'^.*\bimport\s+(qualified\s+)?(?P<module>[\w\d\.]*)$')
 
 
 def find_sublime_haskell_repl():
-    repls = list(sublimerepl.manager.find_repl('sublime_haskell_repl')) if has_sublime_repl else []
-    return repls
+    known_repls = list(sublimerepl.manager.find_repl('sublime_haskell_repl')) if HAS_SUBLIME_REPL else []
+    return known_repls
 
 
-def run_repl_command(repl, str):
-    repl.write("{0}\n".format(str))
-    repl.repl.write("{0}\n".format(str))
+def run_repl_command(repl, repl_cmd):
+    repl.write("{0}\n".format(repl_cmd))
+    repl.repl.write("{0}\n".format(repl_cmd))
 
 
 def show_scope(repl):
-    run_repl_command(":show modules")
-    run_repl_command(":show imports")
+    run_repl_command(repl, ":show modules")
+    run_repl_command(repl, ":show imports")
 
 
 class Repl(object):
-    def __init__(self, view, path = None, project_name = None):
+    def __init__(self, view, path=None, project_name=None):
         self.view = view
         self.path = path
         if not path:
@@ -54,11 +57,11 @@ class Repls(object):
     def __init__(self):
         self.repls = {}
 
-    def set_repl_view(self, id, view, **kwargs):
-        self.repls[id] = Repl(view, **kwargs)
+    def set_repl_view(self, repl_req, view, **kwargs):
+        self.repls[repl_req] = Repl(view, **kwargs)
 
-    def get_repl_view(self, id):
-        return self.repls.get(id)
+    def get_repl_view(self, repl_req):
+        return self.repls.get(repl_req)
 
 repls = Repls()
 
@@ -72,12 +75,12 @@ class SublimeHaskellAutocompleteRepl(sublime_plugin.EventListener):
         return [(":{0}".format(cmd), ":{0}".format(cmd)) for cmd in cmds]
 
     def on_query_completions(self, view, prefix, locations):
-        if not has_sublime_repl or not Common.is_haskell_repl(view):
+        if not HAS_SUBLIME_REPL or not Common.is_haskell_repl(view):
             return []
 
         repl = sublimerepl.manager.repl_view(view)
 
-        line_contents = autocomplete.get_line_contents(view, locations[0])
+        line_contents = Common.get_line_contents(view, locations[0])
         command = COMMAND_RE.match(line_contents)
         if command:
             return self.repl_commands_completions()
@@ -122,7 +125,7 @@ class SublimeHaskellReplGhci(Common.SublimeHaskellWindowCommand):
             caption = "ghci"))
 
     def is_enabled(self):
-        return has_sublime_repl
+        return HAS_SUBLIME_REPL
 
 
 class SublimeHaskellReplGhciCurrentFile(Common.SublimeHaskellWindowCommand):
@@ -136,10 +139,10 @@ class SublimeHaskellReplGhciCurrentFile(Common.SublimeHaskellWindowCommand):
                 cmd = ["ghci", "$file"] + opts,
                 loaded = view.file_name(),
                 caption = "ghci: {0}".format(os.path.basename(view.file_name()))))
-            repls.set_repl_view(repl_external_id(view.file_name()), view)
+            repls.set_repl_view(sublimerepl.repl_external_id(view.file_name()), view)
 
     def is_enabled(self):
-        return has_sublime_repl and Common.SublimeHaskellWindowCommand.is_enabled(self)
+        return HAS_SUBLIME_REPL and Common.SublimeHaskellWindowCommand.is_enabled(self)
 
 
 class SublimeHaskellReplCabal(Common.SublimeHaskellWindowCommand):
@@ -171,10 +174,10 @@ class SublimeHaskellReplCabal(Common.SublimeHaskellWindowCommand):
             cwd = self.project_dir,
             loaded = self.project_dir,
             caption = "cabal repl: {0}/{1}".format(self.project_name, self.names[idx])))
-        repls.set_repl_view(repl_external_id(self.project_dir), view, path = self.project_dir, project_name = self.project_name)
+        repls.set_repl_view(sublimerepl.repl_external_id(self.project_dir), view, path=self.project_dir, project_name=self.project_name)
 
     def is_enabled(self):
-        return has_sublime_repl and Common.is_enabled_haskell_command(None, True)
+        return HAS_SUBLIME_REPL and Common.is_enabled_haskell_command(None, True)
 
 
 class SublimeHaskellReplLoad(Common.SublimeHaskellWindowCommand):
@@ -190,4 +193,4 @@ class SublimeHaskellReplLoad(Common.SublimeHaskellWindowCommand):
                 self.window.run_command("sublime_haskell_repl_cabal", {})
 
     def is_enabled(self):
-        return has_sublime_repl and Common.SublimeHaskellWindowCommand.is_enabled(self)
+        return HAS_SUBLIME_REPL and Common.SublimeHaskellWindowCommand.is_enabled(self)

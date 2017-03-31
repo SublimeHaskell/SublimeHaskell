@@ -1,6 +1,5 @@
+import traceback
 import threading
-
-import sublime
 
 try:
     import queue
@@ -17,21 +16,22 @@ class Worker(threading.Thread):
 
     def run(self):
         while True:
-            name, fn, args, kwargs = self.jobs.get()
+            name, worker_fn, args, kwargs = self.jobs.get()
             try:
-                fn(*args, **kwargs)
-            except Exception as e:
-                Logging.log('worker: job {0} fails with {1}'.format(name, e), Logging.LOG_DEBUG)
+                worker_fn(*args, **kwargs)
+            except:
+                Logging.log('worker: job {0} failws, see console window traceback'.format(name), Logging.LOG_DEBUG)
+                traceback.print_exc()
 
-    def async(self, name, fn, *args, **kwargs):
-        self.jobs.put((name, fn, args, kwargs))
+    def async(self, name, worker_fn, *args, **kwargs):
+        self.jobs.put((name, worker_fn, args, kwargs))
 
-worker = None
+WORKER_QUEUE = None
 
 
-def run_async(name, fn, *args, **kwargs):
-    global worker
-    if not worker or not worker.is_alive():
-        worker = Worker()
-        worker.start()
-    worker.async(name, fn, *args, **kwargs)
+def run_async(name, worker_fn, *args, **kwargs):
+    global WORKER_QUEUE
+    if not WORKER_QUEUE or not WORKER_QUEUE.is_alive():
+        WORKER_QUEUE = Worker()
+        WORKER_QUEUE.start()
+    WORKER_QUEUE.async(name, worker_fn, *args, **kwargs)

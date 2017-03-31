@@ -1,8 +1,9 @@
 import html
-import sublime
-import sublime_plugin
 import webbrowser
 from xml.etree import ElementTree
+
+import sublime
+import sublime_plugin
 
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.utils as Utils

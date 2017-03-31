@@ -1,14 +1,13 @@
 # -*- coding: UTF-8 -*-
 
+from functools import total_ordering, reduce
 import html
+import json
+import os.path
 import re
 import sublime
-import os.path
-from functools import total_ordering
 
-import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.unicode_opers as UnicodeOpers
-from functools import reduce
 
 
 @total_ordering

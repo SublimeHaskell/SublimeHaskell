@@ -25,10 +25,7 @@ class DetectFileTypeCommand(sublime_plugin.EventListener):
 
             name = os.path.basename(filename.lower())
             if name.endswith(".hs") or name.endswith(".hsc"):
-                set_our_syntax(view, filename)
+                view.settings().set('syntax', 'Packages/SublimeHaskell/Syntaxes/Haskell-SublimeHaskell.tmLanguage')
+                # print("Switched syntax to SublimeHaskell's fixed Haskell syntax: " + filename)
+
         # TODO Do we also have to fix Literate Haskell?
-
-
-def set_our_syntax(view, filename):
-    view.settings().set('syntax', 'Packages/SublimeHaskell/Syntaxes/Haskell-SublimeHaskell.tmLanguage')
-    # print("Switched syntax to SublimeHaskell's fixed Haskell syntax: " + filename)

@@ -3,9 +3,10 @@
 import os
 import os.path
 import re
-import sublime
 import time
 import threading
+
+import sublime
 
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.logging as Logging
@@ -299,23 +300,27 @@ def get_prev_value(lst, pred, cycle=True):
 class SublimeHaskellNextError(Common.SublimeHaskellTextCommand):
     def run(self, edit):
         errs = errors_for_view(self.view)
-        if not errs:
-            Common.show_status_message('No errors or warnings!', priority=5)
-        next_err = get_next_value(errs, lambda e: e.region > v.sel()[0])
-        v.sel().clear()
-        v.sel().add(next_err.region.to_region(self.view))
-        goto_error(self.view, next_err)
+        with self.view as view:
+            if not errs:
+                Common.show_status_message('No errors or warnings!', priority=5)
+            else:
+                next_err = get_next_value(errs, lambda e: e.region > view.sel()[0])
+                view.sel().clear()
+                view.sel().add(next_err.region.to_region(self.view))
+                goto_error(self.view, next_err)
 
 
 class SublimeHaskellPreviousError(Common.SublimeHaskellTextCommand):
     def run(self, edit):
         errs = errors_for_view(self.view)
-        if not errs:
-            Common.show_status_message("No errors or warnings!", priority=5)
-        prev_err = get_prev_value(errs, lambda e: e.region < v.sel()[0])
-        v.sel().clear()
-        v.sel().add(prev_err.region.to_region(self.view))
-        goto_error(self.view, prev_err)
+        with self.view as view:
+            if not errs:
+                Common.show_status_message("No errors or warnings!", priority=5)
+            else:
+                prev_err = get_prev_value(errs, lambda e: e.region < view.sel()[0])
+                view.sel().clear()
+                view.sel().add(prev_err.region.to_region(self.view))
+                goto_error(self.view, prev_err)
 
 
 def region_key(name, is_fix=False):

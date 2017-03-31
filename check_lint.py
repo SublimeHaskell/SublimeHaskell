@@ -291,7 +291,7 @@ def ghcmod_browse_module(module_name, cabal=None):
     if not contents:
         return None
 
-    m = symbols.Module(module_name, cabal=cabal)
+    m = symbols.Module(module_name)
 
     functionRegex = r'(?P<name>\w+)\s+::\s+(?P<type>.*)'
     typeRegex = r'(?P<what>(class|type|data|newtype))\s+(?P<name>\w+)(\s+(?P<args>\w+(\s+\w+)*))?'

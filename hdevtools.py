@@ -53,11 +53,6 @@ def call_hdevtools_and_wait(arg_list, filename=None, cabal=None):
             show_hdevtools_error_and_disable()
         return None
 
-    except:
-        Logging.log('calling to hdevtools fails, see traceback in console window (<ctrl>-<backtick>)', Logging.LOG_ERROR)
-        print(traceback.format_exc())
-        return None
-
 
 def admin(cmds, wait=False, **popen_kwargs):
     if not Settings.PLUGIN_SETTINGS.enable_hdevtools:
@@ -75,9 +70,9 @@ def admin(cmds, wait=False, **popen_kwargs):
             exit_code, stdout, stderr = ProcHelper.ProcHelper.run_process(command, **popen_kwargs)
             return stdout if exit_code == 0 else 'error running {0}: {1}'.format(command, stderr)
         else:
-            p = ProcHelper.ProcHelper(command, **popen_kwargs)
-            OutputCollector.DescriptorDrain('hdevtools stdout', p.process.stdout).start()
-            OutputCollector.DescriptorDrain('hdevtools stderr', p.process.stderr).start()
+            proc = ProcHelper.ProcHelper(command, **popen_kwargs)
+            OutputCollector.DescriptorDrain('hdevtools stdout', proc.process.stdout).start()
+            OutputCollector.DescriptorDrain('hdevtools stderr', proc.process.stderr).start()
             return ''
 
     except OSError as os_exc:

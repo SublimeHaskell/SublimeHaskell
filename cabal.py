@@ -1,7 +1,5 @@
 # -*- coding: UTF-8 -*-
 
-import sublime
-
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.hsdev.agent as hsdev
 
@@ -14,15 +12,15 @@ class SublimeHaskellCabalList(Common.SublimeHaskellWindowCommand):
     def run(self):
         self.window.show_input_panel("Cabal list", "", self.on_done, self.on_change, self.on_cancel)
 
-    def on_done(self, input):
+    def on_done(self, inp):
         self.packages = hsdev.client.cabal_list(input)
         if not self.packages:
-            Common.show_status_message("Package {0} not found".format(input))
-            return
+            Common.show_status_message("Package {0} not found".format(inp))
+        else:
+            self.window.show_quick_panel([([p.name] + ([p.synopsis] if p.synopsis else [])) for p in self.packages],
+                                         self.on_select)
 
-        self.window.show_quick_panel([([p.name] + ([p.synopsis] if p.synopsis else [])) for p in self.packages], self.on_select)
-
-    def on_change(self, input):
+    def on_change(self, _):
         pass
 
     def on_cancel(self):
