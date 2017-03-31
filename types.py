@@ -167,16 +167,16 @@ def sorted_types(view, types, pt):
 def get_type(view, filename, module_name, line, column, cabal=None):
     result = None
 
-    if Settings.PLUGIN_SETTINGS.enable_hsdev:
+    if Settings.PLUGIN.enable_hsdev:
         # Convert from hsdev one-based locations to sublime zero-based positions
         ts = get_types(filename, cabal=cabal) or []
         pt = FilePosition(line, column).point(view)
         return sorted_types(view, ts, pt)
     column = ParseOutput.sublime_column_to_ghc_column(view, line, column)
     line = line + 1
-    if Settings.PLUGIN_SETTINGS.enable_hdevtools:
+    if Settings.PLUGIN.enable_hdevtools:
         result = HDevTools.hdevtools_type(filename, line, column, cabal=cabal)
-    if not result and module_name and Settings.PLUGIN_SETTINGS.enable_ghc_mod:
+    if not result and module_name and Settings.PLUGIN.enable_ghc_mod:
         result = GHCIMod.ghcmod_type(filename, module_name, line, column)
     return parse_type_output(view, result) if result else None
 
@@ -200,7 +200,7 @@ def get_type_view(view, selection=None):
 
 
 def get_types(filename, on_result=None, cabal=None):
-    if Settings.PLUGIN_SETTINGS.enable_hsdev:
+    if Settings.PLUGIN.enable_hsdev:
         def to_file_pos(r):
             return FilePosition(int(r['line']) - 1, int(r['column']) - 1)
 

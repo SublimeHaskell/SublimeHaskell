@@ -7,11 +7,13 @@
 # (lock controlled) dictionary.
 # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
+import threading
+
 import sublime
 
 import SublimeHaskell.internals.locked_object as LockedObject
 
-class SublimeHaskellSettings(object):
+class SetttingsContainer(object):
     """Container object for default and user preference settings."""
 
     # Map instance settings keys to attributes and default values.
@@ -82,7 +84,7 @@ class SublimeHaskellSettings(object):
         self.use_improved_syntax = None
 
         # Set attributes to their respective default values:
-        for (attr, default) in SublimeHaskellSettings.attr_dict.values():
+        for (attr, default) in SetttingsContainer.attr_dict.values():
             self.__setattr__(attr, default)
 
         # Additional change callbacks to propagate:
@@ -90,16 +92,15 @@ class SublimeHaskellSettings(object):
 
     def load(self):
         settings = get_settings()
-        for (key, (attr, default)) in SublimeHaskellSettings.attr_dict.items():
+        for (key, (attr, default)) in SetttingsContainer.attr_dict.items():
             self.__setattr__(attr, settings.get(key, default))
             install_updater(settings, self, key)
         with self.changes as changes:
             changes = {}
 
     def update_setting(self, key):
-        print("update_setting: key {0}".format(key))
         settings = get_settings()
-        (attr, default) = SublimeHaskellSettings.attr_dict[key]
+        (attr, default) = SetttingsContainer.attr_dict[key]
         oldval = self.__getattribute__(attr)
         newval = settings.get(key, default)
         if oldval != newval:
@@ -131,8 +132,36 @@ def get_settings():
 def save_settings():
     sublime.save_settings("SublimeHaskell.sublime-settings")
 
+class SublimeHaskellSetttings(object):
+    """Proxy object in front of the settings container."""
+    def __init__(self):
+        self.lock_ = threading.RLock()
+        self.obj_ = SetttingsContainer()
+
+    def __getattr__(self, attr):
+        if attr != 'lock_' and attr != 'obj_':
+            with self.lock_:
+                return getattr(self.obj_, attr)
+        elif attr == 'lock_':
+            return self.lock_
+        elif attr == 'obj_':
+            return self.obj_
+        else:
+            raise AttributeError
+
+    def __setattr__(self, attr, val):
+        if attr != 'lock_' and attr != 'obj_':
+            with self.lock_:
+                self.obj_.__setattr__(attr, val)
+        elif attr == 'lock_':
+            super().__setattr__('lock_', val)
+        elif attr == 'obj_':
+            super().__setattr__('obj_', val)
+        else:
+            raise AttributeError
+            
 # Preserve settings across plugin reloads:
-if 'PLUGIN_SETTINGS' not in globals():
-    PLUGIN_SETTINGS = SublimeHaskellSettings()
+if 'PLUGIN' not in globals():
+    PLUGIN = SublimeHaskellSetttings()
 else:
-    PLUGIN_SETTINGS = globals()['PLUGIN_SETTINGS']
+    PLUGIN = globals()['PLUGIN']

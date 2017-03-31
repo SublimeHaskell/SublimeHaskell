@@ -12,8 +12,8 @@ def plugin_loaded():
     if not os.path.exists(cache_path):
         os.makedirs(cache_path)
 
-    Settings.PLUGIN_SETTINGS.load()
+    Settings.PLUGIN.load()
 
     # Register change detection:
-    Settings.PLUGIN_SETTINGS.add_change_callback('add_to_PATH', ProcHelper.ProcHelper.update_environment)
-    Settings.PLUGIN_SETTINGS.add_change_callback('add_standard_dirs', ProcHelper.ProcHelper.update_environment)
+    Settings.PLUGIN.add_change_callback('add_to_PATH', ProcHelper.ProcHelper.update_environment)
+    Settings.PLUGIN.add_change_callback('add_standard_dirs', ProcHelper.ProcHelper.update_environment)

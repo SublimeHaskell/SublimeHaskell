@@ -24,7 +24,7 @@ def lint_as_hints(msgs):
 
 
 def hsdev_check():
-    return (hsdev.client.check, lambda file: [file], lambda ms: ms, {'ghc': Settings.PLUGIN_SETTINGS.ghc_opts})
+    return (hsdev.client.check, lambda file: [file], lambda ms: ms, {'ghc': Settings.PLUGIN.ghc_opts})
 
 
 def hsdev_lint():
@@ -32,7 +32,7 @@ def hsdev_lint():
 
 # def hsdev_check_lint():
 #     return (hsdev.client.ghcmod_check_lint,
-#             lambda file: [file], lambda ms: ms, { 'ghc': Settings.PLUGIN_SETTINGS.ghc_opts })
+#             lambda file: [file], lambda ms: ms, { 'ghc': Settings.PLUGIN.ghc_opts })
 
 
 def messages_as_hints(cmd):
@@ -118,7 +118,7 @@ class SublimeHaskellHsDevChain(Common.SublimeHaskellTextCommand):
 
         ParseOutput.set_global_error_messages(output_messages)
         output_text = ParseOutput.format_output_messages(output_messages)
-        if Settings.PLUGIN_SETTINGS.show_error_window:
+        if Settings.PLUGIN.show_error_window:
             sublime.set_timeout(lambda: ParseOutput.write_output(self.view,
                                                                  output_text,
                                                                  Common.get_cabal_project_dir_of_file(self.filename) or \
@@ -134,10 +134,10 @@ class SublimeHaskellHsDevChain(Common.SublimeHaskellTextCommand):
 def ghcmod_command(cmdname):
     def wrap(fn):
         def wrapper(self, *args, **kwargs):
-            if Settings.PLUGIN_SETTINGS.enable_hsdev:
+            if Settings.PLUGIN.enable_hsdev:
                 Logging.log("Invoking '{0}' command via hsdev".format(cmdname), Logging.LOG_TRACE)
                 return fn(self, *args, **kwargs)
-            elif Settings.PLUGIN_SETTINGS.enable_ghc_mod:
+            elif Settings.PLUGIN.enable_ghc_mod:
                 Logging.log("Invoking '{0}' command via ghc-mod".format(cmdname), Logging.LOG_TRACE)
                 self.view.window().run_command('sublime_haskell_ghc_mod_{0}'.format(cmdname))
             else:

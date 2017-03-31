@@ -9,6 +9,6 @@ LOG_TRACE = 5
 
 
 def log(message, level=LOG_INFO):
-    log_level = Settings.PLUGIN_SETTINGS.log or LOG_INFO
+    log_level = Settings.PLUGIN.log or LOG_INFO
     if log_level >= level:
         print(u'Sublime Haskell: {0}'.format(message))

@@ -196,11 +196,11 @@ class ProcHelper(object):
         ext_env = dict(os.environ)
         env_path = os.getenv('PATH') or ""
         std_places = []
-        if Settings.PLUGIN_SETTINGS.add_standard_dirs:
+        if Settings.PLUGIN.add_standard_dirs:
             std_places = ["$HOME/.local/bin" if not isWinXX() else "%APPDATA%/local/bin"] + cabal_config()
             std_places = list(filter(os.path.isdir, map(normalize_path, std_places)))
 
-        add_to_path = list(filter(os.path.isdir, map(normalize_path, Settings.PLUGIN_SETTINGS.add_to_path, [])))
+        add_to_path = list(filter(os.path.isdir, map(normalize_path, Settings.PLUGIN.add_to_path, [])))
 
         Logging.log("std_places = {0}".format(std_places), Logging.LOG_INFO)
         Logging.log("add_to_PATH = {0}".format(add_to_path), Logging.LOG_INFO)
@@ -247,7 +247,7 @@ class ProcHelper(object):
     @staticmethod
     def invoke_tool(command, tool_name, inp='', on_result=None, filename=None, on_line=None, check_enabled=True,
                     **popen_kwargs):
-        if check_enabled and not Settings.PLUGIN_SETTINGS.__getattribute__(Utils.tool_enabled(tool_name)):
+        if check_enabled and not Settings.PLUGIN.__getattribute__(Utils.tool_enabled(tool_name)):
             return None
 
         source_dir = get_source_dir(filename)
@@ -272,7 +272,7 @@ class ProcHelper(object):
                 errmsg = "SublimeHaskell: {0} was not found!\n'{1}' is set to False".format(tool_name,
                                                                                             Utils.tool_enabled(tool_name))
                 Common.output_error_async(sublime.active_window(), errmsg)
-                Settings.PLUGIN_SETTINGS.__setattr__(Utils.tool_enabled(tool_name), False)
+                Settings.PLUGIN.__setattr__(Utils.tool_enabled(tool_name), False)
             else:
                 Logging.log('{0} fails with {1}, command: {2}'.format(tool_name, os_exc, command), Logging.LOG_ERROR)
 

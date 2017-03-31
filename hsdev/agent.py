@@ -220,7 +220,7 @@ def dirty(dirty_fn):
 
 def use_inspect_modules(inspect_fn):
     def wrapped(self, *args, **kwargs):
-        if Settings.PLUGIN_SETTINGS.inspect_modules:
+        if Settings.PLUGIN.inspect_modules:
             return inspect_fn(self, *args, **kwargs)
     return wrapped
 
@@ -234,7 +234,7 @@ def use_hsdev(def_val=None):
     """
     def wrap(use_fn):
         def wrapped(*args, **kwargs):
-            if Settings.PLUGIN_SETTINGS.enable_hsdev and agent_connected():
+            if Settings.PLUGIN.enable_hsdev and agent_connected():
                 return use_fn(*args, **kwargs)
             else:
                 return def_val
@@ -256,7 +256,7 @@ class HsDevAgent(threading.Thread):
         self.dirty_paths = LockedObject.LockedObject([])
         self.hsdev_process = HsDevProcess(cache=os.path.join(Common.sublime_haskell_cache_path(), 'hsdev'),
                                           log_file=os.path.join(Common.sublime_haskell_cache_path(), 'hsdev', 'hsdev.log'),
-                                          log_config=Settings.PLUGIN_SETTINGS.hsdev_log_config)
+                                          log_config=Settings.PLUGIN.hsdev_log_config)
         self.client = HsDevClient.HsDev(HSDEV_DEFAULT_PORT)
         self.client_back = HsDevClient.HsDev(HSDEV_DEFAULT_PORT)
 
@@ -331,14 +331,14 @@ class HsDevAgent(threading.Thread):
             self.mark_all_files()
 
     def run(self):
-        Settings.PLUGIN_SETTINGS.add_change_callback('enable_hsdev', self.on_hsdev_enabled)
-        Settings.PLUGIN_SETTINGS.add_change_callback('inspect_modules', self.on_inspect_modules_changed)
+        Settings.PLUGIN.add_change_callback('enable_hsdev', self.on_hsdev_enabled)
+        Settings.PLUGIN.add_change_callback('inspect_modules', self.on_inspect_modules_changed)
 
-        if Settings.PLUGIN_SETTINGS.enable_hsdev:
+        if Settings.PLUGIN.enable_hsdev:
             self.start_hsdev()
 
         while True:
-            if Settings.PLUGIN_SETTINGS.enable_hsdev and not self.client.ping():
+            if Settings.PLUGIN.enable_hsdev and not self.client.ping():
                 Logging.log('hsdev ping: no pong', Logging.LOG_WARNING)
 
             scan_paths = []
@@ -378,7 +378,7 @@ class HsDevAgent(threading.Thread):
                 Worker.run_async('inspect cabal {0}'.format(cabal), self.inspect_cabal, cabal)
 
             if files_to_reinspect:
-                if Settings.PLUGIN_SETTINGS.enable_hdocs:
+                if Settings.PLUGIN.enable_hdocs:
                     self.client_back.docs(files=files_to_reinspect)
             self.reinspect_event.wait(HsDevAgent.sleep_timeout)
             self.reinspect_event.clear()
@@ -421,7 +421,7 @@ class HsDevAgent(threading.Thread):
                                       sandboxes=[] if cabal == 'cabal' else [cabal],
                                       on_notify=ScanStatus(smgr),
                                       wait=True,
-                                      docs=Settings.PLUGIN_SETTINGS.enable_hdocs)
+                                      docs=Settings.PLUGIN.enable_hdocs)
         except:
             Logging.log('loading standard modules info for {0} failed:'.format(cabal or 'cabal'),
                         Logging.LOG_ERROR)
@@ -438,8 +438,8 @@ class HsDevAgent(threading.Thread):
                                           files=files,
                                           on_notify=ScanStatus(smgr),
                                           wait=True,
-                                          ghc=Settings.PLUGIN_SETTINGS.ghc_opts,
-                                          docs=Settings.PLUGIN_SETTINGS.enable_hdocs)
+                                          ghc=Settings.PLUGIN.ghc_opts,
+                                          docs=Settings.PLUGIN.enable_hdocs)
             except OSError:
                 Logging.log('Inspection failed, see console window traceback', Logging.LOG_ERROR)
                 print(traceback.format_exc())
@@ -452,8 +452,8 @@ class HsDevAgent(threading.Thread):
                 self.client_back.scan(paths=[path],
                                       on_notify=ScanStatus(smgr),
                                       wait=True,
-                                      ghc=Settings.PLUGIN_SETTINGS.ghc_opts,
-                                      docs=Settings.PLUGIN_SETTINGS.enable_hdocs)
+                                      ghc=Settings.PLUGIN.ghc_opts,
+                                      docs=Settings.PLUGIN.enable_hdocs)
         except:
             Logging.log('Inspecting path {0} failed, see console window traceback'.format(path), Logging.LOG_ERROR)
             print(traceback.format_exc())
@@ -468,7 +468,7 @@ class HsDevAgent(threading.Thread):
                 self.client_back.scan(projects=[cabal_dir],
                                       on_notify=ScanStatus(smgr),
                                       wait=True,
-                                      docs=Settings.PLUGIN_SETTINGS.enable_hdocs)
+                                      docs=Settings.PLUGIN.enable_hdocs)
         except:
             Logging.log('Inspecting project {0} failed, see console window traceback'.format(cabal_dir), Logging.LOG_ERROR)
             print(traceback.format_exc())
@@ -481,8 +481,8 @@ class HsDevAgent(threading.Thread):
                 self.client_back.scan(files=filenames,
                                       on_notify=ScanStatus(smgr),
                                       wait=True,
-                                      ghc=Settings.PLUGIN_SETTINGS.ghc_opts,
-                                      docs=Settings.PLUGIN_SETTINGS.enable_hdocs)
+                                      ghc=Settings.PLUGIN.ghc_opts,
+                                      docs=Settings.PLUGIN.enable_hdocs)
         except:
             Logging.log('Inspecting files failed, see console window traceback', Logging.LOG_ERROR)
             print(traceback.format_exc())
@@ -490,22 +490,22 @@ class HsDevAgent(threading.Thread):
 
 class HsDevWindowCommand(Common.SublimeHaskellWindowCommand):
     def is_enabled(self):
-        return Settings.PLUGIN_SETTINGS.enable_hsdev and \
+        return Settings.PLUGIN.enable_hsdev and \
                agent_connected() and \
                Common.SublimeHaskellWindowCommand.is_enabled(self)
 
     def is_visible(self):
-        return Settings.PLUGIN_SETTINGS.enable_hsdev and Common.SublimeHaskellWindowCommand.is_visible(self)
+        return Settings.PLUGIN.enable_hsdev and Common.SublimeHaskellWindowCommand.is_visible(self)
 
 
 class HsDevTextCommand(Common.SublimeHaskellTextCommand):
     def is_enabled(self):
-        return Settings.PLUGIN_SETTINGS.enable_hsdev and \
+        return Settings.PLUGIN.enable_hsdev and \
                agent_connected() and \
                Common.SublimeHaskellTextCommand.is_enabled(self)
 
     def is_visible(self):
-        return Settings.PLUGIN_SETTINGS.enable_hsdev and Common.SublimeHaskellTextCommand.is_visible(self)
+        return Settings.PLUGIN.enable_hsdev and Common.SublimeHaskellTextCommand.is_visible(self)
 
 
 def start_agent():

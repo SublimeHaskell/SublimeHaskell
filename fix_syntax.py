@@ -18,7 +18,7 @@ import SublimeHaskell.internals.settings as Settings
 class DetectFileTypeCommand(sublime_plugin.EventListener):
 
     def on_load(self, view):
-        if Settings.PLUGIN_SETTINGS.use_improved_syntax:
+        if Settings.PLUGIN.use_improved_syntax:
             filename = view.file_name()
             if not filename:  # buffer has never been saved
                 return

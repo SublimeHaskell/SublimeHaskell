@@ -79,7 +79,7 @@ class SublimeHaskellContext(sublime_plugin.EventListener):
         if key == 'haskell_autofix':
             return view.settings().get('autofix')
         if key == 'auto_completion_popup':
-            return Settings.PLUGIN_SETTINGS.auto_completion_popup
+            return Settings.PLUGIN.auto_completion_popup
         elif key == 'haskell_source':
             return Common.is_haskell_source(view)
         elif key == 'haskell_source_or_repl':
@@ -1101,7 +1101,7 @@ class SublimeHaskellAutoFix(hsdev.HsDevWindowCommand):
 
             self.status_msg = Common.status_message_process('Autofix: ' + self.window.active_view().file_name(), priority=3)
             self.status_msg.start()
-            hsdev.client.check_lint(files=[self.window.active_view().file_name()], ghc=Settings.PLUGIN_SETTINGS.ghc_opts, wait=False, on_response=on_resp, on_error=on_err, timeout=0)
+            hsdev.client.check_lint(files=[self.window.active_view().file_name()], ghc=Settings.PLUGIN.ghc_opts, wait=False, on_response=on_resp, on_error=on_err, timeout=0)
 
     def on_got_messages(self):
         self.corrections = list(filter(lambda corr: os.path.samefile(corr.file, self.window.active_view().file_name()), hsdev.client.autofix_show(self.messages)))
