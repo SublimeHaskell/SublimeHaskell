@@ -85,36 +85,40 @@ class SetttingsContainer(object):
 
         # Set attributes to their respective default values:
         for (attr, default) in SetttingsContainer.attr_dict.values():
-            self.__setattr__(attr, default)
+            setattr(self, attr, default)
 
         # Additional change callbacks to propagate:
         self.changes = LockedObject.LockedObject({})
+        # Write-access lock
+        self.wlock = threading.RLock()
 
     def load(self):
-        settings = get_settings()
-        for (key, (attr, default)) in SetttingsContainer.attr_dict.items():
-            self.__setattr__(attr, settings.get(key, default))
-            install_updater(settings, self, key)
-        with self.changes as changes:
-            changes = {}
+        with self.wlock:
+            settings = get_settings()
+            for (key, (attr, default)) in SetttingsContainer.attr_dict.items():
+                setattr(self, attr, settings.get(key, default))
+                install_updater(settings, self, key)
+            self.changes = LockedObject.LockedObject({})
 
     def update_setting(self, key):
         settings = get_settings()
         (attr, default) = SetttingsContainer.attr_dict[key]
-        oldval = self.__getattribute__(attr)
+        oldval = getattr(self, attr)
         newval = settings.get(key, default)
         if oldval != newval:
-            self.__setattr__(attr, newval)
-            with self.changes as changes:
-                for change_fn in changes.get(key, []):
-                    change_fn(key, newval)
+            with self.wlock:
+                setattr(self, attr, newval)
+                with self.changes as changes:
+                    for change_fn in changes.get(key, []):
+                        change_fn(key, newval)
 
     def add_change_callback(self, key, change_fn):
-        with self.changes as changes:
-            if key not in changes:
-                changes[key] = []
+        with self.wlock:
+            with self.changes as changes:
+                if key not in changes:
+                    changes[key] = []
 
-            changes[key].append(change_fn)
+                changes[key].append(change_fn)
 
 
 def install_updater(settings, setting_obj, key):
@@ -132,36 +136,8 @@ def get_settings():
 def save_settings():
     sublime.save_settings("SublimeHaskell.sublime-settings")
 
-class SublimeHaskellSetttings(object):
-    """Proxy object in front of the settings container."""
-    def __init__(self):
-        self.lock_ = threading.RLock()
-        self.obj_ = SetttingsContainer()
-
-    def __getattr__(self, attr):
-        if attr != 'lock_' and attr != 'obj_':
-            with self.lock_:
-                return getattr(self.obj_, attr)
-        elif attr == 'lock_':
-            return self.lock_
-        elif attr == 'obj_':
-            return self.obj_
-        else:
-            raise AttributeError
-
-    def __setattr__(self, attr, val):
-        if attr != 'lock_' and attr != 'obj_':
-            with self.lock_:
-                self.obj_.__setattr__(attr, val)
-        elif attr == 'lock_':
-            super().__setattr__('lock_', val)
-        elif attr == 'obj_':
-            super().__setattr__('obj_', val)
-        else:
-            raise AttributeError
-            
 # Preserve settings across plugin reloads:
 if 'PLUGIN' not in globals():
-    PLUGIN = SublimeHaskellSetttings()
+    PLUGIN = SetttingsContainer()
 else:
     PLUGIN = globals()['PLUGIN']
