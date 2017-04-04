@@ -262,10 +262,10 @@ class ProcHelper(object):
                     raise Exception('{0} exited with exit code {1} and stderr: {2}'.format(tool_name, exit_code, stderr))
 
                 if on_line:
-                    for l in io.TextIOWrapper(stdout, encoding='utf-8'):
+                    for l in io.StringIO(stdout):
                         on_line(mk_result(l))
                 else:
-                    return mk_result(io.TextIOWrapper(stdout, encoding='utf-8'))
+                    return mk_result(io.StringIO(stdout))
 
         except OSError as e:
             if e.errno == errno.ENOENT:

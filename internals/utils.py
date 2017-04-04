@@ -5,7 +5,7 @@ Miscelaneous glue, mostly for interoperability between Python2 and Python3.
 import os
 
 def decode_bytes(src):
-    return src.decode('utf-8').data.replace('\r\n', '\n').replace('\r', '\n') if src is not None else None
+    return src.decode('utf-8').replace('\r\n', '\n').replace('\r', '\n') if src is not None else None
 
 
 def encode_bytes(src):
