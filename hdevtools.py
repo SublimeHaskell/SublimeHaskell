@@ -82,8 +82,9 @@ def admin(cmds, wait=False, **popen_kwargs):
         Settings.PLUGIN.enable_hdevtools = False
 
         return None
-    except Exception as exc:
-        Logging.log('calling to hdevtools fails with {0}'.format(exc))
+    except Exception:
+        Logging.log('hdevtools.admin failed with exception, see console window traceback')
+        traceback.print_exc()
         return None
 
 

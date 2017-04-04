@@ -31,3 +31,28 @@ def run_build_command_with(msg, cmd):
 #         if err.filename == filename and err.region.start.line == line and err.region.start.column:
 #             return err
 #     return None
+
+# def show_status_message(msg, is_ok = None):
+#     """
+#     Show status message with check mark (is_ok = true), ballot x (is_ok = false) or ... (is_ok = None)
+#     """
+#     mark = u'...'
+#     if is_ok is not None:
+#         mark = u' \u2714' if is_ok else u' \u2718'
+#     sublime_status_message(u'{0}{1}'.format(msg, mark))
+
+
+def crlf2lf(s):
+    " CRLF -> LF "
+    if s is None:
+        return None
+    if not s:
+        return ''
+    return s.replace('\r\n', '\n')
+
+
+
+class SublimeHaskellError(RuntimeError):
+    def __init__(self, what):
+        super().__init__()
+        self.reason = what

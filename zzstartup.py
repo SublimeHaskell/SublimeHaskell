@@ -4,6 +4,7 @@ import os
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.proc_helper as ProcHelper
+import SublimeHaskell.hdevtools as HDevTools
 
 
 def plugin_loaded():
@@ -17,3 +18,11 @@ def plugin_loaded():
     # Register change detection:
     Settings.PLUGIN.add_change_callback('add_to_PATH', ProcHelper.ProcHelper.update_environment)
     Settings.PLUGIN.add_change_callback('add_standard_dirs', ProcHelper.ProcHelper.update_environment)
+
+    # Deprecate?
+    HDevTools.start_hdevtools()
+
+
+def plugin_unloaded():
+    # Does this work properly on exit?
+    HDevTools.stop_hdevtools()

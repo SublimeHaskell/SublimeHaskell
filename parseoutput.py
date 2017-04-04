@@ -218,6 +218,7 @@ def mark_messages_in_views(errors):
     "Mark the regions in open views where errors were found."
     begin_time = time.clock()
     # Mark each diagnostic in each open view in all windows:
+    view_filename = ''
     for win in sublime.windows():
         for view in win.views():
             view_filename = view.file_name()
@@ -294,33 +295,41 @@ def get_next_value(lst, pred, cycle=True):
 
 def get_prev_value(lst, pred, cycle=True):
     # Inverse of `get_next_value`, goes back and finds value satisfying `p`
-    return get_next_value(reversed(lst), pred, cycle)
+    return get_next_value(list(reversed(lst)), pred, cycle)
 
 
 class SublimeHaskellNextError(Common.SublimeHaskellTextCommand):
     def run(self, edit):
         errs = errors_for_view(self.view)
-        with self.view as view:
-            if not errs:
-                Common.show_status_message('No errors or warnings!', priority=5)
-            else:
-                next_err = get_next_value(errs, lambda e: e.region > view.sel()[0])
-                view.sel().clear()
-                view.sel().add(next_err.region.to_region(self.view))
-                goto_error(self.view, next_err)
+        if not errs:
+            Common.show_status_message('No errors or warnings!', priority=5)
+        else:
+            cursel = self.view.sel()[0]
+            beg_line, beg_col = self.view.rowcol(cursel.begin())
+            end_line, end_col = self.view.rowcol(cursel.end())
+            cur_point = symbols.Region(symbols.Position(beg_line, beg_col).from_zero_based(),
+                                       symbols.Position(end_line, end_col).from_zero_based())
+            next_err = get_next_value(errs, lambda e: e.region > cur_point)
+            self.view.sel().clear()
+            self.view.sel().add(next_err.region.to_region(self.view))
+            goto_error(self.view, next_err)
 
 
 class SublimeHaskellPreviousError(Common.SublimeHaskellTextCommand):
     def run(self, edit):
         errs = errors_for_view(self.view)
-        with self.view as view:
-            if not errs:
-                Common.show_status_message("No errors or warnings!", priority=5)
-            else:
-                prev_err = get_prev_value(errs, lambda e: e.region < view.sel()[0])
-                view.sel().clear()
-                view.sel().add(prev_err.region.to_region(self.view))
-                goto_error(self.view, prev_err)
+        if not errs:
+            Common.show_status_message("No errors or warnings!", priority=5)
+        else:
+            cursel = self.view.sel()[0]
+            beg_line, beg_col = self.view.rowcol(cursel.begin())
+            end_line, end_col = self.view.rowcol(cursel.end())
+            cur_point = symbols.Region(symbols.Position(beg_line, beg_col),
+                                       symbols.Position(end_line, end_col))
+            prev_err = get_prev_value(errs, lambda e: e.region < cur_point)
+            self.view.sel().clear()
+            self.view.sel().add(prev_err.region.to_region(self.view))
+            goto_error(self.view, prev_err)
 
 
 def region_key(name, is_fix=False):
@@ -403,10 +412,10 @@ def ghc_column_to_sublime_column(view, line, column):
     cur_line = view.substr(view.line(view.text_point(line - 1, 0)))
     col = 1
     real_col = 0
-    for c in cur_line:
+    for char in cur_line:
         if col >= column:
             return real_col
-        col += (8 if c == '\t' else 1)
+        col += (8 if char == '\t' else 1)
         real_col += 1
     return real_col
 
@@ -415,20 +424,17 @@ def parse_output_messages(view, base_dir, text):
     "Parse text into a list of OutputMessage objects."
     matches = OUTPUT_REGEX.finditer(text)
 
-    def to_error(m):
-        filename, line, column, messy_details = m.groups()
+    def to_error(errmsg):
+        filename, line, column, messy_details = errmsg.groups()
         line, column = int(line), int(column)
 
         column = ghc_column_to_sublime_column(view, line, column)
         line = line - 1
-        return OutputMessage(
-            # Record the absolute, normalized path.
-            os.path.normpath(os.path.join(base_dir, filename)),
-            symbols.Region(
-                symbols.Position(line, column),
-                symbols.Position(line, column)),
-            messy_details.strip(),
-            'warning' if 'warning' in messy_details.lower() else 'error')
+        # Record the absolute, normalized path.
+        return OutputMessage(os.path.normpath(os.path.join(base_dir, filename)),
+                             symbols.Region(symbols.Position(line, column)),
+                             messy_details.strip(),
+                             'warning' if 'warning' in messy_details.lower() else 'error')
 
     return list(map(to_error, matches))
 
