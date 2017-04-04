@@ -3,6 +3,7 @@
 import sublime
 import sublime_plugin
 import re
+import os
 
 has_sublime_repl = True
 
