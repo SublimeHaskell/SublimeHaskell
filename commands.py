@@ -336,14 +336,12 @@ class SublimeHaskellGoTo(hsdev.HsDevWindowCommand):
         return min(fdecls, key=lambda d: abs(d[1].position.line - self.line))[0]
 
     def on_done(self, idx):
-        if idx == -1:
-            return
-        self.open(self.decls[idx])
+        if idx >= 0:
+            self.open(self.decls[idx])
 
     def on_highlighted(self, idx):
-        if idx == -1:
-            return
-        self.open(self.decls[idx], True)
+        if idx >= 0:
+            self.open(self.decls[idx], True)
 
     def open(self, decl, transient=False):
         self.window.open_file(decl.get_source_location(),
@@ -606,9 +604,8 @@ class SublimeHaskellSymbolInfoCommand(hsdev.HsDevTextCommand):
             self.view.window().show_quick_panel(results, self.on_done)
 
     def on_done(self, idx):
-        if idx == -1:
-            return
-        self.show_symbol_info(self.candidates[idx])
+        if idx >= 0:
+            self.show_symbol_info(self.candidates[idx])
 
     def on_import_selected(self, idx):
         if idx == 0:  # Yes, select imported module
@@ -616,16 +613,14 @@ class SublimeHaskellSymbolInfoCommand(hsdev.HsDevTextCommand):
             sublime.set_timeout(lambda: self.view.window().show_quick_panel(results, self.on_candidate_selected), 0)
 
     def on_candidate_selected(self, idx):
-        if idx == -1:
-            return
+        if idx >= 0:
+            (module_name, ident_name) = self.candidates[idx]
+            info = hsdev.client.whois('{0}.{1}'.format(module_name, ident_name), self.view.file_name())
 
-        (module_name, ident_name) = self.candidates[idx]
-        info = hsdev.client.whois('{0}.{1}'.format(module_name, ident_name), self.view.file_name())
-
-        if info:
-            self.show_symbol_info(info[0])
-        else:
-            Common.show_status_message("Can't get info for {0}.{1}".format(module_name, ident_name), False)
+            if info:
+                self.show_symbol_info(info[0])
+            else:
+                Common.show_status_message("Can't get info for {0}.{1}".format(module_name, ident_name), False)
 
     def show_symbol_info(self, decl):
         show_declaration_info_panel(self.view, decl)
@@ -698,21 +693,20 @@ class SublimeHaskellInsertImportForSymbol(hsdev.HsDevTextCommand):
 
         if hsdev.client.whois(self.full_name, self.current_file_name):
             Common.show_status_message('Symbol {0} already in scope'.format(self.full_name))
-            return
-
-        self.candidates = hsdev.client.lookup(self.full_name, self.current_file_name)
-
-        if not self.candidates:
-            Common.show_status_message('Symbol {0} not found'.format(self.full_name))
-        elif len(self.candidates) == 1:
-            self.add_import(self.candidates[0].module.name)
         else:
-            self.view.window().show_quick_panel([[c.module.name] for c in self.candidates], self.on_done)
+            self.candidates = hsdev.client.lookup(self.full_name, self.current_file_name)
+
+            if not self.candidates:
+                Common.show_status_message('Symbol {0} not found'.format(self.full_name))
+            elif len(self.candidates) == 1:
+                self.add_import(self.candidates[0].module.name)
+            else:
+                self.view.window().show_quick_panel([[c.module.name] for c in self.candidates], self.on_done)
 
     def add_import(self, module_name):
         self.module_name = module_name
         contents = self.view.substr(sublime.Region(0, self.view.size()))
-        # Truncate contents_part to the module declaration and the imports list, if present.
+        # Truncate contents to the module declaration and the imports list, if present.
         imports_list = list(re.finditer('^import.*$', contents, re.MULTILINE))
         if len(imports_list) > 0:
             imports_list = imports_list[-1].end()
@@ -772,11 +766,10 @@ class SublimeHaskellInsertImportForSymbol(hsdev.HsDevTextCommand):
             Common.show_status_message('Import {0} added'.format(self.module_name), True)
 
     def on_done(self, idx):
-        if idx == -1:
-            return
-        self.view.run_command('sublime_haskell_insert_import_for_symbol', {
-            'filename': self.current_file_name,
-            'module_name': self.candidates[idx].module.name})
+        if idx >= 0:
+            self.view.run_command('sublime_haskell_insert_import_for_symbol',
+                                  {'filename': self.current_file_name,
+                                   'module_name': self.candidates[idx].module.name})
 
     def is_visible(self):
         return Common.is_haskell_source(self.view)
@@ -878,25 +871,22 @@ class SublimeHaskellBrowseModule(hsdev.HsDevWindowCommand):
             self.window.show_quick_panel([c[1] for c in self.candidates], self.on_done)
 
     def on_done(self, idx):
-        if idx == -1:
-            return
+        if idx >= 0:
+            the_module = self.candidates[idx][0]
 
-        the_module = self.candidates[idx][0]
+            info = {}
+            info['module_name'] = the_module.name
+            if the_module.by_source():
+                info['filename'] = the_module.location.filename
+            if the_module.by_cabal() and the_module.location.package.name:
+                info['package_name'] = the_module.location.package.name
+                info['db'] = the_module.location.db.to_string()
 
-        info = {}
-        info['module_name'] = the_module.name
-        if the_module.by_source():
-            info['filename'] = the_module.location.filename
-        if the_module.by_cabal() and the_module.location.package.name:
-            info['package_name'] = the_module.location.package.name
-            info['db'] = the_module.location.db.to_string()
-
-        sublime.set_timeout(lambda: self.window.run_command('sublime_haskell_browse_module', info), 0)
+            sublime.set_timeout(lambda: self.window.run_command('sublime_haskell_browse_module', info), 0)
 
     def on_symbol_selected(self, idx):
-        if idx == -1:
-            return
-        show_declaration_info(self.window.active_view(), self.candidates[idx])
+        if idx >= 0:
+            show_declaration_info(self.window.active_view(), self.candidates[idx])
 
     def candidate_modules(self, module_name, scope, symdb):
         retval = None
@@ -985,14 +975,12 @@ class SublimeHaskellGoToDeclaration(hsdev.HsDevTextCommand):
                     self.view.window().show_quick_panel(just_names, self.on_done, 0, 0, self.on_highlighted)
 
     def on_done(self, idx):
-        if idx == -1:
-            return
-
-        selected = self.select_candidates[idx]
-        if selected[1]:
-            self.view.window().open_file(selected[0][1], sublime.ENCODED_POSITION)
-        else:
-            self.view.window().open_file(selected[0][1])
+        if idx >= 0:
+            selected = self.select_candidates[idx]
+            if selected[1]:
+                self.view.window().open_file(selected[0][1], sublime.ENCODED_POSITION)
+            else:
+                self.view.window().open_file(selected[0][1])
 
     def on_highlighted(self, idx):
         if idx >= 0:

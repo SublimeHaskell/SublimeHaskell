@@ -480,21 +480,18 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
 
         window = view.window()
         if window:
-            if int(sublime.version()) < 3000:
-                pass
-            else:
-                if not self.project_file_name:
-                    self.project_file_name = window.project_file_name()
-                if window.project_file_name() is not None and window.project_file_name() != self.project_file_name:
-                    self.project_file_name = window.project_file_name()
-                    Logging.log('project switched to {0}, reinspecting'.format(self.project_file_name))
-                    if hsdev.agent_connected():
-                        Logging.log('reinspect all', Logging.LOG_TRACE)
-                        hsdev.client.remove_all()
-                        hsdev.agent.start_inspect()
-                        hsdev.agent.force_inspect()
-                    else:
-                        Common.show_status_message("inspector not connected", is_ok=False)
+            if not self.project_file_name:
+                self.project_file_name = window.project_file_name()
+            if window.project_file_name() is not None and window.project_file_name() != self.project_file_name:
+                self.project_file_name = window.project_file_name()
+                Logging.log('project switched to {0}, reinspecting'.format(self.project_file_name))
+                if hsdev.agent_connected():
+                    Logging.log('reinspect all', Logging.LOG_TRACE)
+                    hsdev.client.remove_all()
+                    hsdev.agent.start_inspect()
+                    hsdev.agent.force_inspect()
+                else:
+                    Common.show_status_message("inspector not connected", is_ok=False)
 
     def on_post_save(self, view):
         if Common.is_inspected_source(view):
