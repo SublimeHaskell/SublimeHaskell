@@ -211,13 +211,15 @@ class AutoCompletion(object):
         line_contents = Common.get_line_contents(view, locations[0])
         qsymbol = Common.get_qualified_symbol(line_contents)
         qualified_prefix = qsymbol.qualified_name()
+        Logging.log('qsymbol {0}'.format(qsymbol), Logging.LOG_DEBUG)
+        Logging.log('current_file_name {0} qualified_prefix {1}'.format(current_file_name, qualified_prefix))
 
         wide = self.wide_completion == view
         if wide:  # Drop wide
             self.wide_completion = None
 
+        suggestions = []
         if qsymbol.module:
-            suggestions = []
             if qsymbol.is_import_list:
                 current_module = Utils.head_of(hsdev.client.module(file=current_file_name))
                 if current_module and current_module.location.project:
@@ -241,8 +243,10 @@ class AutoCompletion(object):
             return self.keyword_completions + make_completions(suggestions)
         else:
             with self.cache as cache_:
-                completions = cache_.global_completions() if wide \
+                completions = cache_.global_completions() \
+                              if wide \
                               else cache_.files.get(current_file_name, cache_.global_completions())
+
                 return self.keyword_completions + completions
 
     @hsdev.use_hsdev([])
@@ -411,8 +415,8 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
                 # TODO: Implement
                 pass
 
-        if not completions:
-            completions = AUTO_COMPLETER.get_completions(view, locations)
+        # Add current file's completions:
+        completions = AUTO_COMPLETER.get_completions(view, locations) + completions
 
         end_time = time.clock()
         Logging.log('time to get completions: {0} seconds'.format(end_time - begin_time), Logging.LOG_DEBUG)
@@ -426,9 +430,14 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
         #     return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         # return comp
 
-        if Settings.PLUGIN.inhibit_completions and len(completions) != 0:
-            return (completions, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
-        return completions
+        if Settings.PLUGIN.inhibit_completions:
+            if len(completions) > 0:
+                return (completions, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
+            else:
+                # Because we want to inhibit completions...
+                return []
+        else:
+            return completions
 
     def set_cabal_status(self, view):
         filename = view.file_name()
