@@ -5,6 +5,8 @@ import shlex
 import threading
 import webbrowser
 
+import pprint
+
 import sublime
 import sublime_plugin
 
@@ -710,39 +712,64 @@ class SublimeHaskellInsertImportForSymbol(hsdev.HsDevTextCommand):
     def add_import(self, module_name):
         self.module_name = module_name
         contents = self.view.substr(sublime.Region(0, self.view.size()))
-        contents_part = contents[0: list(re.finditer('^import.*$', contents, re.MULTILINE))[-1].end()]
-        ProcHelper.ProcHelper.invoke_tool(['hsinspect'], 'hsinspect', contents_part, self.on_inspected, check_enabled=False)
+        # Truncate contents_part to the module declaration and the imports list, if present.
+        imports_list = list(re.finditer('^import.*$', contents, re.MULTILINE))
+        if len(imports_list) > 0:
+            imports_list = imports_list[-1].end()
+            contents = contents[0:imports_list]
+
+        ProcHelper.ProcHelper.invoke_tool(['hsinspect'], 'hsinspect', contents, self.on_inspected, check_enabled=False)
 
     def on_inspected(self, result):
-        cur_module = HsDevResultParse.parse_module(json.loads(result)['module']) \
-                     if self.view.is_dirty() \
-                     else Utils.head_of(hsdev.client.module(file=self.current_file_name))
-        imports = sorted(cur_module.imports, key=lambda i: i.position.line)
-        after = [i for i in imports if i.module > self.module_name]
+        imp_module = None
 
-        insert_line = 0
-        insert_gap = False
-
-        if len(after) > 0:
-            # Insert before after[0]
-            insert_line = after[0].position.line - 1
-        elif len(imports) > 0:
-            # Insert after all imports
-            insert_line = imports[-1].position.line
-        elif len(cur_module.declarations) > 0:
-            # Insert before first declaration
-            insert_line = min([d.position.line for d in cur_module.declarations.values()]) - 1
-            insert_gap = True
+        if self.view.is_dirty():
+            # Use the buffer's contents
+            pyresult = json.loads(result).get('result')
+            if pyresult is not None:
+                if Logging.is_log_level(Logging.LOG_DEBUG):
+                    pprint.pprint(pyresult, width=80)
+                modinfo = pyresult.get('module')
+                if modinfo is not None:
+                    imp_module = HsDevResultParse.parse_module(modinfo)
         else:
-            # Insert at the end of file
-            insert_line = self.view.rowcol(self.view.size())[0]
+            # Otherwise, use the actual file
+            imp_module = Utils.head_of(hsdev.client.module(file=self.current_file_name))
 
-        insert_text = 'import {0}\n'.format(self.module_name) + ('\n' if insert_gap else '')
+        if imp_module is not None:
+            imports = sorted(imp_module.imports, key=lambda i: i.position.line)
+            after = [i for i in imports if i.module > self.module_name]
 
-        point = self.view.text_point(insert_line, 0)
-        self.view.insert(self.edit, point, insert_text)
+            insert_line = 0
+            insert_gap = False
 
-        Common.show_status_message('Import {0} added'.format(self.module_name), True)
+            if len(after) > 0:
+                # Insert before after[0]
+                insert_line = after[0].position.line - 1
+            elif len(imports) > 0:
+                # Insert after all imports
+                insert_line = imports[-1].position.line
+            elif len(imp_module.declarations) > 0:
+                # Insert before first declaration
+                insert_line = min([d.position.line for d in imp_module.declarations.values()]) - 1
+                insert_gap = True
+            else:
+                # Try to add the import just after the "where" of the module declaration
+                contents = self.view.substr(sublime.Region(0, self.view.size()))
+                mod_decl = re.search('module.*where', contents, re.MULTILINE)
+                if mod_decl is not None:
+                    insert_line = mod_decl.end()
+                    insert_gap = True
+                else:
+                    # Punt! Insert at the end of the file
+                    insert_line = self.view.rowcol(self.view.size())[0]
+
+            insert_text = 'import {0}\n'.format(self.module_name) + ('\n' if insert_gap else '')
+
+            point = self.view.text_point(insert_line, 0)
+            self.view.insert(self.edit, point, insert_text)
+
+            Common.show_status_message('Import {0} added'.format(self.module_name), True)
 
     def on_done(self, idx):
         if idx == -1:
@@ -768,12 +795,12 @@ class SublimeHaskellClearImports(hsdev.HsDevTextCommand):
         if not self.current_file_name:
             self.current_file_name = self.view.file_name()
 
-        cur_module = Utils.head_of(hsdev.client.module(file=self.current_file_name))
-        if not cur_module:
+        imp_module = Utils.head_of(hsdev.client.module(file=self.current_file_name))
+        if not imp_module:
             Logging.log("module not scanned")
             return
 
-        imports = sorted(cur_module.imports, key=lambda i: i.position.line)
+        imports = sorted(imp_module.imports, key=lambda i: i.position.line)
 
         cmd = ['hsclearimports', self.current_file_name, '--max-import-list', '32']
         exit_code, cleared, err = ProcHelper.ProcHelper.run_process(cmd)
@@ -823,34 +850,17 @@ class SublimeHaskellBrowseModule(hsdev.HsDevWindowCommand):
             if not the_module:
                 Common.show_status_message('Module {0} not found'.format(filename))
                 return
-
         elif module_name:
-            # FIXME: This should be a function
-            cand_mods = hsdev.client.scope_modules(scope, lookup=module_name, search_type='exact') \
-                        if scope \
-                        else hsdev.client.scope_modules(self.current_file_name, lookup=module_name, search_type='exact') \
-                          if self.current_file_name \
-                          else hsdev.client.list_modules(module=module_name,
-                                                         symdb=symbols.PackageDb.from_string(symdb) if symdb else None)
-
+            cand_mods = self.candidate_modules(module_name, scope, symdb)
             if len(cand_mods) == 0:
                 Common.show_status_message('Module {0} not found'.format(module_name))
                 return
             elif len(cand_mods) == 1:
-                # FIXME: This should be a function
-                the_module = hsdev.client.module(lookup=module_name, search_type='exact', file=cand_mods[0].location.filename) \
-                             if cand_mods[0].by_source() \
-                             else hsdev.client.module(lookup=module_name,
-                                                      search_type='exact',
-                                                      symdb=cand_mods[0].location.db,
-                                                      package=cand_mods[0].location.package.name) \
-                               if cand_mods[0].by_cabal() \
-                               else hsdev.client.module(lookup=module_name, search_type='exact')
+                the_module = self.get_module_info(cand_mods[0], module_name)
                 if the_module:
                     the_module = Utils.head_of(the_module)
             else:
                 self.candidates.extend([(m, [m.name, m.location.to_string()]) for m in cand_mods])
-
         else:
             if self.current_file_name:
                 cand_mods = hsdev.client.scope_modules(self.current_file_name)
@@ -863,10 +873,9 @@ class SublimeHaskellBrowseModule(hsdev.HsDevWindowCommand):
             results = [[decl.brief(use_unicode=False), decl.docs.splitlines()[0] if decl.docs else ''] \
                       for decl in self.candidates]
             self.window.show_quick_panel(results, self.on_symbol_selected)
-            return
-
-        self.candidates.sort(key=lambda c: c[1][0])
-        self.window.show_quick_panel([c[1] for c in self.candidates], self.on_done)
+        else:
+            self.candidates.sort(key=lambda c: c[1][0])
+            self.window.show_quick_panel([c[1] for c in self.candidates], self.on_done)
 
     def on_done(self, idx):
         if idx == -1:
@@ -889,6 +898,28 @@ class SublimeHaskellBrowseModule(hsdev.HsDevWindowCommand):
             return
         show_declaration_info(self.window.active_view(), self.candidates[idx])
 
+    def candidate_modules(self, module_name, scope, symdb):
+        retval = None
+        if scope is not None:
+            retval = hsdev.client.scope_modules(scope, lookup=module_name, search_type='exact')
+        elif self.current_file_name is not None:
+            retval = hsdev.client.scope_modules(self.current_file_name, lookup=module_name, search_type='exact')
+        else:
+            retval = hsdev.client.list_modules(module=module_name,
+                                               symdb=symbols.PackageDb.from_string(symdb) if symdb else None)
+        return retval
+
+    def get_module_info(self, module, module_name):
+        retval = None
+        if module.by_source():
+            retval = hsdev.client.module(lookup=module_name, search_type='exact', file=module.location.filename)
+        elif module.by_cabal():
+            retval = hsdev.client.module(lookup=module_name, search_type='exact', symdb=module.location.db,
+                                         package=module.location.package.name)
+        else:
+            retval = hsdev.client.module(lookup=module_name, search_type='exact')
+
+        return retval
 
 class SublimeHaskellGoToDeclaration(hsdev.HsDevTextCommand):
     def __init__(self, view):
