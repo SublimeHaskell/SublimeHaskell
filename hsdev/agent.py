@@ -415,77 +415,56 @@ class HsDevAgent(threading.Thread):
 
     @use_hsdev()
     def inspect_cabal(self, cabal=None):
-        try:
-            with Common.status_message_process('Inspecting {0}'.format(cabal or 'cabal'), priority=1) as smgr:
-                self.client_back.scan(cabal=(cabal == 'cabal'),
-                                      sandboxes=[] if cabal == 'cabal' else [cabal],
-                                      on_notify=ScanStatus(smgr),
-                                      wait=True,
-                                      docs=Settings.PLUGIN.enable_hdocs)
-        except:
-            Logging.log('loading standard modules info for {0} failed:'.format(cabal or 'cabal'),
-                        Logging.LOG_ERROR)
-            print(traceback.format_exc())
+        with Common.status_message_process('Inspecting {0}'.format(cabal or 'cabal'), priority=1) as smgr:
+            self.client_back.scan(cabal=(cabal == 'cabal'),
+                                  sandboxes=[] if cabal == 'cabal' else [cabal],
+                                  on_notify=ScanStatus(smgr),
+                                  wait=True,
+                                  docs=Settings.PLUGIN.enable_hdocs)
 
     @use_hsdev()
     @use_inspect_modules
     def inspect(self, paths, projects, files):
         if paths or projects or files:
-            try:
-                with Common.status_message_process('Inspecting', priority=1) as smgr:
-                    self.client_back.scan(paths=paths,
-                                          projects=projects,
-                                          files=files,
-                                          on_notify=ScanStatus(smgr),
-                                          wait=True,
-                                          ghc=Settings.PLUGIN.ghc_opts,
-                                          docs=Settings.PLUGIN.enable_hdocs)
-            except OSError:
-                Logging.log('Inspection failed, see console window traceback', Logging.LOG_ERROR)
-                print(traceback.format_exc())
-
-    @use_hsdev()
-    @use_inspect_modules
-    def inspect_path(self, path):
-        try:
-            with Common.status_message_process('Inspecting path {0}'.format(path), priority=1) as smgr:
-                self.client_back.scan(paths=[path],
+            with Common.status_message_process('Inspecting', priority=1) as smgr:
+                self.client_back.scan(paths=paths,
+                                      projects=projects,
+                                      files=files,
                                       on_notify=ScanStatus(smgr),
                                       wait=True,
                                       ghc=Settings.PLUGIN.ghc_opts,
                                       docs=Settings.PLUGIN.enable_hdocs)
-        except:
-            Logging.log('Inspecting path {0} failed, see console window traceback'.format(path), Logging.LOG_ERROR)
-            print(traceback.format_exc())
+
+    @use_hsdev()
+    @use_inspect_modules
+    def inspect_path(self, path):
+        with Common.status_message_process('Inspecting path {0}'.format(path), priority=1) as smgr:
+            self.client_back.scan(paths=[path],
+                                  on_notify=ScanStatus(smgr),
+                                  wait=True,
+                                  ghc=Settings.PLUGIN.ghc_opts,
+                                  docs=Settings.PLUGIN.enable_hdocs)
 
     @use_hsdev()
     @use_inspect_modules
     def inspect_project(self, cabal_dir):
         (project_name, _) = Common.get_cabal_in_dir(cabal_dir)
 
-        try:
-            with Common.status_message_process('Inspecting project {0}'.format(project_name), priority=1) as smgr:
-                self.client_back.scan(projects=[cabal_dir],
-                                      on_notify=ScanStatus(smgr),
-                                      wait=True,
-                                      docs=Settings.PLUGIN.enable_hdocs)
-        except:
-            Logging.log('Inspecting project {0} failed, see console window traceback'.format(cabal_dir), Logging.LOG_ERROR)
-            print(traceback.format_exc())
+        with Common.status_message_process('Inspecting project {0}'.format(project_name), priority=1) as smgr:
+            self.client_back.scan(projects=[cabal_dir],
+                                  on_notify=ScanStatus(smgr),
+                                  wait=True,
+                                  docs=Settings.PLUGIN.enable_hdocs)
 
     @use_hsdev()
     @use_inspect_modules
     def inspect_files(self, filenames):
-        try:
-            with Common.status_message_process('Inspecting files', priority=1) as smgr:
-                self.client_back.scan(files=filenames,
-                                      on_notify=ScanStatus(smgr),
-                                      wait=True,
-                                      ghc=Settings.PLUGIN.ghc_opts,
-                                      docs=Settings.PLUGIN.enable_hdocs)
-        except:
-            Logging.log('Inspecting files failed, see console window traceback', Logging.LOG_ERROR)
-            print(traceback.format_exc())
+        with Common.status_message_process('Inspecting files', priority=1) as smgr:
+            self.client_back.scan(files=filenames,
+                                  on_notify=ScanStatus(smgr),
+                                  wait=True,
+                                  ghc=Settings.PLUGIN.ghc_opts,
+                                  docs=Settings.PLUGIN.enable_hdocs)
 
 
 class HsDevWindowCommand(Common.SublimeHaskellWindowCommand):

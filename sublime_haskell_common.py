@@ -1,5 +1,4 @@
 # -*- coding: UTF-8 -*-
-# [SublimeLinter pylint-@python:3]
 
 import fnmatch
 import os
@@ -220,17 +219,18 @@ def output_text(view, text=None, clear=False):
 
 
 # Create new output panel
-def output_panel(window, text='', panel_name=DEFAULT_PANEL_NAME, syntax=None, show_panel=True):
-    if not window:
-        return None
-    output_view = window.get_output_panel(panel_name)
-    if syntax is not None:
-        output_view.set_syntax_file('Packages/SublimeHaskell/Syntaxes/{0}.tmLanguage'.format(syntax))
-    output_text(output_view, text, clear=True)
-    output_view.sel().clear()
-    output_view.sel().add(sublime.Region(0, 0))
-    if show_panel:
-        window.run_command('show_panel', {'panel': ('output.' + panel_name)})
+def output_panel(window, text='', panel_name=DEFAULT_PANEL_NAME, syntax=None, panel_display=True):
+    output_view = None
+    if window is not None:
+        output_view = window.get_output_panel(panel_name)
+        if syntax is not None:
+            output_view.set_syntax_file('Packages/SublimeHaskell/Syntaxes/{0}.tmLanguage'.format(syntax))
+        output_text(output_view, text, clear=True)
+        output_view.sel().clear()
+        output_view.sel().add(sublime.Region(0, 0))
+        if panel_display:
+            window.run_command('show_panel', {'panel': ('output.' + panel_name)})
+
     return output_view
 
 
@@ -243,10 +243,10 @@ def hide_panel(window, panel_name=DEFAULT_PANEL_NAME):
 
 
 def show_panel(window, panel_name=DEFAULT_PANEL_NAME):
-    if not window:
+    if window is None:
         window = sublime.active_window()
-    if not window:
-        return
+        if window is None:
+            return
     window.run_command('show_panel', {'panel': ('output.' + panel_name)})
 
 

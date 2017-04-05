@@ -137,8 +137,8 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
                 # Try get type of hovered symbol
                 self.point = point
                 self.typed_expr = None
-                if types.file_types.has(self.current_file_name):
-                    self.typed_expr = self.get_type(types.file_types.get(self.current_file_name))
+                if types.FILE_TYPES.has(self.current_file_name):
+                    self.typed_expr = self.get_type(types.FILE_TYPES.get(self.current_file_name))
                 else:
                     types.get_types(self.current_file_name, self.on_types)
 

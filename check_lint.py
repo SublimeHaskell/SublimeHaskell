@@ -130,7 +130,7 @@ class SublimeHaskellHsDevChain(Common.SublimeHaskellTextCommand):
                                                                  output_text,
                                                                  Common.get_cabal_project_dir_of_file(self.filename) or \
                                                                      os.path.dirname(self.filename),
-                                                                 show_panel=not self.fly_mode and len(output_messages)),
+                                                                 panel_display=not self.fly_mode and len(output_messages)),
                                 0)
         sublime.set_timeout(lambda: ParseOutput.mark_messages_in_views(output_messages), 0)
 

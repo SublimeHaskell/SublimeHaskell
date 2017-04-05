@@ -1,25 +1,19 @@
 
 import time
-import traceback
 
 import SublimeHaskell.internals.logging as Logging
 
-def call_callback(fn, *args, **kwargs):
+def call_callback(callback_fn, *args, **kwargs):
     name = kwargs.get('name')
     if name:
         del kwargs['name']
-    try:
-        if fn is not None:
-            fn(*args, **kwargs)
-    except:
-        Logging.log('callback \'{0}\' throws exception, see console window traceback'.format(name or '<unnamed>'),
-                    Logging.LOG_ERROR)
-        print(traceback.format_exc())
+    if callback_fn is not None:
+        callback_fn(*args, **kwargs)
 
 
 class HsDevCallbacks(object):
-    def __init__(self, id, command, on_response=None, on_notify=None, on_error=None):
-        self.id = id
+    def __init__(self, call_id, command, on_response=None, on_notify=None, on_error=None):
+        self.ident = call_id
         self.command = command
         self.start_time = time.clock()
         self.on_response = on_response
@@ -32,15 +26,15 @@ class HsDevCallbacks(object):
     def log_time(self):
         Logging.log('{0}: {1} seconds'.format(self.command, self.time()), Logging.LOG_TRACE)
 
-    def call_response(self, r):
+    def call_response(self, resp):
         self.log_time()
-        call_callback(self.on_response, r)
+        call_callback(self.on_response, resp)
 
-    def call_notify(self, n):
-        call_callback(self.on_notify, n)
+    def call_notify(self, notif):
+        call_callback(self.on_notify, notif)
 
-    def call_error(self, e, ds):
+    def call_error(self, err, details):
         self.log_time()
-        details = ', '.join(['{0}: {1}'.format(k, v) for k, v in ds.items()])
-        Logging.log('{0} returns error: {1}\n{2}'.format(self.command, e, details), Logging.LOG_ERROR)
-        call_callback(self.on_error, e, ds)
+        comb_details = ', '.join(['{0}: {1}'.format(k, v) for k, v in details.items()])
+        Logging.log('{0} returns error: {1}\n{2}'.format(self.command, err, comb_details), Logging.LOG_ERROR)
+        call_callback(self.on_error, err, details)

@@ -52,7 +52,7 @@ class SublimeHaskellFilterCommand(Common.SublimeHaskellTextCommand):
             for region in regions:
                 self.view.sel().add(region)
 
-        except:
+        except OSError:
             self.report_error('Exception executing {0}'.format(' '.join(self.indenter)))
             traceback.print_exc()
 

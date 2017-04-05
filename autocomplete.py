@@ -223,14 +223,14 @@ class AutoCompletion(object):
                 if current_module and current_module.location.project:
                     # Search for declarations of qsymbol.module within current project
                     q_module = Utils.head_of(hsdev.client.scope_modules(file=current_file_name,
-                                                                        input=qsymbol.module,
+                                                                        lookup=qsymbol.module,
                                                                         search_type='exact'))
                     if q_module.by_source():
                         proj_module = hsdev.client.resolve(file=q_module.location.filename, exports=True)
                         if proj_module:
                             suggestions = proj_module.declarations.values()
                     elif q_module.by_cabal():
-                        cabal_module = Utils.head_of(hsdev.client.module(q_module.name,
+                        cabal_module = Utils.head_of(hsdev.client.module(lookup=q_module.name,
                                                                          search_type='exact',
                                                                          package=q_module.location.package.name))
                         if cabal_module:
@@ -252,13 +252,13 @@ class AutoCompletion(object):
         """
         retval = []
         if module:
-            mods = hsdev.client.scope_modules(filename, input=module, search_type='exact') if filename else []
+            mods = hsdev.client.scope_modules(filename, lookup=module, search_type='exact') if filename else []
 
             mod_file = mods[0].location.filename if mods and mods[0].by_source() else None
             cache_db = mods[0].location.db if mods and mods[0].by_cabal() else None
             package = mods[0].location.package.name if mods and mods[0].by_cabal() else None
 
-            mod_decls = Utils.head_of(hsdev.client.module(input=module, search_type='exact', file=mod_file, db=cache_db,
+            mod_decls = Utils.head_of(hsdev.client.module(lookup=module, search_type='exact', file=mod_file, symdb=cache_db,
                                                           package=package))
             retval = make_completions(mod_decls.declarations.values()) if mod_decls else []
 

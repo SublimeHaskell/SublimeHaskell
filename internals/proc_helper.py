@@ -10,7 +10,6 @@ import os
 import os.path
 import re
 import platform
-import traceback
 
 import sublime
 
@@ -20,7 +19,7 @@ import SublimeHaskell.internals.locked_object as LockedObject
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.utils as Utils
 
-def isWinXX():
+def is_windows():
     return platform.system() == "Windows"
 
 class ProcHelper(object):
@@ -42,7 +41,7 @@ class ProcHelper(object):
         self.process = None
         self.process_err = None
 
-        if isWinXX():
+        if is_windows():
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             popen_kwargs['startupinfo'] = startupinfo
@@ -121,8 +120,7 @@ class ProcHelper(object):
     @staticmethod
     def update_environment(_key, _val):
         # Reinitialize the tool -> path cache:
-        with ProcHelper.which_cache as cache:
-            cache = {}
+        ProcHelper.which_cache = LockedObject.LockedObject({})
         ProcHelper.augmented_env = ProcHelper.get_extended_env()
 
     # Generate the augmented environment for subprocesses. This copies the
@@ -134,7 +132,7 @@ class ProcHelper(object):
 
         def cabal_config():
             cconfig = os.environ.get('CABAL_CONFIG') or \
-                ('~/.cabal' if not isWinXX() else '%APPDATA%/cabal') + \
+                ('~/.cabal' if not is_windows() else '%APPDATA%/cabal') + \
                 "/config"
 
             # Various patterns to match...
@@ -145,10 +143,10 @@ class ProcHelper(object):
             re_bindir = re.compile(r'bindir:\s+(.*)$')
 
             # Things to collect
-            user_prefix = "$HOME/.cabal" if not isWinXX() else "%APPDATA%/cabal"
+            user_prefix = "$HOME/.cabal" if not is_windows() else "%APPDATA%/cabal"
             # FIXME: Need to interrogate Shel32 for the Windows PROGRAMFILES known
             # folder path:
-            global_prefix = "/usr/local" if not isWinXX() else "%PROGRAMFILES%/Haskell"
+            global_prefix = "/usr/local" if not is_windows() else "%PROGRAMFILES%/Haskell"
             user_bindir = "bin"
             global_bindir = "bin"
             p_state = 0
@@ -160,29 +158,29 @@ class ProcHelper(object):
                     # had to go with an indentation-specific format.
                     #
                     # This is a "cheap and dirty" scanner to pick up
-                    for l in f_cconfig:
-                        l1 = l.rstrip()
+                    for line in f_cconfig:
+                        line = line.rstrip()
                         # One of the sections?
-                        if re_user_dirs.match(l1):
+                        if re_user_dirs.match(line):
                             p_state = 1
-                        elif re_global_dirs.match(l1):
+                        elif re_global_dirs.match(line):
                             p_state = 2
-                        elif re.match(r'^\s+\w', l1):
+                        elif re.match(r'^\s+\w', line):
                             # prefix attribute?
-                            m = re_prefix.search(l1)
-                            if m:
+                            m_prefix = re_prefix.search(line)
+                            if m_prefix:
                                 if p_state == 1:
-                                    user_prefix = m.group(1)
+                                    user_prefix = m_prefix.group(1)
                                 elif p_state == 2:
-                                    global_prefix = m.group(1)
+                                    global_prefix = m_prefix.group(1)
                             # bindir attribute?
-                            m = re_bindir.search(l1)
-                            if m:
+                            m_bindir = re_bindir.search(line)
+                            if m_bindir:
                                 if p_state == 1:
-                                    user_bindir = m.group(1)
+                                    user_bindir = m_bindir.group(1)
                                 elif p_state == 2:
-                                    global_bindir = m.group(1)
-                        elif re_section.match(l1):
+                                    global_bindir = m_bindir.group(1)
+                        elif re_section.match(line):
                             p_state = 0
 
             except IOError:
@@ -197,7 +195,7 @@ class ProcHelper(object):
         env_path = os.getenv('PATH') or ""
         std_places = []
         if Settings.PLUGIN.add_standard_dirs:
-            std_places = ["$HOME/.local/bin" if not isWinXX() else "%APPDATA%/local/bin"] + cabal_config()
+            std_places = ["$HOME/.local/bin" if not is_windows() else "%APPDATA%/local/bin"] + cabal_config()
             std_places = list(filter(os.path.isdir, map(normalize_path, std_places)))
 
         add_to_path = list(filter(os.path.isdir, map(normalize_path, Settings.PLUGIN.add_to_path, [])))
@@ -219,7 +217,7 @@ class ProcHelper(object):
         if cval is not None:
             return [cval] + args[1:]
         else:
-            exe_exts = [''] if not isWinXX() else ['.exe', '.cmd', '.bat']
+            exe_exts = [''] if not is_windows() else ['.exe', '.cmd', '.bat']
 
             program = args[0]
             fpath, _ = os.path.split(program)
@@ -262,10 +260,10 @@ class ProcHelper(object):
                     raise Exception('{0} exited with exit code {1} and stderr: {2}'.format(tool_name, exit_code, stderr))
 
                 if on_line:
-                    for line in io.TextIOWrapper(stdout, encoding='utf-8'):
+                    for line in io.StringIO(stdout):
                         on_line(mk_result(line))
                 else:
-                    return mk_result(io.TextIOWrapper(stdout, encoding='utf-8'))
+                    return mk_result(stdout)
 
         except OSError as os_exc:
             if os_exc.errno == errno.ENOENT:

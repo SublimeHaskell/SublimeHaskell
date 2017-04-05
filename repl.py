@@ -2,7 +2,6 @@
 
 import os
 import re
-import os
 
 import sublime
 import sublime_plugin

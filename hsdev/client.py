@@ -137,7 +137,7 @@ class HsDev(object):
 
     def on_receive(self, ident, command, on_response=None, on_notify=None, on_error=None):
         with self.request_map as requests:
-            requests[ident] = HsCallback.HsDevCallbacks(id, command, on_response, on_notify, on_error)
+            requests[ident] = HsCallback.HsDevCallbacks(ident, command, on_response, on_notify, on_error)
 
     def verify_connected(self):
         if self.is_connected():
@@ -245,9 +245,9 @@ class HsDev(object):
     def get_response(self):
         while '\n' not in self.part:
             self.part = self.part + self.socket.recv(65536).decode('utf-8')
-        (r, _, post) = self.part.partition('\n')
+        (pre, _, post) = self.part.partition('\n')
         self.part = post
-        return r
+        return pre
 
     # Commands
 
@@ -260,66 +260,67 @@ class HsDev(object):
         return cmd('ping', {}, lambda r: r and ('message' in r) and (r['message'] == 'pong'))
 
     @HsDecorator.async_command
-    def scan(self, cabal=False, sandboxes=[], projects=[], files=[], paths=[], ghc=[], contents={}, docs=False, infer=False):
-        return cmd('scan', {'projects': projects,
+    def scan(self, cabal=False, sandboxes=None, projects=None, files=None, paths=None, ghc=None, contents=None,
+             docs=False, infer=False):
+        return cmd('scan', {'projects': projects or [],
                             'cabal': cabal,
-                            'sandboxes': sandboxes,
-                            'files': files_and_contents(files, contents),
-                            'paths': paths,
-                            'ghc-opts': ghc,
+                            'sandboxes': sandboxes or [],
+                            'files': files_and_contents(files or [], contents or {}),
+                            'paths': paths or [],
+                            'ghc-opts': ghc or [],
                             'docs': docs,
                             'infer': infer})
 
     @HsDecorator.async_command
-    def docs(self, projects=[], files=[], modules=[]):
-        return cmd('docs', {'projects': projects,
-                            'files': files,
-                            'modules': modules})
+    def docs(self, projects=None, files=None, modules=None):
+        return cmd('docs', {'projects': projects or [],
+                            'files': files or [],
+                            'modules': modules or []})
 
     @HsDecorator.async_command
-    def infer(self, projects=[], files=[], modules=[]):
-        return cmd('infer', {'projects': projects,
-                             'files': files,
-                             'modules': modules})
+    def infer(self, projects=None, files=None, modules=None):
+        return cmd('infer', {'projects': projects or [],
+                             'files': files or [],
+                             'modules': modules or []})
 
     @HsDecorator.async_list_command
-    def remove(self, cabal=False, sandboxes=[], projects=[], files=[], packages=[]):
-        return cmd('remove', {'projects': projects,
+    def remove(self, cabal=False, sandboxes=None, projects=None, files=None, packages=None):
+        return cmd('remove', {'projects': projects or [],
                               'cabal': cabal,
-                              'sandboxes': sandboxes,
-                              'files': files,
-                              'packages': packages})
+                              'sandboxes': sandboxes or [],
+                              'files': files or [],
+                              'packages': packages or []})
 
     @HsDecorator.command
     def remove_all(self):
         return cmd('remove-all', {})
 
     @HsDecorator.list_command
-    def list_modules(self, project=None, file=None, module=None, deps=None, sandbox=None, cabal=False, db=None, package=None,
+    def list_modules(self, project=None, file=None, module=None, deps=None, sandbox=None, cabal=False, symdb=None, package=None,
                      source=False, standalone=False):
-        fs = []
+        filters = []
         if project:
-            fs.append({'project': project})
+            filters.append({'project': project})
         if file:
-            fs.append({'file': file})
+            filters.append({'file': file})
         if module:
-            fs.append({'module': module})
+            filters.append({'module': module})
         if deps:
-            fs.append({'deps': deps})
+            filters.append({'deps': deps})
         if sandbox:
-            fs.append({'cabal': {'sandbox': sandbox}})
+            filters.append({'cabal': {'sandbox': sandbox}})
         if cabal:
-            fs.append({'cabal': 'cabal'})
-        if db:
-            fs.append({'db': ResultParse.encode_package_db(db)})
+            filters.append({'cabal': 'cabal'})
+        if symdb:
+            filters.append({'db': ResultParse.encode_package_db(symdb)})
         if package:
-            fs.append({'package': package})
+            filters.append({'package': package})
         if source:
-            fs.append('sourced')
+            filters.append('sourced')
         if standalone:
-            fs.append('standalone')
+            filters.append('standalone')
 
-        return cmd('modules', {'filters': fs}, ResultParse.parse_modules_brief)
+        return cmd('modules', {'filters': filters}, ResultParse.parse_modules_brief)
 
     @HsDecorator.list_command
     def list_packages(self):
@@ -330,63 +331,63 @@ class HsDev(object):
         return cmd('projects', {})
 
     @HsDecorator.list_command
-    def symbol(self, input="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
-               cabal=False, db=None, package=None, source=False, standalone=False, locals=False):
+    def symbol(self, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
+               cabal=False, symdb=None, package=None, source=False, standalone=False, local_names=False):
         # search_type is one of: exact, prefix, infix, suffix, regex
-        q = {'input': input, 'type': search_type}
+        query = {'input': lookup, 'type': search_type}
 
-        fs = []
+        filters = []
         if project:
-            fs.append({'project': project})
+            filters.append({'project': project})
         if file:
-            fs.append({'file': file})
+            filters.append({'file': file})
         if module:
-            fs.append({'module': module})
+            filters.append({'module': module})
         if deps:
-            fs.append({'deps': deps})
+            filters.append({'deps': deps})
         if sandbox:
-            fs.append({'cabal': {'sandbox': sandbox}})
+            filters.append({'cabal': {'sandbox': sandbox}})
         if cabal:
-            fs.append({'cabal': 'cabal'})
-        if db:
-            fs.append({'db': ResultParse.encode_package_db(db)})
+            filters.append({'cabal': 'cabal'})
+        if symdb:
+            filters.append({'db': ResultParse.encode_package_db(symdb)})
         if package:
-            fs.append({'package': package})
+            filters.append({'package': package})
         if source:
-            fs.append('sourced')
+            filters.append('sourced')
         if standalone:
-            fs.append('standalone')
+            filters.append('standalone')
 
-        return cmd('symbol', {'query': q, 'filters': fs, 'locals': locals}, ResultParse.parse_decls)
+        return cmd('symbol', {'query': query, 'filters': filters, 'locals': local_names}, ResultParse.parse_decls)
 
     @HsDecorator.command
-    def module(self, input="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
-               cabal=False, db=None, package=None, source=False, standalone=False):
-        q = {'input': input, 'type': search_type}
+    def module(self, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
+               cabal=False, symdb=None, package=None, source=False, standalone=False):
+        query = {'input': lookup, 'type': search_type}
 
-        fs = []
+        filters = []
         if project:
-            fs.append({'project': project})
+            filters.append({'project': project})
         if file:
-            fs.append({'file': file})
+            filters.append({'file': file})
         if module:
-            fs.append({'module': module})
+            filters.append({'module': module})
         if deps:
-            fs.append({'deps': deps})
+            filters.append({'deps': deps})
         if sandbox:
-            fs.append({'cabal': {'sandbox': sandbox}})
+            filters.append({'cabal': {'sandbox': sandbox}})
         if cabal:
-            fs.append({'cabal': 'cabal'})
-        if db:
-            fs.append({'db': ResultParse.encode_package_db(db)})
+            filters.append({'cabal': 'cabal'})
+        if symdb:
+            filters.append({'db': ResultParse.encode_package_db(symdb)})
         if package:
-            fs.append({'package': package})
+            filters.append({'package': package})
         if source:
-            fs.append('sourced')
+            filters.append('sourced')
         if standalone:
-            fs.append('standalone')
+            filters.append('standalone')
 
-        return cmd('module', {'query': q, 'filters': fs}, ResultParse.parse_modules)
+        return cmd('module', {'query': query, 'filters': filters}, ResultParse.parse_modules)
 
     @HsDecorator.command
     def resolve(self, file, exports=False):
@@ -409,14 +410,14 @@ class HsDev(object):
         return cmd('whois', {'name': name, 'file': file}, ResultParse.parse_declarations)
 
     @HsDecorator.list_command
-    def scope_modules(self, file, input='', search_type='prefix'):
-        return cmd('scope modules', {'query': {'input': input, 'type': search_type}, 'file': file},
+    def scope_modules(self, file, lookup='', search_type='prefix'):
+        return cmd('scope modules', {'query': {'input': lookup, 'type': search_type}, 'file': file},
                    ResultParse.parse_modules_brief)
 
     @HsDecorator.list_command
-    def scope(self, file, input='', search_type='prefix', global_scope=False):
+    def scope(self, file, lookup='', search_type='prefix', global_scope=False):
         return cmd('scope',
-                   {'query': {'input': input,
+                   {'query': {'input': lookup,
                               'type': search_type
                              },
                     'global': global_scope,
@@ -424,8 +425,8 @@ class HsDev(object):
                    }, ResultParse.parse_declarations)
 
     @HsDecorator.list_command
-    def complete(self, input, file, wide=False):
-        return cmd('complete', {'prefix': input, 'wide': wide, 'file': file}, ResultParse.parse_declarations)
+    def complete(self, lookup, file, wide=False):
+        return cmd('complete', {'prefix': lookup, 'wide': wide, 'file': file}, ResultParse.parse_declarations)
 
     @HsDecorator.list_command
     def hayoo(self, query, page=None, pages=None):
@@ -437,20 +438,21 @@ class HsDev(object):
             lambda r: [ResultParse.parse_cabal_package(s) for s in r] if r else None)
 
     @HsDecorator.list_command
-    def lint(self, files=[], contents={}, hlint=[]):
-        return cmd('lint', {'files': files_and_contents(files, contents), 'hlint-opts': hlint})
+    def lint(self, files=None, contents=None, hlint=None):
+        return cmd('lint', {'files': files_and_contents(files or [], contents or {}), 'hlint-opts': hlint or []})
 
     @HsDecorator.list_command
-    def check(self, files=[], contents={}, ghc=[]):
-        return cmd('check', {'files': files_and_contents(files, contents), 'ghc-opts': ghc})
+    def check(self, files=None, contents=None, ghc=None):
+        return cmd('check', {'files': files_and_contents(files or [], contents or {}), 'ghc-opts': ghc or []})
 
     @HsDecorator.list_command
-    def check_lint(self, files=[], contents={}, ghc=[], hlint=[]):
-        return cmd('check-lint', {'files': files_and_contents(files, contents), 'ghc-opts': ghc, 'hlint-opts': hlint})
+    def check_lint(self, files=None, contents=None, ghc=None, hlint=None):
+        return cmd('check-lint', {'files': files_and_contents(files or [], contents or {}), 'ghc-opts': ghc or [],
+                                  'hlint-opts': hlint or []})
 
     @HsDecorator.list_command
-    def types(self, files=[], contents={}, ghc=[]):
-        return cmd('types', {'files': files_and_contents(files, contents), 'ghc-opts': ghc})
+    def types(self, files=None, contents=None, ghc=None):
+        return cmd('types', {'files': files_and_contents(files or [], contents or {}), 'ghc-opts': ghc or []})
 
     @HsDecorator.command
     def langs(self):
@@ -465,15 +467,15 @@ class HsDev(object):
         return cmd('autofix show', {'messages': messages}, ResultParse.parse_corrections)
 
     @HsDecorator.list_command
-    def autofix_fix(self, messages, rest=[], pure=False):
-        return cmd('autofix fix', {'messages': messages, 'rest': rest, 'pure': pure}, ResultParse.parse_corrections)
+    def autofix_fix(self, messages, rest=None, pure=False):
+        return cmd('autofix fix', {'messages': messages, 'rest': rest or [], 'pure': pure}, ResultParse.parse_corrections)
 
     @HsDecorator.list_command
     def ghc_eval(self, exprs, file=None, source=None):
-        f = None
+        the_file = None
         if file is not None:
-            f = {'file': f, 'contents': source}
-        return cmd('ghc eval', {'exprs': exprs, 'file': f})
+            the_file = {'file': the_file, 'contents': source}
+        return cmd('ghc eval', {'exprs': exprs, 'file': the_file})
 
     @HsDecorator.command
     def exit(self):

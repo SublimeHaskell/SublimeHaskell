@@ -373,9 +373,9 @@ def run_binary(name, bin_file, base_dir):
             sublime.set_timeout(lambda: write_output(window, err, base_dir), 0)
 
 
-def write_output(window, text, base_dir, show_panel=True):
+def write_output(window, text, base_dir):
     "Write text to Sublime's output panel."
-    output_view = Common.output_panel(window, text, panel_name=OUTPUT_PANEL_NAME, show_panel=show_panel)
+    output_view = Common.output_panel(window, text, panel_name=OUTPUT_PANEL_NAME, panel_display=True)
     output_view.settings().set("result_base_dir", base_dir)
 
 

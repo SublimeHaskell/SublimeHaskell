@@ -737,13 +737,13 @@ def flatten(lsts):
 
 
 class CabalPackage(object):
-    def __init__(self, name, synopsis=None, version=None, installed=None, homepage=None, license=None):
+    def __init__(self, name, synopsis, version, installed, homepage, pkg_license):
         self.name = name
         self.synopsis = synopsis
         self.default_version = version
         self.installed_versions = installed[:] if installed else []
         self.homepage = homepage
-        self.license = license
+        self.license = pkg_license
 
     def brief(self):
         return self.name

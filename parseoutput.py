@@ -46,7 +46,7 @@ class OutputMessage(object):
     def __init__(self, filename, region, message, level, correction=None):
         self.filename = filename
         self.region = region
-        self.message = message.replace(os.linesep, "\n")
+        self.message = message
         self.level = level
         self.correction = correction
 
@@ -96,7 +96,6 @@ def clear_error_marks():
 
 
 def set_global_error_messages(messages):
-    # global ERRORS
     clear_error_marks()
     ERRORS.extend(messages)
 
@@ -130,7 +129,7 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
     collected_out = []
     output_log = Common.output_panel(view.window(), '',
                                      panel_name=BUILD_LOG_PANEL_NAME,
-                                     show_panel=Settings.PLUGIN.show_output_window)
+                                     panel_display=Settings.PLUGIN.show_output_window)
     for cmd in cmds:
         Common.output_text(output_log, ' '.join(cmd) + '...\n')
 
@@ -278,55 +277,53 @@ def goto_error(view, error):
         show_output(view)
         # error_region = ERROR_VIEW.find('{0}: line {1}, column \\d+:(\\n\\s+.*)*'.format(re.escape(filename), line), 0)
         error_region = ERROR_VIEW.find(re.escape(str(error)), 0)
-        # error_region = ERROR_VIEW.find('\\s{{2}}{0}: line {1}, column {2}:(\\n\\s+.*)*'.format(re.escape(filename), line, column), 0)
+        # error_region = ERROR_VIEW.find('\\s{{2}}{0}: line {1}, column {2}:(\\n\\s+.*)*'.format(re.escape(filename),
+        #                                                                                        line, column), 0)
         ERROR_VIEW.add_regions("current_error", [error_region], 'string', 'dot', sublime.HIDDEN)
         ERROR_VIEW.show(error_region.a)
     view.window().open_file("{0}:{1}:{2}".format(filename, line, column), sublime.ENCODED_POSITION)
 
 
-def get_next_value(lst, pred, cycle=True):
-    # Get first value satisfying `pred`, if no such values and `cycle`, return first element
-    for elem in filter(pred, lst):
-        return elem
-    if cycle and len(lst):
-        return lst[0]
-    return None
-
-
-def get_prev_value(lst, pred, cycle=True):
-    # Inverse of `get_next_value`, goes back and finds value satisfying `p`
-    return get_next_value(list(reversed(lst)), pred, cycle)
-
-
 class SublimeHaskellNextError(Common.SublimeHaskellTextCommand):
+    def __init__(self, view):
+        super().__init__(view)
+
     def run(self, edit):
         errs = errors_for_view(self.view)
         if not errs:
             Common.show_status_message('No errors or warnings!', priority=5)
         else:
-            cursel = self.view.sel()[0]
-            beg_line, beg_col = self.view.rowcol(cursel.begin())
-            end_line, end_col = self.view.rowcol(cursel.end())
-            cur_point = symbols.Region(symbols.Position(beg_line, beg_col).from_zero_based(),
-                                       symbols.Position(end_line, end_col).from_zero_based())
-            next_err = get_next_value(errs, lambda e: e.region > cur_point)
+            view_pt = self.view.sel()[0]
+            # Bump just past the view's point, just in case we're sitting on top of the current
+            cur_point = symbols.Region.from_region(self.view, view_pt)
+            err_iter = filter(lambda e: e.region > cur_point, errs)
+            next_err = next(err_iter, None)
+            # If the view's point is really on top of the start of an error, move to the next, otherwise,
+            # we'll just keep sitting on top of the current error and never move.
+            if next_err is not None and next_err.region.start == cur_point.start:
+                next_err = next(err_iter, None)
+            # Cycle around to the first error if we run off the end of the list.
+            if next_err is None:
+                next_err = errs[0]
             self.view.sel().clear()
             self.view.sel().add(next_err.region.to_region(self.view))
             goto_error(self.view, next_err)
 
 
 class SublimeHaskellPreviousError(Common.SublimeHaskellTextCommand):
+    def __init__(self, view):
+        super().__init__(view)
+
     def run(self, edit):
         errs = errors_for_view(self.view)
         if not errs:
             Common.show_status_message("No errors or warnings!", priority=5)
         else:
-            cursel = self.view.sel()[0]
-            beg_line, beg_col = self.view.rowcol(cursel.begin())
-            end_line, end_col = self.view.rowcol(cursel.end())
-            cur_point = symbols.Region(symbols.Position(beg_line, beg_col),
-                                       symbols.Position(end_line, end_col))
-            prev_err = get_prev_value(errs, lambda e: e.region < cur_point)
+            cur_point = symbols.Region.from_region(self.view, self.view.sel()[0])
+            prev_err = next(filter(lambda e: e.region < cur_point, reversed(errs)), None)
+            # Cycle around to the last error if we run off the first
+            if prev_err is None:
+                prev_err = errs[-1]
             self.view.sel().clear()
             self.view.sel().add(prev_err.region.to_region(self.view))
             goto_error(self.view, prev_err)
@@ -348,34 +345,32 @@ def get_icon(png):
 
 
 def mark_messages_in_view(messages, view):
-    for m in messages:
-        m.erase_from_view()
+    for msg in messages:
+        msg.erase_from_view()
 
-    for i, m in enumerate(messages):
-        m.region.save(view, '{0}-{1}'.format(region_key(m.level, m.correction is not None), str(i)))
-        view.add_regions(
-            m.region.region_key,
-            [m.to_region(view)],
-            MESSAGE_LEVELS[m.level]['style'],
-            get_icon(MESSAGE_LEVELS[m.level]['icon']['fix' if m.correction is not None else 'normal']),
-            sublime.DRAW_OUTLINED)
-        if m.correction and m.correction.corrector:
-            m.correction.corrector.region.save(view, 'autofix-{0}'.format(str(i)))
-            view.add_regions(
-                m.correction.corrector.region.region_key,
-                [m.correction.corrector.region.to_region(view)],
-                'autofix.region',
-                '',
-                sublime.HIDDEN)
+    for i, msg in enumerate(messages):
+        msg.region.save(view, '{0}-{1}'.format(region_key(msg.level, msg.correction is not None), str(i)))
+        view.add_regions(msg.region.region_key,
+                         [msg.to_region(view)],
+                         MESSAGE_LEVELS[msg.level]['style'],
+                         get_icon(MESSAGE_LEVELS[msg.level]['icon']['fix' if msg.correction is not None else 'normal']),
+                         sublime.DRAW_OUTLINED)
+        if msg.correction and msg.correction.corrector:
+            msg.correction.corrector.region.save(view, 'autofix-{0}'.format(str(i)))
+            view.add_regions(msg.correction.corrector.region.region_key,
+                             [msg.correction.corrector.region.to_region(view)],
+                             'autofix.region',
+                             '',
+                             sublime.HIDDEN)
 
 
-def write_output(view, text, cabal_project_dir, show_panel=True):
+def write_output(view, text, cabal_project_dir, panel_display=False):
     "Write text to Sublime's output panel."
     global ERROR_VIEW
     ERROR_VIEW = Common.output_panel(view.window(), text,
                                      panel_name=OUTPUT_PANEL_NAME,
                                      syntax='HaskellOutputPanel',
-                                     show_panel=show_panel)
+                                     panel_display=panel_display)
     ERROR_VIEW.settings().set("RESULT_FILE_REGEX", RESULT_FILE_REGEX)
     ERROR_VIEW.settings().set("result_base_dir", cabal_project_dir)
 
@@ -443,8 +438,8 @@ def trim_region(view, region):
     "Return the specified Region, but without leading or trailing whitespace."
     text = view.substr(region)
     # Regions may be selected backwards, so b could be less than a.
-    a = region.begin()
-    b = region.end()
+    rgn_begin = region.begin()
+    rgn_end = region.end()
     # Figure out how much to move the endpoints to lose the space.
     # If the region is entirely whitespace, give up and return it unchanged.
     if text.isspace():
@@ -452,23 +447,23 @@ def trim_region(view, region):
     else:
         text_trimmed_on_left = text.lstrip()
         text_trimmed = text_trimmed_on_left.rstrip()
-        a += len(text) - len(text_trimmed_on_left)
-        b -= len(text_trimmed_on_left) - len(text_trimmed)
-        return sublime.Region(a, b)
+        rgn_begin += len(text) - len(text_trimmed_on_left)
+        rgn_end -= len(text_trimmed_on_left) - len(text_trimmed)
+        return sublime.Region(rgn_begin, rgn_end)
 
+DATA_REGEX = re.compile(r'(?P<what>(newtype|type|data))\s+((?P<ctx>(.*))=>\s+)?(?P<name>\S+)\s+' + \
+                        r'(?P<args>(\w+\s+)*)=(\s*(?P<def>.*)\s+-- Defined)?',
+                        re.MULTILINE)
+CLASS_REGEX = re.compile(r'(?P<what>class)\s+((?P<ctx>(.*))=>\s+)?(?P<name>\S+)\s+(?P<args>(\w+\s+)*)(.*)where$',
+                         re.MULTILINE)
 
 def parse_info(name, contents):
     """
     Parses result of :i <name> command of ghci and returns derived symbols.Declaration
     """
-    functionRegex = r'{0}\s+::\s+(?P<type>.*?)(\s+--(.*))?$'.format(name)
-    dataRegex = r'(?P<what>(newtype|type|data))\s+((?P<ctx>(.*))=>\s+)?(?P<name>\S+)\s+' + \
-                r'(?P<args>(\w+\s+)*)=(\s*(?P<def>.*)\s+-- Defined)?'
-    classRegex = r'(?P<what>class)\s+((?P<ctx>(.*))=>\s+)?(?P<name>\S+)\s+(?P<args>(\w+\s+)*)(.*)where$'
-
     if name[0].isupper():
         # data, class, type or newtype
-        matched = re.search(dataRegex, contents, re.MULTILINE) or re.search(classRegex, contents, re.MULTILINE)
+        matched = DATA_REGEX.search(contents) or CLASS_REGEX.search(contents)
         if matched:
             what = matched.group('what')
             args = matched.group('args').strip().split(' ') if matched.group('args') else []
@@ -490,7 +485,8 @@ def parse_info(name, contents):
 
     else:
         # function
-        matched = re.search(functionRegex, contents, re.MULTILINE)
+        function_regex = r'{0}\s+::\s+(?P<type>.*?)(\s+--(.*))?$'.format(name)
+        matched = re.search(function_regex, contents, re.MULTILINE)
         if matched:
             return symbols.Function(name, matched.group('type'))
 

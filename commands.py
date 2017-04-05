@@ -174,7 +174,7 @@ class SublimeHaskellFindDeclarations(hsdev.HsDevWindowCommand):
         self.window.show_input_panel("Search string", "", self.on_done, self.on_change, self.on_cancel)
 
     def on_done(self, sym):
-        self.decls = hsdev.client.symbol(input=sym, search_type='regex')
+        self.decls = hsdev.client.symbol(lookup=sym, search_type='regex')
         if not self.decls:
             Common.show_status_message("Nothing found for: {0}".format(sym))
         else:
@@ -249,7 +249,7 @@ class SublimeHaskellSearch(hsdev.HsDevWindowCommand):
         self.search_str = search_str
         self.status_msg = Common.status_message_process("Search '{0}'".format(search_str), priority=3)
         self.status_msg.start()
-        hsdev.client.symbol(input=self.search_str, search_type='infix', wait=False,
+        hsdev.client.symbol(lookup=self.search_str, search_type='infix', wait=False,
                             on_response=self.on_symbol, on_error=self.on_err)
 
     def on_change(self, _ignored):
@@ -305,7 +305,7 @@ class SublimeHaskellGoTo(hsdev.HsDevWindowCommand):
             decls = self.sorted_decls_name(hsdev.client.symbol(project=current_project))
             self.declarations = [[decl.brief(True, use_unicode=False), decl.module.name] for decl in decls]
         else:
-            decls = self.sorted_decls_pos(hsdev.client.symbol(file=self.current_filename, locals=True))
+            decls = self.sorted_decls_pos(hsdev.client.symbol(file=self.current_filename, local_names=True))
             self.declarations = [[(decl.position.column * ' ') + decl.brief(True, use_unicode=False)] for decl in decls]
         self.decls = decls[:]
         print("Goto: decls {0}".format(decls))
@@ -403,17 +403,17 @@ class SublimeHaskellGoToHackageModule(hsdev.HsDevTextCommand):
             if qsymbol.is_module():  # module
                 scope = self.view.file_name()
                 if scope:
-                    modules = [m for m in hsdev.client.scope_modules(scope, input=qsymbol.module, search_type='exact')
+                    modules = [m for m in hsdev.client.scope_modules(scope, lookup=qsymbol.module, search_type='exact')
                                if m.by_cabal()]
                 else:
-                    modules = [m for m in hsdev.client.list_modules(db=m.location.db)
+                    modules = [m for m in hsdev.client.list_modules(symdb=m.location.db)
                                if m.name == qsymbol.module and m.by_cabal()]
             else:  # symbol
                 scope = self.view.file_name()
                 if scope:
                     decls = hsdev.client.whois(qsymbol.qualified_name(), file=scope) or \
                             hsdev.client.lookup(qsymbol.full_name(), file=scope) or \
-                            hsdev.client.symbol(input=qsymbol.full_name(), search_type='exact')
+                            hsdev.client.symbol(lookup=qsymbol.full_name(), search_type='exact')
                     if not decls:
                         Common.show_status_message('Module for symbol {0} not found'.format(qsymbol.full_name()))
                         return
@@ -564,14 +564,7 @@ class SublimeHaskellSymbolInfoCommand(hsdev.HsDevTextCommand):
             self.full_name = qname
             self.current_file_name = self.view.file_name()
             # Try whois it, followed by file symbol and wider module searches
-            self.candidates = hsdev.client.whois(qname, file=self.current_file_name) or \
-                              (hsdev.client.symbol(name, search_type='exact', file=filename) \
-                               if filename
-                               else (hsdev.client.symbol(name, search_type='exact', module=module_name,
-                                                         db=symbols.PackageDb.from_string(symdb) if symdb else None,
-                                                         package=package_name) \
-                                     if module_name and package_name and symdb
-                                     else []))
+            self.candidates = self.collect_candidates(qname, name, filename, module_name, package_name, symdb)
         else:
             self.current_file_name = self.view.file_name()
 
@@ -600,7 +593,7 @@ class SublimeHaskellSymbolInfoCommand(hsdev.HsDevTextCommand):
                 self.candidates = hsdev.client.lookup(self.full_name, self.current_file_name)
 
             if not self.candidates:
-                self.candidates = hsdev.client.symbol(input=self.full_name, search_type='exact')
+                self.candidates = hsdev.client.symbol(lookup=self.full_name, search_type='exact')
 
         if not self.candidates:
             Common.show_status_message('Symbol {0} not found'.format(self.full_name))
@@ -637,6 +630,21 @@ class SublimeHaskellSymbolInfoCommand(hsdev.HsDevTextCommand):
 
     def is_visible(self):
         return Common.is_haskell_source(self.view) or Common.is_haskell_repl(self.view)
+
+    def collect_candidates(self, qualified_name, unqualified_name, filename, module_name, package_name, symdb):
+        candidates = hsdev.client.whois(qualified_name, file=self.current_file_name)
+        if not candidates:
+            if filename:
+                candidates = hsdev.client.symbol(lookup=unqualified_name, search_type='exact', file=filename)
+            else:
+                if module_name and package_name:
+                    candidates = hsdev.client.symbol(lookup=unqualified_name, search_type='exact', module=module_name,
+                                                     symdb=symbols.PackageDb.from_string(symdb) if symdb else None,
+                                                     package=package_name)
+                else:
+                    candidates = []
+
+        return candidates
 
 TOGGLE_SYMBOL_INFO = False
 
@@ -817,25 +825,27 @@ class SublimeHaskellBrowseModule(hsdev.HsDevWindowCommand):
                 return
 
         elif module_name:
-            cand_mods = hsdev.client.scope_modules(scope, input=module_name, search_type='exact') \
+            # FIXME: This should be a function
+            cand_mods = hsdev.client.scope_modules(scope, lookup=module_name, search_type='exact') \
                         if scope \
-                        else hsdev.client.scope_modules(self.current_file_name, input=module_name, search_type='exact') \
+                        else hsdev.client.scope_modules(self.current_file_name, lookup=module_name, search_type='exact') \
                           if self.current_file_name \
                           else hsdev.client.list_modules(module=module_name,
-                                                         db=symbols.PackageDb.from_string(symdb) if symdb else None)
+                                                         symdb=symbols.PackageDb.from_string(symdb) if symdb else None)
 
             if len(cand_mods) == 0:
                 Common.show_status_message('Module {0} not found'.format(module_name))
                 return
             elif len(cand_mods) == 1:
-                the_module = hsdev.client.module(module_name, search_type='exact', file=cand_mods[0].location.filename) \
+                # FIXME: This should be a function
+                the_module = hsdev.client.module(lookup=module_name, search_type='exact', file=cand_mods[0].location.filename) \
                              if cand_mods[0].by_source() \
-                             else hsdev.client.module(module_name,
+                             else hsdev.client.module(lookup=module_name,
                                                       search_type='exact',
-                                                      db=cand_mods[0].location.db,
+                                                      symdb=cand_mods[0].location.db,
                                                       package=cand_mods[0].location.package.name) \
                                if cand_mods[0].by_cabal() \
-                               else hsdev.client.module(module_name, search_type='exact')
+                               else hsdev.client.module(lookup=module_name, search_type='exact')
                 if the_module:
                     the_module = Utils.head_of(the_module)
             else:
@@ -845,7 +855,7 @@ class SublimeHaskellBrowseModule(hsdev.HsDevWindowCommand):
             if self.current_file_name:
                 cand_mods = hsdev.client.scope_modules(self.current_file_name)
             else:
-                cand_mods = hsdev.client.list_modules(db=symbols.PackageDb.from_string(symdb) if symdb else None)
+                cand_mods = hsdev.client.list_modules(symdb=symbols.PackageDb.from_string(symdb) if symdb else None)
             self.candidates.extend([(m, [m.name, m.location.to_string()]) for m in cand_mods])
 
         if the_module:
@@ -913,13 +923,13 @@ class SublimeHaskellGoToDeclaration(hsdev.HsDevTextCommand):
                         candidates = []
                         for cand in cands:
                             for i in cand.imported:
-                                candidates = [s for s in hsdev.client.symbol(input=cand.name, search_type='exact', source=True)
+                                candidates = [s for s in hsdev.client.symbol(lookup=cand.name, search_type='exact', source=True)
                                               if s.module.name == i.module]
                                 if candidates and candidates[0].has_source_location():
                                     self.view.window().open_file(candidates[0].get_source_location(), sublime.ENCODED_POSITION)
                     return
                 else:
-                    candidates = hsdev.client.symbol(input=qsymbol.name, search_type='exact', source=True)
+                    candidates = hsdev.client.symbol(lookup=qsymbol.name, search_type='exact', source=True)
             else:
                 module_candidates = [m for m in hsdev.client.list_modules(source=True, module=full_name) if m.name == full_name]
 
