@@ -13,6 +13,20 @@ import sublime
 
 import SublimeHaskell.internals.locked_object as LockedObject
 
+def access_sync(lock_name):
+    """Decorate a function that requires lock synchronization: acquire the lock named `lock_name` (a member of an object)
+    and execute a function. This ensures that readers and writers don't collide with each other."""
+    def decorator(method):
+        def synced_method(self, *args, **kwargs):
+            # Because we use this on an object's __getattribute__ method, we have to call object.__getattribute__
+            # directly to avoid infinite recursion.
+            lock = object.__getattribute__(self, lock_name)
+            with lock:
+                return method(self, *args, **kwargs)
+        return synced_method
+    return decorator
+
+
 class SetttingsContainer(object):
     """Container object for default and user preference settings."""
 
@@ -92,13 +106,17 @@ class SetttingsContainer(object):
         # Write-access lock
         self.wlock = threading.RLock()
 
+    @access_sync('wlock')
+    def __getattribute__(self, attr):
+        return object.__getattribute__(self, attr)
+
+    @access_sync('wlock')
     def load(self):
-        with self.wlock:
-            settings = get_settings()
-            for (key, (attr, default)) in SetttingsContainer.attr_dict.items():
-                setattr(self, attr, settings.get(key, default))
-                install_updater(settings, self, key)
-            self.changes = LockedObject.LockedObject({})
+        settings = get_settings()
+        for (key, (attr, default)) in SetttingsContainer.attr_dict.items():
+            setattr(self, attr, settings.get(key, default))
+            install_updater(settings, self, key)
+        self.changes = LockedObject.LockedObject({})
 
     def update_setting(self, key):
         settings = get_settings()
@@ -106,19 +124,20 @@ class SetttingsContainer(object):
         oldval = getattr(self, attr)
         newval = settings.get(key, default)
         if oldval != newval:
+            # Only acquire the lock when we really need it.
             with self.wlock:
                 setattr(self, attr, newval)
                 with self.changes as changes:
                     for change_fn in changes.get(key, []):
                         change_fn(key, newval)
 
+    @access_sync('wlock')
     def add_change_callback(self, key, change_fn):
-        with self.wlock:
-            with self.changes as changes:
-                if key not in changes:
-                    changes[key] = []
+        with self.changes as changes:
+            if key not in changes:
+                changes[key] = []
 
-                changes[key].append(change_fn)
+            changes[key].append(change_fn)
 
 
 def install_updater(settings, setting_obj, key):

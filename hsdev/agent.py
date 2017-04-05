@@ -241,26 +241,39 @@ def use_hsdev(def_val=None):
         return wrapped
     return wrap
 
-
-# hsdev agent
-# holds hsdev server process and two clients: for commands and for background tasks
-# also automatically reinspects files/paths/etc. when they marked as dirty
 class HsDevAgent(threading.Thread):
-    sleep_timeout = 60.0  # agent sleeping timeout
-
     def __init__(self):
         super().__init__()
         self.daemon = True
         self.cabal_to_load = LockedObject.LockedObject([])
         self.dirty_files = LockedObject.LockedObject([])
         self.dirty_paths = LockedObject.LockedObject([])
+        self.client = HsDevClient.HsDev(HSDEV_DEFAULT_PORT)
+        self.client_back = HsDevClient.HsDev(HSDEV_DEFAULT_PORT)
+        self.reinspect_event = threading.Event()
+
+    def start_hsdev(self):
+        Logging.log('For some reason, HsDevAgent\'s start_hsdev() was called.', Logging.LOG_ERROR)
+
+    def stop_hsdev(self):
+        self.client.close()
+        self.client_back.close()
+
+class HsDevLocalAgent(HsDevAgent):
+    """Local `hsdev` agent.
+
+    This object is a container for the `hsdev` server process and maintains connections to two `hsdev` clients:
+    the `client` connection for commands and the `client_back` for background tasks. `HsDevLocalAgent` also
+    automatically reinspects files/paths/etc. when they marked as dirty.
+    """
+
+    sleep_timeout = 60.0  # agent sleeping timeout
+
+    def __init__(self):
+        super().__init__()
         self.hsdev_process = HsDevProcess(cache=os.path.join(Common.sublime_haskell_cache_path(), 'hsdev'),
                                           log_file=os.path.join(Common.sublime_haskell_cache_path(), 'hsdev', 'hsdev.log'),
                                           log_config=Settings.PLUGIN.hsdev_log_config)
-        self.client = HsDevClient.HsDev(HSDEV_DEFAULT_PORT)
-        self.client_back = HsDevClient.HsDev(HSDEV_DEFAULT_PORT)
-
-        self.reinspect_event = threading.Event()
 
     def is_connected(self):
         return self.client.is_connected()
@@ -310,10 +323,6 @@ class HsDevAgent(threading.Thread):
 
             self.hsdev_process.start()
             self.hsdev_process.create()
-
-    def stop_hsdev(self):
-        self.client.close()
-        self.client_back.close()
 
     def on_hsdev_enabled(self, key, value):
         if key == 'enable_hsdev':
@@ -380,7 +389,7 @@ class HsDevAgent(threading.Thread):
             if files_to_reinspect:
                 if Settings.PLUGIN.enable_hdocs:
                     self.client_back.docs(files=files_to_reinspect)
-            self.reinspect_event.wait(HsDevAgent.sleep_timeout)
+            self.reinspect_event.wait(HsDevLocalAgent.sleep_timeout)
             self.reinspect_event.clear()
 
     @dirty
@@ -495,7 +504,7 @@ def start_agent():
     if agent is None:
         Logging.log('starting agent', Logging.LOG_TRACE)
 
-        agent = HsDevAgent()
+        agent = HsDevLocalAgent()
         agent.start()
         client = agent.client
         client_back = agent.client_back
