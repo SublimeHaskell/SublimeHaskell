@@ -304,6 +304,11 @@ class QualifiedSymbol(object):
         self.is_import_list = is_import_list
         self.is_operator = is_operator
 
+    def __str__(self):
+        return u'QualifiedSymbol(name: {0}, module {1}, '.format(self.name, self.module) + \
+               u'module_as {0}, is_import_list {1}, is_operator {2}'.format(self.module_as, self.is_import_list,
+                                                                            self.is_operator)
+
     def qualified_name(self):
         if self.name is None:
             return self.module
