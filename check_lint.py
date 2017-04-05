@@ -2,14 +2,17 @@
 
 import os
 import re
-import sublime
 import threading
+import traceback
+
+import sublime
 
 import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.hsdev.agent as hsdev
+import SublimeHaskell.hsdev.result_parse as HsResultParse
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.ghci_backend as GHCIMod
-import SublimeHaskell.hsdev as hsdev
 import SublimeHaskell.parseoutput as ParseOutput
 import SublimeHaskell.symbols as symbols
 
@@ -21,7 +24,7 @@ def lint_as_hints(msgs):
 
 
 def hsdev_check():
-    return (hsdev.client.check, lambda file: [file], lambda ms: ms, {'ghc': Settings.get_setting_async('ghc_opts')})
+    return (hsdev.client.check, lambda file: [file], lambda ms: ms, {'ghc': Settings.PLUGIN.ghc_opts})
 
 
 def hsdev_lint():
@@ -29,7 +32,7 @@ def hsdev_lint():
 
 # def hsdev_check_lint():
 #     return (hsdev.client.ghcmod_check_lint,
-#             lambda file: [file], lambda ms: ms, { 'ghc': Settings.get_setting_async('ghc_opts') })
+#             lambda file: [file], lambda ms: ms, { 'ghc': Settings.PLUGIN.ghc_opts })
 
 
 def messages_as_hints(cmd):
@@ -38,6 +41,17 @@ def messages_as_hints(cmd):
 
 
 class SublimeHaskellHsDevChain(Common.SublimeHaskellTextCommand):
+    def __init__(self, view):
+        super().__init__(view)
+        self.messages = []
+        self.msgs = []
+        self.corrections = []
+        self.corrections_dict = {}
+        self.fly_mode = False
+        self.filename = None
+        self.contents = {}
+        self.status_msg = None
+
     def run(self, edit):
         pass
 
@@ -54,11 +68,10 @@ class SublimeHaskellHsDevChain(Common.SublimeHaskellTextCommand):
             self.contents[self.filename] = self.view.substr(sublime.Region(0, self.view.size()))
         if not self.fly_mode:
             ParseOutput.hide_output(self.view)
-        if not cmds:
-            return
-        else:
+        if cmds:
             self.status_msg = Common.status_message_process(msg + ': ' + self.filename, priority=2)
             self.status_msg.start()
+
             if not hsdev.agent_connected():
                 Logging.log('hsdev chain fails: hsdev not connected', Logging.LOG_ERROR)
                 self.status_msg.fail()
@@ -73,31 +86,29 @@ class SublimeHaskellHsDevChain(Common.SublimeHaskellTextCommand):
                 hsdev.client.autofix_show(self.msgs, on_response=self.on_autofix)
             else:
                 cmd, tail_cmds = cmds[0], cmds[1:]
-                (fn, modify_args, modify_msgs, kwargs) = cmd
+                (chain_fn, modify_args, modify_msgs, kwargs) = cmd
 
                 def on_resp(msgs):
                     self.messages.extend(modify_msgs(msgs))
                     self.msgs.extend(msgs)
                     self.go_chain(tail_cmds)
 
-                def on_err(err, ds):
+                def on_err(_err, _details):
                     self.status_msg.fail()
                     self.go_chain([])
 
-                fn(modify_args(self.filename),
-                   contents=self.contents,
-                   wait=False,
-                   on_response=on_resp,
-                   on_error=on_err, **kwargs)
-        except Exception as e:
-            Logging.log('hsdev chain fails with: {0}'.format(e), Logging.LOG_ERROR)
+                chain_fn(modify_args(self.filename), contents=self.contents, wait=False, on_response=on_resp,
+                         on_error=on_err, **kwargs)
+        except OSError:
+            Logging.log('hsdev chain failed, see console window (<ctrl>-<backtick>) traceback', Logging.LOG_ERROR)
+            print(traceback.format_exc())
             self.status_msg.fail()
             self.status_msg.stop()
 
     def on_autofix(self, corrections):
         output_messages = [ParseOutput.OutputMessage(
             m['source']['file'],
-            hsdev.parse_region(m['region']).to_zero_based(),
+            HsResultParse.parse_region(m['region']).to_zero_based(),
             m['level'].capitalize() + ': ' + m['note']['message'].replace('\n', '\n  '),
             m['level']) for m in self.messages]
 
@@ -114,12 +125,12 @@ class SublimeHaskellHsDevChain(Common.SublimeHaskellTextCommand):
 
         ParseOutput.set_global_error_messages(output_messages)
         output_text = ParseOutput.format_output_messages(output_messages)
-        if Settings.get_setting_async('show_error_window'):
+        if Settings.PLUGIN.show_error_window:
             sublime.set_timeout(lambda: ParseOutput.write_output(self.view,
                                                                  output_text,
                                                                  Common.get_cabal_project_dir_of_file(self.filename) or \
                                                                      os.path.dirname(self.filename),
-                                                                 show_panel=not self.fly_mode and len(output_messages)),
+                                                                 panel_display=not self.fly_mode and len(output_messages)),
                                 0)
         sublime.set_timeout(lambda: ParseOutput.mark_messages_in_views(output_messages), 0)
 
@@ -128,12 +139,12 @@ class SublimeHaskellHsDevChain(Common.SublimeHaskellTextCommand):
 
 
 def ghcmod_command(cmdname):
-    def wrap(fn):
+    def wrap(outer_fn):
         def wrapper(self, *args, **kwargs):
-            if Settings.get_setting_async('enable_hsdev'):
+            if Settings.PLUGIN.enable_hsdev:
                 Logging.log("Invoking '{0}' command via hsdev".format(cmdname), Logging.LOG_TRACE)
-                return fn(self, *args, **kwargs)
-            elif Settings.get_setting_async('enable_ghc_mod'):
+                return outer_fn(self, *args, **kwargs)
+            elif Settings.PLUGIN.enable_ghc_mod:
                 Logging.log("Invoking '{0}' command via ghc-mod".format(cmdname), Logging.LOG_TRACE)
                 self.view.window().run_command('sublime_haskell_ghc_mod_{0}'.format(cmdname))
             else:
@@ -144,20 +155,22 @@ def ghcmod_command(cmdname):
 
 class SublimeHaskellCheck(SublimeHaskellHsDevChain):
     @ghcmod_command('check')
-    def run(self, edit, fly=False):
-        self.run_chain([hsdev_check()], 'Checking', fly_mode=fly)
+    def run(self, edit, **kwargs):
+        self.run_chain([hsdev_check()], 'Checking', fly_mode=(kwargs.get('fly') or False))
 
 
 class SublimeHaskellLint(SublimeHaskellHsDevChain):
     @ghcmod_command('lint')
-    def run(self, edit, fly=False):
-        self.run_chain([hsdev_lint()], 'Linting', fly_mode=fly)
+    def run(self, edit, **kwargs):
+        self.run_chain([hsdev_lint()], 'Linting', fly_mode=(kwargs.get('fly') or False))
 
 
 class SublimeHaskellCheckAndLint(SublimeHaskellHsDevChain):
     @ghcmod_command('check_and_lint')
-    def run(self, edit, fly=False):
-        self.run_chain([hsdev_check(), messages_as_hints(hsdev_lint())], 'Checking and Linting', fly_mode=fly)
+    def run(self, edit, **kwargs):
+        self.run_chain([hsdev_check(), messages_as_hints(hsdev_lint())],
+                       'Checking and Linting',
+                       fly_mode=(kwargs.get('fly') or False))
 
 
 class SublimeHaskellGhcModCheck(Common.SublimeHaskellWindowCommand):
@@ -190,11 +203,11 @@ def run_ghcmods(cmds, msg, alter_messages_cb=None):
     and show output.
     alter_messages_cb accepts dictionary (cmd => list of output messages)
     """
-    window, view, file_shown_in_view = Common.get_haskell_command_window_view_file_project()
+    _window, view, file_shown_in_view = Common.get_haskell_command_window_view_file_project()
     if not file_shown_in_view:
         return
 
-    file_dir, file_name = os.path.split(file_shown_in_view)
+    file_name = os.path.split(file_shown_in_view)[1]
 
     ghc_mod_args = []
     for cmd in cmds:
@@ -204,13 +217,11 @@ def run_ghcmods(cmds, msg, alter_messages_cb=None):
         if alter_messages_cb:
             alter_messages_cb(msgs)
 
-        def sort_key(a):
-            return (
-                a[1].filename != file_shown_in_view,
-                a[1].filename,
-                a[1].start.line,
-                a[1].start.column
-            )
+        def sort_key(msg):
+            return (msg[1].filename != file_shown_in_view,
+                    msg[1].filename,
+                    msg[1].start.line,
+                    msg[1].start.column)
 
         msgs.sort(key=sort_key)
 
@@ -256,9 +267,8 @@ def wait_ghcmod_and_parse(view, filename, msg, cmds_with_args, alter_messages_cb
 
         all_cmds_successful &= success
 
-        parsed = ParseOutput.parse_output_messages(view, file_dir, out)
-        for p in parsed:
-            parsed_messages.append((cmd, p))
+        for parsed in ParseOutput.parse_output_messages(view, file_dir, out):
+            parsed_messages.append((cmd, parsed))
 
     if alter_messages_cb:
         alter_messages_cb(parsed_messages)
@@ -287,17 +297,17 @@ def ghcmod_browse_module(module_name, cabal=None):
     if not contents:
         return None
 
-    m = symbols.Module(module_name, cabal=cabal)
+    mod_decls = symbols.Module(module_name)
 
-    functionRegex = r'(?P<name>\w+)\s+::\s+(?P<type>.*)'
-    typeRegex = r'(?P<what>(class|type|data|newtype))\s+(?P<name>\w+)(\s+(?P<args>\w+(\s+\w+)*))?'
+    function_regex = r'(?P<name>\w+)\s+::\s+(?P<type>.*)'
+    type_regex = r'(?P<what>(class|type|data|newtype))\s+(?P<name>\w+)(\s+(?P<args>\w+(\s+\w+)*))?'
 
-    def toDecl(line):
-        matched = re.search(functionRegex, line)
+    def to_decl(line):
+        matched = re.search(function_regex, line)
         if matched:
             return symbols.Function(matched.group('name'), matched.group('type'))
         else:
-            matched = re.search(typeRegex, line)
+            matched = re.search(type_regex, line)
             if matched:
                 decl_type = matched.group('what')
                 decl_name = matched.group('name')
@@ -315,8 +325,7 @@ def ghcmod_browse_module(module_name, cabal=None):
             else:
                 return symbols.Declaration(line)
 
-    decls = map(toDecl, contents)
-    for decl in decls:
-        m.add_declaration(decl)
+    for decl in map(to_decl, contents):
+        mod_decls.add_declaration(decl)
 
-    return m
+    return mod_decls

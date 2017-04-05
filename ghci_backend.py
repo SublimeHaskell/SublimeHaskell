@@ -8,6 +8,7 @@ import sublime
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.proc_helper as ProcHelper
+import SublimeHaskell.parseoutput as ParseOutput
 
 def ghci_package_db(cabal=None):
     if not cabal or cabal == 'cabal':
@@ -22,7 +23,7 @@ def get_ghc_opts(filename=None, add_package_db=True, cabal=None):
     """
     Gets ghc_opts, used in several tools, as list with extra '-package-db' option and '-i' option if filename passed
     """
-    ghc_opts = Settings.get_setting_async('ghc_opts')
+    ghc_opts = Settings.PLUGIN.ghc_opts
     if not ghc_opts:
         ghc_opts = []
     if add_package_db:
@@ -91,18 +92,18 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal=None):
         raise os_exc
 
 
-def ghcmod_type(filename, module_name, line, column, cabal = None):
+def ghcmod_type(filename, module_name, line, column, cabal=None):
     """
     Uses ghc-mod type to infer type
     """
-    return call_ghcmod_and_wait(['type', filename, module_name, str(line), str(column)], filename = filename, cabal = cabal)
+    return call_ghcmod_and_wait(['type', filename, module_name, str(line), str(column)], filename=filename, cabal=cabal)
 
 
-def ghcmod_info(filename, module_name, symbol_name, cabal = None):
+def ghcmod_info(filename, module_name, symbol_name, cabal=None):
     """
     Uses ghc-mod info filename module_name symbol_name to get symbol info
     """
-    contents = GHCIMod.call_ghcmod_and_wait(['info', filename, module_name, symbol_name], filename = filename, cabal = cabal)
+    contents = call_ghcmod_and_wait(['info', filename, module_name, symbol_name], filename=filename, cabal=cabal)
     # TODO: Returned symbol doesn't contain location
     # But in fact we use ghcmod_info only to retrieve type of symbol
-    return parse_info(symbol_name, contents)
+    return ParseOutput.parse_info(symbol_name, contents)

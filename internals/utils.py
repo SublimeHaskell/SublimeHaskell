@@ -13,10 +13,7 @@ def encode_bytes(src):
 
 
 def head_of(lst):
-    if lst is not None and len(lst) > 0:
-        return lst[0]
-    else:
-        return None
+    return lst[0] if lst is not None and len(lst) > 0 else None
 
 
 def tool_enabled(feature):

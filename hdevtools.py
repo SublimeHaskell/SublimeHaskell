@@ -26,7 +26,7 @@ def show_hdevtools_error_and_disable():
         "or adjust the 'add_to_PATH' setting for a custom location.\n"
         "'enable_hdevtools' automatically set to False in the User settings."), 0)
 
-    Settings.set_setting_async('enable_hdevtools', False)
+    Settings.PLUGIN.enable_hdevtools = False
 
 
 def call_hdevtools_and_wait(arg_list, filename=None, cabal=None):
@@ -35,7 +35,7 @@ def call_hdevtools_and_wait(arg_list, filename=None, cabal=None):
     Shows a sublime error message if hdevtools is not available.
     """
     ghc_opts_args = GHCIMod.get_ghc_opts_args(filename, cabal=cabal)
-    hdevtools_socket = Settings.get_setting_async('hdevtools_socket')
+    hdevtools_socket = Settings.PLUGIN.hdevtools_socket
     source_dir = ProcHelper.get_source_dir(filename)
 
     if hdevtools_socket:
@@ -53,17 +53,12 @@ def call_hdevtools_and_wait(arg_list, filename=None, cabal=None):
             show_hdevtools_error_and_disable()
         return None
 
-    except:
-        Logging.log('calling to hdevtools fails, see traceback in console window (<ctrl>-<backtick>)', Logging.LOG_ERROR)
-        print(traceback.format_exc())
-        return None
-
 
 def admin(cmds, wait=False, **popen_kwargs):
-    if not Settings.get_setting_async('enable_hdevtools'):
+    if not Settings.PLUGIN.enable_hdevtools:
         return None
 
-    hdevtools_socket = Settings.get_setting_async('hdevtools_socket')
+    hdevtools_socket = Settings.PLUGIN.hdevtools_socket
 
     if hdevtools_socket:
         cmds.append('--socket={0}'.format(hdevtools_socket))
@@ -75,20 +70,21 @@ def admin(cmds, wait=False, **popen_kwargs):
             exit_code, stdout, stderr = ProcHelper.ProcHelper.run_process(command, **popen_kwargs)
             return stdout if exit_code == 0 else 'error running {0}: {1}'.format(command, stderr)
         else:
-            p = ProcHelper.ProcHelper(command, '', **popen_kwargs)
-            OutputCollector.DescriptorDrain('hdevtools stdout', p.process.stdout).start()
-            OutputCollector.DescriptorDrain('hdevtools stderr', p.process.stderr).start()
+            proc = ProcHelper.ProcHelper(command, **popen_kwargs)
+            OutputCollector.DescriptorDrain('hdevtools stdout', proc.process.stdout).start()
+            OutputCollector.DescriptorDrain('hdevtools stderr', proc.process.stderr).start()
             return ''
 
     except OSError as os_exc:
         if os_exc.errno == errno.ENOENT:
             show_hdevtools_error_and_disable()
 
-        Settings.set_setting_async('enable_hdevtools', False)
+        Settings.PLUGIN.enable_hdevtools = False
 
         return None
-    except Exception as exc:
-        Logging.log('calling to hdevtools fails with {0}'.format(exc))
+    except Exception:
+        Logging.log('hdevtools.admin failed with exception, see console window traceback')
+        traceback.print_exc()
         return None
 
 

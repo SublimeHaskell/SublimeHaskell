@@ -1,7 +1,3 @@
-import sublime
-import sublime_plugin
-
-import faulthandler
 import io
 import threading
 import subprocess
@@ -41,6 +37,8 @@ class OutputCollector(object):
         self.panel.set_read_only(False)
 
     def wait(self):
+        panel_settings = self.panel.settings()
+
         if self.prochelp is not None:
             # Wait for process and threads to complete...
             self.exit_code = self.prochelp.process.wait()
@@ -50,17 +48,15 @@ class OutputCollector(object):
             if self.stderr_collector is not None:
                 self.stderr_collector.join()
 
-            exit_msg = '\n\nExit code: {0}\n\n'.format(self.exit_code) if self.exit_code != 0 else ''
-            self.panel.run_command('insert', {'characters': exit_msg})
+            if self.exit_code != 0:
+                exit_msg = '\n\nExit code: {0}\n\n'.format(self.exit_code)
+                self.panel.run_command('insert', {'characters': exit_msg})
+
             self.prochelp.cleanup()
         else:
             self.lines = self.prochelp.process_err
             self.panel.run_command('insert', {'characters': self.prochelp.process_err})
 
-            panel_settings.set('auto_indent', autoindent)
-            self.panel.set_read_only(roflag)
-
-        panel_settings = self.panel.settings()
         panel_settings.set('auto_indent', self.autoindent)
         self.panel.set_read_only(self.roflag)
 
@@ -79,13 +75,13 @@ class FileObjectCollector(threading.Thread):
 
     def run(self):
         try:
-            for l in io.TextIOWrapper(self.fobject, encoding="utf-8"):
+            for line in io.TextIOWrapper(self.fobject, encoding="utf-8"):
                 # l = Utils.decode_bytes(l)
                 with self.lines_lock:
-                    self.lines.append(l)
-                self.panel.run_command('insert', {'characters': l})
+                    self.lines.append(line)
+                self.panel.run_command('insert', {'characters': line})
 
-        except ValueError as ve:
+        except ValueError:
             # Uncomment for debugging...
             # print("ValueError {0}".format(ve))
 
@@ -101,16 +97,16 @@ class DescriptorDrain(threading.Thread):
     def __init__(self, label, fd):
         super().__init__(name='drain-' + label)
         self.label = label
-        self.fd = fd
+        self.fobject = fd
         self.stop_me = threading.Event()
 
     def run(self):
         while not self.stop_me.is_set():
-            l = self.fd.readline()
-            if isinstance(l, bytearray):
-                l = Utils.decode_bytes()
-            l = l.rstrip()
-            print('<{0}> {1}'.format(self.label, l))
+            line = self.fobject.readline()
+            if isinstance(line, bytearray):
+                line = Utils.decode_bytes(line)
+            line = line.rstrip()
+            print('<{0}> {1}'.format(self.label, line))
 
     def stop(self):
         self.stop_me.set()

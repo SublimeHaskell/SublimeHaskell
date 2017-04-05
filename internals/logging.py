@@ -1,5 +1,3 @@
-import sublime
-
 import SublimeHaskell.internals.settings as Settings
 
 # Logging primitives
@@ -11,6 +9,6 @@ LOG_TRACE = 5
 
 
 def log(message, level=LOG_INFO):
-    log_level = Settings.get_setting_async('log', LOG_INFO)
+    log_level = Settings.PLUGIN.log or LOG_INFO
     if log_level >= level:
         print(u'Sublime Haskell: {0}'.format(message))

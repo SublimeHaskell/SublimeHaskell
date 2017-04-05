@@ -31,9 +31,9 @@ class SublimeHaskellFilterCommand(Common.SublimeHaskellTextCommand):
                 # Newline conversion seems dubious here, but... leave it alone for the time being.
                 sel_str = self.view.substr(selection).replace('\r\n', '\n')
 
-                with ProcHelper.ProcHelper(self.indenter, sel_str) as p:
-                    if p.process is not None:
-                        exit_code, out, err = p.wait()
+                with ProcHelper.ProcHelper(self.indenter) as proc:
+                    if proc.process is not None:
+                        _, out, err = proc.wait(sel_str)
                         # stylish-haskell does not have a non-zero exit code if it errors out! (Surprise!)
                         # Not sure about hindent, but this seems like a safe enough test.
                         if err is None or len(err) == 0:
@@ -43,7 +43,7 @@ class SublimeHaskellFilterCommand(Common.SublimeHaskellTextCommand):
                             stderr_out = '\n'.join(["{0} failed, stderr contents:".format(indent_err), "-" * 40, ""]) + err
                             self.report_error(stderr_out)
                     else:
-                        self.report_error(p.process_err)
+                        self.report_error(proc.process_err)
 
 
             # Questionable whether regions should be re-activated: stylish-haskell usually adds whitespace, which makes
@@ -52,9 +52,9 @@ class SublimeHaskellFilterCommand(Common.SublimeHaskellTextCommand):
             for region in regions:
                 self.view.sel().add(region)
 
-        except:
+        except OSError:
             self.report_error('Exception executing {0}'.format(' '.join(self.indenter)))
-            print(traceback.format_exc())
+            traceback.print_exc()
 
     def report_error(self, errmsg):
         window = self.view.window()
