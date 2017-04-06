@@ -5,6 +5,7 @@ import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.proc_helper as ProcHelper
 import SublimeHaskell.hdevtools as HDevTools
+import SublimeHaskell.hsdev.agent as HsDevAgent
 
 
 def plugin_loaded():
@@ -26,3 +27,5 @@ def plugin_loaded():
 def plugin_unloaded():
     # Does this work properly on exit?
     HDevTools.stop_hdevtools()
+    # Shutdown hsdev
+    HsDevAgent.stop_hsdev()

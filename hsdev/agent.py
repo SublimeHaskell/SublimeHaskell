@@ -120,6 +120,8 @@ class HsDevProcess(threading.Thread):
                            (self.log_file, ["--log", self.log_file]),
                            (self.log_config, ["--log-config", self.log_config])])
 
+        Logging.log('hsdev command: {0}'.format(cmd), Logging.LOG_DEBUG)
+
         while True:
             self.create_event.wait()
             self.create_event.clear()
@@ -136,7 +138,8 @@ class HsDevProcess(threading.Thread):
                 hsdev_proc.process.stderr = io.TextIOWrapper(hsdev_proc.process.stderr, 'utf-8')
 
                 while True:
-                    srvout = hsdev_proc.process.stdout.readline()
+                    srvout = hsdev_proc.process.stdout.readline().strip()
+                    Logging.log('hsdev initial output: {0}'.format(srvout), Logging.LOG_DEBUG)
                     start_confirm = re.match(r'^.*?hsdev> Server started at port (?P<port>\d+)$', srvout)
                     if start_confirm:
                         Logging.log('hsdev server started at port {0}'.format(start_confirm.group('port')))
@@ -241,110 +244,81 @@ def use_hsdev(def_val=None):
         return wrapped
     return wrap
 
+
 class HsDevAgent(threading.Thread):
-    def __init__(self):
+    """Base class for managing the local or remote `hsdev` agent that does work for the plugin.
+    """
+    def __init__(self, host, port=HSDEV_DEFAULT_PORT):
         super().__init__()
         self.daemon = True
         self.cabal_to_load = LockedObject.LockedObject([])
         self.dirty_files = LockedObject.LockedObject([])
         self.dirty_paths = LockedObject.LockedObject([])
-        self.client = HsDevClient.HsDev(HSDEV_DEFAULT_PORT)
-        self.client_back = HsDevClient.HsDev(HSDEV_DEFAULT_PORT)
+        self.client = HsDevClient.HsDev(host, port)
+        self.client_back = HsDevClient.HsDev(host, port)
         self.reinspect_event = threading.Event()
 
     def start_hsdev(self):
-        Logging.log('For some reason, HsDevAgent\'s start_hsdev() was called.', Logging.LOG_ERROR)
+        """Start a connection to an `hsdev` server. Utilizes a protocol call sequence: the subclass provides its specific
+        startup implementation via the `do_hsdev_start` method so that calls to `super()` are avoided.
+        """
+        def connected_():
+            Logging.log('hsdev agent: primary connection to hsdev established', Logging.LOG_TRACE)
+            self.client.link()
+
+        def back_connected_():
+            Logging.log('hsdev agent: async connection to hsdev established', Logging.LOG_TRACE)
+            self.start_inspect()
+
+        self.client.on_connected = connected_
+        self.client_back.on_connected = back_connected_
+        self.do_start_hsdev()
+
+    def do_start_hsdev(self):
+        self.connect_clients()
+        return True
 
     def stop_hsdev(self):
+        self.do_stop_hsdev()
+        self.disconnect_clients()
+
+    def do_stop_hsdev(self):
+        pass
+
+    def connect_clients(self):
+        self.client.connect()
+        self.client_back.connect()
+
+    def disconnect_clients(self):
         self.client.close()
         self.client_back.close()
-
-class HsDevLocalAgent(HsDevAgent):
-    """Local `hsdev` agent.
-
-    This object is a container for the `hsdev` server process and maintains connections to two `hsdev` clients:
-    the `client` connection for commands and the `client_back` for background tasks. `HsDevLocalAgent` also
-    automatically reinspects files/paths/etc. when they marked as dirty.
-    """
-
-    sleep_timeout = 60.0  # agent sleeping timeout
-
-    def __init__(self):
-        super().__init__()
-        self.hsdev_process = HsDevProcess(cache=os.path.join(Common.sublime_haskell_cache_path(), 'hsdev'),
-                                          log_file=os.path.join(Common.sublime_haskell_cache_path(), 'hsdev', 'hsdev.log'),
-                                          log_config=Settings.PLUGIN.hsdev_log_config)
+        self.client = None
+        self.client_back = None
 
     def is_connected(self):
         return self.client.is_connected()
-
-    def start_hsdev(self):
-        hsdev_ver = hsdev_version()
-        if hsdev_ver is None:
-            Common.output_error_async(sublime.active_window(), "\n".join([
-                "SublimeHaskell: hsdev executable couldn't be found!",
-                "It's used in most features of SublimeHaskell",
-                "Check if it's installed and in PATH",
-                "If it's not installed, run 'cabal install hsdev' to install hsdev",
-                "You may also want to adjust 'add_to_PATH' setting",
-                "",
-                "To supress this message and disable hsdev set 'enable_hsdev' to false"]))
-        elif not check_version(hsdev_ver, HSDEV_MIN_VER, HSDEV_MAX_VER):
-            Common.output_error_async(sublime.active_window(), "\n".join([
-                "SublimeHaskell: hsdev version is incorrect: {0}".format(show_version(hsdev_ver)),
-                "Required version: >= {0} and < {1}".format(show_version(HSDEV_MIN_VER), show_version(HSDEV_MAX_VER)),
-                "Update it by running 'cabal update' and 'cabal install hsdev'",
-                "",
-                "To supress this message and disable hsdev set 'enable_hsdev' to false"]))
-        else:
-            def start_():
-                Logging.log('hsdev process started', Logging.LOG_TRACE)
-                self.client.connect_async()
-                self.client_back.connect_async()
-
-            def exit_():
-                Logging.log('hsdev process exited', Logging.LOG_TRACE)
-                self.client.close()
-                self.client_back.close()
-
-            def connected_():
-                Logging.log('hsdev agent: connected to hsdev', Logging.LOG_TRACE)
-                self.client.link()
-
-            def back_connected_():
-                Logging.log('hsdev agent: connected to hsdev', Logging.LOG_TRACE)
-                self.start_inspect()
-
-            self.client.on_connected = connected_
-            self.client_back.on_connected = back_connected_
-
-            self.hsdev_process.on_start = start_
-            self.hsdev_process.on_exit = exit_
-
-            self.hsdev_process.start()
-            self.hsdev_process.create()
 
     def on_hsdev_enabled(self, key, value):
         if key == 'enable_hsdev':
             if value:
                 Logging.log("starting hsdev", Logging.LOG_INFO)
-                self.hsdev_process.create()
+                self.start_hsdev()
             else:
                 Logging.log("stopping hsdev", Logging.LOG_INFO)
-                self.hsdev_process.stop()
-                self.client.close()
-                self.client_back.close()
+                self.stop_hsdev()
 
     def on_inspect_modules_changed(self, key, value):
         if key == 'inspect_modules' and value:
             self.mark_all_files()
 
     def run(self):
+        if not Settings.PLUGIN.enable_hsdev:
+            return
+
         Settings.PLUGIN.add_change_callback('enable_hsdev', self.on_hsdev_enabled)
         Settings.PLUGIN.add_change_callback('inspect_modules', self.on_inspect_modules_changed)
 
-        if Settings.PLUGIN.enable_hsdev:
-            self.start_hsdev()
+        self.start_hsdev()
 
         while True:
             if Settings.PLUGIN.enable_hsdev and not self.client.ping():
@@ -386,9 +360,9 @@ class HsDevLocalAgent(HsDevAgent):
             for cabal in load_cabal:
                 Worker.run_async('inspect cabal {0}'.format(cabal), self.inspect_cabal, cabal)
 
-            if files_to_reinspect:
-                if Settings.PLUGIN.enable_hdocs:
-                    self.client_back.docs(files=files_to_reinspect)
+            if files_to_reinspect and Settings.PLUGIN.enable_hdocs:
+                self.client_back.docs(files=files_to_reinspect)
+
             self.reinspect_event.wait(HsDevLocalAgent.sleep_timeout)
             self.reinspect_event.clear()
 
@@ -476,6 +450,77 @@ class HsDevLocalAgent(HsDevAgent):
                                   docs=Settings.PLUGIN.enable_hdocs)
 
 
+class HsDevRemoteAgent(HsDevAgent):
+    def __init__(self, host, port):
+        super().__init__(host, port)
+
+
+class HsDevLocalAgent(HsDevAgent):
+    """Local `hsdev` agent.
+
+    This object is a container for the `hsdev` server process and maintains connections to two `hsdev` clients:
+    the `client` connection for commands and the `client_back` for background tasks. `HsDevLocalAgent` also
+    automatically reinspects files/paths/etc. when they marked as dirty.
+    """
+
+    sleep_timeout = 60.0  # agent sleeping timeout
+
+    hsdev_not_found = ["SublimeHaskell: hsdev executable couldn't be found!",
+                       "It's used in most features of SublimeHaskell",
+                       "Check if it's installed and in PATH",
+                       "If it's not installed, run 'cabal install hsdev' to install hsdev",
+                       "You may also want to adjust 'add_to_PATH' setting",
+                       "",
+                       "To supress this message and disable hsdev set 'enable_hsdev' to false"
+                      ]
+
+    def __init__(self, port):
+        super().__init__("localhost", port)
+        self.hsdev_process = HsDevProcess(cache=os.path.join(Common.sublime_haskell_cache_path(), 'hsdev'),
+                                          log_file=os.path.join(Common.sublime_haskell_cache_path(), 'hsdev', 'hsdev.log'),
+                                          log_config=Settings.PLUGIN.hsdev_log_config)
+
+
+    def do_start_hsdev(self):
+        hsdev_ver = hsdev_version()
+        if hsdev_ver is None:
+            Common.output_error_async(sublime.active_window(), "\n".join(HsDevLocalAgent.hsdev_not_found))
+            return False
+        elif not check_version(hsdev_ver, HSDEV_MIN_VER, HSDEV_MAX_VER):
+            Common.output_error_async(sublime.active_window(), "\n".join(HsDevLocalAgent.hsdev_wrong_version(hsdev_ver)))
+            return False
+        else:
+            def start_():
+                Logging.log('hsdev process started', Logging.LOG_TRACE)
+                self.connect_clients()
+
+            def exit_():
+                Logging.log('hsdev process exited', Logging.LOG_TRACE)
+                self.disconnect_clients()
+
+            self.hsdev_process.on_start = start_
+            self.hsdev_process.on_exit = exit_
+
+            self.hsdev_process.start()
+            self.hsdev_process.create()
+            return True
+
+
+    def do_stop_hsdev(self):
+        Logging.log('local hsdev stopping...', Logging.LOG_INFO)
+        self.client.exit()
+        self.hsdev_process.stop()
+
+
+    @staticmethod
+    def hsdev_wrong_version(version_str):
+        return ["SublimeHaskell: hsdev version is incorrect: {0}".format(show_version(version_str)),
+                "Required version: >= {0} and < {1}".format(show_version(HSDEV_MIN_VER), show_version(HSDEV_MAX_VER)),
+                "Update it by running 'cabal update' and 'cabal install hsdev'",
+                "",
+                "To supress this message and disable hsdev set 'enable_hsdev' to false"
+               ]
+
 class HsDevWindowCommand(Common.SublimeHaskellWindowCommand):
     def is_enabled(self):
         return Settings.PLUGIN.enable_hsdev and \
@@ -504,7 +549,21 @@ def start_agent():
     if agent is None:
         Logging.log('starting agent', Logging.LOG_TRACE)
 
-        agent = HsDevLocalAgent()
+        if Settings.PLUGIN.hsdev_local_process:
+            agent = HsDevLocalAgent(Settings.PLUGIN.hsdev_port)
+        else:
+            agent = HsDevRemoteAgent(Settings.PLUGIN.hsdev_host, Settings.PLUGIN.hsdev_port)
         agent.start()
         client = agent.client
         client_back = agent.client_back
+
+def stop_agent():
+    global agent
+    global client
+    global client_back
+
+    if agent is not None:
+        agent.stop_hsdev()
+        agent = None
+        client = None
+        client_back = None

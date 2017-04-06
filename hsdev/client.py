@@ -25,14 +25,13 @@ def files_and_contents(files, contents):
 # hsdev client
 # see for functions with command decorator for hsdev api
 class HsDev(object):
-    def __init__(self, port):
+    def __init__(self, host, port):
+        self.host = host
         self.port = port
         self.connecting = threading.Event()
         self.connected = threading.Event()
         self.socket = None
         self.listener = None
-        self.hsdev_socket = None
-        self.hsdev_address = None
         self.autoconnect = True
         self.request_map = LockedObject.LockedObject({})
         self.request_serial = 1
@@ -68,13 +67,11 @@ class HsDev(object):
     def connect(self, tries=10, delay=1.0):
         try:
             for retry in range(0, tries):
-                Logging.log('connecting to hsdev server ({0})...'.format(retry), Logging.LOG_INFO)
+                Logging.log('connecting to hsdev server (attempt {0})...'.format(retry), Logging.LOG_INFO)
 
                 # Use 'localhost' instead of the IP dot-quad for systems (and they exist) that are solely
                 # IPv6. Makes this code friendlier to IPv4 and IPv6 hybrid systems.
-                self.socket = socket.create_connection(('localhost', self.port))
-                self.hsdev_socket = self.socket
-                self.hsdev_address = 'localhost'
+                self.socket = socket.create_connection((self.host, self.port))
                 self.set_connected()
                 self.listener = threading.Thread(target=self.listen)
                 self.listener.start()
@@ -93,21 +90,15 @@ class HsDev(object):
 
     @HsDecorator.reconnect_function
     def connect_async(self, tries=10, delay=1.0):
-        thread = threading.Thread(target=self.connect,
-                                  kwargs={'tries': tries, 'delay': delay, 'just_connect': True})
-        thread.start()
+        threading.Thread(target=self.connect, kwargs={'tries': tries, 'delay': delay, 'just_connect': True}).start()
 
     def wait(self, timeout=None):
         return self.connected.wait(timeout)
 
     def close(self):
-        if self.is_unconnected():
-            return
-        self.connected.clear()
-        if self.hsdev_socket:
-            self.hsdev_socket.close()
-            self.hsdev_socket = None
-        self.socket.close()
+        if not self.is_unconnected():
+            self.connected.clear()
+            self.socket.close()
 
     def is_connecting(self):
         return self.connecting.is_set()
@@ -202,8 +193,8 @@ class HsDev(object):
             # Seems, that first sendall doesn't throw error on closed socket
             # So we just call it twice
             # It's hackish, but I haven't found easy solution
-            self.hsdev_socket.sendall(msg.encode('utf-8'))
-            self.hsdev_socket.sendall('\n'.encode('utf-8'))
+            self.socket.sendall(msg.encode('utf-8'))
+            self.socket.sendall('\n'.encode('utf-8'))
             Logging.log(call_cmd, Logging.LOG_TRACE)
 
             if wait:

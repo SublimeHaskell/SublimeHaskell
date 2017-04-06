@@ -1,1 +1,3 @@
-### Empty __init__.py to make pylint happy.
+"""
+Module import for `hsdev` backend.
+"""
