@@ -39,7 +39,7 @@ class SetttingsContainer(object):
     attr_dict = {
         'add_standard_dirs': ('add_standard_dirs', True),
         'add_to_PATH': ('add_to_path', []),
-        'auto_build_mode': ('auto_build_mode', "normal-then-warnings"),
+        'auto_build_mode': ('auto_build_mode', 'normal-then-warnings'),
         'auto_complete_imports': ('auto_complete_imports', True),
         'auto_complete_language_pragmas': ('auto_complete_language_pragmas', True),
         'auto_completion_popup': ('auto_completion_popup', False),
@@ -53,9 +53,12 @@ class SetttingsContainer(object):
         'enable_hsdev': ('enable_hsdev', True),
         'ghc_opts': ('ghc_opts', []),
         'ghci_opts': ('ghci_opts', []),
-        'haskell_build_tool': ('haskell_build_tool', "stack"),
-        'hdevtools_socket': ('hdevtools_socket', ""),
-        'hsdev_log_config': ('hsdev_log_config', "use silent"),
+        'haskell_build_tool': ('haskell_build_tool', 'stack'),
+        'hdevtools_socket': ('hdevtools_socket', ''),
+        'hsdev_host': ('hsdev_host', 'localhost'),
+        'hsdev_local_process': ('hsdev_local_process', True),
+        'hsdev_log_config': ('hsdev_log_config', 'use silent'),
+        'hsdev_port': ('hsdev_port', 4567),
         'inhibit_completions': ('inhibit_completions', False),
         'inspect_modules': ('inspect_modules', True),
         'lint_check_fly': ('lint_check_fly', False),
@@ -68,6 +71,7 @@ class SetttingsContainer(object):
     }
 
     def __init__(self):
+        # Instantiate the attributes (rationale: style and pylint error checking)
         self.add_standard_dirs = None
         self.add_to_path = None
         self.auto_build_mode = None
@@ -86,7 +90,10 @@ class SetttingsContainer(object):
         self.ghci_opts = None
         self.haskell_build_tool = None
         self.hdevtools_socket = None
+        self.hsdev_host = None
+        self.hsdev_local_process = None
         self.hsdev_log_config = None
+        self.hsdev_port = None
         self.inhibit_completions = None
         self.inspect_modules = None
         self.lint_check_fly = None

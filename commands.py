@@ -1,11 +1,7 @@
-import json
 import os.path
-import re
 import shlex
 import threading
 import webbrowser
-
-import pprint
 
 import sublime
 import sublime_plugin
