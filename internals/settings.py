@@ -38,6 +38,12 @@ def update_setting(key):
     get_setting(key)
 
 
+def get_project_setting(key, default=None):
+    view.window().project_data().get(key, default)
+
+def set_project_setting(key, value):
+    view.window().project_data().set(key, value)
+
 def on_changed_setting(key):
     "Updates setting as it was changed"
     with sublime_haskell_settings as settings:

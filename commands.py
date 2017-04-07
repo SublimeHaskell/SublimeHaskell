@@ -1241,3 +1241,14 @@ class SublimeHaskellStackExec(sublime_plugin.TextCommand):
 
     def show_output_panel(self):
         return output_view
+
+class SublimeHaskellStackConfigSwitch(Common.SublimeHaskellWindowCommand):
+    def run(self):
+        options = Settings.get_project_setting('stack_config_file_list', [])
+        self.view.window().show_quick_panel(options, self.on_done)
+
+    def on_done(self, idx):
+        options = Settings.get_project_setting('stack_config_file_list')
+        selected = options[idx]
+
+        Settings.set_project_setting('stack_config_file', selected)
