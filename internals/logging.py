@@ -1,9 +1,4 @@
-import sublime
-
-if int(sublime.version()) < 3000:
-    import internals.settings as Settings
-else:
-    import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.internals.settings as Settings
 
 # Logging primitives
 LOG_ERROR = 1
@@ -14,6 +9,12 @@ LOG_TRACE = 5
 
 
 def log(message, level=LOG_INFO):
-    log_level = Settings.get_setting_async('log', LOG_INFO)
+    log_level = Settings.PLUGIN.log or LOG_INFO
     if log_level >= level:
         print(u'Sublime Haskell: {0}'.format(message))
+
+def current_log_level():
+    return Settings.PLUGIN.log
+
+def is_log_level(level):
+    return Settings.PLUGIN.log >= level

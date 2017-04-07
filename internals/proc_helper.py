@@ -13,19 +13,13 @@ import platform
 
 import sublime
 
-if int(sublime.version()) < 3000:
-    # from internals.locked_object import LockedObject
-    # from internals.settings import get_setting_async
-    # from internal.utils import decode_bytes, encode_bytes
-    pass
-else:
-    import SublimeHaskell.sublime_haskell_common as Common
-    import SublimeHaskell.internals.logging as Logging
-    import SublimeHaskell.internals.locked_object as LockedObject
-    import SublimeHaskell.internals.settings as Settings
-    import SublimeHaskell.internals.utils as Utils
+import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.internals.logging as Logging
+import SublimeHaskell.internals.locked_object as LockedObject
+import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.internals.utils as Utils
 
-def isWinXX():
+def is_windows():
     return platform.system() == "Windows"
 
 class ProcHelper(object):
@@ -38,7 +32,7 @@ class ProcHelper(object):
     # to augment the user's PATH used to search for executables and tools:
     augmented_env = None
 
-    def __init__(self, command, input_string='', **popen_kwargs):
+    def __init__(self, command, **popen_kwargs):
         """Open a pipe to a command or tool."""
 
         if ProcHelper.augmented_env is None:
@@ -47,7 +41,7 @@ class ProcHelper(object):
         self.process = None
         self.process_err = None
 
-        if isWinXX():
+        if is_windows():
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             popen_kwargs['startupinfo'] = startupinfo
@@ -65,10 +59,7 @@ class ProcHelper(object):
                 self.process = subprocess.Popen(normcmd
                                                 , stdin=subprocess.PIPE
                                                 , env=ProcHelper.augmented_env
-                                                , **popen_kwargs
-                                               )
-
-                self.process.stdin.write(Utils.encode_bytes(input_string))
+                                                , **popen_kwargs)
             else:
                 self.process = None
                 self.process_err = "SublimeHaskell.ProcHelper: {0} was not found on PATH!".format(command[0])
@@ -113,11 +104,11 @@ class ProcHelper(object):
                 # stderr can be None if it is tied to stdout (i.e., 'stderr=subprocess.STDOUT')
                 self.process.stderr.close()
 
-    def wait(self):
+    def wait(self, input_str=None):
         """Wait for subprocess to complete and exit, collect and decode ``stdout`` and ``stderr``,
         returning the tuple ``(exit_code, stdout, stderr)```"""
         if self.process is not None:
-            stdout, stderr = self.process.communicate()
+            stdout, stderr = self.process.communicate(Utils.encode_bytes(input_str) if input_str is not None else '')
             exit_code = self.process.wait()
             # Ensure that we reap the file descriptors.
             self.cleanup()
@@ -129,20 +120,19 @@ class ProcHelper(object):
     @staticmethod
     def update_environment(_key, _val):
         # Reinitialize the tool -> path cache:
-        with ProcHelper.which_cache as cache:
-            cache = {}
+        ProcHelper.which_cache = LockedObject.LockedObject({})
         ProcHelper.augmented_env = ProcHelper.get_extended_env()
 
     # Generate the augmented environment for subprocesses. This copies the
     # current process environment and updates PATH with `add_to_PATH` extras.
     @staticmethod
     def get_extended_env():
-        def normalize_path(dir):
-            return os.path.normpath(os.path.expandvars(os.path.expanduser(dir)))
+        def normalize_path(dpath):
+            return os.path.normpath(os.path.expandvars(os.path.expanduser(dpath)))
 
         def cabal_config():
             cconfig = os.environ.get('CABAL_CONFIG') or \
-                ('~/.cabal' if not isWinXX() else '%APPDATA%/cabal') + \
+                ('~/.cabal' if not is_windows() else '%APPDATA%/cabal') + \
                 "/config"
 
             # Various patterns to match...
@@ -153,10 +143,10 @@ class ProcHelper(object):
             re_bindir = re.compile(r'bindir:\s+(.*)$')
 
             # Things to collect
-            user_prefix = "$HOME/.cabal" if not isWinXX() else "%APPDATA%/cabal"
+            user_prefix = "$HOME/.cabal" if not is_windows() else "%APPDATA%/cabal"
             # FIXME: Need to interrogate Shel32 for the Windows PROGRAMFILES known
             # folder path:
-            global_prefix = "/usr/local" if not isWinXX() else "%PROGRAMFILES%/Haskell"
+            global_prefix = "/usr/local" if not is_windows() else "%PROGRAMFILES%/Haskell"
             user_bindir = "bin"
             global_bindir = "bin"
             p_state = 0
@@ -168,32 +158,32 @@ class ProcHelper(object):
                     # had to go with an indentation-specific format.
                     #
                     # This is a "cheap and dirty" scanner to pick up
-                    for l in f_cconfig:
-                        l1 = l.rstrip()
+                    for line in f_cconfig:
+                        line = line.rstrip()
                         # One of the sections?
-                        if re_user_dirs.match(l1):
+                        if re_user_dirs.match(line):
                             p_state = 1
-                        elif re_global_dirs.match(l1):
+                        elif re_global_dirs.match(line):
                             p_state = 2
-                        elif re.match('^\s+\w', l1):
+                        elif re.match(r'^\s+\w', line):
                             # prefix attribute?
-                            m = re_prefix.search(l1)
-                            if m:
+                            m_prefix = re_prefix.search(line)
+                            if m_prefix:
                                 if p_state == 1:
-                                    user_prefix = m.group(1)
+                                    user_prefix = m_prefix.group(1)
                                 elif p_state == 2:
-                                    global_prefix = m.group(1)
+                                    global_prefix = m_prefix.group(1)
                             # bindir attribute?
-                            m = re_bindir.search(l1)
-                            if m:
+                            m_bindir = re_bindir.search(line)
+                            if m_bindir:
                                 if p_state == 1:
-                                    user_bindir = m.group(1)
+                                    user_bindir = m_bindir.group(1)
                                 elif p_state == 2:
-                                    global_bindir = m.group(1)
-                        elif re_section.match(l1):
+                                    global_bindir = m_bindir.group(1)
+                        elif re_section.match(line):
                             p_state = 0
 
-            except IOError as e:
+            except IOError:
                 # Silently fail.
                 pass
 
@@ -202,24 +192,18 @@ class ProcHelper(object):
                    ]
 
         ext_env = dict(os.environ)
-        PATH = os.getenv('PATH') or ""
+        env_path = os.getenv('PATH') or ""
         std_places = []
-        if Settings.get_setting_async('add_standard_dirs', True):
-            std_places = ["$HOME/.local/bin" if not isWinXX() else "%APPDATA%/local/bin"] + cabal_config()
+        if Settings.PLUGIN.add_standard_dirs:
+            std_places = ["$HOME/.local/bin" if not is_windows() else "%APPDATA%/local/bin"] + cabal_config()
             std_places = list(filter(os.path.isdir, map(normalize_path, std_places)))
 
-        add_to_PATH = list(map(normalize_path, Settings.get_setting_async('add_to_PATH', [])))
-        if not Utils.PyV3:
-            # convert unicode strings to strings (for Python < 3). Environment
-            # can contain only strings.
-            add_to_PATH = list(map(str, add_to_PATH))
+        add_to_path = list(filter(os.path.isdir, map(normalize_path, Settings.PLUGIN.add_to_path, [])))
 
-        add_to_PATH = list(filter(os.path.isdir, add_to_PATH))
+        Logging.log("std_places = {0}".format(std_places), Logging.LOG_INFO)
+        Logging.log("add_to_PATH = {0}".format(add_to_path), Logging.LOG_INFO)
 
-        print("std_places = {0}".format(std_places))
-        print("add_to_PATH = {0}".format(add_to_PATH))
-
-        ext_env['PATH'] = os.pathsep.join(add_to_PATH + std_places + [PATH])
+        ext_env['PATH'] = os.pathsep.join(add_to_path + std_places + [env_path])
         return ext_env
 
     @staticmethod
@@ -227,27 +211,27 @@ class ProcHelper(object):
         def is_exe(fpath):
             return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 
-        with ProcHelper.which_cache as c:
-            cval = c.get(args[0])
+        with ProcHelper.which_cache as cache:
+            cval = cache.get(args[0])
 
         if cval is not None:
             return [cval] + args[1:]
         else:
-            exeExts = [''] if not isWinXX() else ['.exe', '.cmd', '.bat']
+            exe_exts = [''] if not is_windows() else ['.exe', '.cmd', '.bat']
 
             program = args[0]
-            fpath, fname = os.path.split(program)
+            fpath, _ = os.path.split(program)
             if fpath:
                 if is_exe(program):
                     return args
             else:
                 for path in env_path.split(os.pathsep):
                     path = path.strip('"')
-                    for ext in exeExts:
+                    for ext in exe_exts:
                         exe_file = os.path.join(path, program)
                         if is_exe(exe_file + ext):
-                            with ProcHelper.which_cache as c:
-                                c[program] = exe_file
+                            with ProcHelper.which_cache as cache:
+                                cache[program] = exe_file
                             return [exe_file] + args[1:]
 
         return None
@@ -255,42 +239,42 @@ class ProcHelper(object):
     @staticmethod
     def run_process(command, input_string='', **popen_kwargs):
         """Execute a subprocess, wait for it to complete, returning a ``(exit_code, stdout, stderr)``` tuple."""
-        with ProcHelper(command, input_string, **popen_kwargs) as proc:
-            return proc.wait()
+        with ProcHelper(command, **popen_kwargs) as proc:
+            return proc.wait(input_string)
 
     @staticmethod
-    def invoke_tool(command, tool_name, input='', on_result=None, filename=None, on_line=None, check_enabled=True, **popen_kwargs):
-        if check_enabled and not Settings.get_setting_async(Utils.tool_enabled(tool_name)):
+    def invoke_tool(command, tool_name, inp='', on_result=None, filename=None, on_line=None, check_enabled=True,
+                    **popen_kwargs):
+        if check_enabled and not Settings.PLUGIN.__getattribute__(Utils.tool_enabled(tool_name)):
             return None
 
         source_dir = get_source_dir(filename)
 
-        def mk_result(s):
-            return on_result(s) if on_result else s
+        def mk_result(result):
+            return on_result(result) if on_result else result
 
         try:
-            with ProcHelper(command, input, cwd = source_dir, **popen_kwargs) as p:
-                exit_code, stdout, stderr = p.wait()
+            with ProcHelper(command, cwd=source_dir, **popen_kwargs) as proc:
+                exit_code, stdout, stderr = proc.wait(inp)
                 if exit_code != 0:
                     raise Exception('{0} exited with exit code {1} and stderr: {2}'.format(tool_name, exit_code, stderr))
 
                 if on_line:
-                    for l in io.TextIOWrapper(stdout, encoding='utf-8'):
-                        on_line(mk_result(l))
+                    for line in io.StringIO(stdout):
+                        on_line(mk_result(line))
                 else:
-                    return mk_result(io.TextIOWrapper(stdout, encoding='utf-8'))
+                    return mk_result(stdout)
 
-        except OSError as e:
-            if e.errno == errno.ENOENT:
-                Common.output_error_async(sublime.active_window(), "SublimeHaskell: {0} was not found!\n'{1}' is set to False".format(tool_name, Utils.tool_enabled(tool_name)))
-                Settings.set_setting_async(Utils.tool_enabled(tool_name), False)
+        except OSError as os_exc:
+            if os_exc.errno == errno.ENOENT:
+                errmsg = "SublimeHaskell: {0} was not found!\n'{1}' is set to False".format(tool_name,
+                                                                                            Utils.tool_enabled(tool_name))
+                Common.output_error_async(sublime.active_window(), errmsg)
+                Settings.PLUGIN.__setattr__(Utils.tool_enabled(tool_name), False)
             else:
-                Logging.log('{0} fails with {1}, command: {2}'.format(tool_name, e, command), Logging.LOG_ERROR)
+                Logging.log('{0} fails with {1}, command: {2}'.format(tool_name, os_exc, command), Logging.LOG_ERROR)
 
             return None
-
-        except Exception as e:
-            Logging.log('{0} fails with {1}, command: {2}'.format(tool_name, e, command), Logging.LOG_ERROR)
 
         return None
 

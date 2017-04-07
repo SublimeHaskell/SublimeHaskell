@@ -1,16 +1,13 @@
 # -*- coding: UTF-8 -*-
 
+from functools import total_ordering, reduce
 import html
+import json
+import os.path
 import re
 import sublime
-import os.path
-from functools import total_ordering
 
-if int(sublime.version()) < 3000:
-    import sublime_haskell_common as Common
-else:
-    import SublimeHaskell.sublime_haskell_common as Common
-    from functools import reduce
+import SublimeHaskell.internals.unicode_opers as UnicodeOpers
 
 
 @total_ordering
@@ -34,10 +31,7 @@ class Position(object):
         return self.line == other.line and self.column == other.column
 
     def __lt__(self, other):
-        if self.line == other.line:
-            return self.column < other.column
-        else:
-            return self.line < other.line
+        return self.line < other.line or (self.line == other.line and self.column < other.column)
 
     def to_zero_based(self):
         self.line = self.line - 1
@@ -53,27 +47,25 @@ class Position(object):
         return view.text_point(self.line, self.column)
 
     @staticmethod
-    def from_point(view, pt):
-        (l, c) = view.rowcol(pt)
-        return Position(int(l), int(c))
+    def from_point(view, point):
+        (line, col) = view.rowcol(point)
+        return Position(int(line), int(col))
 
     @staticmethod
-    def from_str(s):
-        ps = s.split(':')
-        if len(ps) == 1:
-            return Position(int(ps[0]), 0)
-        elif len(ps) == 2:
-            return Position(int(ps[0]), int(ps[1]))
+    def from_str(pt_str):
+        comps = pt_str.split(':')
+        if len(comps) == 1:
+            return Position(int(comps[0]), 0)
+        elif len(comps) == 2:
+            return Position(int(comps[0]), int(comps[1]))
         return None
 
 
 @total_ordering
 class Region(object):
-    def __init__(self, start, end = None, view = None, region_key = None):
+    def __init__(self, start, end=None, view=None, region_key=None):
         self.start = start
-        self.end = end
-        if self.end is None:
-            self.end = self.start
+        self.end = end or self.start
         self.view = view
         self.region_key = region_key
 
@@ -84,16 +76,13 @@ class Region(object):
         return self.to_string()
 
     def to_string(self):
-        return u'-'.join([self.start.to_string(), self.end.to_string()])
+        return 'symbols.Region({0})'.format(u'-'.join([str(self.start), str(self.end)]))
 
     def __eq__(self, other):
         return self.start == other.start and self.end == other.end
 
     def __lt__(self, other):
-        if self.start == other.start:
-            return self.end < other.end
-        else:
-            return self.start < other.start
+        return self.start < other.start or (self.start == other.start and self.end < other.end)
 
     def from_zero_based(self):
         self.start.from_zero_based()
@@ -105,7 +94,7 @@ class Region(object):
         self.end.to_zero_based()
         return self
 
-    def to_region(self, view = None):
+    def to_region(self, view=None):
         if not view:
             view = self.view
         if not view:
@@ -116,9 +105,9 @@ class Region(object):
         if self.saved():
             rgns = self.view.get_regions(self.region_key)
             if len(rgns):
-                r = Region.from_region(self.view, rgns[0], self.region_key)
-                self.start = r.start
-                self.end = r.end
+                rgn = Region.from_region(self.view, rgns[0], self.region_key)
+                self.start = rgn.start
+                self.end = rgn.end
 
     def save(self, view, region_key):
         self.view = view
@@ -134,16 +123,19 @@ class Region(object):
             self.region_key = None
 
     @staticmethod
-    def from_region(view, rgn, region_key = None):
-        return Region(Position.from_point(view, rgn.begin()), Position.from_point(view, rgn.end()), view if region_key else None, region_key)
+    def from_region(view, rgn, region_key=None):
+        return Region(Position.from_point(view, rgn.begin()),
+                      Position.from_point(view, rgn.end()),
+                      view if region_key else None,
+                      region_key)
 
     @staticmethod
-    def from_str(s):
-        ps = s.split('-')
-        if len(ps) == 1:
-            return Region(Position.from_str(ps[0]))
-        elif len(ps) == 2:
-            return Region(Position.from_str(ps[0]), Position.from_str(ps[1]))
+    def from_str(rgn_str):
+        comps = rgn_str.split('-')
+        if len(comps) == 1:
+            return Region(Position.from_str(comps[0]))
+        elif len(comps) == 2:
+            return Region(Position.from_str(comps[0]), Position.from_str(comps[1]))
         return None
 
     def empty(self):
@@ -154,7 +146,7 @@ class Location(object):
     """
     Location in file at line
     """
-    def __init__(self, filename, project = None):
+    def __init__(self, filename, project=None):
         self.project = project
         self.filename = filename
 
@@ -179,7 +171,7 @@ def source_location(loc, pos):
 
 
 class Package(object):
-    def __init__(self, name, version = None):
+    def __init__(self, name, version=None):
         self.name = name
         self.version = version
 
@@ -190,19 +182,18 @@ class Package(object):
 def parse_package(package_id):
     if package_id is None:
         return None
-    m = re.match('([\w\-]+)\-([\d\.]+)', package_id)
-    if m:
-        (name, version) = m.groups()
+    pkg = re.match(r'([\w\-]+)\-([\d\.]+)', package_id)
+    if pkg:
+        (name, version) = pkg.groups()
         return Package(name, version)
-    m = re.match('([\w\-]+)', package_id)
-    if m:
-        (name, ) = m.groups()
-        return Package(name)
+    pkg = re.match(r'([\w\-]+)', package_id)
+    if pkg:
+        return Package(pkg.groups()[0])
     return None
 
 
 class PackageDb(object):
-    def __init__(self, global_db = False, user_db = False, package_db = None):
+    def __init__(self, global_db=False, user_db=False, package_db=None):
         self.global_db = False
         self.user_db = False
         self.package_db = None
@@ -228,19 +219,19 @@ class PackageDb(object):
             return self.package_db
 
     @staticmethod
-    def from_string(s):
-        if s == 'global-db':
-            return PackageDb(global_db = True)
-        if s == 'user-db':
-            return PackageDb(user_db = True)
-        return PackageDb(package_db = s)
+    def from_string(pkgdb_str):
+        if pkgdb_str == 'global-db':
+            return PackageDb(global_db=True)
+        if pkgdb_str == 'user-db':
+            return PackageDb(user_db=True)
+        return PackageDb(package_db=pkgdb_str)
 
 
 class InstalledLocation(object):
     """
     Module location in cabal
     """
-    def __init__(self, package, db = PackageDb(global_db = True)):
+    def __init__(self, package, db=PackageDb(global_db=True)):
         self.package = package
         self.db = db
 
@@ -274,7 +265,7 @@ class OtherLocation(object):
         return self.to_string()
 
     def to_string(self):
-        return (self.source or "")
+        return self.source or ""
 
     def is_null(self):
         return self.source is None
@@ -284,19 +275,19 @@ class OtherLocation(object):
 
 
 def location_package_name(loc):
-    if type(loc) == InstalledLocation and loc.package:
+    if isinstance(loc, InstalledLocation) and loc.package:
         return loc.package.name
     return None
 
 
 def location_project(loc):
-    if type(loc) == Location and loc.project:
+    if isinstance(loc, Location) and loc.project:
         return loc.project
     return None
 
 
 def location_cabal(loc):
-    if type(loc) == InstalledLocation:
+    if isinstance(loc, InstalledLocation):
         return loc.cabal
     return None
 
@@ -316,7 +307,7 @@ class Import(object):
     """
     Haskell import of module
     """
-    def __init__(self, module_name, is_qualified = False, import_as = None, position = None, location = None):
+    def __init__(self, module_name, is_qualified=False, import_as=None, position=None, location=None):
         self.module = module_name
         self.is_qualified = is_qualified
         self.import_as = import_as
@@ -335,22 +326,20 @@ class Module(Symbol):
     """
     Haskell module symbol
     """
-    def __init__(self, module_name, exports = None, imports = [], declarations = {}, location = None, last_inspection_time = 0):
-        super(Module, self).__init__('module', module_name)
+    def __init__(self, module_name, exports=None, imports=None, declarations=None, location=None, last_inspection_time=0):
+        super().__init__('module', module_name)
         self.location = location
         # List of strings
         if exports is not None:
             self.exports = exports[:]
         # Dictionary from module name to Import object
-        self.imports = imports[:]
+        self.imports = imports[:] if imports else []
         for i in self.imports:
             i.location = self.location
         # Dictionary from name to Symbol
-        self.declarations = declarations.copy()
-        for d in self.declarations.values():
-            d.location = self.location
-
+        self.declarations = declarations.copy() if declarations else {}
         for decl in self.declarations.values():
+            decl.location = self.location
             decl.module = self
 
         # Time as from time.time()
@@ -372,18 +361,18 @@ class Module(Symbol):
         return [i.module for i in self.imports if i.import_as == module_alias]
 
     def get_location_id(self):
-        if type(self.location) == InstalledLocation:
+        if isinstance(self.location, InstalledLocation):
             return '{0}:{1}'.format(self.location.get_id(), self.name)
         return self.location.get_id()
 
     def by_source(self):
-        return type(self.location) == Location
+        return isinstance(self.location, Location)
 
     def by_cabal(self):
-        return type(self.location) == InstalledLocation
+        return isinstance(self.location, InstalledLocation)
 
     def by_hayoo(self):
-        return type(self.location) == OtherLocation
+        return isinstance(self.location, OtherLocation)
 
 
 def escape_text(txt):
@@ -392,28 +381,28 @@ def escape_text(txt):
     """
     lines = []
     for line in txt.splitlines():
-        m = re.match(r'^\s+', line)
-        if m:  # Replace leading spaces with non-breaking ones
-            lines.append(m.end() * '&nbsp;' + html.escape(line[m.end():], quote = False))
+        lead_spaces = re.match(r'^\s+', line)
+        if lead_spaces:  # Replace leading spaces with non-breaking ones
+            lines.append(lead_spaces.end() * '&nbsp;' + html.escape(line[lead_spaces.end():], quote=False))
         else:
-            lines.append(html.escape(line, quote = False))
+            lines.append(html.escape(line, quote=False))
 
     return '<br>'.join(lines)
 
 
-def unicode_operators(fn):
-    def wrapped(*args, use_unicode = None, **kwargs):
+def unicode_operators(wrap_fn):
+    def wrapped(*args, use_unicode=None, **kwargs):
         if use_unicode is False:
-            return fn(*args, **kwargs)
-        return Common.use_unicode_operators(fn(*args, **kwargs), force = use_unicode is True)
+            return wrap_fn(*args, **kwargs)
+        return UnicodeOpers.use_unicode_operators(wrap_fn(*args, **kwargs), force=(use_unicode is True))
     return wrapped
 
 
 class Declaration(Symbol):
-    def __init__(self, name, decl_type = 'declaration', docs = None, imported = [], defined = None, position = None, module = None):
-        super(Declaration, self).__init__(decl_type, name)
+    def __init__(self, name, decl_type='declaration', docs=None, imported=None, defined=None, position=None, module=None):
+        super().__init__(decl_type, name)
         self.docs = docs
-        self.imported = imported[:]
+        self.imported = imported[:] if imported else []
         self.defined = defined
         self.position = position
         self.module = module
@@ -422,13 +411,13 @@ class Declaration(Symbol):
         return self.defined or self.module
 
     def by_source(self):
-        return type(self.defined_module().location) == Location
+        return isinstance(self.defined_module().location, Location)
 
     def by_cabal(self):
-        return type(self.defined_module().location) == InstalledLocation
+        return isinstance(self.defined_module().location, InstalledLocation)
 
     def by_hayoo(self):
-        return type(self.defined_module().location) == OtherLocation
+        return isinstance(self.defined_module().location, OtherLocation)
 
     def has_source_location(self):
         return self.by_source() and self.position is not None
@@ -463,7 +452,7 @@ class Declaration(Symbol):
         """ Returns suggestion for this declaration """
         return ('{0}\t{1}'.format(self.name, self.imported_from_name()), self.name)
 
-    def brief(self, short = False):
+    def brief(self, _short=False):
         """ Brief information, just a name by default """
         return self.name
 
@@ -500,27 +489,25 @@ class Declaration(Symbol):
     @unicode_operators
     def popup_brief(self):
         """ Brief info on popup with name, possibly with link if have source location """
-        info = u'<span class="function">{0}</span>'.format(html.escape(self.name, quote = False))
+        info = u'<span class="function">{0}</span>'.format(html.escape(self.name, quote=False))
         if self.has_source_location():
             return u'<a href="{0}">{1}</a>'.format(html.escape(self.get_source_location()), info)
         else:
             return info
 
     @unicode_operators
-    def popup(self, comments = []):
+    def popup(self, comments=None):
         """ Full info on popup with docs """
         parts = [u'<p>']
         parts.append(self.popup_brief())
-        for c in comments:
-            parts.append(u'<br>{0}<span class="comment">-- {1}</span>'.format(
-                4 * '&nbsp;',
-                c))
+        for cmnt in comments or []:
+            parts.append(u'<br>{0}<span class="comment">-- {1}</span>'.format(4 * '&nbsp;', cmnt))
         if self.imported_names():
             parts.append(u'<br>{0}<span class="comment">-- Imported from {1}</span>'.format(
                 4 * '&nbsp;',
-                html.escape(u', '.join(self.imported_names()), quote = False)))
+                html.escape(u', '.join(self.imported_names()), quote=False)))
         if self.defined_module():
-            module_ref = html.escape(self.defined_module().name, quote = False)
+            module_ref = html.escape(self.defined_module().name, quote=False)
             if self.defined_module().by_source():
                 module_ref = u'<a href="{0}">{1}</a>'.format(self.defined_module().location.to_string(), module_ref)
             elif self.defined_module().by_cabal():
@@ -551,40 +538,43 @@ def format_type(expr):
     """
     if not expr:
         return expr
-    m = re.search(r'([a-zA-Z]\w*)|(->|=>|::|\u2192|\u21d2|\u2237)', expr)
-    if m:
-        e = expr[m.start():m.end()]
+    tyname = re.search(r'([a-zA-Z]\w*)|(->|=>|::|\u2192|\u21d2|\u2237)', expr)
+    if tyname:
+        tyexpr = expr[tyname.start():tyname.end()]
         expr_class = ''
-        if m.group(1):
-            expr_class = 'type' if e[0].isupper() else 'tyvar'
-        elif m.group(2):
+        if tyname.group(1):
+            expr_class = 'type' if tyexpr[0].isupper() else 'tyvar'
+        elif tyname.group(2):
             expr_class = 'operator'
-        decorated = '<span class="{0}">{1}</span>'.format(expr_class, html.escape(e, quote = False))
-        return html.escape(expr[0:m.start()], quote = False) + decorated + format_type(expr[m.end():])
+        decorated = '<span class="{0}">{1}</span>'.format(expr_class, html.escape(tyexpr, quote=False))
+        return html.escape(expr[0:tyname.start()], quote=False) + decorated + format_type(expr[tyname.end():])
     else:
-        return html.escape(expr, quote = False)
+        return html.escape(expr, quote=False)
 
 
 class Function(Declaration):
     """
     Haskell function declaration
     """
-    def __init__(self, name, function_type, docs = None, imported = [], defined = None, position = None, module = None):
-        super(Function, self).__init__(name, 'function', docs, imported, defined, position, module)
+    def __init__(self, name, function_type, docs=None, imported=None, defined=None, position=None, module=None):
+        super().__init__(name, 'function', docs, imported or [], defined, position, module)
         self.type = function_type
 
     def suggest(self):
-        return (Common.use_unicode_operators(u'{0} :: {1}\t{2}'.format(wrap_operator(self.name), self.type, self.imported_from_name())), self.name)
+        return (UnicodeOpers.use_unicode_operators(u'{0} :: {1}\t{2}'.format(wrap_operator(self.name),
+                                                                             self.type,
+                                                                             self.imported_from_name())),
+                self.name)
 
     @unicode_operators
-    def brief(self, short = False):
+    def brief(self, short=False):
         if short:
             return u'{0}'.format(wrap_operator(self.name))
         return u'{0} :: {1}'.format(wrap_operator(self.name), self.type if self.type else u'?')
 
     @unicode_operators
     def popup_brief(self):
-        info = u'<span class="function">{0}</span>'.format(html.escape(self.name, quote = False))
+        info = u'<span class="function">{0}</span>'.format(html.escape(self.name, quote=False))
         if self.has_source_location():
             info = u'<a href="{0}">{1}</a>'.format(html.escape(self.get_source_location()), info)
         return u'{0} <span class="operator">::</span> {1}'.format(info, format_type(self.type if self.type else u'?'))
@@ -594,17 +584,21 @@ class TypeBase(Declaration):
     """
     Haskell type, data or class
     """
-    def __init__(self, name, decl_type, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
-        super(TypeBase, self).__init__(name, decl_type, docs, imported, defined, position, module)
+    def __init__(self, name, decl_type, context, args, definition=None, docs=None, imported=None, defined=None,
+                 position=None, module=None):
+        super().__init__(name, decl_type, docs, imported or [], defined, position, module)
         self.context = context
         self.args = args
         self.definition = definition
 
     def suggest(self):
-        return (Common.use_unicode_operators(u'{0} {1}\t{2}'.format(self.name, ' '.join(self.args), self.imported_from_name())), self.name)
+        return (UnicodeOpers.use_unicode_operators(u'{0} {1}\t{2}'.format(self.name,
+                                                                          ' '.join(self.args),
+                                                                          self.imported_from_name())),
+                self.name)
 
     @unicode_operators
-    def brief(self, short = False):
+    def brief(self, short=False):
         if short:
             brief_parts = [self.what, self.name]
             if self.args:
@@ -629,7 +623,7 @@ class TypeBase(Declaration):
 
     @unicode_operators
     def popup_brief(self):
-        parts = [u'<span class="keyword">{0}</span>'.format(html.escape(self.what, quote = False))]
+        parts = [u'<span class="keyword">{0}</span>'.format(html.escape(self.what, quote=False))]
         if self.context:
             ctx = self.context.split(', ')
             if len(ctx) == 1:
@@ -637,7 +631,7 @@ class TypeBase(Declaration):
             else:
                 parts.append(format_type(u'({0}) =>'.format(', '.join(ctx))))
 
-        name_part = u'<span class="type">{0}</span>'.format(html.escape(self.name, quote = False))
+        name_part = u'<span class="type">{0}</span>'.format(html.escape(self.name, quote=False))
         if self.has_source_location():
             name_part = u'<a href="{0}">{1}</a>'.format(html.escape(self.get_source_location()), name_part)
         parts.append(name_part)
@@ -652,63 +646,67 @@ class Type(TypeBase):
     """
     Haskell type synonym
     """
-    def __init__(self, name, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
-        super(Type, self).__init__(name, 'type', context, args, definition, docs, imported, defined, position, module)
+    def __init__(self, name, context, args, definition=None, docs=None, imported=None, defined=None,
+                 position=None, module=None):
+        super().__init__(name, 'type', context, args, definition, docs, imported or [], defined, position, module)
 
 
 class Newtype(TypeBase):
     """
     Haskell newtype synonym
     """
-    def __init__(self, name, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
-        super(Newtype, self).__init__(name, 'newtype', context, args, definition, docs, imported, defined, position, module)
+    def __init__(self, name, context, args, definition=None, docs=None, imported=None, defined=None,
+                 position=None, module=None):
+        super().__init__(name, 'newtype', context, args, definition, docs, imported or [], defined, position, module)
 
 
 class Data(TypeBase):
     """
     Haskell data declaration
     """
-    def __init__(self, name, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
-        super(Data, self).__init__(name, 'data', context, args, definition, docs, imported, defined, position, module)
+    def __init__(self, name, context, args, definition=None, docs=None, imported=None, defined=None,
+                 position=None, module=None):
+        super().__init__(name, 'data', context, args, definition, docs, imported or [], defined, position, module)
 
 
 class Class(TypeBase):
     """
     Haskell class declaration
     """
-    def __init__(self, name, context, args, definition = None, docs = None, imported = [], defined = None, position = None, module = None):
-        super(Class, self).__init__(name, 'class', context, args, definition, docs, imported, defined, position, module)
+    def __init__(self, name, context, args, definition=None, docs=None, imported=None, defined=None,
+                 position=None, module=None):
+        super().__init__(name, 'class', context, args, definition, docs, imported or [], defined, position, module)
 
 
-def update_with(l, r, default_value, f):
+def update_with(left, right, default_value, upd_fn):
     """
     unionWith for Python, but modifying first dictionary instead of returning result
     """
-    for k, v in r.items():
-        if k not in l:
-            l[k] = default_value[:]
-        l[k] = f(l[k], v)
-    return l
+    for k, val in right.items():
+        if k not in left:
+            left[k] = default_value[:]
+        left[k] = upd_fn(left[k], val)
+    return left
 
 
-def same_module(l, r):
+def same_module(left, right):
     """
     Returns true if l is same module as r, which is when module name is equal
     and modules defined in one file, in same cabal-dev sandbox or in cabal
     """
-    same_cabal = l.cabal and r.cabal and (l.cabal == r.cabal)
-    same_filename = l.location and r.location and (l.location.filename == r.location.filename)
-    nowhere = (not l.cabal) and (not l.location) and (not r.cabal) and (not r.location)
-    return l.name == r.name and (same_cabal or same_filename or nowhere)
+    same_cabal = left.cabal and right.cabal and (left.cabal == right.cabal)
+    same_filename = left.location and right.location and (left.location.filename == right.location.filename)
+    nowhere = (not left.cabal) and (not left.location) and (not right.cabal) and (not right.location)
+    return left.name == right.name and (same_cabal or same_filename or nowhere)
 
 
-def same_declaration(l, r):
+def same_declaration(left, right):
     """
     Returns true if l is same declaration as r
     """
-    same_mod = l.module and r.module and same_module(l.module, r.module)
-    nowhere = (not l.module) and (not r.module)
-    return l.name == r.name and (same_mod or nowhere)
+    same_mod = left.module and right.module and same_module(left.module, right.module)
+    nowhere = (not left.module) and (not right.module)
+    return left.name == right.name and (same_mod or nowhere)
 
 
 def is_within_project(module, project):
@@ -720,7 +718,7 @@ def is_within_project(module, project):
     return False
 
 
-def is_within_cabal(module, cabal = None):
+def is_within_cabal(module, cabal=None):
     """
     Returns whether module loaded from cabal specified
     """
@@ -739,13 +737,13 @@ def flatten(lsts):
 
 
 class CabalPackage(object):
-    def __init__(self, name, synopsis = None, version = None, installed = [], homepage = None, license = None):
+    def __init__(self, name, synopsis, version, installed, homepage, pkg_license):
         self.name = name
         self.synopsis = synopsis
         self.default_version = version
-        self.installed_versions = installed[:]
+        self.installed_versions = installed[:] if installed else []
         self.homepage = homepage
-        self.license = license
+        self.license = pkg_license
 
     def brief(self):
         return self.name
@@ -774,8 +772,8 @@ class Corrector(object):
         self.region = region
         self.contents = contents
 
-    def __eq__(self, other):
-        return self.region == other.region and self.contents == other.contents
+    # def __eq__(self, other):
+    #     return self.region == other.region and self.contents == other.contents
 
     def to_region(self, view):
         return self.region.to_region(view)
@@ -788,8 +786,8 @@ class Corrector(object):
 
     @staticmethod
     def from_json(j):
-        d = json.loads(j)
-        its = list(d.items())
+        corrs = json.loads(j)
+        its = list(corrs.items())
         if len(its) == 1:
             (rgn, cts) = its[0]
             return Corrector(Region.from_str(rgn), cts)
@@ -797,7 +795,7 @@ class Corrector(object):
 
 
 class Correction(object):
-    def __init__(self, file, level, message, corrector, message_region = None):
+    def __init__(self, file, level, message, corrector, message_region=None):
         self.file = file
         self.level = level
         self.message = message
@@ -819,9 +817,13 @@ class Correction(object):
 
     @unicode_operators
     def popup(self):
-        parts = [u'<span class="message">— {0} (<a href="{1}">{2}</a>)</span>'.format(html.escape(self.message), html.escape("autofix:" + self.corrector.region.to_string()), "autofix")]
+        arg1 = html.escape(self.message)
+        arg2 = html.escape("autofix:" + self.corrector.region.to_string())
+        parts = [u'<span class="message">— {0} (<a href="{1}">{2}</a>)</span>'.format(arg1, arg2, "autofix")]
         if self.corrector.contents:
-            parts.append(u'<br>{0}<span class="{1}">{2}</span>'.format(2 * "&nbsp;", html.escape(self.level), html.escape("Why not: ")))
+            parts.append(u'<br>{0}<span class="{1}">{2}</span>'.format(2 * "&nbsp;",
+                                                                       html.escape(self.level),
+                                                                       html.escape("Why not: ")))
             parts.append(u'<br><br>{0}<span class="code">{1}</span>'.format(4 * "&nbsp;", html.escape(self.corrector.contents)))
         return u''.join(parts)
 
