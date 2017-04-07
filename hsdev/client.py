@@ -40,9 +40,12 @@ class HsDev(object):
 
         self.part = ''
 
-        self.on_connected = None
-        self.on_disconnected = None
-        self.on_reconnect = None
+        def null_func(self):
+            pass
+
+        self.on_connected = null_func
+        self.on_disconnected = null_func
+        self.on_reconnect = null_func
 
     def __del__(self):
         self.close()
@@ -87,6 +90,9 @@ class HsDev(object):
             time.sleep(delay)
 
         return False
+
+    def set_on_connected(self, conn_fn):
+        self.on_connected = conn_fn
 
     @HsDecorator.reconnect_function
     def connect_async(self, tries=10, delay=1.0):

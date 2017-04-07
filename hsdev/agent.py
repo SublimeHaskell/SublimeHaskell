@@ -264,14 +264,13 @@ class HsDevAgent(threading.Thread):
         """
         def connected_():
             Logging.log('hsdev agent: primary connection to hsdev established', Logging.LOG_TRACE)
-            self.client.link()
 
         def back_connected_():
             Logging.log('hsdev agent: async connection to hsdev established', Logging.LOG_TRACE)
             self.start_inspect()
 
-        self.client.on_connected = connected_
-        self.client_back.on_connected = back_connected_
+        self.client.set_on_connected(connected_)
+        self.client_back.set_on_connected(back_connected_)
         self.do_start_hsdev()
 
     def do_start_hsdev(self):
@@ -498,6 +497,11 @@ class HsDevLocalAgent(HsDevAgent):
                 Logging.log('hsdev process exited', Logging.LOG_TRACE)
                 self.disconnect_clients()
 
+            def connected_():
+                Logging.log('hsdev agent: primary connection to hsdev established', Logging.LOG_TRACE)
+                self.client.link()
+
+            self.client.set_on_connected(connected_)
             self.hsdev_process.on_start = start_
             self.hsdev_process.on_exit = exit_
 
