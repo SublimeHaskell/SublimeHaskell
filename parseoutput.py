@@ -288,7 +288,7 @@ class SublimeHaskellNextError(Common.SublimeHaskellTextCommand):
     def __init__(self, view):
         super().__init__(view)
 
-    def run(self, edit):
+    def run(self, _edit):
         errs = errors_for_view(self.view)
         if not errs:
             Common.show_status_message('No errors or warnings!', priority=5)
@@ -314,7 +314,7 @@ class SublimeHaskellPreviousError(Common.SublimeHaskellTextCommand):
     def __init__(self, view):
         super().__init__(view)
 
-    def run(self, edit):
+    def run(self, _edit):
         errs = errors_for_view(self.view)
         if not errs:
             Common.show_status_message("No errors or warnings!", priority=5)
