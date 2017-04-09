@@ -1,0 +1,89 @@
+### Apparently dead code... :-)
+
+from functools import reduce
+import json
+
+import SublimeHaskell.internals.logging as Logging
+import SublimeHaskell.internals.proc_helper as ProcHelper
+import SublimeHaskell.hsdev.agent as hsdev
+
+
+def concat_opts(opts):
+    def cat(x, y):
+        (px, ex) = x
+        (py, ey) = y
+        v = (ex if px else {}).copy()
+        v.update((ey if py else {}).copy())
+        return (px or py, v)
+    return reduce(cat, opts, (True, {}))[1]
+
+
+# {'x': ['1','2'], 'y': None} ⇒ ['--x', '1', '--x', '2', '--y']
+def flatten_opts(opts):
+    r = []
+
+    def to_opt(x):
+        return '--{0}'.format(x)
+
+    for k, v in opts.items():
+        if v is None:
+            r.append(to_opt(k))
+        elif type(v) is list:
+            for n in v:
+                r.extend([to_opt(k), str(n)])
+        else:
+            r.extend([to_opt(k), str(v)])
+
+    return r
+
+
+def if_some(x, lst):
+    return lst if x is not None else []
+
+
+def cabal_path(cabal):
+    if not cabal:
+        return []
+    return ["--cabal"] if cabal == 'cabal' else ["--sandbox={0}".format(cabal)]
+
+
+def hsinspect(module=None, file=None, cabal=None, ghc_opts=None):
+    cmd = ['hsinspect']
+    on_result = None
+    if module:
+        cmd.extend([module])
+        on_result = hsdev.parse_module
+    elif file:
+        cmd.extend([file])
+        on_result = hsdev.parse_module
+    elif cabal:
+        cmd.extend([cabal])
+    else:
+        Logging.log('hsinspect must specify module, file or cabal', Logging.LOG_DEBUG)
+        return None
+
+    for opt in ghc_opts or[]:
+        cmd.extend(['-g', opt])
+
+    with ProcHelper.ProcHelper.invoke_tool(cmd, 'hsinspect', lambda s: json.loads(s), file, None) as p:
+        if p.process is not None:
+            _, stdout, stderr = p.wait()
+            if 'error' in stdout:
+                Logging.log('hsinspect returns error: {0}'.format(stdout), Logging.LOG_ERROR)
+            elif 'error' in stderr:
+                Logging.log('hsinspect returns error: {0}'.format(stderr), Logging.LOG_ERROR)
+            else:
+                return on_result(stdout) if on_result else stdout
+    return None
+
+
+def parse_database(s):
+    if not s:
+        return None
+    if s and 'projects' in s and 'modules' in s:
+        return (s['projects'], [parse_module(m) for m in s['modules']])
+    return None
+
+
+def print_status(s):
+    print(s['status'])
