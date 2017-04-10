@@ -21,3 +21,7 @@ cabal-dev
 # logs
 *.log
 .build
+
+# ST3 stuff
+subhask.sublime-workspace
+
