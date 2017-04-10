@@ -13,6 +13,7 @@ cabal-dev
 
 #python's junk
 *.pyc
+__pycache__/
 
 #util
 *.exe
