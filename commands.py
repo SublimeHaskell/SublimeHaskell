@@ -1,3 +1,4 @@
+import json
 import os.path
 import shlex
 import threading
@@ -143,7 +144,7 @@ class SublimeHaskellBrowseDeclarations(hsdev.HsDevTextCommand):
         self.current_file_name = view.file_name()
         self.status_msg = Common.status_message_process('Browse declarations', priority=3)
 
-    def run(self, edit):
+    def run(self, _edit):
         self.status_msg.start()
         hsdev.client.scope(self.current_file_name, wait=False, on_response=self.on_resp, on_error=self.on_err)
 
@@ -369,7 +370,7 @@ class SublimeHaskellGoToHackagePackage(Common.SublimeHaskellTextCommand):
     def __init__(self, view):
         super().__init__(view)
 
-    def run(self, edit):
+    def run(self, _edit):
         pack = self.view.settings().get('package')
         if pack:
             webbrowser.open('http://hackage.haskell.org/package/{0}'.format(pack))
@@ -386,7 +387,7 @@ class SublimeHaskellGoToHackageModule(hsdev.HsDevTextCommand):
         super().__init__(view)
         self.candidates = []
 
-    def run(self, edit):
+    def run(self, _edit):
         if Common.is_haskell_symbol_info(self.view):
             pack = self.view.settings().get('package')
             mod = self.view.settings().get('module')
@@ -476,7 +477,7 @@ class SublimeHaskellScanContents(hsdev.HsDevTextCommand):
         self.current_file_name = None
         self.status_msg = None
 
-    def run(self, edit, **kwargs):
+    def run(self, _edit, **kwargs):
         self.current_file_name = kwargs.get('filename') or self.view.file_name()
         self.status_msg = Common.status_message_process("Scanning {0}".format(self.current_file_name), priority=3)
         self.status_msg.start()
@@ -503,7 +504,7 @@ class SublimeHaskellInferDocs(hsdev.HsDevTextCommand):
         self.current_file_name = None
         self.status_msg = None
 
-    def run(self, edit, **kwargs):
+    def run(self, _edit, **kwargs):
         self.current_file_name = kwargs.get('filename') or self.view.file_name()
         self.status_msg = Common.status_message_process("Scanning docs for {0}".format(self.current_file_name), priority=3)
         self.status_msg.start()
@@ -547,7 +548,7 @@ class SublimeHaskellSymbolInfoCommand(hsdev.HsDevTextCommand):
         self.candidate_selected = None
         self.whois_name = None
 
-    def run(self, edit, **kwargs):
+    def run(self, _edit, **kwargs):
         filename = kwargs.get('filename')
         module_name = kwargs.get('module_name')
         package_name = kwargs.get('package_name')
@@ -796,7 +797,7 @@ class SublimeHaskellGoToDeclaration(hsdev.HsDevTextCommand):
         super().__init__(view)
         self.select_candidates = None
 
-    def run(self, edit):
+    def run(self, _edit):
         qsymbol = Common.get_qualified_symbol_at_region(self.view, self.view.sel()[0])
 
         if Common.is_haskell_symbol_info(self.view):  # Go to within symbol info window
@@ -917,7 +918,7 @@ class SublimeHaskellEvalSelectionCommand(hsdev.HsDevTextCommand):
         self.args = []
         self.results = None
 
-    def run(self, edit):
+    def run(self, _edit):
         self.args = [self.view.substr(s) for s in self.view.sel()]
         self.results = ghc_eval_x(hsdev.client.ghc_eval(self.args))
 
@@ -1297,7 +1298,7 @@ class SublimeHaskellStackExec(sublime_plugin.TextCommand):
         def run(self):
             self.sexec_proc.wait()
 
-    def run(self, edit):
+    def run(self, _edit):
         win = self.view.window()
         win.show_input_panel('stack exec', '', self.stack_exec, None, None)
 
@@ -1311,18 +1312,15 @@ class SublimeHaskellStackExec(sublime_plugin.TextCommand):
         pretty_cmdargs = 'Running \'{0}\''.format(' '.join(cmdargs))
         runv.run_command('insert', {'characters': '{0}\n{1}\n'.format(pretty_cmdargs, '-' * len(pretty_cmdargs))})
 
-        sthread = SExecRunner(runv, cmdargs).start()
-
-    def show_output_panel(self):
-        return output_view
+        SublimeHaskellStackExec.SExecRunner(runv, cmdargs).start()
 
 class SublimeHaskellStackConfigSwitch(Common.SublimeHaskellWindowCommand):
     def run(self):
-        options = Settings.get_project_setting('stack_config_file_list', [])
+        options = Settings.get_project_setting(self.view, 'stack_config_file_list', [])
         self.view.window().show_quick_panel(options, self.on_done)
 
     def on_done(self, idx):
-        options = Settings.get_project_setting('stack_config_file_list')
+        options = Settings.get_project_setting(self.view, 'stack_config_file_list')
         selected = options[idx]
 
-        Settings.set_project_setting('stack_config_file', selected)
+        Settings.set_project_setting(self.view, 'stack_config_file', selected)
