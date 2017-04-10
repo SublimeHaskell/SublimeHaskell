@@ -26,3 +26,6 @@ __pycache__/
 # ST3 stuff
 subhask.sublime-workspace
 
+# Documentation stuff
+*.html
+
