@@ -40,12 +40,9 @@ class HsDev(object):
 
         self.part = ''
 
-        def null_func(self):
-            pass
-
-        self.on_connected = null_func
-        self.on_disconnected = null_func
-        self.on_reconnect = null_func
+        self.on_connected = None
+        self.on_disconnected = None
+        self.on_reconnect = None
 
     def __del__(self):
         self.close()
@@ -96,7 +93,7 @@ class HsDev(object):
 
     @HsDecorator.reconnect_function
     def connect_async(self, tries=10, delay=1.0):
-        threading.Thread(target=self.connect, kwargs={'tries': tries, 'delay': delay, 'just_connect': True}).start()
+        threading.Thread(target=self.connect, kwargs={'tries': tries, 'delay': delay}).start()
 
     def wait(self, timeout=None):
         return self.connected.wait(timeout)

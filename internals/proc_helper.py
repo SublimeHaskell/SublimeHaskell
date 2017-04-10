@@ -8,25 +8,18 @@ import json
 import subprocess
 import os
 import os.path
-import re
-import platform
 
 import sublime
 
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.logging as Logging
-import SublimeHaskell.internals.locked_object as LockedObject
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.utils as Utils
-
-def is_windows():
-    return platform.system() == "Windows"
+import SublimeHaskell.internals.which as Which
+import SublimeHaskell.internals.cabal_cfgrdr as CabalConfigRdr
 
 class ProcHelper(object):
     """Command and tool process execution helper."""
-
-    # Tool name -> executable path cache. Avoids probing the file system multiple times.
-    which_cache = LockedObject.LockedObject({})
 
     # Augmented environment for the subprocesses. Specifically, we really want
     # to augment the user's PATH used to search for executables and tools:
@@ -41,7 +34,7 @@ class ProcHelper(object):
         self.process = None
         self.process_err = None
 
-        if is_windows():
+        if Utils.is_windows():
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             popen_kwargs['startupinfo'] = startupinfo
@@ -54,7 +47,7 @@ class ProcHelper(object):
             popen_kwargs['stderr'] = subprocess.PIPE
 
         try:
-            normcmd = ProcHelper.which(command, ProcHelper.augmented_env['PATH'])
+            normcmd = Which.which(command, ProcHelper.augmented_env['PATH'])
             if normcmd is not None:
                 self.process = subprocess.Popen(normcmd
                                                 , stdin=subprocess.PIPE
@@ -120,121 +113,29 @@ class ProcHelper(object):
     @staticmethod
     def update_environment(_key, _val):
         # Reinitialize the tool -> path cache:
-        ProcHelper.which_cache = LockedObject.LockedObject({})
+        Which.reset_cache()
         ProcHelper.augmented_env = ProcHelper.get_extended_env()
 
     # Generate the augmented environment for subprocesses. This copies the
     # current process environment and updates PATH with `add_to_PATH` extras.
     @staticmethod
     def get_extended_env():
-        def normalize_path(dpath):
-            return os.path.normpath(os.path.expandvars(os.path.expanduser(dpath)))
-
-        def cabal_config():
-            cconfig = os.environ.get('CABAL_CONFIG') or \
-                ('~/.cabal' if not is_windows() else '%APPDATA%/cabal') + \
-                "/config"
-
-            # Various patterns to match...
-            re_user_dirs = re.compile(r'^install-dirs\s+user')
-            re_global_dirs = re.compile(r'^install-dirs\s+global')
-            re_section = re.compile(r'^\w+')
-            re_prefix = re.compile(r'prefix:\s+(.*)$')
-            re_bindir = re.compile(r'bindir:\s+(.*)$')
-
-            # Things to collect
-            user_prefix = "$HOME/.cabal" if not is_windows() else "%APPDATA%/cabal"
-            # FIXME: Need to interrogate Shel32 for the Windows PROGRAMFILES known
-            # folder path:
-            global_prefix = "/usr/local" if not is_windows() else "%PROGRAMFILES%/Haskell"
-            user_bindir = "bin"
-            global_bindir = "bin"
-            p_state = 0
-
-            try:
-                with open(normalize_path(cconfig), 'rU') as f_cconfig:
-                    # You would think that the Cabal maintainers would use a
-                    # well known file format... But now, they didn't. And they
-                    # had to go with an indentation-specific format.
-                    #
-                    # This is a "cheap and dirty" scanner to pick up
-                    for line in f_cconfig:
-                        line = line.rstrip()
-                        # One of the sections?
-                        if re_user_dirs.match(line):
-                            p_state = 1
-                        elif re_global_dirs.match(line):
-                            p_state = 2
-                        elif re.match(r'^\s+\w', line):
-                            # prefix attribute?
-                            m_prefix = re_prefix.search(line)
-                            if m_prefix:
-                                if p_state == 1:
-                                    user_prefix = m_prefix.group(1)
-                                elif p_state == 2:
-                                    global_prefix = m_prefix.group(1)
-                            # bindir attribute?
-                            m_bindir = re_bindir.search(line)
-                            if m_bindir:
-                                if p_state == 1:
-                                    user_bindir = m_bindir.group(1)
-                                elif p_state == 2:
-                                    global_bindir = m_bindir.group(1)
-                        elif re_section.match(line):
-                            p_state = 0
-
-            except IOError:
-                # Silently fail.
-                pass
-
-            return [os.path.join(user_prefix, user_bindir)
-                    , os.path.join(global_prefix, global_bindir)
-                   ]
 
         ext_env = dict(os.environ)
         env_path = os.getenv('PATH') or ""
         std_places = []
         if Settings.PLUGIN.add_standard_dirs:
-            std_places = ["$HOME/.local/bin" if not is_windows() else "%APPDATA%/local/bin"] + cabal_config()
-            std_places = list(filter(os.path.isdir, map(normalize_path, std_places)))
+            std_places = ["$HOME/.local/bin" if not Utils.is_windows() else "%APPDATA%/local/bin"] + \
+                         CabalConfigRdr.cabal_config()
+            std_places = list(filter(os.path.isdir, map(Utils.normalize_path, std_places)))
 
-        add_to_path = list(filter(os.path.isdir, map(normalize_path, Settings.PLUGIN.add_to_path, [])))
+        add_to_path = list(filter(os.path.isdir, map(Utils.normalize_path, Settings.PLUGIN.add_to_path, [])))
 
         Logging.log("std_places = {0}".format(std_places), Logging.LOG_INFO)
         Logging.log("add_to_PATH = {0}".format(add_to_path), Logging.LOG_INFO)
 
         ext_env['PATH'] = os.pathsep.join(add_to_path + std_places + [env_path])
         return ext_env
-
-    @staticmethod
-    def which(args, env_path):
-        def is_exe(fpath):
-            return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
-
-        with ProcHelper.which_cache as cache:
-            cval = cache.get(args[0])
-
-        if cval is not None:
-            return [cval] + args[1:]
-        else:
-            exe_exts = [''] if not is_windows() else ['.exe', '.cmd', '.bat']
-
-            program = args[0]
-            fpath, _ = os.path.split(program)
-            if fpath:
-                if is_exe(program):
-                    return args
-            else:
-                for path in env_path.split(os.pathsep):
-                    path = path.strip('"')
-                    for ext in exe_exts:
-                        exe_file = os.path.join(path, program)
-                        if is_exe(exe_file + ext):
-                            with ProcHelper.which_cache as cache:
-                                cache[program] = exe_file
-                            return [exe_file] + args[1:]
-
-        return None
 
     @staticmethod
     def run_process(command, input_string='', **popen_kwargs):

@@ -11,8 +11,8 @@
       "linters": {
         "pylint" : {
           "paths": [
-            "%USERPROFILE%\\Sublime",
-            "%USERPROFILE%\\Sublime\\Data\\Packages",
+            "$USERPROFILE\\Sublime",
+            "$USERPROFILE\\Sublime\\Data\\Packages",
             "$HOME/Library/Application Support/Sublime Text 3/Packages/",
             "/Applications/Sublime Text.app/Contents/MacOS"
           ],

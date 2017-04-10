@@ -3,6 +3,7 @@
 # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
 import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.internals.utils as Utils
 
 class SublimeHaskellBackend(object):
     """Base class for SublimeHaskell backends. Provides the basic interface for managing and communicating with a
@@ -26,6 +27,10 @@ class SublimeHaskellBackend(object):
     def valid_version(self):
         return True
 
+KNOWN_BACKENDS = ["hsdev",
+                  "ghc-mod",
+                  "hdevtools"
+                 ]
+
 def initialize_backend():
     pass
-    

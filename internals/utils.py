@@ -3,6 +3,8 @@ Miscelaneous glue, mostly for interoperability between Python2 and Python3.
 """
 
 import os
+import os.path
+import platform
 
 def decode_bytes(src):
     return src.decode('utf-8').replace('\r\n', '\n').replace('\r', '\n') if src is not None else None
@@ -19,3 +21,9 @@ def head_of(lst):
 def tool_enabled(feature):
     """Generate the name of a feature to test whether it is enabled."""
     return 'enable_' + str(feature)
+
+def normalize_path(dpath):
+    return os.path.normpath(os.path.expandvars(os.path.expanduser(dpath)))
+
+def is_windows():
+    return platform.system() == "Windows"
