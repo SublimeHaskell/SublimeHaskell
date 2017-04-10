@@ -159,8 +159,11 @@ def parse_type_output(view, msg):
 
 
 def sorted_types(view, types, point):
-    return sorted(list(filter(lambda t: t.region(view).contains(point), types)),
-                  key=lambda t: t.region(view).size())
+    if types is not None:
+        return sorted(list(filter(lambda t: t.region(view).contains(point), types)),
+                      key=lambda t: t.region(view).size())
+    else:
+        return []
 
 
 def get_type(view, filename, module_name, line, column, cabal=None):
