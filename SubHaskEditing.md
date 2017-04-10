@@ -1,6 +1,51 @@
 SublimeHaskell Editing Guide
 ============================
 
+## Commands
+
+These are the _SublimeHaskell_ commands accessible via the command pane (<ctrl>-<shift>-P on Windows and Linux,
+<cmd>-<shift>-P on Mac). These commands are prefixed by "SublimeHaskell:".
+
+...: Apply to selection             |
+...: Apply to selection list        |
+...: Auto fix                       |
+...: Browse declarations            |
+...: Browse module                  |
+...: Build                          |
+...: Cabal: List                    |
+...: Check                          |
+...: Check & Lint                   |
+...: Clean                          |
+...: Configure                      |
+...: Eval selection                 |
+...: Expand selection to Expression |
+...: Find declarations              |
+...: Go to declaration              |
+...: Go to module                   |
+...: Go to next error               |
+...: Go to previous error           |
+...: Hayoo                          |
+...: HIndent                        |
+...: Insert import for symbol       |
+...: Insert type                    |
+...: Install                        |
+...: Lint                           |
+...: Rebuild                        |
+...: Reinspect all                  |
+...: Run                            |
+...: Scan docs and infer types      |
+...: Search declarations everywhere |
+...: Show error panel               |
+...: Show symbol info               |
+...: Show type                      |
+...: Show types                     |
+...: Show/hide all types            |
+...: Stack Exec                     |
+...: Stylish                        |
+...: Test                           |
+...: Toggle symbol info panel       |
+...: Typecheck build (no codegen)   |
+
 ## Snippets
 
 Snippets are a way to quickly insert code by typing all or part of the snippet trigger and pressing `TAB`. For example, typing `data<TAB>` inserts the snippet for a plain (not GADT) data type:

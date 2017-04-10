@@ -13,6 +13,7 @@ cabal-dev
 
 #python's junk
 *.pyc
+__pycache__/
 
 #util
 *.exe
@@ -21,3 +22,7 @@ cabal-dev
 # logs
 *.log
 .build
+
+# ST3 stuff
+subhask.sublime-workspace
+
