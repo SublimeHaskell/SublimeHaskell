@@ -163,7 +163,7 @@ def save_settings():
     sublime.save_settings("SublimeHaskell.sublime-settings")
 
 def get_project_setting(view, key, default=None):
-    view.window().project_data().get(key, default)
+    return view.window().project_data().get(key, default)
 
 def set_project_setting(view, key, value):
     view.window().project_data().set(key, value)

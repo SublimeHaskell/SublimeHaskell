@@ -1315,6 +1315,10 @@ class SublimeHaskellStackExec(sublime_plugin.TextCommand):
         SublimeHaskellStackExec.SExecRunner(runv, cmdargs).start()
 
 class SublimeHaskellStackConfigSwitch(Common.SublimeHaskellWindowCommand):
+    def __init__(self, window):
+        super().__init__(window)
+        self.view = self.window.active_view()
+
     def run(self):
         options = Settings.get_project_setting(self.view, 'stack_config_file_list', [])
         self.view.window().show_quick_panel(options, self.on_done)
