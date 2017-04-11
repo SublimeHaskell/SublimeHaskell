@@ -14,6 +14,7 @@ def plugin_loaded():
     if not os.path.exists(cache_path):
         os.makedirs(cache_path)
 
+    # Probably already loaded... doesn't hurt to reload.
     Settings.PLUGIN.load()
 
     # Register change detection:
@@ -28,4 +29,5 @@ def plugin_unloaded():
     # Does this work properly on exit?
     HDevTools.stop_hdevtools()
     # Shutdown hsdev
-    HsDevAgent.stop_hsdev()
+    if HsDevAgent.agent is not None:
+        HsDevAgent.agent.stop_hsdev()
