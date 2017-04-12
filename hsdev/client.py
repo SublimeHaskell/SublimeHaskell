@@ -40,12 +40,9 @@ class HsDev(object):
 
         self.part = ''
 
-        def null_func(self):
-            pass
-
-        self.on_connected = null_func
-        self.on_disconnected = null_func
-        self.on_reconnect = null_func
+        self.on_connected = None
+        self.on_disconnected = None
+        self.on_reconnect = None
 
     def __del__(self):
         self.close()

@@ -1,3 +1,4 @@
+import json
 import os.path
 import shlex
 import threading
@@ -1311,18 +1312,19 @@ class SublimeHaskellStackExec(sublime_plugin.TextCommand):
         pretty_cmdargs = 'Running \'{0}\''.format(' '.join(cmdargs))
         runv.run_command('insert', {'characters': '{0}\n{1}\n'.format(pretty_cmdargs, '-' * len(pretty_cmdargs))})
 
-        sthread = SExecRunner(runv, cmdargs).start()
-
-    def show_output_panel(self):
-        return output_view
+        SublimeHaskellStackExec.SExecRunner(runv, cmdargs).start()
 
 class SublimeHaskellStackConfigSwitch(Common.SublimeHaskellWindowCommand):
+    def __init__(self, window):
+        super().__init__(window)
+        self.view = window.active_view()
+
     def run(self):
-        options = Settings.get_project_setting('stack_config_file_list', [])
+        options = Settings.get_project_setting(self.view, 'stack_config_file_list', [])
         self.view.window().show_quick_panel(options, self.on_done)
 
     def on_done(self, idx):
-        options = Settings.get_project_setting('stack_config_file_list')
+        options = Settings.get_project_setting(self.view, 'stack_config_file_list')
         selected = options[idx]
 
-        Settings.set_project_setting('stack_config_file', selected)
+        Settings.set_project_setting(self.view, 'stack_config_file', selected)
