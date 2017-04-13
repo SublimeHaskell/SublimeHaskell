@@ -186,4 +186,8 @@
         "caption": "SublimeHaskell: Backend: Restart",
         "command": "sublime_haskell_restart_backend"
     }
+//    {
+//        "caption": "SublimeHaskell: Switch Stack Configs",
+//        "command": "sublime_haskell_config_switch"
+//    }
 ]
