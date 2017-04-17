@@ -39,7 +39,7 @@ class OutputCollector(object):
     def wait(self):
         panel_settings = self.panel.settings()
 
-        if self.prochelp is not None:
+        if self.prochelp.process is not None:
             # Wait for process and threads to complete...
             self.exit_code = self.prochelp.process.wait()
 

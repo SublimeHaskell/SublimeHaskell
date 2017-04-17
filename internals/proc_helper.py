@@ -29,7 +29,7 @@ class ProcHelper(object):
         """Open a pipe to a command or tool."""
 
         if ProcHelper.augmented_env is None:
-            ProcHelper.augmented_env = ProcHelper.get_extended_env()
+            ProcHelper.augmented_env = ProcHelper.make_extended_env()
 
         self.process = None
         self.process_err = None
@@ -114,12 +114,12 @@ class ProcHelper(object):
     def update_environment(_key, _val):
         # Reinitialize the tool -> path cache:
         Which.reset_cache()
-        ProcHelper.augmented_env = ProcHelper.get_extended_env()
+        ProcHelper.augmented_env = ProcHelper.make_extended_env()
 
     # Generate the augmented environment for subprocesses. This copies the
     # current process environment and updates PATH with `add_to_PATH` extras.
     @staticmethod
-    def get_extended_env():
+    def make_extended_env():
 
         ext_env = dict(os.environ)
         env_path = os.getenv('PATH') or ""
@@ -136,6 +136,12 @@ class ProcHelper(object):
 
         ext_env['PATH'] = os.pathsep.join(add_to_path + std_places + [env_path])
         return ext_env
+
+    @staticmethod
+    def get_extended_env():
+        if ProcHelper.augmented_env is None:
+            ProcHelper.augmented_env = ProcHelper.make_extended_env()
+        return ProcHelper.augmented_env
 
     @staticmethod
     def run_process(command, input_string='', **popen_kwargs):

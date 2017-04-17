@@ -44,13 +44,11 @@ class SetttingsContainer(object):
         'auto_complete_language_pragmas': ('auto_complete_language_pragmas', True),
         'auto_completion_popup': ('auto_completion_popup', False),
         'auto_run_tests': ('auto_run_tests', True),
+        'backends': ('backends', None),
         'enable_auto_build': ('enable_auto_build', False),
         'enable_auto_check': ('enable_auto_check', True),
         'enable_auto_lint': ('enable_auto_lint', True),
-        'enable_ghc_mod': ('enable_ghc_mod', True),
-        'enable_hdevtools': ('enable_hdevtools', True),
         'enable_hdocs': ('enable_hdocs', False),
-        'enable_hsdev': ('enable_hsdev', True),
         'ghc_opts': ('ghc_opts', []),
         'ghci_opts': ('ghci_opts', []),
         'haskell_build_tool': ('haskell_build_tool', 'stack'),
@@ -79,13 +77,11 @@ class SetttingsContainer(object):
         self.auto_complete_language_pragmas = None
         self.auto_completion_popup = None
         self.auto_run_tests = None
+        self.backends = None
         self.enable_auto_build = None
         self.enable_auto_check = None
         self.enable_auto_lint = None
-        self.enable_ghc_mod = None
-        self.enable_hdevtools = None
         self.enable_hdocs = None
-        self.enable_hsdev = None
         self.ghc_opts = None
         self.ghci_opts = None
         self.haskell_build_tool = None

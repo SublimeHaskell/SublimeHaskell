@@ -125,8 +125,10 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
     sublime.set_timeout(lambda: hide_output(view), 0)
 
     # run and wait commands, fail on first fail
+    # exit_code has scope outside of the loop
     # stdout = ''
     collected_out = []
+    exit_code = 0
     output_log = Common.output_panel(view.window(), '',
                                      panel_name=BUILD_LOG_PANEL_NAME,
                                      panel_display=Settings.PLUGIN.show_output_window)
@@ -142,7 +144,7 @@ def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
         if exit_code != 0:
             break
 
-    if len(collected_out) > 0:
+    if len(collected_out) > 0 or exit_code == 0:
         # We're going to show the errors in the output panel...
         Common.hide_panel(view.window(), panel_name=BUILD_LOG_PANEL_NAME)
 

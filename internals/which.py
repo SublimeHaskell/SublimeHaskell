@@ -10,15 +10,17 @@ def is_exe(fpath):
 WHICH_CACHE = LockedObject.LockedObject({})
 
 def which(cmd, env_path):
+    the_cmd = cmd[0]
+
     with WHICH_CACHE as cache:
-        cval = cache.get(cmd[0])
+        cval = cache.get(the_cmd)
 
     if cval is not None:
         return [cval] + cmd[1:]
     else:
         exe_exts = [''] if not Utils.is_windows() else ['.exe', '.cmd', '.bat']
 
-        program = cmd[0]
+        program = the_cmd
         fpath, _ = os.path.split(program)
         if fpath:
             if is_exe(program):
