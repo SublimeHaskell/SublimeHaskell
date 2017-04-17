@@ -22,7 +22,7 @@ import SublimeHaskell.worker as Worker
 
 HSDEV_DEFAULT_PORT = 4567
 HSDEV_MIN_VER = [0, 2, 0, 0]  # minimum hsdev version
-HSDEV_MAX_VER = [0, 2, 3, 0]  # maximum hsdev version
+HSDEV_MAX_VER = [0, 2, 3, 1]  # maximum hsdev version
 
 def hsdev_version():
     retval = None
