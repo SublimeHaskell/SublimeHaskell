@@ -12,7 +12,7 @@ import SublimeHaskell.hsdev.agent as hsdev
 import SublimeHaskell.hsdev.result_parse as HsResultParse
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.logging as Logging
-import SublimeHaskell.ghci_backend as GHCIMod
+import SublimeHaskell.ghcimod.ghci_backend as GHCIMod
 import SublimeHaskell.parseoutput as ParseOutput
 import SublimeHaskell.symbols as symbols
 

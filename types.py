@@ -8,7 +8,7 @@ from functools import total_ordering
 import sublime
 import sublime_plugin
 
-import SublimeHaskell.ghci_backend as GHCIMod
+import SublimeHaskell.ghcimod.ghci_backend as GHCIMod
 import SublimeHaskell.hdevtools as HDevTools
 import SublimeHaskell.hsdev.agent as hsdev
 import SublimeHaskell.internals.settings as Settings

@@ -2,26 +2,45 @@
 # SublimeHaskell backend management class and helpers
 # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
-import SublimeHaskell.internals.proc_helper as ProcHelper
-import SublimeHaskell.internals.settings as Settings
-import SublimeHaskell.internals.logging as Logging
-import SublimeHaskell.internals.utils as Utils
-import SublimeHaskell.internals.which as Which
-
 class HaskellBackend(object):
     '''Base class for SublimeHaskell backends. Provides the basic interface for managing and communicating with a
-    backend (hsdev, hdevtools, ghc-mod).'''
+    backend (hsdev, hdevtools, ghc-mod).
+    '''
 
     def __init__(self):
         pass
 
-    def activate_backend(self):
-        pass
+    @staticmethod
+    def backend_name():
+        '''Return the backend's name, e.g. `hsdev` or `ghc-mod`.
+        '''
+        return "Default null Haskell backend"
 
-    def inactivate_backend(self):
-        pass
+    @staticmethod
+    def is_availabile():
+        '''Test if the backend is available to use
+        '''
+        return False
 
     def start_backend(self):
+        '''This method allows the `HaskellBackend` subclass to start a local process, if needed, with which it interacts.
+        `hsdev`'s local backend option takes advantage of it.
+
+        Returns `True` if backend startup was successful. If no local external process is created, just return 'True'.
+
+        The `HaskellBackend` base class returns `False` to return the backend manager's state to BackendManager.INITIAL.
+        You can't start up something that doesn't exist.
+        '''
+        return False
+
+    def connect_backend(self):
+        '''Once the backend has been started, this method is where the `HaskellBackend` subclass creates a connection to it.
+
+        Returns 'True' if connected successfully to the backend.
+        '''
+        return False
+
+    def disconnect_backend(self):
         pass
 
     def stop_backend(self):
@@ -29,27 +48,3 @@ class HaskellBackend(object):
 
     def valid_version(self):
         return True
-
-
-class BackendManager(object):
-    # Known backends. Can be overridden by the 'backends' preference.
-    DEFAULT_KNOWN_BACKENDS = ['hsdev', 'ghc-mod', 'hdevtools']
-
-    # The manager's states:
-    INITIAL = 0
-
-    def __init__(self):
-        super().__init__()
-        self.state = BackendManager.INITIAL
-
-    def initialize(self):
-        backends = Settings.PLUGIN.backends or BackendManager.DEFAULT_KNOWN_BACKENDS
-        env_path = ProcHelper.ProcHelper.get_extended_env().get('PATH')
-        avail = list(filter(lambda b: Which.which([b], env_path) is not None, backends))
-        if avail:
-            print('Available backends: {0}'.format(avail))
-            # Take first available because DEFAULT_KNOWN_BACKENDS are listed in order of priority...
-            the_backend = avail[0]
-        else:
-            # Yell at luser.
-            print('No backends found.')

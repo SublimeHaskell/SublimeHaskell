@@ -14,7 +14,7 @@ import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.locked_object as LockedObject
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.utils as Utils
-import SublimeHaskell.ghci_backend as GHCIMod
+import SublimeHaskell.ghcimod.ghci_backend as GHCIMod
 import SublimeHaskell.hsdev.agent as hsdev
 import SublimeHaskell.worker as Worker
 
