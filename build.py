@@ -27,23 +27,23 @@ def same_steps(steps):
 
 BUILD_TOOL_CONFIG = {
     'clean': {
-        'message': 'Cleaning',
+        'message': 'Cleaning', # theres no analogue of new-clean yet
         'steps': same_steps([['clean']])
     },
     'configure': {
         'message': 'Configuring',
         'steps': {
-            'cabal': [['configure', '--enable-tests']],
+            'cabal': [['new-configure', '--enable-tests']],
             'stack': []
         }
     },
     'build': {
         'message': 'Building',
-        'steps': same_steps([['build']])
+        'steps': same_steps([['new-build']])
     },
     'typecheck': {
         'message': 'Checking',
-        'steps': same_steps([['build', '--ghc-options=-c']])
+        'steps': same_steps([['new-build', '--ghc-options=-c']])
     },
     # Commands with warnings:
     # Run fast, incremental build first. Then build everything with -Wall and -fno-code
@@ -51,14 +51,14 @@ BUILD_TOOL_CONFIG = {
     'build_then_warnings': {
         'message': 'Building',
         'steps': {
-            'cabal': [['build'], ['build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
+            'cabal': [['new-build'], ['new-build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
             'stack': [['build']]
         }
     },
     'typecheck_then_warnings': {
         'message': 'Checking',
         'steps': {
-            'cabal': [['build', '--ghc-options=-c'], ['build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
+            'cabal': [['new-build', '--ghc-options=-c'], ['new-build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
             'stack': [['build']]
         }
     },
@@ -66,20 +66,20 @@ BUILD_TOOL_CONFIG = {
     'rebuild': {
         'message': 'Rebuilding',
         'steps': {
-            'cabal': [['clean'], ['configure', '--enable-tests'], ['build']],
+            'cabal': [['clean'], ['new-configure', '--enable-tests'], ['new-build']],
             'stack': [['clean'], ['build']]
         }
     },
     'install': {
         'message': 'Installing',
         'steps': {
-            'cabal': [['install', '--enable-tests']],
+            'cabal': [['install', '--enable-tests']], # not sure what new-install is/ if we have it yet
             'stack': [['install']]
         }
     },
     'test': {
         'message': 'Testing',
-        'steps': same_steps([['test']])
+        'steps': same_steps([['test']]) # no cabal new-test / test yet
     }
 }
 
