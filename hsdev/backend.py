@@ -10,7 +10,6 @@ import threading
 
 import sublime
 
-import SublimeHaskell.hsdev.callback as HsCallback
 import SublimeHaskell.hsdev.client as HsDevClient
 import SublimeHaskell.internals.backend as Backend
 import SublimeHaskell.internals.locked_object as LockedObject
@@ -20,6 +19,7 @@ import SublimeHaskell.internals.proc_helper as ProcHelper
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.which as Which
 import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.worker as Worker
 
 
 # Show scan progress in status bar
@@ -39,8 +39,6 @@ class ScanStatus(object):
 # Set reinspect event
 def dirty(dirty_fn):
     def wrapped(self, *args, **kwargs):
-        if not hasattr(self, 'dirty_lock'):
-            self.dirty_lock = threading.Lock()
         acquired = self.dirty_lock.acquire(blocking=False)
         try:
             return dirty_fn(self, *args, **kwargs)
@@ -63,9 +61,8 @@ def use_hsdev(def_val=None):
     """
     def decorator(use_fn):
         def inner(self, *args, **kwargs):
-            print('main_client {0} aux_client {1}'.format(self.main_client.is_connected(), self.aux_client.is_connected()))
             if self.main_client.is_connected() and self.aux_client.is_connected():
-                return use_fn(*args, **kwargs)
+                return use_fn(self, *args, **kwargs)
             else:
                 return def_val
         return inner
@@ -100,12 +97,8 @@ class HsDevBackend(Backend.HaskellBackend):
         self.main_client = None
         # Auxiliary client connection: asynchronous
         self.aux_client = None
-        # (Re-)Inspection state:
-        self.dirty_lock = threading.Lock()
-        self.cabal_to_load = LockedObject.LockedObject([])
-        self.dirty_files = LockedObject.LockedObject([])
-        self.dirty_paths = LockedObject.LockedObject([])
-        self.reinspect_event = threading.Event()
+        # Inspection thread
+        self.inspector = None
 
     @staticmethod
     def backend_name():
@@ -183,7 +176,9 @@ class HsDevBackend(Backend.HaskellBackend):
             if self.is_local_hsdev:
                 self.main_client.link()
             # Start the inspection process...
-            self.start_inspect()
+            # FIXME: Settings.PLUGIN.add_change_callback('inspect_modules', self.on_inspect_modules_changed)
+            self.inspector = HsDevInspector(self.main_client, self.aux_client)
+            self.inspector.start()
         else:
             Logging.log('Connections to \'hsdev\' server unsuccessful, see tracebacks to diagnose.', Logging.LOG_ERROR)
             retval = False
@@ -213,6 +208,116 @@ class HsDevBackend(Backend.HaskellBackend):
             return (left_pred or right_pred, (left_expr if left_pred else []) + (right_expr if right_pred else []))
 
         return reduce(inner_concat, args, (True, []))[1]
+
+
+class HsDevStartupReader(threading.Thread):
+    '''Separate thread object that reads the local `hsdev` server's `stdout` looking for the server's startup
+    message. The server's port number is parsed from the startup message and saved in the object's `hsdev_port`
+    attribute, just in case this differs from the default or requested port.
+    '''
+
+    def __init__(self, fstdout):
+        super().__init__(name='hsdev startup reader')
+        self.stdout = fstdout
+        self.hsdev_port = -1
+        self.end_event = threading.Event()
+
+    def run(self):
+        self.end_event.clear()
+
+        while not self.end_event.is_set():
+            srvout = self.stdout.readline().strip()
+            if srvout != '':
+                Logging.log('hsdev initial output: {0}'.format(srvout), Logging.LOG_DEBUG)
+                start_confirm = re.match(r'^.*?hsdev> Server started at port (?P<port>\d+)$', srvout)
+                if start_confirm:
+                    self.hsdev_port = int(start_confirm.group('port'))
+                    Logging.log('\'hsdev\' server started at port {0}'.format(self.hsdev_port))
+                    self.end_event.set()
+            else:
+                # Got EOF, stop loop.
+                self.end_event.set()
+
+    def wait_startup(self, tmo):
+        self.end_event.wait(tmo)
+
+    def successful(self):
+        return self.end_event.is_set()
+
+    def stop(self):
+        self.end_event.clear()
+
+    def port(self):
+        return self.hsdev_port
+
+class HsDevInspector(threading.Thread):
+    '''The inspection thread.
+    '''
+
+    # Re-inspect event wait time, in seconds
+    WAIT_TIMEOUT = 60.0
+
+    def __init__(self, main_client, aux_client):
+        super().__init__(name='hsdev inspector')
+        # Thread control event
+        self.end_event = threading.Event()
+        # Connection state
+        self.main_client = main_client
+        self.aux_client = aux_client
+        # (Re-)Inspection state:
+        self.dirty_lock = threading.Lock()
+        self.cabal_to_load = LockedObject.LockedObject([])
+        self.dirty_files = LockedObject.LockedObject([])
+        self.dirty_paths = LockedObject.LockedObject([])
+        self.reinspect_event = threading.Event()
+
+    def run(self):
+        self.end_event.clear()
+        while not self.end_event.is_set():
+            if not self.main_client.ping():
+                Logging.log('hsdev ping: no pong', Logging.LOG_WARNING)
+
+            scan_paths = []
+            with self.dirty_paths as dirty_paths:
+                scan_paths = dirty_paths[:]
+                dirty_paths[:] = []
+
+            files_to_reinspect = []
+            with self.dirty_files as dirty_files:
+                files_to_reinspect = dirty_files[:]
+                dirty_files[:] = []
+
+            projects = []
+            files = []
+
+            if len(files_to_reinspect) > 0:
+                projects = []
+                files = []
+                for finspect in files_to_reinspect:
+                    projdir = Common.get_cabal_project_dir_of_file(finspect)
+                    if projdir is not None:
+                        projects.append(projdir)
+                    else:
+                        files.append(finspect)
+
+            projects = list(set(projects))
+            files = list(set(files))
+
+            self.inspect(paths=scan_paths, projects=projects, files=files)
+
+            load_cabal = []
+            with self.cabal_to_load as cabal_to_load:
+                load_cabal = cabal_to_load[:]
+                cabal_to_load[:] = []
+
+            for cabal in load_cabal:
+                Worker.run_async('inspect cabal {0}'.format(cabal), self.inspect_cabal, cabal)
+
+            if files_to_reinspect and Settings.PLUGIN.enable_hdocs:
+                self.aux_client.docs(files=files_to_reinspect)
+
+            self.reinspect_event.wait(HsDevInspector.WAIT_TIMEOUT)
+            self.reinspect_event.clear()
 
     @dirty
     def force_inspect(self):
@@ -296,43 +401,3 @@ class HsDevBackend(Backend.HaskellBackend):
                                  wait=True,
                                  ghc=Settings.PLUGIN.ghc_opts,
                                  docs=Settings.PLUGIN.enable_hdocs)
-
-class HsDevStartupReader(threading.Thread):
-    '''Separate thread object that reads the local `hsdev` server's `stdout` looking for the server's startup
-    message. The server's port number is parsed from the startup message and saved in the object's `hsdev_port`
-    attribute, just in case this differs from the default or requested port.
-    '''
-
-    def __init__(self, fstdout):
-        super().__init__(name='hsdev startup reader')
-        self.stdout = fstdout
-        self.hsdev_port = -1
-        self.got_startup = threading.Event()
-
-    def run(self):
-        self.got_startup.clear()
-
-        while not self.got_startup.is_set():
-            srvout = self.stdout.readline().strip()
-            if srvout != '':
-                Logging.log('hsdev initial output: {0}'.format(srvout), Logging.LOG_DEBUG)
-                start_confirm = re.match(r'^.*?hsdev> Server started at port (?P<port>\d+)$', srvout)
-                if start_confirm:
-                    self.hsdev_port = int(start_confirm.group('port'))
-                    Logging.log('\'hsdev\' server started at port {0}'.format(self.hsdev_port))
-                    self.got_startup.set()
-            else:
-                # Got EOF, stop loop.
-                self.got_startup.set()
-
-    def wait_startup(self, tmo):
-        self.got_startup.wait(tmo)
-
-    def successful(self):
-        return self.got_startup.is_set()
-
-    def stop(self):
-        self.got_startup.clear()
-
-    def port(self):
-        return self.hsdev_port
