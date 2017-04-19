@@ -24,19 +24,19 @@ def files_and_contents(files, contents):
 
 # hsdev client
 # see for functions with command decorator for hsdev api
-class HsDevClient(object):
-    # Number of times we try to connect to the hsdev server
-    CONNECT_TRIES = 10
-    # Delay between attempts if not successful
-    CONNECT_DELAY = 2.0
-
+class HsDev(object):
     def __init__(self, host, port):
         self.host = host
         self.port = port
+        self.connecting = threading.Event()
+        self.connected = threading.Event()
         self.socket = None
         self.listener = None
+        self.autoconnect = True
         self.request_map = LockedObject.LockedObject({})
         self.request_serial = 1
+
+        self.connect_fun = None
 
         self.part = ''
 
@@ -47,20 +47,36 @@ class HsDevClient(object):
     def __del__(self):
         self.close()
 
+    # Autoconnect
+    def set_reconnect_function(self, reconnect_fn):
+        if self.connect_fun is None:
+            self.connect_fun = reconnect_fn
+
+    def reconnect(self):
+        if self.connect_fun is not None:
+            Logging.log('Reconnecting to hsdev...', Logging.LOG_INFO)
+            HsCallback.call_callback(self.on_reconnect, name='HsDev.on_reconnect')
+            self.connect_fun()
+        else:
+            Logging.log('No reconnect function')
+
     # Socket functions
 
-    def connect(self):
+    @HsDecorator.connect_function
+    @HsDecorator.reconnect_function
+    def connect(self, tries=10, delay=1.0):
         try:
-            for retry in range(1, HsDevClient.CONNECT_TRIES):
+            for retry in range(0, tries):
                 Logging.log('connecting to hsdev server (attempt {0})...'.format(retry), Logging.LOG_INFO)
 
                 # Use 'localhost' instead of the IP dot-quad for systems (and they exist) that are solely
                 # IPv6. Makes this code friendlier to IPv4 and IPv6 hybrid systems.
                 self.socket = socket.create_connection((self.host, self.port))
+                self.set_connected()
                 self.listener = threading.Thread(target=self.listen)
                 self.listener.start()
 
-                Logging.log('Connection established to \'hsdev\' server.', Logging.LOG_INFO)
+                Logging.log('connected to hsdev server', Logging.LOG_INFO)
                 HsCallback.call_callback(self.on_connected, name='HsDev.on_connected')
                 return True
 
@@ -68,25 +84,65 @@ class HsDevClient(object):
             # Captures all of the socket exceptions:
             Logging.log('Failed to connect to hsdev server:', Logging.LOG_WARNING)
             print(traceback.format_exc())
-            time.sleep(HsDevClient.CONNECT_DELAY)
+            time.sleep(delay)
 
         return False
 
+    def set_on_connected(self, conn_fn):
+        self.on_connected = conn_fn
+
+    @HsDecorator.reconnect_function
+    def connect_async(self, tries=10, delay=1.0):
+        threading.Thread(target=self.connect, kwargs={'tries': tries, 'delay': delay}).start()
+
+    def wait(self, timeout=None):
+        return self.connected.wait(timeout)
+
     def close(self):
-        self.socket.close()
-        self.socket = None
+        if not self.is_unconnected():
+            self.connected.clear()
+            self.socket.close()
+
+    def is_connecting(self):
+        return self.connecting.is_set()
 
     def is_connected(self):
-        return self.socket is not None
+        return self.connected.is_set()
+
+    def is_unconnected(self):
+        return (not self.is_connecting()) and (not self.is_connected())
+
+    def set_unconnected(self):
+        if self.connecting.is_set():
+            self.connecting.clear()
+        if self.connected.is_set():
+            self.connected.clear()
+
+    def set_connecting(self):
+        self.set_unconnected()
+        self.connecting.set()
+
+    def set_connected(self):
+        if self.is_connecting():
+            self.connected.set()
+            self.connecting.clear()
+        else:
+            Logging.log('HsDev.set_connected called while not in connecting state', Logging.LOG_DEBUG)
 
     def on_receive(self, ident, command, on_response=None, on_notify=None, on_error=None):
         with self.request_map as requests:
             requests[ident] = HsCallback.HsDevCallbacks(ident, command, on_response, on_notify, on_error)
 
     def verify_connected(self):
-        return self.is_connected()
+        if self.is_connected():
+            return True
+        else:
+            self.connection_lost('verify_connected', 'no connection')
+            return self.is_connected()
 
     def connection_lost(self, func_name, reason):
+        if self.is_unconnected():
+            return
         self.close()
         Logging.log('{0}: connection to hsdev lost: {1}'.format(func_name, reason), Logging.LOG_ERROR)
         HsCallback.call_callback(self.on_disconnected, name='HsDev.on_disconnected')
@@ -99,6 +155,9 @@ class HsDevClient(object):
 
         self.request_serial = 1
         self.part = ''
+
+        if self.autoconnect:
+            self.reconnect()
 
     def call(self, command, opts=None, on_response=None, on_notify=None, on_error=None, wait=False, timeout=None):
         # log

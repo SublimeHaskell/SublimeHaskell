@@ -4,8 +4,7 @@ import os
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.proc_helper as ProcHelper
-import SublimeHaskell.hdevtools as HDevTools
-import SublimeHaskell.hsdev.agent as HsDevAgent
+import SublimeHaskell.internals.backend_mgr as BackendManager
 
 
 def plugin_loaded():
@@ -21,13 +20,12 @@ def plugin_loaded():
     Settings.PLUGIN.add_change_callback('add_to_PATH', ProcHelper.ProcHelper.update_environment)
     Settings.PLUGIN.add_change_callback('add_standard_dirs', ProcHelper.ProcHelper.update_environment)
 
-    # Deprecate?
-    HDevTools.start_hdevtools()
+    # Now create the backend...
+    backend = BackendManager.BackendManager()
+    backend.initialize()
 
 
 def plugin_unloaded():
-    # Does this work properly on exit?
-    HDevTools.stop_hdevtools()
-    # Shutdown hsdev
-    if HsDevAgent.agent is not None:
-        HsDevAgent.agent.stop_hsdev()
+    backend = BackendManager.BackendManager.active_backend()
+    if backend is not None:
+        backend.shutdown_backend()

@@ -1,52 +1,6 @@
 
 
 import SublimeHaskell.hsdev.callback as HsCallback
-import SublimeHaskell.internals.logging as Logging
-
-def reconnect_function(conn_fn):
-    def wrapped(self, *args, **kwargs):
-        autoconnect_ = kwargs.pop('autoconnect', False)
-        on_reconnect_ = kwargs.pop('on_reconnect', None)
-        just_connect_ = kwargs.pop('just_connect', False)
-
-        def run_fn():
-            if not just_connect_:
-                self.autoconnect = autoconnect_
-                self.on_reconnect = on_reconnect_
-            return conn_fn(self, *args, **kwargs)
-
-        if not just_connect_:
-            self.set_reconnect_function(run_fn)
-        return run_fn()
-
-    return wrapped
-
-
-class ConnectingServer(object):
-    def __init__(self, agent):
-        self.agent = agent
-
-    def __enter__(self):
-        self.agent.set_connecting()
-        return self
-
-    def __exit__(self, exc_type, value, traceback):
-        if exc_type:
-            self.agent.set_unconnected()
-        else:
-            if self.agent.is_connecting():
-                self.agent.set_unconnected()
-
-
-def connect_function(conn_fn):
-    def wrapped(self, *args, **kwargs):
-        if self.is_unconnected():
-            with ConnectingServer(self):
-                return conn_fn(self, *args, **kwargs)
-        else:
-            Logging.log('hsdev already connected', Logging.LOG_WARNING)
-    return wrapped
-
 
 def hsdev_command(async=False, timeout=None, is_list=False):
     def wrap_function(cmd_fn):
