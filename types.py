@@ -2,15 +2,15 @@
 
 """Haskell type display and query support"""
 
-import re
 from functools import total_ordering
+import re
 
 import sublime
 import sublime_plugin
 
 import SublimeHaskell.ghcimod.ghci_backend as GHCIMod
 import SublimeHaskell.hdevtools as HDevTools
-import SublimeHaskell.hsdev.agent as hsdev
+import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.unicode_opers as UnicodeOpers
 import SublimeHaskell.internals.utils as Utils
@@ -190,7 +190,9 @@ def get_type_view(view, selection=None):
         selection = view.sel()[0]
 
     line, column = view.rowcol(selection.b)
-    module_name = Utils.head_of(hsdev.client.module(file=filename))
+    backend = BackendManager.active_backend()
+    if backend is not None:
+        module_name = Utils.head_of(backend.module(file=filename))
 
     return get_type(view, filename, module_name, line, column)
 
@@ -214,13 +216,18 @@ def get_types(filename, on_result=None):
             return FILE_TYPES.get(filename)
 
         wait = on_result is None
-        res = hsdev.client.types(files=[filename],
-                                 ghc=GHCIMod.get_ghc_opts(filename),
-                                 wait=wait, on_response=on_resp if on_result is not None else None)
-        if res is not None and wait:
-            types = [to_region_type(r) for r in res]
-            FILE_TYPES.set(filename, types, False)
-            return types
+        backend = BackendManager.active_backend()
+        if backend is not None:
+            res = backend.types(files=[filename],
+                                ghc=GHCIMod.get_ghc_opts(filename),
+                                wait=wait,
+                                on_response=on_resp if on_result is not None else None)
+            if res is not None and wait:
+                types = [to_region_type(r) for r in res]
+                FILE_TYPES.set(filename, types, False)
+                return types
+
+        return []
 
 
 class SublimeHaskellShowType(Common.SublimeHaskellTextCommand):
@@ -245,9 +252,12 @@ class SublimeHaskellShowType(Common.SublimeHaskellTextCommand):
         if (not line) or (not column):
             line, column = self.view.rowcol(self.view.sel()[0].b)
 
-        module_name = Utils.head_of(hsdev.client.module(file=filename))
-
-        return get_type(self.view, filename, module_name, line, column)
+        backend = BackendManager.active_backend()
+        if backend is not None:
+            module_name = Utils.head_of(backend.module(file=filename))
+            return get_type(self.view, filename, module_name, line, column)
+        else:
+            return []
 
     def get_best_type(self, types):
         if not types:

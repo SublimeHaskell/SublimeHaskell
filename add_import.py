@@ -5,7 +5,7 @@ import pprint
 
 import sublime
 
-import SublimeHaskell.hsdev.agent as hsdev
+import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.hsdev.result_parse as HsDevResultParse
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.proc_helper as ProcHelper
@@ -45,10 +45,10 @@ class SublimeHaskellInsertImportForSymbol(hsdev.HsDevTextCommand):
             qsymbol = Common.get_qualified_symbol_at_region(self.view, self.view.sel()[0])
             self.full_name = qsymbol.qualified_name()
 
-        if hsdev.client.whois(self.full_name, self.current_file_name):
+        if BackendManager.active_backend().whois(self.full_name, self.current_file_name):
             Common.show_status_message('Symbol {0} already in scope'.format(self.full_name))
         else:
-            self.candidates = hsdev.client.lookup(self.full_name, self.current_file_name)
+            self.candidates = BackendManager.active_backend().lookup(self.full_name, self.current_file_name)
 
             if not self.candidates:
                 Common.show_status_message('Symbol {0} not found'.format(self.full_name))
@@ -82,7 +82,7 @@ class SublimeHaskellInsertImportForSymbol(hsdev.HsDevTextCommand):
                     imp_module = HsDevResultParse.parse_module(modinfo)
         else:
             # Otherwise, use the actual file
-            imp_module = Utils.head_of(hsdev.client.module(file=self.current_file_name))
+            imp_module = Utils.head_of(BackendManager.active_backend().module(file=self.current_file_name))
 
         if imp_module is not None:
             imports = sorted(imp_module.imports, key=lambda i: i.position.line)

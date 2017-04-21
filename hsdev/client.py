@@ -20,9 +20,7 @@ class HsDevClient(object):
     # Delay between attempts if not successful
     CONNECT_DELAY = 2.0
 
-    def __init__(self, host, port):
-        self.host = host
-        self.port = port
+    def __init__(self):
         self.socket = None
         self.listener = None
         self.request_map = LockedObject.LockedObject({})
@@ -39,14 +37,14 @@ class HsDevClient(object):
 
     # Socket functions
 
-    def connect(self):
+    def connect(self, host, port):
         try:
             for retry in range(1, HsDevClient.CONNECT_TRIES):
                 Logging.log('connecting to hsdev server (attempt {0})...'.format(retry), Logging.LOG_INFO)
 
                 # Use 'localhost' instead of the IP dot-quad for systems (and they exist) that are solely
                 # IPv6. Makes this code friendlier to IPv4 and IPv6 hybrid systems.
-                self.socket = socket.create_connection((self.host, self.port))
+                self.socket = socket.create_connection((host, port))
                 self.listener = threading.Thread(target=self.listen)
                 self.listener.start()
 

@@ -14,61 +14,12 @@ import SublimeHaskell.hsdev.callback as HsCallback
 import SublimeHaskell.hsdev.client as HsDevClient
 import SublimeHaskell.hsdev.result_parse as ResultParse
 import SublimeHaskell.internals.backend as Backend
-import SublimeHaskell.internals.locked_object as LockedObject
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.output_collector as OutputCollector
 import SublimeHaskell.internals.proc_helper as ProcHelper
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.which as Which
 import SublimeHaskell.sublime_haskell_common as Common
-import SublimeHaskell.worker as Worker
-
-
-# Show scan progress in status bar
-class ScanStatus(object):
-    def __init__(self, status_message):
-        self.status_message = status_message
-
-    def __call__(self, msgs):
-        statuses = []
-        for msg in msgs:
-            progress = msg['progress']
-            statuses.append('{0} ({1}/{2})'.format(msg['name'], progress['current'], progress['total'])
-                            if progress else msg['name'])
-        self.status_message.change_message('Inspecting {0}'.format(' / '.join(statuses)))
-
-
-# Set reinspect event
-def dirty(dirty_fn):
-    def wrapped(self, *args, **kwargs):
-        acquired = self.dirty_lock.acquire(blocking=False)
-        try:
-            return dirty_fn(self, *args, **kwargs)
-        finally:
-            if acquired:
-                self.dirty_lock.release()
-                self.reinspect_event.set()
-    return wrapped
-
-
-def use_inspect_modules(inspect_fn):
-    def wrapped(self, *args, **kwargs):
-        if Settings.PLUGIN.inspect_modules:
-            return inspect_fn(self, *args, **kwargs)
-    return wrapped
-
-
-def use_hsdev(def_val=None):
-    """Return a default value if hsdev is not enabled/connected
-    """
-    def decorator(use_fn):
-        def inner(self, *args, **kwargs):
-            if self.main_client.is_connected() and self.aux_client.is_connected():
-                return use_fn(self, *args, **kwargs)
-            else:
-                return def_val
-        return inner
-    return decorator
 
 
 class HsDevBackend(Backend.HaskellBackend):
@@ -99,8 +50,6 @@ class HsDevBackend(Backend.HaskellBackend):
         self.main_client = None
         # Auxiliary client connection: asynchronous
         self.aux_client = None
-        # Inspection thread
-        self.inspector = None
 
     @staticmethod
     def backend_name():
@@ -171,16 +120,14 @@ class HsDevBackend(Backend.HaskellBackend):
     def connect_backend(self):
         Logging.log('Connecting to \'hsdev\' server at {0}:{1}'.format(self.hostname, self.port), Logging.LOG_INFO)
         retval = True
-        self.main_client = HsDevClient.HsDevClient(self.hostname, self.port)
-        self.aux_client = HsDevClient.HsDevClient(self.hostname, self.port)
-        if self.main_client.connect() and self.aux_client.connect():
+        self.main_client = HsDevClient.HsDevClient()
+        self.aux_client = HsDevClient.HsDevClient()
+        if self.main_client.connect(self.hostname, self.port) and self.aux_client.connect(self.hostname, self.port):
             # For a local hsdev server that we started, send the link command so that it exits when we exit.
             if self.is_local_hsdev:
-                self.main_client.link()
+                self.link()
             # Start the inspection process...
             # FIXME: Settings.PLUGIN.add_change_callback('inspect_modules', self.on_inspect_modules_changed)
-            self.inspector = HsDevInspector(self.main_client, self.aux_client)
-            self.inspector.start()
         else:
             Logging.log('Connections to \'hsdev\' server unsuccessful, see tracebacks to diagnose.', Logging.LOG_ERROR)
             retval = False
@@ -233,14 +180,16 @@ class HsDevBackend(Backend.HaskellBackend):
                 else:
                     HsCallback.call_callback(on_notify, reply)
 
-            opts.update({'split-result': None})  # FIXME: Is this option still used?
-            resp = self.call(name
-                             , opts
-                             , on_response=on_response
-                             , on_notify=inner_notify
-                             , on_error=on_error
-                             , wait=not async
-                             , timeout=timeout)
+            # FIXME: Is this option still used?
+            opts.update({'split-result': None})
+            # FIXME: Need a connection pool
+            resp = self.main_client.call(name
+                                         , opts
+                                         , on_response=on_response
+                                         , on_notify=inner_notify
+                                         , on_error=on_error
+                                         , wait=not async
+                                         , timeout=timeout)
 
             return result if not async else resp
 
@@ -248,13 +197,14 @@ class HsDevBackend(Backend.HaskellBackend):
             def processed_response(resp):
                 on_response(on_result(resp))
 
-            resp = self.call(name
-                             , opts
-                             , on_response=processed_response if on_response else None
-                             , on_notify=on_notify
-                             , on_error=on_error
-                             , wait=not async
-                             , timeout=timeout)
+            # FIXME: Need a connection pool
+            resp = self.main_client.call(name
+                                         , opts
+                                         , on_response=processed_response if on_response else None
+                                         , on_notify=on_notify
+                                         , on_error=on_error
+                                         , wait=not async
+                                         , timeout=timeout)
 
             return on_result(resp) if not async else resp
 
@@ -594,155 +544,3 @@ class HsDevStartupReader(threading.Thread):
 
     def port(self):
         return self.hsdev_port
-
-class HsDevInspector(threading.Thread):
-    '''The inspection thread.
-    '''
-
-    # Re-inspect event wait time, in seconds
-    WAIT_TIMEOUT = 60.0
-
-    def __init__(self, main_client, aux_client):
-        super().__init__(name='hsdev inspector')
-        # Thread control event
-        self.end_event = threading.Event()
-        # Connection state
-        self.main_client = main_client
-        self.aux_client = aux_client
-        # (Re-)Inspection state:
-        self.dirty_lock = threading.Lock()
-        self.cabal_to_load = LockedObject.LockedObject([])
-        self.dirty_files = LockedObject.LockedObject([])
-        self.dirty_paths = LockedObject.LockedObject([])
-        self.reinspect_event = threading.Event()
-
-    def run(self):
-        self.end_event.clear()
-        while not self.end_event.is_set():
-            if not self.main_client.ping():
-                Logging.log('hsdev ping: no pong', Logging.LOG_WARNING)
-
-            scan_paths = []
-            with self.dirty_paths as dirty_paths:
-                scan_paths = dirty_paths[:]
-                dirty_paths[:] = []
-
-            files_to_reinspect = []
-            with self.dirty_files as dirty_files:
-                files_to_reinspect = dirty_files[:]
-                dirty_files[:] = []
-
-            projects = []
-            files = []
-
-            if len(files_to_reinspect) > 0:
-                projects = []
-                files = []
-                for finspect in files_to_reinspect:
-                    projdir = Common.get_cabal_project_dir_of_file(finspect)
-                    if projdir is not None:
-                        projects.append(projdir)
-                    else:
-                        files.append(finspect)
-
-            projects = list(set(projects))
-            files = list(set(files))
-
-            self.inspect(paths=scan_paths, projects=projects, files=files)
-
-            load_cabal = []
-            with self.cabal_to_load as cabal_to_load:
-                load_cabal = cabal_to_load[:]
-                cabal_to_load[:] = []
-
-            for cabal in load_cabal:
-                Worker.run_async('inspect cabal {0}'.format(cabal), self.inspect_cabal, cabal)
-
-            if files_to_reinspect and Settings.PLUGIN.enable_hdocs:
-                self.aux_client.docs(files=files_to_reinspect)
-
-            self.reinspect_event.wait(HsDevInspector.WAIT_TIMEOUT)
-            self.reinspect_event.clear()
-
-    @dirty
-    def force_inspect(self):
-        self.reinspect_event.set()
-
-    @dirty
-    def start_inspect(self):
-        self.mark_cabal()
-        self.mark_all_files()
-
-    @dirty
-    @use_inspect_modules
-    def mark_all_files(self):
-        for window in sublime.windows():
-            with self.dirty_files as dirty_files:
-                dirty_files.extend(list(filter(lambda f: f and f.endswith('.hs'), [v.file_name() for v in window.views()])))
-            with self.dirty_paths as dirty_paths:
-                dirty_paths.extend(window.folders())
-
-    @dirty
-    @use_inspect_modules
-    def mark_file_dirty(self, filename):
-        if filename is not None:
-            with self.dirty_files as dirty_files:
-                dirty_files.append(filename)
-
-    @dirty
-    def mark_cabal(self, cabal_name=None):
-        with self.cabal_to_load as cabal_to_load:
-            cabal_to_load.append(cabal_name or 'cabal')
-
-    @use_hsdev()
-    def inspect_cabal(self, cabal=None):
-        with Common.status_message_process('Inspecting {0}'.format(cabal or 'cabal'), priority=1) as smgr:
-            self.aux_client.scan(cabal=(cabal == 'cabal'),
-                                 sandboxes=[] if cabal == 'cabal' else [cabal],
-                                 on_notify=ScanStatus(smgr),
-                                 wait=True,
-                                 docs=Settings.PLUGIN.enable_hdocs)
-
-    @use_hsdev()
-    @use_inspect_modules
-    def inspect(self, paths, projects, files):
-        if paths or projects or files:
-            with Common.status_message_process('Inspecting', priority=1) as smgr:
-                self.aux_client.scan(paths=paths,
-                                     projects=projects,
-                                     files=files,
-                                     on_notify=ScanStatus(smgr),
-                                     wait=True,
-                                     ghc=Settings.PLUGIN.ghc_opts,
-                                     docs=Settings.PLUGIN.enable_hdocs)
-
-    @use_hsdev()
-    @use_inspect_modules
-    def inspect_path(self, path):
-        with Common.status_message_process('Inspecting path {0}'.format(path), priority=1) as smgr:
-            self.aux_client.scan(paths=[path],
-                                 on_notify=ScanStatus(smgr),
-                                 wait=True,
-                                 ghc=Settings.PLUGIN.ghc_opts,
-                                 docs=Settings.PLUGIN.enable_hdocs)
-
-    @use_hsdev()
-    @use_inspect_modules
-    def inspect_project(self, cabal_dir):
-        (project_name, _) = Common.get_cabal_in_dir(cabal_dir)
-
-        with Common.status_message_process('Inspecting project {0}'.format(project_name), priority=1) as smgr:
-            self.aux_client.scan(projects=[cabal_dir],
-                                 on_notify=ScanStatus(smgr),
-                                 wait=True,
-                                 docs=Settings.PLUGIN.enable_hdocs)
-
-    @use_hsdev()
-    @use_inspect_modules
-    def inspect_files(self, filenames):
-        with Common.status_message_process('Inspecting files', priority=1) as smgr:
-            self.aux_client.scan(files=filenames,
-                                 on_notify=ScanStatus(smgr),
-                                 wait=True,
-                                 ghc=Settings.PLUGIN.ghc_opts,
-                                 docs=Settings.PLUGIN.enable_hdocs)

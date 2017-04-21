@@ -1,5 +1,4 @@
 # -*- coding: UTF-8 -*-
-# pylint: disable=fixme
 
 """SublimeHaskell autocompletion support."""
 
@@ -10,12 +9,11 @@ import sublime
 import sublime_plugin
 
 import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.locked_object as LockedObject
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.utils as Utils
-import SublimeHaskell.ghcimod.ghci_backend as GHCIMod
-import SublimeHaskell.hsdev.agent as hsdev
 import SublimeHaskell.worker as Worker
 
 
@@ -38,23 +36,19 @@ EXPORT_MODULE_RE = re.compile(r'\bmodule\s+[\w\d\.]*$')
 
 # Gets available LANGUAGE options and import modules from ghc-mod
 def get_language_pragmas():
-
-    if Settings.PLUGIN.enable_hsdev:
-        return hsdev.client.langs()
-    elif Settings.PLUGIN.enable_ghc_mod:
-        return GHCIMod.call_ghcmod_and_wait(['lang']).splitlines()
-
-    return []
+    return BackendManager.active_backend().langs()
+    # elif Settings.PLUGIN.enable_ghc_mod:
+    #     return GHCIMod.call_ghcmod_and_wait(['lang']).splitlines()
+    # else:
+    #     return []
 
 
 def get_flags_pragmas():
-
-    if Settings.PLUGIN.enable_hsdev:
-        return hsdev.client.flags()
-    elif Settings.PLUGIN.enable_ghc_mod:
-        return GHCIMod.call_ghcmod_and_wait(['flag']).splitlines()
-
-    return []
+    return BackendManager.active_backend().flags()
+    # elif Settings.PLUGIN.enable_ghc_mod:
+    #     return GHCIMod.call_ghcmod_and_wait(['flag']).splitlines()
+    # else:
+    #     return []
 
 
 def sort_completions(comps):
@@ -127,7 +121,6 @@ class AutoCompletion(object):
     def mark_wide_completion(self, view):
         self.wide_completion = view
 
-    @hsdev.use_hsdev([])
     def get_completions_async(self, file_name=None):
         def log_result(result):
             Logging.log('completions: {0}'.format(len(result or [])), Logging.LOG_TRACE)
@@ -156,9 +149,10 @@ class AutoCompletion(object):
             return log_result(none_comps)
         else:
             Logging.log('preparing completions for {0}'.format(file_name), Logging.LOG_DEBUG)
-            current_module = Utils.head_of(hsdev.client_back.module(file=file_name))
+            current_module = Utils.head_of(BackendManager.active_backend().module(file=file_name))
+
             if current_module:
-                comps = make_completions(hsdev.client_back.complete('', file_name, timeout=None))
+                comps = make_completions(BackendManager.active_backend().complete('', file_name, timeout=None))
 
                 # Get import names
                 #
@@ -199,7 +193,6 @@ class AutoCompletion(object):
                 if filename:
                     self.get_completions_async(filename)
 
-    @hsdev.use_hsdev([])
     def get_completions(self, view, locations):
         "Get all the completions related to the current file."
 
@@ -208,6 +201,8 @@ class AutoCompletion(object):
             return []
 
         self.current_filename = current_file_name
+
+        backend = BackendManager.active_backend()
         line_contents = Common.get_line_contents(view, locations[0])
         qsymbol = Common.get_qualified_symbol(line_contents)
         qualified_prefix = qsymbol.qualified_name()
@@ -221,24 +216,24 @@ class AutoCompletion(object):
         suggestions = []
         if qsymbol.module:
             if qsymbol.is_import_list:
-                current_module = Utils.head_of(hsdev.client.module(file=current_file_name))
+                current_module = Utils.head_of(backend.module(file=current_file_name))
                 if current_module and current_module.location.project:
                     # Search for declarations of qsymbol.module within current project
-                    q_module = Utils.head_of(hsdev.client.scope_modules(file=current_file_name,
-                                                                        lookup=qsymbol.module,
-                                                                        search_type='exact'))
+                    q_module = Utils.head_of(backend.scope_modules(file=current_file_name,
+                                                                   lookup=qsymbol.module,
+                                                                   search_type='exact'))
                     if q_module.by_source():
-                        proj_module = hsdev.client.resolve(file=q_module.location.filename, exports=True)
+                        proj_module = backend.resolve(file=q_module.location.filename, exports=True)
                         if proj_module:
                             suggestions = proj_module.declarations.values()
                     elif q_module.by_cabal():
-                        cabal_module = Utils.head_of(hsdev.client.module(lookup=q_module.name,
-                                                                         search_type='exact',
-                                                                         package=q_module.location.package.name))
+                        cabal_module = Utils.head_of(backend.module(lookup=q_module.name,
+                                                                    search_type='exact',
+                                                                    package=q_module.location.package.name))
                         if cabal_module:
                             suggestions = cabal_module.declarations.values()
             else:
-                suggestions = hsdev.client.complete(qualified_prefix, current_file_name, wide=wide)
+                suggestions = backend.complete(qualified_prefix, current_file_name, wide=wide)
 
             return self.keyword_completions + make_completions(suggestions)
         else:
@@ -249,21 +244,21 @@ class AutoCompletion(object):
 
                 return self.keyword_completions + completions
 
-    @hsdev.use_hsdev([])
     def completions_for_module(self, module, filename=None):
         """
         Returns completions for module
         """
         retval = []
+        backend = BackendManager.active_backend()
         if module:
-            mods = hsdev.client.scope_modules(filename, lookup=module, search_type='exact') if filename else []
+            mods = backend.scope_modules(filename, lookup=module, search_type='exact') if filename else []
 
             mod_file = mods[0].location.filename if mods and mods[0].by_source() else None
             cache_db = mods[0].location.db if mods and mods[0].by_cabal() else None
             package = mods[0].location.package.name if mods and mods[0].by_cabal() else None
 
-            mod_decls = Utils.head_of(hsdev.client.module(lookup=module, search_type='exact', file=mod_file, symdb=cache_db,
-                                                          package=package))
+            mod_decls = Utils.head_of(backend.module(lookup=module, search_type='exact', file=mod_file, symdb=cache_db,
+                                                     package=package))
             retval = make_completions(mod_decls.declarations.values()) if mod_decls else []
 
         return retval
@@ -274,7 +269,6 @@ class AutoCompletion(object):
         """
         return self.completions_for_module(module_name, filename)
 
-    @hsdev.use_hsdev([])
     def get_import_completions(self, view, locations):
 
         self.current_filename = view.file_name()
@@ -327,7 +321,6 @@ class AutoCompletion(object):
 
         return []
 
-    @hsdev.use_hsdev([])
     def get_module_completions_for(self, qualified_prefix, modules=None, current_dir=None):
         def module_next_name(mname):
             """
@@ -342,7 +335,6 @@ class AutoCompletion(object):
         return list(set((module_next_name(m) + '\tmodule', module_next_name(m))
                         for m in module_list if m.startswith(qualified_prefix)))
 
-    @hsdev.use_hsdev([])
     def get_current_module_completions(self, current_dir=None):
         """
         Get modules, that are in scope of file/project
@@ -351,20 +343,21 @@ class AutoCompletion(object):
             project - get dependent modules
             sandbox - get sandbox modules
         """
+        backend = BackendManager.active_backend()
         if self.current_filename:
-            return set([m.name for m in hsdev.client.scope_modules(self.current_filename)])
+            return set([m.name for m in backend.scope_modules(self.current_filename)])
         elif current_dir:
-            proj = hsdev.client.project(path=current_dir)
+            proj = backend.project(path=current_dir)
             if proj and 'path' in proj:
-                return set([m.name for m in hsdev.client.list_modules(deps=proj['path'])])
-            sbox = hsdev.client.sandbox(path=current_dir)
+                return set([m.name for m in backend.list_modules(deps=proj['path'])])
+            sbox = backend.sandbox(path=current_dir)
             if sbox and isinstance(sbox, dict) and 'sandbox' in sbox:
                 sbox = sbox.get('sandbox')
             if sbox:
-                mods = hsdev.client.list_modules(sandbox=sbox) or []
+                mods = backend.list_modules(sandbox=sbox) or []
                 return set([m.name for m in mods])
         else:
-            mods = hsdev.client.list_modules(cabal=True) or []
+            mods = backend.list_modules(cabal=True) or []
             return set([m.name for m in mods])
 
 AUTO_COMPLETER = AutoCompletion()
@@ -454,28 +447,25 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
                 Worker.run_async('get completions for {0}'.format(filename), AUTO_COMPLETER.get_completions_async, filename)
 
     def on_new(self, view):
-        hsdev.start_agent()
-
+        Logging.log('SublimeHaskellAutocomplete.on_new invoked.', Logging.LOG_DEBUG)
         self.set_cabal_status(view)
         if Common.is_inspected_source(view):
             filename = view.file_name()
             if filename:
-                hsdev.agent.mark_file_dirty(filename)
+                BackendManager.inspector().mark_file_dirty(filename)
                 update_completions_async(drop_all=True)
 
     def on_load(self, view):
-        hsdev.start_agent()
-
+        Logging.log('SublimeHaskellAutocomplete.on_load invoked.', Logging.LOG_DEBUG)
         self.set_cabal_status(view)
         if Common.is_inspected_source(view):
             filename = view.file_name()
             if filename:
-                hsdev.agent.mark_file_dirty(filename)
+                BackendManager.inspector().mark_file_dirty(filename)
                 update_completions_async(drop_all=True)
 
     def on_activated(self, view):
-        hsdev.start_agent()
-
+        Logging.log('SublimeHaskellAutocomplete.on_activated invoked.', Logging.LOG_DEBUG)
         self.set_cabal_status(view)
 
         window = view.window()
@@ -485,17 +475,14 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
             if window.project_file_name() is not None and window.project_file_name() != self.project_file_name:
                 self.project_file_name = window.project_file_name()
                 Logging.log('project switched to {0}, reinspecting'.format(self.project_file_name))
-                if hsdev.agent_connected():
-                    Logging.log('reinspect all', Logging.LOG_TRACE)
-                    hsdev.client.remove_all()
-                    hsdev.agent.start_inspect()
-                    hsdev.agent.force_inspect()
-                else:
-                    Common.show_status_message("inspector not connected", is_ok=False)
+                Logging.log('reinspect all', Logging.LOG_TRACE)
+                BackendManager.active_backend().remove_all()
+                BackendManager.inspector().start_inspect()
+                BackendManager.inspector().force_inspect()
 
     def on_post_save(self, view):
         if Common.is_inspected_source(view):
             filename = view.file_name()
             if filename:
-                hsdev.agent.mark_file_dirty(filename)
+                BackendManager.inspector().mark_file_dirty(filename)
                 update_completions_async(drop_all=True)
