@@ -8,8 +8,14 @@
 	// Enable auto build project on save
 	"enable_auto_build": false,
 
-	// Haskell build tool: "cabal" to use only cabal and "stack" to use stack whenever
-	// there's stack.yaml in project root
+	// Haskell build system. Choices are:
+	//
+	// "cabal": Use cabal to build projects
+	// "cabal-new-build": Use the new cabal build system
+	// "stack" Use stack to build projects
+	//
+	// Ideally, you should put your default preference in your User preferences. Someday, SublimeHaskell
+	// will pick this up on a per-project basis.
 	"haskell_build_tool": "stack",
 
 	// Enable auto run tests on save, has effect only if auto build enabled (enable_auto_build)
