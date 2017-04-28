@@ -58,6 +58,7 @@ class SetttingsContainer(object):
         'hsdev_host': ('hsdev_host', 'localhost'),
         'hsdev_local_process': ('hsdev_local_process', True),
         'hsdev_log_config': ('hsdev_log_config', 'use silent'),
+        'hsdev_log_level': ('hsdev_log_level', 'warning'),
         'hsdev_port': ('hsdev_port', 4567),
         'inhibit_completions': ('inhibit_completions', False),
         'inspect_modules': ('inspect_modules', True),
@@ -93,6 +94,7 @@ class SetttingsContainer(object):
         self.hsdev_host = None
         self.hsdev_local_process = None
         self.hsdev_log_config = None
+        self.hsdev_log_level = None
         self.hsdev_port = None
         self.inhibit_completions = None
         self.inspect_modules = None
