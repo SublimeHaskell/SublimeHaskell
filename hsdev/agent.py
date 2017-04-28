@@ -124,6 +124,14 @@ class HsDevProcess(threading.Thread):
                            (self.port, ["--port", str(self.port)]),
                            (self.cache, ["--cache", self.cache]),
                            (self.log_file, ["--log", self.log_file]),
+                           # HACK! HACK! HACK! Alexandr changed simple-log's command line API.
+                           #
+                           # "--log-config" only applies to earlier hsdev versions that support 'log politics' (and for those
+                           # of us old enough to remember the Soviet era, 'log politics' is an incredibly Soviet notion that
+                           # makes us smile! :-)
+                           #
+                           # Versions 0.2.3.0 and later: Simplified argument -- just the log level, and only one log level,
+                           # Yvgeny! (With apologies to "The Hunt for Red October".)
                            (not new_simple_log and self.log_config, ["--log-config", self.log_config]),
                            (new_simple_log and self.log_config, ["--log-level", self.log_config])])
 
@@ -487,15 +495,25 @@ class HsDevLocalAgent(HsDevAgent):
 
     def __init__(self, port):
         super().__init__("localhost", port)
+        self.hsdev_process = None
 
         hsdev_ver = hsdev_version()
         if hsdev_ver is None:
             Common.output_error_async(sublime.active_window(), "\n".join(HsDevLocalAgent.hsdev_not_found))
-            return False
         elif not check_version(hsdev_ver, HSDEV_MIN_VER):
             Common.output_error_async(sublime.active_window(), "\n".join(HsDevLocalAgent.hsdev_wrong_version(hsdev_ver)))
-            return False
         else:
+            hsdev_log_settings = Settings.PLUGIN.hsdev_log_config
+            if patch_simple_log(hsdev_ver):
+                hsdev_log_settings = Settings.PLUGIN.hsdev_log_level
+
+            self.hsdev_process = HsDevProcess(port, hsdev_ver,
+                                              cache=os.path.join(Common.sublime_haskell_cache_path(), 'hsdev'),
+                                              log_file=os.path.join(Common.sublime_haskell_cache_path(), 'hsdev', 'hsdev.log'),
+                                              log_config=hsdev_log_settings)
+
+    def do_start_hsdev(self):
+        if self.hsdev_process is not None:
             def start_():
                 Logging.log('hsdev process started', Logging.LOG_TRACE)
                 self.connect_clients()
@@ -505,26 +523,17 @@ class HsDevLocalAgent(HsDevAgent):
                 self.disconnect_clients()
 
             def connected_():
-                Logging.log('hsdev agent: primary connection to hsdev established', Logging.LOG_TRACE)
+                Logging.log('hsdev agent: primary connection to hsdev established', Logging.LOG_DEBUG)
                 self.client.link()
 
-            self.client.set_on_connected(connected_)
-
-            hsdev_log_settings = Settings.PLUGIN.hsdev_log_config
-            if patch_simple_log(hsdev_ver):
-                hsdev_log_settings = Settings.PLUGIN.hsdev_log_level
-
-            self.hsdev_process = HsDevProcess(port, hsdev_ver,
-                                              cache=os.path.join(Common.sublime_haskell_cache_path(), 'hsdev'),
-                                              log_file=os.path.join(Common.sublime_haskell_cache_path(), 'hsdev', 'hsdev.log'),
-                                              log_config=hsdev_log_settings)
             self.hsdev_process.on_start = start_
             self.hsdev_process.on_exit = exit_
+            self.client.set_on_connected(connected_)
 
-    def do_start_hsdev(self):
-        self.hsdev_process.start()
-        self.hsdev_process.create()
-        return True
+            self.hsdev_process.start()
+            self.hsdev_process.create()
+
+        return self.hsdev_process is not None
 
 
     def do_stop_hsdev(self):
