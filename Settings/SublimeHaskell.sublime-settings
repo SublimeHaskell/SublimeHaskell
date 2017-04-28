@@ -8,8 +8,14 @@
 	// Enable auto build project on save
 	"enable_auto_build": false,
 
-	// Haskell build tool: "cabal" to use only cabal and "stack" to use stack whenever
-	// there's stack.yaml in project root
+	// Haskell build system. Choices are:
+	//
+	// "cabal": Use cabal to build projects
+	// "cabal-new-build": Use the new cabal build system
+	// "stack" Use stack to build projects
+	//
+	// Ideally, you should put your default preference in your User preferences. Someday, SublimeHaskell
+	// will pick this up on a per-project basis.
 	"haskell_build_tool": "stack",
 
 	// Enable auto run tests on save, has effect only if auto build enabled (enable_auto_build)
@@ -155,7 +161,15 @@
 	// Log level, 0 — no log, 1 — errors, 2 — warnings, 3 — info messages, 4 — debug, 5 — trace
 	"log": 1,
 
-	// hsdev's logging: 'use default' (somewhat verbose, informational), 'use silent' (quiet)
-	// This is a somewhat magic setting that comes from the Haskell 'simple-log' documentation.
-  "hsdev_log_config": "use silent"
+	// hsdev logging output:
+	//
+	// !!!PAY ATTENTION TO YOUR HSDEV VERSION!!!
+	//
+	// hsdev version 0.2.2.0 and below: The "hsdev_log_config" preference controls hsdev's logging. It has several interesting
+	// values: 'use default' (somewhat verbose, informational), 'use silent' (quiet)
+	//
+	// hsdev version 0.2.3.0 and higher: The "hsdev_log_level" preference controls hsdev's logging. Valid values are
+	// 'trace', 'debug', 'info', 'warning', 'error' and 'fatal'.
+  "hsdev_log_config": "use silent",
+  "hsdev_log_level": "warning"
 }

@@ -106,7 +106,11 @@ class DescriptorDrain(threading.Thread):
             if isinstance(line, bytearray):
                 line = Utils.decode_bytes(line)
             line = line.rstrip()
-            print('<{0}> {1}'.format(self.label, line))
+            if line != '':
+                print('<{0}> {1}'.format(self.label, line))
+            else:
+                # Got EOF. Stop.
+                self.stop()
 
     def stop(self):
         self.stop_me.set()

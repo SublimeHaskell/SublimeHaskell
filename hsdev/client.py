@@ -247,7 +247,9 @@ class HsDev(object):
 
     @HsDecorator.command
     def link(self, hold=False):
-        return cmd('link', {'hold': hold})
+        retval = cmd('link', {'hold': hold})
+        Logging.log("link command sent, result: {0}".format(retval), Logging.LOG_DEBUG)
+        return retval
 
     @HsDecorator.command
     def ping(self):

@@ -18,12 +18,17 @@ OUTPUT_PANEL_NAME = "haskell_run_output"
 
 BUILD_TOOL = {
     'cabal': {'command': 'cabal', 'name': 'cabal'},
+    'cabal-new-build': {'command': 'cabal', 'name': 'cabal (new build)'},
     'stack': {'command': 'stack', 'name': 'stack'}
 }
 
 
 def same_steps(steps):
-    return {'cabal': steps, 'stack': steps}
+    return {
+        'cabal': steps,
+        'cabal-new-build': steps,
+        'stack': steps
+    }
 
 BUILD_TOOL_CONFIG = {
     'clean': {
@@ -33,17 +38,26 @@ BUILD_TOOL_CONFIG = {
     'configure': {
         'message': 'Configuring',
         'steps': {
-            'cabal': [['configure', '--enable-tests']],
-            'stack': []
+            'cabal':           [['configure', '--enable-tests']],
+            'cabal-new-build': [['new-configure', '--enable-tests']],
+            'stack':           []
         }
     },
     'build': {
         'message': 'Building',
-        'steps': same_steps([['build']])
+        'steps': {
+            'cabal':           [['build']],
+            'cabal-new-build': [['new-build']],
+            'stack':           [['build']]
+        }
     },
     'typecheck': {
         'message': 'Checking',
-        'steps': same_steps([['build', '--ghc-options=-c']])
+        'steps': {
+            'cabal':           [['build', '--ghc-options=-c']],
+            'cabal-new-build': [['new-build', '--ghc-options=-c']],
+            'stack':           [['build', '--ghc-options=-c']]
+        }
     },
     # Commands with warnings:
     # Run fast, incremental build first. Then build everything with -Wall and -fno-code
@@ -51,30 +65,35 @@ BUILD_TOOL_CONFIG = {
     'build_then_warnings': {
         'message': 'Building',
         'steps': {
-            'cabal': [['build'], ['build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
-            'stack': [['build']]
+            'cabal':           [['build'], ['build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
+            'cabal-new-build': [['new-build'], ['new-build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
+            'stack':           [['build']]
         }
     },
     'typecheck_then_warnings': {
         'message': 'Checking',
         'steps': {
-            'cabal': [['build', '--ghc-options=-c'], ['build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
-            'stack': [['build']]
+            'cabal':           [['build', '--ghc-options=-c'], ['build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
+            'cabal-new-build': [['new-build', '--ghc-options=-c'],
+                                ['new-build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
+            'stack':           [['build']]
         }
     },
 
     'rebuild': {
         'message': 'Rebuilding',
         'steps': {
-            'cabal': [['clean'], ['configure', '--enable-tests'], ['build']],
-            'stack': [['clean'], ['build']]
+            'cabal':           [['clean'], ['configure', '--enable-tests'], ['build']],
+            'cabal-new-build': [['clean'], ['new-configure', '--enable-tests'], ['new-build']],
+            'stack':           [['clean'], ['build']]
         }
     },
     'install': {
         'message': 'Installing',
         'steps': {
-            'cabal': [['install', '--enable-tests']],
-            'stack': [['install']]
+            'cabal':           [['install', '--enable-tests']],
+            'cabal-new-build': [['install', '--enable-tests']],
+            'stack':           [['install']]
         }
     },
     'test': {

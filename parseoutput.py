@@ -182,9 +182,8 @@ def show_output_result_text(view, msg, text, exit_code, base_dir):
 
     Common.show_status_message_process(msg, success)
     # Show panel if there is any text to show (without the part that we add)
-    if text:
-        if Settings.PLUGIN.show_error_window:
-            sublime.set_timeout(lambda: write_output(view, output, base_dir), 0)
+    if text and Settings.PLUGIN.show_error_window:
+        sublime.set_timeout(lambda: write_output(view, output, base_dir), 0)
 
 
 def parse_output_messages_and_show(view, msg, base_dir, exit_code, stderr):
@@ -364,13 +363,13 @@ def mark_messages_in_view(messages, view):
                              sublime.HIDDEN)
 
 
-def write_output(view, text, cabal_project_dir, panel_display=False):
+def write_output(view, text, cabal_project_dir, panel_out=True):
     "Write text to Sublime's output panel."
     global ERROR_VIEW
     ERROR_VIEW = Common.output_panel(view.window(), text,
                                      panel_name=OUTPUT_PANEL_NAME,
                                      syntax='HaskellOutputPanel',
-                                     panel_display=panel_display)
+                                     panel_display=panel_out)
     ERROR_VIEW.settings().set("RESULT_FILE_REGEX", RESULT_FILE_REGEX)
     ERROR_VIEW.settings().set("result_base_dir", cabal_project_dir)
 
