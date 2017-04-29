@@ -156,7 +156,7 @@ class HsDevProcess(threading.Thread):
                     srvout = hsdev_proc.process.stdout.readline().strip()
                     if srvout != '':
                         Logging.log('hsdev initial output: {0}'.format(srvout), Logging.LOG_DEBUG)
-                        start_confirm = re.match(r'[Ss]erver started at port (?P<port>\d+)$', srvout)
+                        start_confirm = re.search(r'[Ss]erver started at port (?P<port>\d+)$', srvout)
                         if start_confirm:
                             Logging.log('hsdev server started at port {0}'.format(start_confirm.group('port')))
                             break
