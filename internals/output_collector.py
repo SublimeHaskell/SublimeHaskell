@@ -23,6 +23,9 @@ class OutputCollector(object):
         self.autoindent = panel_settings.get('auto_indent')
         self.roflag = self.panel.is_read_only()
 
+        panel_settings.set('auto_indent', False)
+        panel.set_read_only(False)
+
         if self.prochelp.process is not None:
             lines_lock = threading.RLock()
             self.stdout_collector = FileObjectCollector("stdout-collector", panel, lines_lock,
@@ -32,14 +35,20 @@ class OutputCollector(object):
                 self.stderr_collector = FileObjectCollector("stderr-collector", panel, lines_lock,
                                                             self.lines, self.prochelp.process.stderr)
                 self.stderr_collector.start()
+        else:
+            self.lines = self.prochelp.process_err
+            self.panel.run_command('insert', {'characters': self.prochelp.process_err})
 
-        panel_settings.set('auto_indent', False)
-        self.panel.set_read_only(False)
+        panel_settings.set('auto_indent', self.autoindent)
+        self.panel.set_read_only(self.roflag)
 
     def wait(self):
         panel_settings = self.panel.settings()
 
-        if self.prochelp is not None:
+        panel_settings.set('auto_indent', False)
+        self.panel.set_read_only(False)
+
+        if self.prochelp.process is not None:
             # Wait for process and threads to complete...
             self.exit_code = self.prochelp.process.wait()
 
@@ -53,9 +62,6 @@ class OutputCollector(object):
                 self.panel.run_command('insert', {'characters': exit_msg})
 
             self.prochelp.cleanup()
-        else:
-            self.lines = self.prochelp.process_err
-            self.panel.run_command('insert', {'characters': self.prochelp.process_err})
 
         panel_settings.set('auto_indent', self.autoindent)
         self.panel.set_read_only(self.roflag)

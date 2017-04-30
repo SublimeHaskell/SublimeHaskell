@@ -22,7 +22,6 @@
             { "key": "scanned_source" } ],
         "command": "sublime_haskell_go_to_declaration"
     },
-    { "keys": ["ctrl+b"], "context": [ { "key" : "haskell_source" } ], "command": "sublime_haskell_build" },
     { "keys": ["ctrl+shift+y"], "context": [ { "key": "haskell_source" } ], "command": "sublime_haskell_expand_selection_expression" },
     { "keys": ["ctrl+m", "ctrl+i"], "context": [ { "key": "haskell_source" } ], "command": "sublime_haskell_insert_import" },
     { "keys": ["ctrl+k", "ctrl+h", "ctrl+t"], "context": [ { "key" : "haskell_source" } ], "command": "sublime_haskell_show_type" },

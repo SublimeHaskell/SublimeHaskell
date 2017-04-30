@@ -379,6 +379,7 @@ def hide_output(view, panel_name=OUTPUT_PANEL_NAME):
 
 
 def show_output(view, panel_name=OUTPUT_PANEL_NAME):
+    ## view.set_read_only(True)
     view.window().run_command('show_panel', {'panel': 'output.' + panel_name})
 
 
