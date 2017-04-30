@@ -111,6 +111,8 @@ PROJECTS_BEING_BUILT = set()
 
 # Base command
 class SublimeHaskellBaseCommand(Common.SublimeHaskellWindowCommand):
+    def __init__(self, window):
+        super().__init__(window)
 
     def build(self, command, filter_project=None):
         select_project(self.window,
@@ -258,34 +260,30 @@ def run_build(view, project_name, project_dir, config):
 
 # Default build system (cabal or cabal-dev)
 
-class SublimeHaskellCleanCommand(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('clean')
-
-
-class SublimeHaskellConfigureCommand(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('configure')
-
-
 class SublimeHaskellBuildCommand(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('build')
+    def __init__(self, window):
+        super().__init__(window)
+
+    def run(self, task='build', flags=None):
+        """
+        Runs the "sublime_haskell_build" command - invoked by Sublime Text via the
+        command palette or sublime.Window.run_command()
+        :param task:
+            A unicode string of "build", "clean", "configure", "rebuild"
+        :param flags:
+            A list of unicode strings of flags to send to the command-line go
+            tool. The "cross_compile" task executes the "build" command with
+            the GOOS and GOARCH environment variables set, meaning that
+            flags for "build" should be used with it. Execute "go help" on the
+            command line to learn about available flags.
+        """
+        if task in ['build', 'clean', 'configure', 'rebuild', 'install']:
+            self.build(task)
 
 
 class SublimeHaskellTypecheckCommand(SublimeHaskellBaseCommand):
     def run(self):
         self.build('typecheck_then_warnings')
-
-
-class SublimeHaskellRebuildCommand(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('rebuild')
-
-
-class SublimeHaskellInstallCommand(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('install')
 
 
 class SublimeHaskellTestCommand(SublimeHaskellBaseCommand):

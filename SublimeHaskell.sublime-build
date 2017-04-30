@@ -1,0 +1,23 @@
+{
+    "target": "sublime_haskell_build",
+    "selector": "source.haskell",
+
+    "variants": [
+        {
+            "name": "Clean",
+            "task": "clean"
+        },
+        {
+            "name": "Configure",
+            "task": "configure"
+        },
+        {
+            "name": "Rebuild",
+            "task": "rebuild"
+        },
+        {
+            "name": "Install",
+            "task": "install"
+        }
+    ]
+}
