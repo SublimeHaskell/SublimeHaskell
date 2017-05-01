@@ -1,7 +1,8 @@
-"""
+"""The main API for the client-side of hsdev.
 """
 
 import json
+import pprint
 import socket
 import sys
 import threading
@@ -435,7 +436,9 @@ class HsDev(object):
 
     @HsDecorator.list_command
     def lint(self, files=None, contents=None, hlint=None):
-        return cmd('lint', {'files': files_and_contents(files or [], contents or {}), 'hlint-opts': hlint or []})
+        retval = cmd('lint', {'files': files_and_contents(files or [], contents or {}), 'hlint-opts': hlint or []})
+        Logging.log('hsdev.lint: retval\n{0}'.format(pprint.pformat(retval)))
+        return retval
 
     @HsDecorator.list_command
     def check(self, files=None, contents=None, ghc=None):

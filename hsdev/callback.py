@@ -8,7 +8,7 @@ def call_callback(callback_fn, *args, **kwargs):
     if name:
         del kwargs['name']
     if callback_fn is not None:
-        Logging.log('call_callback invoking {0}'.format(callback_fn))
+        # Logging.log('call_callback invoking {0}'.format(callback_fn), Logging.LOG_DEBUG)
         callback_fn(*args, **kwargs)
 
 

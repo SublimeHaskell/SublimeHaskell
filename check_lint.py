@@ -1,9 +1,9 @@
 # -*- coding: UTF-8 -*-
 
 import os
+import pprint
 import re
 import threading
-import traceback
 
 import sublime
 
@@ -23,12 +23,22 @@ def lint_as_hints(msgs):
             msg[1].level = 'hint'
 
 
+def file_as_file_list(file):
+    '''Turn the file name into a singleton list. Used in hsdev_check() and hsdev_lint()
+    '''
+    return [file]
+
+def unfiltered_messages(msgs):
+    '''Identity function for message transforms.
+    '''
+    return msgs
+
 def hsdev_check():
-    return (hsdev.client.check, lambda file: [file], lambda ms: ms, {'ghc': Settings.PLUGIN.ghc_opts})
+    return (hsdev.client.check, file_as_file_list, unfiltered_messages, {'ghc': Settings.PLUGIN.ghc_opts})
 
 
 def hsdev_lint():
-    return (hsdev.client.lint, lambda file: [file], lambda ms: ms, {})
+    return (hsdev.client.lint, file_as_file_list, unfiltered_messages, {})
 
 # def hsdev_check_lint():
 #     return (hsdev.client.ghcmod_check_lint,
@@ -61,49 +71,46 @@ class SublimeHaskellHsDevChain(Common.SublimeHaskellTextCommand):
         self.corrections = []
         self.fly_mode = fly_mode
         self.filename = self.view.file_name()
-        if not self.filename:
-            return
-        self.contents = {}
-        if self.view.is_dirty():
-            self.contents[self.filename] = self.view.substr(sublime.Region(0, self.view.size()))
-        if not self.fly_mode:
-            ParseOutput.hide_output(self.view)
-        if cmds:
-            self.status_msg = Common.status_message_process(msg + ': ' + self.filename, priority=2)
-            self.status_msg.start()
-
-            if not hsdev.agent_connected():
-                Logging.log('hsdev chain fails: hsdev not connected', Logging.LOG_ERROR)
-                self.status_msg.fail()
-                self.status_msg.stop()
-            else:
-                self.go_chain(cmds)
+        if self.filename:
+            self.contents = {}
+            if self.view.is_dirty():
+                self.contents[self.filename] = self.view.substr(sublime.Region(0, self.view.size()))
+            if not self.fly_mode:
+                ParseOutput.hide_output(self.view)
+                if not hsdev.agent_connected():
+                    Logging.log('hsdev chain fails: hsdev not connected', Logging.LOG_ERROR)
+                    sublime.error_message('check_lint.run_chain: Cannot execute command chain, hsdev not connected.')
+                else:
+                    if cmds:
+                        self.status_msg = Common.status_message_process(msg + ': ' + self.filename, priority=2)
+                        self.status_msg.start()
+                        self.go_chain(cmds)
+                    else:
+                        sublime.error_message('Empty command chain (check_lint.run_chain)')
 
     def go_chain(self, cmds):
-        try:
-            if not cmds:
-                self.status_msg.stop()
-                hsdev.client.autofix_show(self.msgs, on_response=self.on_autofix)
-            else:
-                cmd, tail_cmds = cmds[0], cmds[1:]
-                (chain_fn, modify_args, modify_msgs, kwargs) = cmd
-
-                def on_resp(msgs):
-                    self.messages.extend(modify_msgs(msgs))
-                    self.msgs.extend(msgs)
-                    self.go_chain(tail_cmds)
-
-                def on_err(_err, _details):
-                    self.status_msg.fail()
-                    self.go_chain([])
-
-                chain_fn(modify_args(self.filename), contents=self.contents, wait=False, on_response=on_resp,
-                         on_error=on_err, **kwargs)
-        except OSError:
-            Logging.log('hsdev chain failed, see console window (<ctrl>-<backtick>) traceback', Logging.LOG_ERROR)
-            print(traceback.format_exc())
-            self.status_msg.fail()
+        if not cmds:
             self.status_msg.stop()
+            hsdev.client.autofix_show(self.msgs, on_response=self.on_autofix)
+        else:
+            cmd, tail_cmds = cmds[0], cmds[1:]
+            agent_func, modify_args, modify_msgs, kwargs = cmd
+
+            Logging.log('go_chain: executing\n{0}'.format(pprint.pformat(cmd)), Logging.LOG_DEBUG)
+
+            def go_chain_resp(msgs):
+                Logging.log('go_chain_resp:\n{0}'.format(pprint.pformat(msgs)), Logging.LOG_DEBUG)
+                self.messages.extend(modify_msgs(msgs))
+                self.msgs.extend(msgs)
+                self.go_chain(tail_cmds)
+
+            def go_chain_err(_err, details):
+                Logging.log('go_chain_err: details\n{0}'.format(pprint.pformat(details)), Logging.LOG_DEBUG)
+                self.status_msg.fail()
+                self.go_chain([])
+
+            agent_func(modify_args(self.filename), contents=self.contents, wait=False, on_response=go_chain_resp,
+                     on_error=go_chain_err, **kwargs)
 
     def on_autofix(self, corrections):
         output_messages = [ParseOutput.OutputMessage(
@@ -126,12 +133,9 @@ class SublimeHaskellHsDevChain(Common.SublimeHaskellTextCommand):
         ParseOutput.set_global_error_messages(output_messages)
         output_text = ParseOutput.format_output_messages(output_messages)
         if Settings.PLUGIN.show_error_window:
-            sublime.set_timeout(lambda: ParseOutput.write_output(self.view,
-                                                                 output_text,
-                                                                 Common.get_cabal_project_dir_of_file(self.filename) or \
-                                                                     os.path.dirname(self.filename),
-                                                                 panel_display=not self.fly_mode and len(output_messages)),
-                                0)
+            cabal_proj_dir = Common.get_cabal_project_dir_of_file(self.filename) or os.path.dirname(self.filename)
+            panel_display = not self.fly_mode and len(output_messages) > 0
+            sublime.set_timeout(lambda: ParseOutput.write_output(self.view, output_text, cabal_proj_dir, panel_display), 0)
         sublime.set_timeout(lambda: ParseOutput.mark_messages_in_views(output_messages), 0)
 
     def is_enabled(self):
