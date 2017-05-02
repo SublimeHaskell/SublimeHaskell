@@ -11,9 +11,10 @@
       "linters": {
         "pylint" : {
           "paths": [
-            "${env:USERPROFILE}\\Sublime",
             "${sublime}",
-            "/Applications/Sublime Text.app/Contents/MacOS"
+            "${project}/.."
+            "${project}",
+            "${home}/Sublime"
           ],
         }
       }
