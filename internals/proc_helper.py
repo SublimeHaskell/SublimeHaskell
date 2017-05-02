@@ -198,7 +198,8 @@ class ProcHelper(object):
             std_places = ["$HOME/.local/bin" if not is_windows() else "%APPDATA%/local/bin"] + cabal_config()
             std_places = list(filter(os.path.isdir, map(normalize_path, std_places)))
 
-        add_to_path = list(filter(os.path.isdir, map(normalize_path, Settings.PLUGIN.add_to_path, [])))
+        Logging.log('Settings.PLUGIN.add_to_path {0}'.format(Settings.PLUGIN.add_to_path))
+        add_to_path = list(filter(os.path.isdir, map(normalize_path, Settings.PLUGIN.add_to_path)))
 
         Logging.log("std_places = {0}".format(std_places), Logging.LOG_INFO)
         Logging.log("add_to_PATH = {0}".format(add_to_path), Logging.LOG_INFO)

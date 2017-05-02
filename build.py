@@ -111,17 +111,50 @@ PROJECTS_BEING_BUILT = set()
 
 # Base command
 class SublimeHaskellBaseCommand(Common.SublimeHaskellWindowCommand):
+    def __init__(self, window):
+        super().__init__(window)
 
     def build(self, command, filter_project=None):
-        select_project(self.window,
-                       lambda n, d: run_build(self.window.active_view(), n, d, BUILD_TOOL_CONFIG[command]),
-                       filter_project=filter_project)
+        self.select_project(lambda n, d: run_build(self.window.active_view(), n, d, BUILD_TOOL_CONFIG[command]),
+                            filter_project)
 
     def is_enabled(self):
         return Common.is_enabled_haskell_command(None, False)
 
     def is_visible(self):
         return Common.is_enabled_haskell_command(None, False)
+
+
+    # Select project from list
+    # on_selected accepts name of project and directory of project
+    # filter_project accepts name of project and project-info as it appears in AutoCompletion object
+    #   and returns whether this project must appear in selection list
+    def select_project(self, on_selected, filter_project):
+        projs = [(name, info) for (name, info) in get_projects().items() if not filter_project or filter_project(name, info)]
+
+        def run_selected(psel):
+            on_selected(psel[0], psel[1]['path'])
+
+        if len(projs) == 0:
+            Common.show_status_message("No projects found, did you add a '.cabal' file?", is_ok=False, priority=5)
+            return
+        if len(projs) == 1:  # There's only one project, build it
+            run_selected(projs[0])
+            return
+
+        _, cabal_project_name = Common.get_cabal_project_dir_and_name_of_view(self.window.active_view())
+        Logging.log('Current project: {0}'.format(cabal_project_name))
+
+        # Sort by name
+        projs.sort(key=lambda p: p[0])
+
+        current_project_idx = next((i for i, p in enumerate(projs) if p[0] == cabal_project_name), -1)
+
+        def on_done(idx):
+            if idx != -1:
+                run_selected(projs[idx])
+
+        self.window.show_quick_panel(list(map(lambda m: [m[0], m[1]['path']], projs)), on_done, 0, current_project_idx)
 
 
 def is_stack_project(project_dir):
@@ -175,46 +208,15 @@ def get_projects():
         return dict((name, {'name': name, 'path': path}) for name, path in active_projects)
 
 
-# Select project from list
-# on_selected accepts name of project and directory of project
-# filter_project accepts name of project and project-info as it appears in AutoCompletion object
-#   and returns whether this project must appear in selection list
-def select_project(window, on_selected, filter_project=None):
-    projs = [(name, info) for (name, info) in get_projects().items() if not filter_project or filter_project(name, info)]
-
-    def run_selected(psel):
-        on_selected(psel[0], psel[1]['path'])
-
-    if len(projs) == 0:
-        Common.show_status_message("No projects found, did you add a '.cabal' file?", is_ok=False, priority=5)
-        return
-    if len(projs) == 1:  # There's only one project, build it
-        run_selected(projs[0])
-        return
-
-    _, cabal_project_name = Common.get_cabal_project_dir_and_name_of_view(window.active_view())
-    Logging.log('Current project: {0}'.format(cabal_project_name))
-
-    # Sort by name
-    projs.sort(key=lambda p: p[0])
-
-    current_project_idx = next((i for i, p in enumerate(projs) if p[0] == cabal_project_name), -1)
-
-    def on_done(idx):
-        if idx != -1:
-            run_selected(projs[idx])
-
-    window.show_quick_panel(list(map(lambda m: [m[0], m[1]['path']], projs)), on_done, 0, current_project_idx)
-
-
 def run_build(view, project_name, project_dir, config):
     # Don't build if a build is already running for this project
     # We compare the project_name for simplicity (projects with same
     # names are of course possible, but unlikely, so we let them wait)
     if project_name in PROJECTS_BEING_BUILT:
-        Logging.log("Not building '%s' because it is already being built" % project_name, Logging.LOG_WARNING)
+        Logging.log("Waiting for build action on '%s' to complete." % project_name, Logging.LOG_WARNING)
         Common.show_status_message('Already building %s' % project_name, is_ok=False, priority=5)
         return
+
     # Set project as building
     PROJECTS_BEING_BUILT.add(project_name)
 
@@ -258,19 +260,19 @@ def run_build(view, project_name, project_dir, config):
 
 # Default build system (cabal or cabal-dev)
 
-class SublimeHaskellCleanCommand(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('clean')
+# class SublimeHaskellCleanCommand(SublimeHaskellBaseCommand):
+#     def run(self):
+#         self.build('clean')
 
 
-class SublimeHaskellConfigureCommand(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('configure')
+# class SublimeHaskellConfigureCommand(SublimeHaskellBaseCommand):
+#     def run(self):
+#         self.build('configure')
 
 
 class SublimeHaskellBuildCommand(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('build')
+    def run(self, task='build'):
+        self.build(task)
 
 
 class SublimeHaskellTypecheckCommand(SublimeHaskellBaseCommand):
@@ -278,22 +280,22 @@ class SublimeHaskellTypecheckCommand(SublimeHaskellBaseCommand):
         self.build('typecheck_then_warnings')
 
 
-class SublimeHaskellRebuildCommand(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('rebuild')
+# class SublimeHaskellRebuildCommand(SublimeHaskellBaseCommand):
+#     def run(self):
+#         self.build('rebuild')
 
 
-class SublimeHaskellInstallCommand(SublimeHaskellBaseCommand):
-    def run(self):
-        self.build('install')
+# class SublimeHaskellInstallCommand(SublimeHaskellBaseCommand):
+#     def run(self):
+#         self.build('install')
 
 
-class SublimeHaskellTestCommand(SublimeHaskellBaseCommand):
-    def run(self):
-        def has_tests(_, info):
-            return len(info['description']['tests']) > 0
+# class SublimeHaskellTestCommand(SublimeHaskellBaseCommand):
+#     def run(self):
+#         def has_tests(_, info):
+#             return len(info['description']['tests']) > 0
 
-        self.build('test', filter_project=has_tests)
+#         self.build('test', filter_project=has_tests)
 
 
 # Auto build current project

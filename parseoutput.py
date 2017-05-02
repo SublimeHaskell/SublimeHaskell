@@ -370,7 +370,7 @@ def write_output(view, text, cabal_project_dir, panel_out=True):
                                      panel_name=OUTPUT_PANEL_NAME,
                                      syntax='HaskellOutputPanel',
                                      panel_display=panel_out)
-    ERROR_VIEW.settings().set("RESULT_FILE_REGEX", RESULT_FILE_REGEX)
+    ERROR_VIEW.settings().set("result_file_regex", RESULT_FILE_REGEX)
     ERROR_VIEW.settings().set("result_base_dir", cabal_project_dir)
 
 
@@ -379,6 +379,7 @@ def hide_output(view, panel_name=OUTPUT_PANEL_NAME):
 
 
 def show_output(view, panel_name=OUTPUT_PANEL_NAME):
+    ## view.set_read_only(True)
     view.window().run_command('show_panel', {'panel': 'output.' + panel_name})
 
 

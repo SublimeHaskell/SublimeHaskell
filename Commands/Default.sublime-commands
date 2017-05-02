@@ -47,7 +47,8 @@
     },
     {
         "caption": "SublimeHaskell: Build",
-        "command": "sublime_haskell_build"
+        "command": "sublime_haskell_build",
+        "args": { "task": "build" }
     },
     {
         "caption": "SublimeHaskell: Typecheck build (no codegen)",
@@ -55,23 +56,28 @@
     },
     {
         "caption": "SublimeHaskell: Clean",
-        "command": "sublime_haskell_clean"
+        "command": "sublime_haskell_build",
+        "args": { "task": "clean" }
     },
     {
         "caption": "SublimeHaskell: Configure",
-        "command": "sublime_haskell_configure"
+        "command": "sublime_haskell_build",
+        "args": { "task": "configure" }
     },
     {
         "caption": "SublimeHaskell: Rebuild",
-        "command": "sublime_haskell_rebuild"
+        "command": "sublime_haskell_build",
+        "args": { "task": "rebuild" }
     },
     {
         "caption": "SublimeHaskell: Install",
-        "command": "sublime_haskell_install"
+        "command": "sublime_haskell_build",
+        "args": { "task": "install" }
     },
     {
         "caption": "SublimeHaskell: Test",
-        "command": "sublime_haskell_test"
+        "command": "sublime_haskell_build",
+        "args": { "task": "install" }
     },
     {
         "caption": "SublimeHaskell: Run",
