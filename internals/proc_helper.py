@@ -129,7 +129,7 @@ class ProcHelper(object):
                          CabalConfigRdr.cabal_config()
             std_places = list(filter(os.path.isdir, map(Utils.normalize_path, std_places)))
 
-        add_to_path = list(filter(os.path.isdir, map(Utils.normalize_path, Settings.PLUGIN.add_to_path, [])))
+        add_to_path = list(filter(os.path.isdir, map(normalize_path, Settings.PLUGIN.add_to_path)))
 
         Logging.log("std_places = {0}".format(std_places), Logging.LOG_INFO)
         Logging.log("add_to_PATH = {0}".format(add_to_path), Logging.LOG_INFO)

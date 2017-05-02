@@ -1,7 +1,8 @@
-"""
+"""The main API for the client-side of hsdev.
 """
 
 import json
+import pprint
 import socket
 import sys
 import threading
@@ -174,3 +175,4 @@ class HsDevClient(object):
             print(traceback.format_exc())
             self.connection_lost('call', sys.exc_info()[1])
             return False
+

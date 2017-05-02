@@ -22,7 +22,6 @@ import SublimeHaskell.worker as Worker
 
 HSDEV_DEFAULT_PORT = 4567
 HSDEV_MIN_VER = [0, 2, 0, 0]  # minimum hsdev version
-HSDEV_MAX_VER = [0, 2, 3, 0]  # maximum hsdev version
 
 def hsdev_version():
     retval = None
@@ -47,8 +46,12 @@ def show_version(ver):
     return '.'.join(map(str, ver))
 
 
-def check_version(ver, minimal, maximal):
-    return ver is not None and ver >= minimal and (not maximal or ver < maximal)
+def check_version(ver, minimal):
+    return ver is not None and ver >= minimal
+
+
+def patch_simple_log(ver):
+    return ver >= [0, 2, 3, 1]
 
 
 def format_error_details(details):
@@ -99,7 +102,7 @@ class HsDevProcess(threading.Thread):
     `stderr` file objects -- `hsdev` can be quite chatty, which leads to deadlock when `hsdev` has filled the pipe
     between SublimeText and itself.
     """
-    def __init__(self, port=HSDEV_DEFAULT_PORT, cache=None, log_file=None, log_config=None):
+    def __init__(self, port, version, cache=None, log_file=None, log_config=None):
         super().__init__()
         self.process = None
         self.drain_stdout = None
@@ -112,13 +115,25 @@ class HsDevProcess(threading.Thread):
         self.cache = cache
         self.log_file = log_file
         self.log_config = log_config
+        self.version = version
 
     def run(self):
+        new_simple_log = patch_simple_log(self.version)
+
         cmd = concat_args([(True, ["hsdev", "run"]),
                            (self.port, ["--port", str(self.port)]),
                            (self.cache, ["--cache", self.cache]),
                            (self.log_file, ["--log", self.log_file]),
-                           (self.log_config, ["--log-config", self.log_config])])
+                           # HACK! HACK! HACK! Alexandr changed simple-log's command line API.
+                           #
+                           # "--log-config" only applies to earlier hsdev versions that support 'log politics' (and for those
+                           # of us old enough to remember the Soviet era, 'log politics' is an incredibly Soviet notion that
+                           # makes us smile! :-)
+                           #
+                           # Versions 0.2.3.0 and later: Simplified argument -- just the log level, and only one log level,
+                           # Yvgeny! (With apologies to "The Hunt for Red October".)
+                           (not new_simple_log and self.log_config, ["--log-config", self.log_config]),
+                           (new_simple_log and self.log_config, ["--log-level", self.log_config])])
 
         Logging.log('hsdev command: {0}'.format(cmd), Logging.LOG_DEBUG)
 
@@ -130,7 +145,7 @@ class HsDevProcess(threading.Thread):
                 hsdev_proc = ProcHelper.ProcHelper(cmd)
                 if hsdev_proc.process is None:
                     Logging.log('Failed to create hsdev process', Logging.LOG_ERROR)
-                    return None
+                    return
 
                 # Use TextIOWrapper here because it combines decoding with newline handling,
                 # which means less to maintain.
@@ -139,11 +154,15 @@ class HsDevProcess(threading.Thread):
 
                 while True:
                     srvout = hsdev_proc.process.stdout.readline().strip()
-                    Logging.log('hsdev initial output: {0}'.format(srvout), Logging.LOG_DEBUG)
-                    start_confirm = re.match(r'^.*?hsdev> Server started at port (?P<port>\d+)$', srvout)
-                    if start_confirm:
-                        Logging.log('hsdev server started at port {0}'.format(start_confirm.group('port')))
-                        break
+                    if srvout != '':
+                        Logging.log('hsdev initial output: {0}'.format(srvout), Logging.LOG_DEBUG)
+                        start_confirm = re.search(r'[Ss]erver started at port (?P<port>\d+)$', srvout)
+                        if start_confirm:
+                            Logging.log('hsdev server started at port {0}'.format(start_confirm.group('port')))
+                            break
+                    else:
+                        Logging.log('hsdev initial output: Got EOF. Server not started successfully.')
+                        return
 
                 self.process = hsdev_proc.process
                 self.drain_stdout = OutputCollector.DescriptorDrain('hsdev stdout', self.process.stdout)
@@ -157,6 +176,7 @@ class HsDevProcess(threading.Thread):
                 self.drain_stdout.stop()
                 self.drain_stderr.stop()
                 HsCallback.call_callback(self.on_exit, name='HsDevProcess.on_exit')
+
             self.stop_event.clear()
 
     def active(self):
@@ -475,20 +495,25 @@ class HsDevLocalAgent(HsDevAgent):
 
     def __init__(self, port):
         super().__init__("localhost", port)
-        self.hsdev_process = HsDevProcess(cache=os.path.join(Common.sublime_haskell_cache_path(), 'hsdev'),
-                                          log_file=os.path.join(Common.sublime_haskell_cache_path(), 'hsdev', 'hsdev.log'),
-                                          log_config=Settings.PLUGIN.hsdev_log_config)
+        self.hsdev_process = None
 
-
-    def do_start_hsdev(self):
         hsdev_ver = hsdev_version()
         if hsdev_ver is None:
             Common.output_error_async(sublime.active_window(), "\n".join(HsDevLocalAgent.hsdev_not_found))
-            return False
-        elif not check_version(hsdev_ver, HSDEV_MIN_VER, HSDEV_MAX_VER):
+        elif not check_version(hsdev_ver, HSDEV_MIN_VER):
             Common.output_error_async(sublime.active_window(), "\n".join(HsDevLocalAgent.hsdev_wrong_version(hsdev_ver)))
-            return False
         else:
+            hsdev_log_settings = Settings.PLUGIN.hsdev_log_config
+            if patch_simple_log(hsdev_ver):
+                hsdev_log_settings = Settings.PLUGIN.hsdev_log_level
+
+            self.hsdev_process = HsDevProcess(port, hsdev_ver,
+                                              cache=os.path.join(Common.sublime_haskell_cache_path(), 'hsdev'),
+                                              log_file=os.path.join(Common.sublime_haskell_cache_path(), 'hsdev', 'hsdev.log'),
+                                              log_config=hsdev_log_settings)
+
+    def do_start_hsdev(self):
+        if self.hsdev_process is not None:
             def start_():
                 Logging.log('hsdev process started', Logging.LOG_TRACE)
                 self.connect_clients()
@@ -498,16 +523,17 @@ class HsDevLocalAgent(HsDevAgent):
                 self.disconnect_clients()
 
             def connected_():
-                Logging.log('hsdev agent: primary connection to hsdev established', Logging.LOG_TRACE)
+                Logging.log('hsdev agent: primary connection to hsdev established', Logging.LOG_DEBUG)
                 self.client.link()
 
-            self.client.set_on_connected(connected_)
             self.hsdev_process.on_start = start_
             self.hsdev_process.on_exit = exit_
+            self.client.set_on_connected(connected_)
 
             self.hsdev_process.start()
             self.hsdev_process.create()
-            return True
+
+        return self.hsdev_process is not None
 
 
     def do_stop_hsdev(self):
@@ -519,7 +545,7 @@ class HsDevLocalAgent(HsDevAgent):
     @staticmethod
     def hsdev_wrong_version(version_str):
         return ["SublimeHaskell: hsdev version is incorrect: {0}".format(show_version(version_str)),
-                "Required version: >= {0} and < {1}".format(show_version(HSDEV_MIN_VER), show_version(HSDEV_MAX_VER)),
+                "Required version: >= {0}".format(show_version(HSDEV_MIN_VER)),
                 "Update it by running 'cabal update' and 'cabal install hsdev'",
                 "",
                 "To supress this message and disable hsdev set 'enable_hsdev' to false"

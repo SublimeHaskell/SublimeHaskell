@@ -8,6 +8,7 @@ def call_callback(callback_fn, *args, **kwargs):
     if name:
         del kwargs['name']
     if callback_fn is not None:
+        # Logging.log('call_callback invoking {0}'.format(callback_fn), Logging.LOG_DEBUG)
         callback_fn(*args, **kwargs)
 
 
@@ -30,8 +31,8 @@ class HsDevCallbacks(object):
         self.log_time()
         call_callback(self.on_response, resp)
 
-    def call_notify(self, notif):
-        call_callback(self.on_notify, notif)
+    def call_notify(self, notify_msg):
+        call_callback(self.on_notify, notify_msg)
 
     def call_error(self, err, details):
         self.log_time()

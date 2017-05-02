@@ -56,6 +56,7 @@ class SetttingsContainer(object):
         'hsdev_host': ('hsdev_host', 'localhost'),
         'hsdev_local_process': ('hsdev_local_process', True),
         'hsdev_log_config': ('hsdev_log_config', 'use silent'),
+        'hsdev_log_level': ('hsdev_log_level', 'warning'),
         'hsdev_port': ('hsdev_port', 4567),
         'inhibit_completions': ('inhibit_completions', False),
         'inspect_modules': ('inspect_modules', True),
@@ -71,7 +72,7 @@ class SetttingsContainer(object):
     def __init__(self):
         # Instantiate the attributes (rationale: style and pylint error checking)
         self.add_standard_dirs = None
-        self.add_to_path = None
+        self.add_to_path = []
         self.auto_build_mode = None
         self.auto_complete_imports = None
         self.auto_complete_language_pragmas = None
@@ -89,6 +90,7 @@ class SetttingsContainer(object):
         self.hsdev_host = None
         self.hsdev_local_process = None
         self.hsdev_log_config = None
+        self.hsdev_log_level = None
         self.hsdev_port = None
         self.inhibit_completions = None
         self.inspect_modules = None
@@ -117,7 +119,10 @@ class SetttingsContainer(object):
     def load(self):
         settings = get_settings()
         for (key, (attr, default)) in SetttingsContainer.attr_dict.items():
-            setattr(self, attr, settings.get(key, default))
+            value = settings.get(key, default)
+            ## Uncomment to debug. Do NOT use logging because it causes a circular dependency.
+            ## print('Settings.load: {0} = {1}'.format(attr, value))
+            setattr(self, attr, value)
             install_updater(settings, self, key)
         self.changes = LockedObject.LockedObject({})
 
