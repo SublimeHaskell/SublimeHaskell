@@ -28,15 +28,20 @@ class ProcHelper(object):
     # Tool name -> executable path cache. Avoids probing the file system multiple times.
     which_cache = LockedObject.LockedObject({})
 
-    # Augmented environment for the subprocesses. Specifically, we really want
-    # to augment the user's PATH used to search for executables and tools:
-    augmented_env = None
+    # Augmented PATH for the subprocesses and locating executables.
+    augmented_path = None
 
     def __init__(self, command, **popen_kwargs):
         """Open a pipe to a command or tool."""
 
-        if ProcHelper.augmented_env is None:
-            ProcHelper.augmented_env = ProcHelper.get_extended_env()
+        if ProcHelper.augmented_path is None:
+            ProcHelper.augmented_path = ProcHelper.get_augmented_path()
+
+        ## Necessary evil: Don't cache the environment, just update the PATH in the current environment.
+        ## Why? Because someone could (like me) change os.environ via the ST console and those changes
+        ## would never make it here. Use case: settting $http_proxy so that stack can fetch packages.
+        proc_env = dict(os.environ)
+        proc_env['PATH'] = ProcHelper.augmented_path + os.pathsep + (proc_env.get('PATH') or '')
 
         self.process = None
         self.process_err = None
@@ -54,11 +59,11 @@ class ProcHelper(object):
             popen_kwargs['stderr'] = subprocess.PIPE
 
         try:
-            normcmd = ProcHelper.which(command, ProcHelper.augmented_env['PATH'])
+            normcmd = ProcHelper.which(command, proc_env['PATH'])
             if normcmd is not None:
                 self.process = subprocess.Popen(normcmd
                                                 , stdin=subprocess.PIPE
-                                                , env=ProcHelper.augmented_env
+                                                , env=proc_env
                                                 , **popen_kwargs)
             else:
                 self.process = None
@@ -121,12 +126,12 @@ class ProcHelper(object):
     def update_environment(_key, _val):
         # Reinitialize the tool -> path cache:
         ProcHelper.which_cache = LockedObject.LockedObject({})
-        ProcHelper.augmented_env = ProcHelper.get_extended_env()
+        ProcHelper.augmented_path = ProcHelper.get_augmented_path()
 
     # Generate the augmented environment for subprocesses. This copies the
     # current process environment and updates PATH with `add_to_PATH` extras.
     @staticmethod
-    def get_extended_env():
+    def get_augmented_path():
         def normalize_path(dpath):
             return os.path.normpath(os.path.expandvars(os.path.expanduser(dpath)))
 
@@ -191,8 +196,6 @@ class ProcHelper(object):
                     , os.path.join(global_prefix, global_bindir)
                    ]
 
-        ext_env = dict(os.environ)
-        env_path = os.getenv('PATH') or ""
         std_places = []
         if Settings.PLUGIN.add_standard_dirs:
             std_places = ["$HOME/.local/bin" if not is_windows() else "%APPDATA%/local/bin"] + cabal_config()
@@ -204,8 +207,7 @@ class ProcHelper(object):
         Logging.log("std_places = {0}".format(std_places), Logging.LOG_INFO)
         Logging.log("add_to_PATH = {0}".format(add_to_path), Logging.LOG_INFO)
 
-        ext_env['PATH'] = os.pathsep.join(add_to_path + std_places + [env_path])
-        return ext_env
+        return os.pathsep.join(add_to_path + std_places)
 
     @staticmethod
     def which(args, env_path):
