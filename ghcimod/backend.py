@@ -18,4 +18,4 @@ class GHCModBackend(Backend.HaskellBackend):
 
     @staticmethod
     def is_available():
-        return Which.which('ghc-mod', ProcHelper.ProcHelper.get_extended_env().get('PATH'))
+        return Which.which('ghc-mod', ProcHelper.ProcHelper.get_extended_path())

@@ -148,7 +148,7 @@ class Inspector(threading.Thread):
             self.backend.scan(cabal=(cabal == 'cabal'),
                               sandboxes=[] if cabal == 'cabal' else [cabal],
                               on_notify=ScanStatus(smgr),
-                              wait=True,
+                              wait_complete=True,
                               docs=Settings.PLUGIN.enable_hdocs)
 
     @use_inspect_modules
@@ -159,7 +159,7 @@ class Inspector(threading.Thread):
                                   projects=projects,
                                   files=files,
                                   on_notify=ScanStatus(smgr),
-                                  wait=True,
+                                  wait_complete=True,
                                   ghc=Settings.PLUGIN.ghc_opts,
                                   docs=Settings.PLUGIN.enable_hdocs)
 
@@ -168,7 +168,7 @@ class Inspector(threading.Thread):
         with Common.status_message_process('Inspecting path {0}'.format(path), priority=1) as smgr:
             self.backend.scan(paths=[path],
                               on_notify=ScanStatus(smgr),
-                              wait=True,
+                              wait_complete=True,
                               ghc=Settings.PLUGIN.ghc_opts,
                               docs=Settings.PLUGIN.enable_hdocs)
 
@@ -179,7 +179,7 @@ class Inspector(threading.Thread):
         with Common.status_message_process('Inspecting project {0}'.format(project_name), priority=1) as smgr:
             self.backend.scan(projects=[cabal_dir],
                               on_notify=ScanStatus(smgr),
-                              wait=True,
+                              wait_complete=True,
                               docs=Settings.PLUGIN.enable_hdocs)
 
     @use_inspect_modules
@@ -187,6 +187,6 @@ class Inspector(threading.Thread):
         with Common.status_message_process('Inspecting files', priority=1) as smgr:
             self.backend.scan(files=filenames,
                               on_notify=ScanStatus(smgr),
-                              wait=True,
+                              wait_complete=True,
                               ghc=Settings.PLUGIN.ghc_opts,
                               docs=Settings.PLUGIN.enable_hdocs)

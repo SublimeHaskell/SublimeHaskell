@@ -6,6 +6,7 @@ from functools import reduce
 import io
 import os
 import re
+import subprocess
 import threading
 
 import sublime
@@ -22,6 +23,12 @@ import SublimeHaskell.internals.which as Which
 import SublimeHaskell.sublime_haskell_common as Common
 
 
+def result_identity(resp):
+    '''Identity function for results
+    '''
+    return resp
+
+
 class HsDevBackend(Backend.HaskellBackend):
     """This class encapsulates all of the functions that interact with the `hsdev` backend.
     """
@@ -29,7 +36,7 @@ class HsDevBackend(Backend.HaskellBackend):
     HSDEV_DEFAULT_PORT = 4567
     HSDEV_DEFAULT_HOST = 'localhost'
     HSDEV_MIN_VER = [0, 2, 0, 0]  # minimum hsdev version
-    HSDEV_MAX_VER = [0, 2, 3, 0]  # maximum hsdev version
+    HSDEV_MAX_VER = [0, 2, 4, 0]  # maximum hsdev version
 
     def __init__(self):
         super().__init__()
@@ -38,7 +45,10 @@ class HsDevBackend(Backend.HaskellBackend):
         self.hsdev_process = None
         self.cache = os.path.join(Common.sublime_haskell_cache_path(), 'hsdev')
         self.log_file = os.path.join(Common.sublime_haskell_cache_path(), 'hsdev', 'hsdev.log')
-        self.log_config = Settings.PLUGIN.hsdev_log_config
+        # Keep track of the hsdev version early. Needed to patch command line arguments later.
+        hsdev_path = Which.which('hsdev', ProcHelper.ProcHelper.get_extended_path())
+        self.version = HsDevBackend.hsdev_version() if hsdev_path is not None else [0, 0, 0, 0]
+
         self.drain_stdout = None
         self.drain_stderr = None
         # Connection params
@@ -57,7 +67,9 @@ class HsDevBackend(Backend.HaskellBackend):
 
     @staticmethod
     def is_available():
-        hsdev_path = Which.which('hsdev', ProcHelper.ProcHelper.get_extended_env().get('PATH'))
+        # Yes, this is slightly redundant because eventually __init__ does the same thing for a class
+        # instance.
+        hsdev_path = Which.which('hsdev', ProcHelper.ProcHelper.get_extended_path())
         hsdev_ver = HsDevBackend.hsdev_version() if hsdev_path is not None else [0, 0, 0, 0]
         Logging.log('hsdev version: {0}'.format('.'.join(map(str, hsdev_ver))), Logging.LOG_INFO)
         return hsdev_path is not None and \
@@ -68,11 +80,16 @@ class HsDevBackend(Backend.HaskellBackend):
         if self.is_local_hsdev:
             Logging.log('Starting local \'hsdev\'server', Logging.LOG_INFO)
 
+            use_log_level = self.version >= [0, 2, 3, 2]
+            log_config = Settings.PLUGIN.hsdev_log_config
+            log_level = Settings.PLUGIN.hsdev_log_level
+
             cmd = self.concat_args([(True, ["hsdev", "run"]),
                                     (self.port, ["--port", str(self.port)]),
                                     (self.cache, ["--cache", self.cache]),
                                     (self.log_file, ["--log", self.log_file]),
-                                    (self.log_config, ["--log-config", self.log_config])])
+                                    (not use_log_level and log_config, ["--log-config", log_config]),
+                                    (use_log_level, ["--log-level", log_level])])
 
             Logging.log('hsdev command: {0}'.format(cmd), Logging.LOG_DEBUG)
 
@@ -133,6 +150,24 @@ class HsDevBackend(Backend.HaskellBackend):
             retval = False
         return retval
 
+    def disconnect_backend(self):
+        # FIXME: Connection pool
+        self.main_client.close()
+        self.aux_client.close()
+
+    def stop_backend(self):
+        if self.is_local_hsdev:
+            try:
+                self.hsdev_process.process.wait(60.0)
+            except subprocess.TimeoutExpired:
+                sublime.message_dialog('\n'.join(['Time out waiting for \'hsdev\' process to terminate.',
+                                                  '',
+                                                  'You may have to kill this process manually from a terminal or'
+                                                  'console window\'s command line.']))
+
+    def is_live_backend(self):
+        return self.main_client.is_connected() and self.aux_client.is_connected()
+
     @staticmethod
     def hsdev_version():
         retval = None
@@ -183,13 +218,13 @@ class HsDevBackend(Backend.HaskellBackend):
             # FIXME: Is this option still used?
             opts.update({'split-result': None})
             # FIXME: Need a connection pool
-            resp = self.main_client.call(name
-                                         , opts
-                                         , on_response=on_response
-                                         , on_notify=inner_notify
-                                         , on_error=on_error
-                                         , wait=not async
-                                         , timeout=timeout)
+            resp = self.main_client.call(name,
+                                         opts,
+                                         on_response=on_response,
+                                         on_notify=inner_notify,
+                                         on_error=on_error,
+                                         wait=not async,
+                                         timeout=timeout)
 
             return result if not async else resp
 
@@ -198,37 +233,37 @@ class HsDevBackend(Backend.HaskellBackend):
                 on_response(on_result(resp))
 
             # FIXME: Need a connection pool
-            resp = self.main_client.call(name
-                                         , opts
-                                         , on_response=processed_response if on_response else None
-                                         , on_notify=on_notify
-                                         , on_error=on_error
-                                         , wait=not async
-                                         , timeout=timeout)
+            resp = self.main_client.call(name,
+                                         opts,
+                                         on_response=processed_response if on_response else None,
+                                         on_notify=on_notify,
+                                         on_error=on_error,
+                                         wait=not async,
+                                         timeout=timeout)
 
             return on_result(resp) if not async else resp
 
-    def command(self, name, opts, on_result=lambda r: r, on_response=None, on_notify=None,
+    def command(self, name, opts, on_result=result_identity, on_response=None, on_notify=None,
                 on_error=None, on_result_part=None, split_result=None):
         return self.hsdev_command(name, opts, on_result, async=False, timeout=1, is_list=False,
                                   on_response=on_response, on_notify=on_notify, on_error=on_error,
                                   on_result_part=on_result_part, split_result=split_result)
 
 
-    def async_command(self, name, opts, on_result=lambda r: r, on_response=None, on_notify=None,
+    def async_command(self, name, opts, on_result=result_identity, on_response=None, on_notify=None,
                       on_error=None, on_result_part=None, split_result=None):
         return self.hsdev_command(name, opts, on_result, async=True, timeout=None, is_list=False,
                                   on_response=on_response, on_notify=on_notify, on_error=on_error,
                                   on_result_part=on_result_part, split_result=split_result)
 
 
-    def list_command(self, name, opts, on_result=lambda r: r, on_response=None, on_notify=None,
+    def list_command(self, name, opts, on_result=result_identity, on_response=None, on_notify=None,
                      on_error=None, on_result_part=None, split_result=None):
         return self.hsdev_command(name, opts, on_result, async=False, timeout=1, is_list=True,
                                   on_response=on_response, on_notify=on_notify, on_error=on_error,
                                   on_result_part=on_result_part, split_result=split_result)
 
-    def async_list_command(self, name, opts, on_result=lambda r: r, on_response=None,
+    def async_list_command(self, name, opts, on_result=result_identity, on_response=None,
                            on_notify=None, on_error=None, on_result_part=None, split_result=None):
         return self.hsdev_command(name, opts, on_result, async=True, timeout=None, is_list=True,
                                   on_response=on_response, on_notify=on_notify, on_error=on_error,
@@ -247,48 +282,53 @@ class HsDevBackend(Backend.HaskellBackend):
         return resp
 
     def scan(self, cabal=False, sandboxes=None, projects=None, files=None, paths=None, ghc=None, contents=None,
-             docs=False, infer=False):
-        resp = self.async_command('scan', {'projects': projects or [],
-                                           'cabal': cabal,
-                                           'sandboxes': sandboxes or [],
-                                           'files': self.files_and_contents(files, contents),
-                                           'paths': paths or [],
-                                           'ghc-opts': ghc or [],
-                                           'docs': docs,
-                                           'infer': infer})
+             docs=False, infer=False, wait_complete=False, **backend_args):
+        action = self.command if wait_complete else self.async_command
+        resp = action('scan', {'projects': projects or [],
+                               'cabal': cabal,
+                               'sandboxes': sandboxes or [],
+                               'files': self.files_and_contents(files, contents),
+                               'paths': paths or [],
+                               'ghc-opts': ghc or [],
+                               'docs': docs,
+                               'infer': infer},
+                      **backend_args)
         Logging.log('HsDevClient.scan: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def docs(self, projects=None, files=None, modules=None):
+    def docs(self, projects=None, files=None, modules=None, **backend_args):
         resp = self.async_command('docs', {'projects': projects or [],
                                            'files': files or [],
-                                           'modules': modules or []})
+                                           'modules': modules or []},
+                                  **backend_args)
         Logging.log('HsDevClient.docs: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def infer(self, projects=None, files=None, modules=None):
+    def infer(self, projects=None, files=None, modules=None, **backend_args):
         resp = self.async_command('infer', {'projects': projects or [],
                                             'files': files or [],
-                                            'modules': modules or []})
+                                            'modules': modules or []},
+                                  **backend_args)
         Logging.log('HsDevClient.infer: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def remove(self, cabal=False, sandboxes=None, projects=None, files=None, packages=None):
+    def remove(self, cabal=False, sandboxes=None, projects=None, files=None, packages=None, **backend_args):
         resp = self.async_list_command('remove', {'projects': projects or [],
                                                   'cabal': cabal,
                                                   'sandboxes': sandboxes or [],
                                                   'files': files or [],
-                                                  'packages': packages or []})
+                                                  'packages': packages or []},
+                                       **backend_args)
         Logging.log('HsDevClient.remove: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def remove_all(self):
-        resp = self.command('remove-all', {})
+    def remove_all(self, **backend_args):
+        resp = self.command('remove-all', {}, **backend_args)
         Logging.log('HsDevClient.remove-all: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
     def list_modules(self, project=None, file=None, module=None, deps=None, sandbox=None, cabal=False, symdb=None, package=None,
-                     source=False, standalone=False):
+                     source=False, standalone=False, **backend_args):
         filters = []
         if project:
             filters.append({'project': project})
@@ -311,22 +351,22 @@ class HsDevBackend(Backend.HaskellBackend):
         if standalone:
             filters.append('standalone')
 
-        resp = self.list_command('modules', {'filters': filters}, ResultParse.parse_modules_brief)
+        resp = self.list_command('modules', {'filters': filters}, ResultParse.parse_modules_brief, **backend_args)
         Logging.log('HsDevClient.list_modules: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def list_packages(self):
-        resp = self.list_command('packages', {})
+    def list_packages(self, **backend_args):
+        resp = self.list_command('packages', {}, **backend_args)
         Logging.log('HsDevClient.list_packages: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def list_projects(self):
-        resp = self.list_command('projects', {})
+    def list_projects(self, **backend_args):
+        resp = self.list_command('projects', {}, **backend_args)
         Logging.log('HsDevClient.list_projects: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
     def symbol(self, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
-               cabal=False, symdb=None, package=None, source=False, standalone=False, local_names=False):
+               cabal=False, symdb=None, package=None, source=False, standalone=False, local_names=False, **backend_args):
         # search_type is one of: exact, prefix, infix, suffix, regex
         query = {'input': lookup, 'type': search_type}
 
@@ -353,12 +393,12 @@ class HsDevBackend(Backend.HaskellBackend):
             filters.append('standalone')
 
         resp = self.list_command('symbol', {'query': query, 'filters': filters, 'locals': local_names},
-                                 ResultParse.parse_decls)
+                                 ResultParse.parse_decls, **backend_args)
         Logging.log('HsDevClient.symbol: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
     def module(self, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
-               cabal=False, symdb=None, package=None, source=False, standalone=False):
+               cabal=False, symdb=None, package=None, source=False, standalone=False, **backend_args):
         query = {'input': lookup, 'type': search_type}
 
         filters = []
@@ -383,127 +423,131 @@ class HsDevBackend(Backend.HaskellBackend):
         if standalone:
             filters.append('standalone')
 
-        resp = self.command('module', {'query': query, 'filters': filters}, ResultParse.parse_modules)
+        resp = self.command('module', {'query': query, 'filters': filters}, ResultParse.parse_modules, **backend_args)
         Logging.log('HsDevClient.module: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def resolve(self, file, exports=False):
-        resp = self.command('resolve', {'file': file, 'exports': exports}, ResultParse.parse_module)
+    def resolve(self, file, exports=False, **backend_args):
+        resp = self.command('resolve', {'file': file, 'exports': exports}, ResultParse.parse_module, **backend_args)
         Logging.log('HsDevClient.resolve: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def project(self, project=None, path=None):
-        resp = self.command('project', {'name': project} if project else {'path': path})
+    def project(self, project=None, path=None, **backend_args):
+        resp = self.command('project', {'name': project} if project else {'path': path}, **backend_args)
         Logging.log('HsDevClient.project: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def sandbox(self, path):
-        resp = self.command('sandbox', {'path': path})
+    def sandbox(self, path, **backend_args):
+        resp = self.command('sandbox', {'path': path}, **backend_args)
         Logging.log('HsDevClient.sandbox: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def lookup(self, name, file):
-        resp = self.list_command('lookup', {'name': name, 'file': file}, ResultParse.parse_decls)
+    def lookup(self, name, file, **backend_args):
+        resp = self.list_command('lookup', {'name': name, 'file': file}, ResultParse.parse_decls, **backend_args)
         Logging.log('HsDevClient.lookup: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def whois(self, name, file):
-        resp = self.list_command('whois', {'name': name, 'file': file}, ResultParse.parse_declarations)
+    def whois(self, name, file, **backend_args):
+        resp = self.list_command('whois', {'name': name, 'file': file}, ResultParse.parse_declarations, **backend_args)
         Logging.log('HsDevClient.whois: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def scope_modules(self, file, lookup='', search_type='prefix'):
+    def scope_modules(self, file, lookup='', search_type='prefix', **backend_args):
         resp = self.list_command('scope modules', {'query': {'input': lookup, 'type': search_type}, 'file': file},
-                                 ResultParse.parse_modules_brief)
+                                 ResultParse.parse_modules_brief, **backend_args)
         Logging.log('HsDevClient.modules: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def scope(self, file, lookup='', search_type='prefix', global_scope=False):
+    def scope(self, file, lookup='', search_type='prefix', global_scope=False, **backend_args):
         resp = self.list_command('scope',
                                  {'query': {'input': lookup,
                                             'type': search_type
                                            },
                                   'global': global_scope,
                                   'file': file
-                                 }, ResultParse.parse_declarations)
+                                 }, ResultParse.parse_declarations, **backend_args)
         Logging.log('HsDevClient.scope: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def complete(self, lookup, file, wide=False):
+    def complete(self, lookup, file, wide=False, **backend_args):
         resp = self.list_command('complete', {'prefix': lookup, 'wide': wide, 'file': file},
-                                 ResultParse.parse_declarations)
+                                 ResultParse.parse_declarations, **backend_args)
         Logging.log('HsDevClient.complete: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def hayoo(self, query, page=None, pages=None):
+    def hayoo(self, query, page=None, pages=None, **backend_args):
         resp = self.list_command('hayoo', {'query': query, 'page': page or 0, 'pages': pages or 1},
-                                 ResultParse.parse_decls)
+                                 ResultParse.parse_decls, **backend_args)
         Logging.log('HsDevClient.hayoo: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def cabal_list(self, packages):
+    def cabal_list(self, packages, **backend_args):
         resp = self.list_command('cabal list', {'packages': packages},
-                                 lambda r: [ResultParse.parse_cabal_package(s) for s in r] if r else None)
+                                 lambda r: [ResultParse.parse_cabal_package(s) for s in r] if r else None,
+                                 **backend_args)
         Logging.log('HsDevClient.cabal_list: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def lint(self, files=None, contents=None, hlint=None):
+    def lint(self, files=None, contents=None, hlint=None, **backend_args):
         resp = self.list_command('lint', {'files': self.files_and_contents(files, contents),
-                                          'hlint-opts': hlint or []})
+                                          'hlint-opts': hlint or []},
+                                 **backend_args)
         Logging.log('HsDevClient.lint: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def check(self, files=None, contents=None, ghc=None):
+    def check(self, files=None, contents=None, ghc=None, **backend_args):
         resp = self.list_command('check', {'files': self.files_and_contents(files, contents),
-                                           'ghc-opts': ghc or []})
+                                           'ghc-opts': ghc or []},
+                                 **backend_args)
         Logging.log('HsDevClient.check: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def check_lint(self, files=None, contents=None, ghc=None, hlint=None):
+    def check_lint(self, files=None, contents=None, ghc=None, hlint=None, **backend_args):
         resp = self.list_command('check-lint', {'files': self.files_and_contents(files, contents),
                                                 'ghc-opts': ghc or [],
-                                                'hlint-opts': hlint or []})
+                                                'hlint-opts': hlint or []},
+                                 **backend_args)
         Logging.log('HsDevClient.check_lint: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def types(self, files=None, contents=None, ghc=None):
+    def types(self, files=None, contents=None, ghc=None, **backend_args):
         resp = self.list_command('types', {'files': self.files_and_contents(files, contents),
-                                           'ghc-opts': ghc or []})
+                                           'ghc-opts': ghc or []},
+                                 **backend_args)
         Logging.log('HsDevClient.types: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def langs(self):
-        resp = self.command('langs', {})
+    def langs(self, **backend_args):
+        resp = self.command('langs', {}, **backend_args)
         Logging.log('HsDevClient.langs: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def flags(self):
-        resp = self.command('flags', {})
+    def flags(self, **backend_args):
+        resp = self.command('flags', {}, **backend_args)
         Logging.log('HsDevClient.flags: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def autofix_show(self, messages):
-        resp = self.list_command('autofix show', {'messages': messages}, ResultParse.parse_corrections)
+    def autofix_show(self, messages, **backend_args):
+        resp = self.list_command('autofix show', {'messages': messages}, ResultParse.parse_corrections, **backend_args)
         Logging.log('HsDevClient.autofix_show: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def autofix_fix(self, messages, rest=None, pure=False):
+    def autofix_fix(self, messages, rest=None, pure=False, **backend_args):
         resp = self.autofix_fix('autofix fix', {'messages': messages, 'rest': rest or [], 'pure': pure},
-                                ResultParse.parse_corrections)
+                                ResultParse.parse_corrections, **backend_args)
         Logging.log('HsDevClient.autofix_fix: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
-    def ghc_eval(self, exprs, file=None, source=None):
+    def ghc_eval(self, exprs, file=None, source=None, **backend_args):
         the_file = None
         if file is not None:
             the_file = {'file': the_file, 'contents': source}
-        resp = self.list_command('ghc eval', {'exprs': exprs, 'file': the_file})
+        resp = self.list_command('ghc eval', {'exprs': exprs, 'file': the_file}, **backend_args)
         Logging.log('HsDevClient.ghc_eval: {0}'.format(resp), Logging.LOG_DEBUG)
         return resp
 
     def exit(self):
         return self.command('exit', {})
-
 
 class HsDevStartupReader(threading.Thread):
     '''Separate thread object that reads the local `hsdev` server's `stdout` looking for the server's startup
@@ -524,7 +568,7 @@ class HsDevStartupReader(threading.Thread):
             srvout = self.stdout.readline().strip()
             if srvout != '':
                 Logging.log('hsdev initial output: {0}'.format(srvout), Logging.LOG_DEBUG)
-                start_confirm = re.match(r'^.*?hsdev> Server started at port (?P<port>\d+)$', srvout)
+                start_confirm = re.search(r'[Ss]erver started at port (?P<port>\d+)$', srvout)
                 if start_confirm:
                     self.hsdev_port = int(start_confirm.group('port'))
                     Logging.log('\'hsdev\' server started at port {0}'.format(self.hsdev_port))

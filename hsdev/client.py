@@ -68,7 +68,7 @@ class HsDevClient(object):
     def is_connected(self):
         return self.socket is not None
 
-    def on_receive(self, ident, command, on_response=None, on_notify=None, on_error=None):
+    def setup_receive_callbacks(self, ident, command, on_response, on_notify, on_error):
         with self.request_map as requests:
             requests[ident] = HsCallback.HsDevCallbacks(ident, command, on_response, on_notify, on_error)
 
@@ -124,12 +124,10 @@ class HsDevClient(object):
 
     def call(self, command, opts, on_response, on_notify, on_error, wait, timeout):
         # log
-        args_cmd = 'hsdev {0}'.format(command)
-        call_cmd = 'hsdev {0} with {1}'.format(command, opts)
-
         if not self.verify_connected():
             return None if wait else False
 
+        call_cmd = 'hsdev {0} with {1}'.format(command, opts)
         try:
             opts = opts or {}
             wait_receive = threading.Event() if wait else None
@@ -150,7 +148,8 @@ class HsDevClient(object):
             self.request_serial = self.request_serial + 1
 
             if wait or on_response or on_notify or on_error:
-                self.on_receive(req_serial, args_cmd, on_response_, on_notify, on_error_)
+                args_cmd = 'hsdev {0}'.format(command)
+                self.setup_receive_callbacks(req_serial, args_cmd, on_response_, on_notify, on_error_)
 
             opts.update({'no-file': True})
             opts.update({'id': req_serial, 'command': command})
@@ -160,8 +159,8 @@ class HsDevClient(object):
             # immediately. It is actually reported on the next send() or sendall() [nutshell: TCP acks the
             # first sendall(), but if the remote side closes the socket, you have to wait until the next
             # TCP ack to know that that's been done.] OTOH, the first sendall() can also fail...
-            self.socket.sendall(msg.encode('utf-8'))
-            self.socket.sendall('\n'.encode('utf-8'))
+
+            self.socket.sendall((msg + '\n').encode('utf-8'))
             Logging.log(call_cmd, Logging.LOG_TRACE)
 
             if wait:
@@ -175,4 +174,3 @@ class HsDevClient(object):
             print(traceback.format_exc())
             self.connection_lost('call', sys.exc_info()[1])
             return False
-

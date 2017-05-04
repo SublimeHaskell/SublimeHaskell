@@ -33,30 +33,27 @@ IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']
                               r'\(.*?((?P<identifier>([a-z][\w\d\']*)?)|(\((?P<operator>[!#$%&*+\.\/<=>?@\\\^|\-~:]*)))$')
 
 
-# Original signature had: must_be_main=False, must_be_file=False
-# This function is never called with either of these two keywords. In fact, it is never called with keywords.
 def is_enabled_haskell_command(view, must_be_project):
-    """Returns True if command for .hs can be invoked"""
+    '''Returns True if command for Haskell source can be invoked.
+    '''
     window, view = get_haskell_command_window_view_file_project(view)[0:2]
 
     if not window or not view:
         return False
+    else:
+        # Note: file_show_in_view is the third element of the get_haskell_command_window_view_file_project() return tuple.
+        # if must_be_file and not file_shown_in_view:
+        #     return False
 
-    # Note: file_show_in_view is the third element of the get_haskell_command_window_view_file_project() return tuple.
-    # if must_be_file and not file_shown_in_view:
-    #     return False
+        syntax_file_for_view = view.settings().get('syntax')
+        if not syntax_file_for_view or 'haskell' not in syntax_file_for_view.lower():
+            return False
 
-    syntax_file_for_view = view.settings().get('syntax')
-    if not syntax_file_for_view or ('haskell' not in syntax_file_for_view.lower()):
-        return False
-
-    if not must_be_project:
-        return True
-
-    cabal_project_dir = get_cabal_project_dir_of_view(view)
-    if not cabal_project_dir:
-        return False
-    return True
+        if not must_be_project:
+            return True
+        else:
+            cabal_project_dir = get_cabal_project_dir_of_view(view)
+            return cabal_project_dir is not None
 
 
 def get_haskell_command_window_view_file_project(view=None):
@@ -600,25 +597,3 @@ def status_message_process(msg, is_ok=True, timeout=300, priority=0):
 def sublime_haskell_cache_path():
     """Get the path where compiled tools and caches are stored"""
     return os.path.join(sublime.cache_path(), 'SublimeHaskell')
-
-
-class SublimeHaskellWindowCommand(sublime_plugin.WindowCommand):
-    def __init__(self, view):
-        super().__init__(view)
-
-    def is_enabled(self):
-        return is_enabled_haskell_command(None, False)
-
-    def is_visible(self):
-        return is_enabled_haskell_command(None, False)
-
-
-class SublimeHaskellTextCommand(sublime_plugin.TextCommand):
-    def __init__(self, view):
-        super().__init__(view)
-
-    def is_enabled(self):
-        return is_enabled_haskell_command(self.view, False)
-
-    def is_visible(self):
-        return is_enabled_haskell_command(self.view, False)

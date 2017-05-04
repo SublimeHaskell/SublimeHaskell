@@ -152,7 +152,7 @@ class AutoCompletion(object):
             current_module = Utils.head_of(BackendManager.active_backend().module(file=file_name))
 
             if current_module:
-                comps = make_completions(BackendManager.active_backend().complete('', file_name, timeout=None))
+                comps = make_completions(BackendManager.active_backend().complete('', file_name))
 
                 # Get import names
                 #

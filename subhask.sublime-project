@@ -7,13 +7,15 @@
 	],
   "SublimeLinter":
    {
-      "@python": 3,
       "linters": {
         "pylint" : {
+          "@python": 3,
           "paths": [
-            "${env:USERPROFILE}\\Sublime",
             "${sublime}",
-            "/Applications/Sublime Text.app/Contents/MacOS"
+            "${project}",
+            "${project}/..",
+            "${home}/Sublime",
+            "${env:USERPROFILE}\\Sublime"
           ],
         }
       }

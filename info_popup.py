@@ -9,7 +9,7 @@ import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.internals.unicode_opers as UnicodeOpers
 import SublimeHaskell.symbols as symbols
-import SublimeHaskell.hsdev.agent as hsdev
+import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.parseoutput as parseoutput
 import SublimeHaskell.types as types
 
@@ -143,12 +143,14 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
                     types.get_types(self.current_file_name, self.on_types)
 
                 # Try whois
+                # FIXME: backend manager whois
                 self.suggest_import = False
-                self.decl = Utils.head_of(hsdev.client.whois(self.whois_name, self.current_file_name))
+                self.decl = Utils.head_of(BackendManager.active_backend().whois(self.whois_name, self.current_file_name))
 
                 if not self.decl:
+                    # FIXME: backend manager lookup
                     self.suggest_import = True
-                    self.decl = Utils.head_of(hsdev.client.lookup(self.full_name, self.current_file_name))
+                    self.decl = Utils.head_of(BackendManager.active_backend().lookup(self.full_name, self.current_file_name))
 
                 self.create_symbol_popup()
 

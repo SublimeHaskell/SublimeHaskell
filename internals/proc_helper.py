@@ -21,15 +21,20 @@ import SublimeHaskell.internals.cabal_cfgrdr as CabalConfigRdr
 class ProcHelper(object):
     """Command and tool process execution helper."""
 
-    # Augmented environment for the subprocesses. Specifically, we really want
-    # to augment the user's PATH used to search for executables and tools:
-    augmented_env = None
+    # Augmented PATH for the subprocesses and locating executables.
+    augmented_path = None
 
     def __init__(self, command, **popen_kwargs):
         """Open a pipe to a command or tool."""
 
-        if ProcHelper.augmented_env is None:
-            ProcHelper.augmented_env = ProcHelper.make_extended_env()
+        if ProcHelper.augmented_path is None:
+            ProcHelper.augmented_path = ProcHelper.make_augmented_path()
+
+        ## Necessary evil: Don't cache the environment, just update the PATH in the current environment.
+        ## Why? Because someone could (like me) change os.environ via the ST console and those changes
+        ## would never make it here. Use case: settting $http_proxy so that stack can fetch packages.
+        proc_env = dict(os.environ)
+        proc_env['PATH'] = ProcHelper.augmented_path + os.pathsep + (proc_env.get('PATH') or '')
 
         self.process = None
         self.process_err = None
@@ -47,11 +52,11 @@ class ProcHelper(object):
             popen_kwargs['stderr'] = subprocess.PIPE
 
         try:
-            normcmd = Which.which(command, ProcHelper.augmented_env['PATH'])
+            normcmd = Which.which(command, proc_env['PATH'])
             if normcmd is not None:
                 self.process = subprocess.Popen(normcmd
                                                 , stdin=subprocess.PIPE
-                                                , env=ProcHelper.augmented_env
+                                                , env=proc_env
                                                 , **popen_kwargs)
             else:
                 self.process = None
@@ -114,34 +119,30 @@ class ProcHelper(object):
     def update_environment(_key, _val):
         # Reinitialize the tool -> path cache:
         Which.reset_cache()
-        ProcHelper.augmented_env = ProcHelper.make_extended_env()
+        ProcHelper.augmented_path = ProcHelper.make_augmented_path()
 
     # Generate the augmented environment for subprocesses. This copies the
     # current process environment and updates PATH with `add_to_PATH` extras.
     @staticmethod
-    def make_extended_env():
-
-        ext_env = dict(os.environ)
-        env_path = os.getenv('PATH') or ""
+    def make_augmented_path():
         std_places = []
         if Settings.PLUGIN.add_standard_dirs:
             std_places = ["$HOME/.local/bin" if not Utils.is_windows() else "%APPDATA%/local/bin"] + \
                          CabalConfigRdr.cabal_config()
             std_places = list(filter(os.path.isdir, map(Utils.normalize_path, std_places)))
 
-        add_to_path = list(filter(os.path.isdir, map(normalize_path, Settings.PLUGIN.add_to_path)))
+        add_to_path = list(filter(os.path.isdir, map(Utils.normalize_path, Settings.PLUGIN.add_to_path)))
 
         Logging.log("std_places = {0}".format(std_places), Logging.LOG_INFO)
         Logging.log("add_to_PATH = {0}".format(add_to_path), Logging.LOG_INFO)
 
-        ext_env['PATH'] = os.pathsep.join(add_to_path + std_places + [env_path])
-        return ext_env
+        return os.pathsep.join(add_to_path + std_places)
 
     @staticmethod
-    def get_extended_env():
-        if ProcHelper.augmented_env is None:
-            ProcHelper.augmented_env = ProcHelper.make_extended_env()
-        return ProcHelper.augmented_env
+    def get_extended_path():
+        if ProcHelper.augmented_path is None:
+            ProcHelper.augmented_path = ProcHelper.make_augmented_path()
+        return ProcHelper.augmented_path + os.pathsep + (os.environ.get('PATH') or '')
 
     @staticmethod
     def run_process(command, input_string='', **popen_kwargs):

@@ -27,3 +27,14 @@ def normalize_path(dpath):
 
 def is_windows():
     return platform.system() == "Windows"
+
+class Singleton(type):
+    '''Singleton meta-class. This ensures that only one instance of an object is every alive at any given time during
+    program execution. Principally used in backends and backend management, where only one NullHaskellBackend and
+    one BackendManager class and instance ever need to be alive.
+    '''
+    _instances = {}
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+        return cls._instances[cls]

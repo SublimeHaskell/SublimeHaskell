@@ -7,13 +7,14 @@ import threading
 
 import sublime
 
-import SublimeHaskell.sublime_haskell_common as Common
-import SublimeHaskell.hsdev.agent as hsdev
-import SublimeHaskell.hsdev.result_parse as HsResultParse
-import SublimeHaskell.internals.settings as Settings
-import SublimeHaskell.internals.logging as Logging
+import SublimeHaskell.cmdwin_types as CommandWin
 import SublimeHaskell.ghcimod.ghci_backend as GHCIMod
+import SublimeHaskell.hsdev.result_parse as HsResultParse
+import SublimeHaskell.internals.backend_mgr as BackendMgr
+import SublimeHaskell.internals.logging as Logging
+import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.parseoutput as ParseOutput
+import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.symbols as symbols
 
 
@@ -34,11 +35,11 @@ def unfiltered_messages(msgs):
     return msgs
 
 def hsdev_check():
-    return (hsdev.client.check, file_as_file_list, unfiltered_messages, {'ghc': Settings.PLUGIN.ghc_opts})
+    return (BackendMgr.active_backend().check, file_as_file_list, unfiltered_messages, {'ghc': Settings.PLUGIN.ghc_opts})
 
 
 def hsdev_lint():
-    return (hsdev.client.lint, file_as_file_list, unfiltered_messages, {})
+    return (BackendMgr.active_backend().lint, file_as_file_list, unfiltered_messages, {})
 
 # def hsdev_check_lint():
 #     return (hsdev.client.ghcmod_check_lint,
@@ -50,7 +51,7 @@ def messages_as_hints(cmd):
     return (msg_fn, arg, lambda ms: [dict(m, level='hint') for m in ms], kwargs)
 
 
-class SublimeHaskellHsDevChain(Common.SublimeHaskellTextCommand):
+class SublimeHaskellHsDevChain(CommandWin.SublimeHaskellTextCommand):
     def __init__(self, view):
         super().__init__(view)
         self.messages = []
@@ -77,7 +78,7 @@ class SublimeHaskellHsDevChain(Common.SublimeHaskellTextCommand):
                 self.contents[self.filename] = self.view.substr(sublime.Region(0, self.view.size()))
             if not self.fly_mode:
                 ParseOutput.hide_output(self.view)
-                if not hsdev.agent_connected():
+                if not BackendMgr.is_live_backend():
                     Logging.log('hsdev chain fails: hsdev not connected', Logging.LOG_ERROR)
                     sublime.error_message('check_lint.run_chain: Cannot execute command chain, hsdev not connected.')
                 else:
@@ -91,7 +92,7 @@ class SublimeHaskellHsDevChain(Common.SublimeHaskellTextCommand):
     def go_chain(self, cmds):
         if not cmds:
             self.status_msg.stop()
-            hsdev.client.autofix_show(self.msgs, on_response=self.on_autofix)
+            BackendMgr.active_backend().autofix_show(self.msgs, on_response=self.on_autofix)
         else:
             cmd, tail_cmds = cmds[0], cmds[1:]
             agent_func, modify_args, modify_msgs, kwargs = cmd
@@ -144,14 +145,15 @@ class SublimeHaskellHsDevChain(Common.SublimeHaskellTextCommand):
 def ghcmod_command(cmdname):
     def wrap(outer_fn):
         def wrapper(self, *args, **kwargs):
-            if Settings.PLUGIN.enable_hsdev:
-                Logging.log("Invoking '{0}' command via hsdev".format(cmdname), Logging.LOG_TRACE)
+            if BackendMgr.is_live_backend():
+                Logging.log("Invoking '{0}' command via backend".format(cmdname), Logging.LOG_TRACE)
                 return outer_fn(self, *args, **kwargs)
-            elif Settings.PLUGIN.enable_ghc_mod:
-                Logging.log("Invoking '{0}' command via ghc-mod".format(cmdname), Logging.LOG_TRACE)
-                self.view.window().run_command('sublime_haskell_ghc_mod_{0}'.format(cmdname))
+            # FIXME: Need to migrate into ghc-mod backend:
+            # elif Settings.PLUGIN.enable_ghc_mod:
+            #     Logging.log("Invoking '{0}' command via ghc-mod".format(cmdname), Logging.LOG_TRACE)
+            #     self.view.window().run_command('sublime_haskell_ghc_mod_{0}'.format(cmdname))
             else:
-                Common.show_status_message('Check/Lint: both hsdev and ghc-mod are disabled', False)
+                Common.show_status_message('Check/Lint: No live backend available.', False)
         return wrapper
     return wrap
 
@@ -176,7 +178,7 @@ class SublimeHaskellCheckAndLint(SublimeHaskellHsDevChain):
                        fly_mode=(kwargs.get('fly') or False))
 
 
-class SublimeHaskellGhcModCheck(Common.SublimeHaskellWindowCommand):
+class SublimeHaskellGhcModCheck(CommandWin.SublimeHaskellWindowCommand):
     def run(self):
         run_ghcmod(['check'], 'Checking')
 
@@ -184,7 +186,7 @@ class SublimeHaskellGhcModCheck(Common.SublimeHaskellWindowCommand):
         return Common.is_haskell_source(None)
 
 
-class SublimeHaskellGhcModLint(Common.SublimeHaskellWindowCommand):
+class SublimeHaskellGhcModLint(CommandWin.SublimeHaskellWindowCommand):
     def run(self):
         run_ghcmod(['lint', '-h', '-u'], 'Linting', lint_as_hints)
 
@@ -192,7 +194,7 @@ class SublimeHaskellGhcModLint(Common.SublimeHaskellWindowCommand):
         return Common.is_haskell_source(None)
 
 
-class SublimeHaskellGhcModCheckAndLint(Common.SublimeHaskellWindowCommand):
+class SublimeHaskellGhcModCheckAndLint(CommandWin.SublimeHaskellWindowCommand):
     def run(self):
         run_ghcmods([['check'], ['lint', '-h', '-u']], 'Checking and Linting', lint_as_hints)
 

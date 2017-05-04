@@ -8,10 +8,11 @@ import threading
 
 import sublime
 
-import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.cmdwin_types as CommandWin
 import SublimeHaskell.internals.logging as Logging
-import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.output_collector as OutputCollector
+import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.symbols as symbols
 
 # This regex matches an unindented line, followed by zero or more
@@ -285,7 +286,7 @@ def goto_error(view, error):
     view.window().open_file("{0}:{1}:{2}".format(filename, line, column), sublime.ENCODED_POSITION)
 
 
-class SublimeHaskellNextError(Common.SublimeHaskellTextCommand):
+class SublimeHaskellNextError(CommandWin.SublimeHaskellTextCommand):
     def __init__(self, view):
         super().__init__(view)
 
@@ -311,7 +312,7 @@ class SublimeHaskellNextError(Common.SublimeHaskellTextCommand):
             goto_error(self.view, next_err)
 
 
-class SublimeHaskellPreviousError(Common.SublimeHaskellTextCommand):
+class SublimeHaskellPreviousError(CommandWin.SublimeHaskellTextCommand):
     def __init__(self, view):
         super().__init__(view)
 

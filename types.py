@@ -8,6 +8,7 @@ import re
 import sublime
 import sublime_plugin
 
+import SublimeHaskell.cmdwin_types as CommandWin
 import SublimeHaskell.ghcimod.ghci_backend as GHCIMod
 import SublimeHaskell.hdevtools as HDevTools
 import SublimeHaskell.internals.backend_mgr as BackendManager
@@ -166,21 +167,24 @@ def sorted_types(view, types, point):
         return []
 
 
-def get_type(view, filename, module_name, line, column, cabal=None):
+def get_type(view, filename, _module_name, line, column, cabal=None):
     result = None
 
-    if Settings.PLUGIN.enable_hsdev:
-        # Convert from hsdev one-based locations to sublime zero-based positions
-        return sorted_types(view, get_types(filename) or [], FilePosition(line, column).point(view))
+    # FIXME: Migrate this functionality into the backend API, then into the respective backends:
+    #
+    # if Settings.PLUGIN.enable_hsdev:
+    #     # Convert from hsdev one-based locations to sublime zero-based positions
+    #     return sorted_types(view, get_types(filename) or [], FilePosition(line, column).point(view))
 
-    column = ParseOutput.sublime_column_to_ghc_column(view, line, column)
-    line = line + 1
-    if Settings.PLUGIN.enable_hdevtools:
-        result = HDevTools.hdevtools_type(filename, line, column, cabal=cabal)
-    if not result and module_name and Settings.PLUGIN.enable_ghc_mod:
-        result = GHCIMod.ghcmod_type(filename, module_name, line, column)
+    # column = ParseOutput.sublime_column_to_ghc_column(view, line, column)
+    # line = line + 1
+    # if Settings.PLUGIN.enable_hdevtools:
+    #     result = HDevTools.hdevtools_type(filename, line, column, cabal=cabal)
+    # if not result and module_name and Settings.PLUGIN.enable_ghc_mod:
+    #     result = GHCIMod.ghcmod_type(filename, module_name, line, column)
 
-    return parse_type_output(view, result) if result else None
+    # return parse_type_output(view, result) if result else None
+    return result
 
 
 def get_type_view(view, selection=None):
@@ -197,8 +201,8 @@ def get_type_view(view, selection=None):
     return get_type(view, filename, module_name, line, column)
 
 
-def get_types(filename, on_result=None):
-    if Settings.PLUGIN.enable_hsdev:
+def get_types(filename, on_result):
+    if BackendManager.is_live_backend():
         def to_file_pos(rgn):
             return FilePosition(int(rgn['line']) - 1, int(rgn['column']) - 1)
 
@@ -207,7 +211,7 @@ def get_types(filename, on_result=None):
                               to_file_pos(rgn['region']['from']),
                               to_file_pos(rgn['region']['to']))
 
-        def on_resp(resps):
+        def get_types_resp(resps):
             types = [to_region_type(r) for r in resps]
             FILE_TYPES.set(filename, types, False)
             on_result(types)
@@ -215,22 +219,17 @@ def get_types(filename, on_result=None):
         if FILE_TYPES.has(filename):
             return FILE_TYPES.get(filename)
 
-        wait = on_result is None
         backend = BackendManager.active_backend()
-        if backend is not None:
-            res = backend.types(files=[filename],
-                                ghc=GHCIMod.get_ghc_opts(filename),
-                                wait=wait,
-                                on_response=on_resp if on_result is not None else None)
-            if res is not None and wait:
-                types = [to_region_type(r) for r in res]
-                FILE_TYPES.set(filename, types, False)
-                return types
+        res = backend.types(files=[filename], ghc=GHCIMod.get_ghc_opts(filename), on_response=get_types_resp)
+        if res is not None:
+            types = [to_region_type(r) for r in res]
+            FILE_TYPES.set(filename, types, False)
+            return types
 
-        return []
+    return []
 
 
-class SublimeHaskellShowType(Common.SublimeHaskellTextCommand):
+class SublimeHaskellShowType(CommandWin.SublimeHaskellTextCommand):
     def __init__(self, view):
         super().__init__(view)
 
@@ -362,7 +361,7 @@ class SublimeHaskellShowTypes(SublimeHaskellShowType):
         Common.show_panel(self.view.window(), panel_name=TYPES_PANEL_NAME)
 
 
-class SublimeHaskellGetTypes(Common.SublimeHaskellTextCommand):
+class SublimeHaskellGetTypes(CommandWin.SublimeHaskellTextCommand):
     def __init__(self, view):
         super().__init__(view)
 
@@ -379,7 +378,7 @@ class SublimeHaskellGetTypes(Common.SublimeHaskellTextCommand):
         pass
 
 
-class SublimeHaskellShowAllTypes(Common.SublimeHaskellTextCommand):
+class SublimeHaskellShowAllTypes(CommandWin.SublimeHaskellTextCommand):
     def __init__(self, view):
         super().__init__(view)
 
@@ -424,7 +423,7 @@ class SublimeHaskellShowAllTypes(Common.SublimeHaskellTextCommand):
         return Common.is_haskell_source(self.view) and self.view.file_name() is not None
 
 
-class SublimeHaskellHideAllTypes(Common.SublimeHaskellTextCommand):
+class SublimeHaskellHideAllTypes(CommandWin.SublimeHaskellTextCommand):
     def run(self, edit):
         FILE_TYPES.hide(self.view.file_name())
         Common.hide_panel(self.view.window(), panel_name=TYPES_PANEL_NAME)
@@ -436,7 +435,7 @@ class SublimeHaskellHideAllTypes(Common.SublimeHaskellTextCommand):
                FILE_TYPES.shown(self.view.file_name())
 
 
-class SublimeHaskellToggleAllTypes(Common.SublimeHaskellTextCommand):
+class SublimeHaskellToggleAllTypes(CommandWin.SublimeHaskellTextCommand):
     def run(self, edit):
         if FILE_TYPES.shown(self.view.file_name()):
             self.view.run_command('sublime_haskell_hide_all_types')

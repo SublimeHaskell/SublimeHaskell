@@ -10,8 +10,9 @@ import SublimeHaskell.ghcimod.backend as GHCIMod
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.inspector as Inspector
+import SublimeHaskell.internals.utils as Utils
 
-class BackendManager(object):
+class BackendManager(object, metaclass=Utils.Singleton):
     # Known backends and mapping to metadata
     BACKEND_META = {
         'hsdev': HsDev.HsDevBackend,
@@ -34,11 +35,6 @@ class BackendManager(object):
 
     # The currently active backend
     ACTIVE_BACKEND = None
-    # Null backend singleton
-    NULL_BACKEND = Backend.NullHaskellBackend
-    # And, finally, the default backend manager:
-    DEFAULT_MANAGER = None
-    DEFAULT_MANAGER_LOCK = threading.RLock()
 
     # Pretty-printing state support:
     STATES_TO_NAME = {
@@ -62,10 +58,9 @@ class BackendManager(object):
     def initialize(self):
         BackendManager.ACTIVE_BACKEND = None
         self.state = BackendManager.INITIAL
-        backends = Settings.PLUGIN.backends or BackendManager.DEFAULT_BACKEND_PRIORITY
         usable_backends = []
 
-        for backend in backends:
+        for backend in Settings.PLUGIN.backends or BackendManager.DEFAULT_BACKEND_PRIORITY:
             backend_clazz = BackendManager.BACKEND_META.get(backend)
             if backend_clazz is not None and backend_clazz.is_available():
                 usable_backends.append(backend_clazz)
@@ -79,7 +74,7 @@ class BackendManager(object):
                 if self.current_state(BackendManager.ACTIVE):
                     BackendManager.ACTIVE_BACKEND = the_backend
                 elif self.current_state(BackendManager.INITIAL):
-                    BackendManager.ACTIVE_BACKEND = None
+                    BackendManager.ACTIVE_BACKEND = Backend.NullHaskellBackend()
                 else:
                     state_str = BackendManager.STATES_TO_NAME.get(self.state, str(self.state))
                     Logging.log('BackendManager: Invalid state after go_active: {0}'.format(state_str), Logging.LOG_ERROR)
@@ -116,6 +111,20 @@ class BackendManager(object):
                 self.src_inspector.start_inspect()
             self.set_state(BackendManager.ACTIVE)
 
+    def shutdown_backend(self):
+        '''Step through the backend shutdown process: disconnect (if active), stop backend (if disconnected). Backend
+        manager's state should end up in INITIAL.
+        '''
+        backend = BackendManager.ACTIVE_BACKEND
+        if self.current_state(BackendManager.ACTIVE):
+            self.set_state(BackendManager.DISCONNECT)
+            backend.disconnect_backend()
+        if self.current_state(BackendManager.DISCONNECT):
+            self.set_state(BackendManager.SHUTDOWN)
+            backend.stop_backend()
+        if self.current_state(BackendManager.SHUTDOWN):
+            self.set_state(BackendManager.INITIAL)
+
     def set_state(self, state):
         with self.state_lock:
             self.state = state
@@ -129,22 +138,25 @@ class BackendManager(object):
 
     @staticmethod
     def active_backend():
+        '''Return the currently active backend. Note: This will return the Backend.NullHaskellBackend if there isn't an
+        active backend. This ensures that API calls to the backend succeed without additional special logic.
+        '''
         backend = BackendManager.ACTIVE_BACKEND
-        if backend is not None and BackendManager.manager().current_state(BackendManager.ACTIVE):
+        if backend is not None and BackendManager().current_state(BackendManager.ACTIVE):
             return backend
         else:
-            return BackendManager.NULL_BACKEND
+            return Backend.NullHaskellBackend()
 
     @staticmethod
-    def manager():
-        with BackendManager.DEFAULT_MANAGER_LOCK:
-            if BackendManager.DEFAULT_MANAGER is None:
-                BackendManager.DEFAULT_MANAGER = BackendManager()
-        return BackendManager.DEFAULT_MANAGER
+    def is_live_backend():
+        '''Determine if the active backend is live and usable, i.e., it is not the null backend.
+        '''
+        return BackendManager.active_backend().is_live_backend()
+
 
     @staticmethod
     def inspector():
-        return BackendManager.manager().inspector()
+        return BackendManager().src_inspector
 
 
 def active_backend():
@@ -153,11 +165,11 @@ def active_backend():
     '''
     return BackendManager.active_backend()
 
-def manager():
-    '''Return the default backend manager object. This is a convenience function that accesses the `BackendManager`'s static
-    function of the same name, reducing the amount of redundant typing.
+def is_live_backend():
+    '''Determine if the active backend is live and usable. This is a convenience function that accesses the `BackendManager`'s
+    static function of the same name and reduces the amount of redundant typing.
     '''
-    return BackendManager.manager()
+    return BackendManager.is_live_backend()
 
 def inspector():
     '''Return the inspector object. This is a convenience function that accesses the `BackendManager`'s static

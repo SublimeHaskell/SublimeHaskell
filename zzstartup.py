@@ -21,11 +21,9 @@ def plugin_loaded():
     Settings.PLUGIN.add_change_callback('add_standard_dirs', ProcHelper.ProcHelper.update_environment)
 
     # Now create the backend...
-    backend = BackendManager.manager()
+    backend = BackendManager.BackendManager()
     backend.initialize()
 
 
 def plugin_unloaded():
-    backend = BackendManager.BackendManager.active_backend()
-    if backend is not None:
-        backend.shutdown_backend()
+    BackendManager.BackendManager().shutdown_backend()

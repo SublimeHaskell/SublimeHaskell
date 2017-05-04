@@ -11,9 +11,10 @@ import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.proc_helper as ProcHelper
 import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.cmdwin_types as CommandWin
 
 
-class SublimeHaskellInsertImportForSymbol(hsdev.HsDevTextCommand):
+class SublimeHaskellInsertImportForSymbol(CommandWin.HsDevTextCommand):
     """
     Insert import for symbol
     """

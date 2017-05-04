@@ -7,12 +7,13 @@ import threading
 
 import sublime
 
-import SublimeHaskell.sublime_haskell_common as Common
-import SublimeHaskell.internals.proc_helper as ProcHelper
+import SublimeHaskell.cmdwin_types as CommandWin
+import SublimeHaskell.internals.backend_mgr as BackendMgr
 import SublimeHaskell.internals.logging as Logging
+import SublimeHaskell.internals.proc_helper as ProcHelper
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.parseoutput as ParseOutput
-import SublimeHaskell.hsdev.agent as hsdev
+import SublimeHaskell.sublime_haskell_common as Common
 
 OUTPUT_PANEL_NAME = "haskell_run_output"
 
@@ -110,7 +111,7 @@ PROJECTS_BEING_BUILT = set()
 
 
 # Base command
-class SublimeHaskellBaseCommand(Common.SublimeHaskellWindowCommand):
+class SublimeHaskellBaseCommand(CommandWin.SublimeHaskellWindowCommand):
     def __init__(self, window):
         super().__init__(window)
 
@@ -174,7 +175,7 @@ def stack_dist_path(project_dir):
 
 # Retrieve projects as dictionary that refers to this app instance
 def get_projects():
-    if hsdev.agent_connected():
+    if BackendMgr.is_live_backend():
         folders = sublime.active_window().folders()
         view_files = [v.file_name() for v in sublime.active_window().views()
                       if (Common.is_haskell_source(v) or Common.is_cabal_source(v)) and v.file_name()
@@ -188,7 +189,7 @@ def get_projects():
 
         return dict((info['name'], info) for info in filter(
             lambda p: any([childof(p['path'], f) for f in folders]) or any([childof(src, p['path']) for src in view_files]),
-            (hsdev.client.list_projects() or [])))
+            (BackendMgr.active_backend().list_projects() or [])))
     else:
         folder_files = [src for f in sublime.active_window().folders() for src in Common.list_files_in_dir_recursively(f) \
                         if os.path.splitext(src)[1] in [".hs", ".cabal"]
@@ -260,16 +261,6 @@ def run_build(view, project_name, project_dir, config):
 
 # Default build system (cabal or cabal-dev)
 
-# class SublimeHaskellCleanCommand(SublimeHaskellBaseCommand):
-#     def run(self):
-#         self.build('clean')
-
-
-# class SublimeHaskellConfigureCommand(SublimeHaskellBaseCommand):
-#     def run(self):
-#         self.build('configure')
-
-
 class SublimeHaskellBuildCommand(SublimeHaskellBaseCommand):
     def run(self, task='build'):
         self.build(task)
@@ -278,16 +269,6 @@ class SublimeHaskellBuildCommand(SublimeHaskellBaseCommand):
 class SublimeHaskellTypecheckCommand(SublimeHaskellBaseCommand):
     def run(self):
         self.build('typecheck_then_warnings')
-
-
-# class SublimeHaskellRebuildCommand(SublimeHaskellBaseCommand):
-#     def run(self):
-#         self.build('rebuild')
-
-
-# class SublimeHaskellInstallCommand(SublimeHaskellBaseCommand):
-#     def run(self):
-#         self.build('install')
 
 
 # class SublimeHaskellTestCommand(SublimeHaskellBaseCommand):

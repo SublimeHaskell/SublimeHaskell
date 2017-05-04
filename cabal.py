@@ -1,10 +1,11 @@
 # -*- coding: UTF-8 -*-
 
+import SublimeHaskell.cmdwin_types as CommandWin
+import SublimeHaskell.internals.backend_mgr as BackendMgr
 import SublimeHaskell.sublime_haskell_common as Common
-import SublimeHaskell.hsdev.agent as hsdev
 
 
-class SublimeHaskellCabalList(Common.SublimeHaskellWindowCommand):
+class SublimeHaskellCabalList(CommandWin.SublimeHaskellWindowCommand):
     def __init__(self, view):
         super().__init__(view)
         self.packages = []
@@ -13,7 +14,7 @@ class SublimeHaskellCabalList(Common.SublimeHaskellWindowCommand):
         self.window.show_input_panel("Cabal list", "", self.on_done, self.on_change, self.on_cancel)
 
     def on_done(self, inp):
-        self.packages = hsdev.client.cabal_list(input)
+        self.packages = BackendMgr.active_backend().cabal_list(input)
         if not self.packages:
             Common.show_status_message("Package {0} not found".format(inp))
         else:
