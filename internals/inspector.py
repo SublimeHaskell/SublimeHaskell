@@ -17,11 +17,14 @@ class ScanStatus(object):
 
     def __call__(self, msgs):
         statuses = []
+        smsg = ''
         for msg in msgs:
             progress = msg['progress']
-            statuses.append('{0} ({1}/{2})'.format(msg['name'], progress['current'], progress['total'])
-                            if progress else msg['name'])
-        self.status_message.change_message('Inspecting {0}'.format(' / '.join(statuses)))
+            smsg = '{0} ({1}/{2})'.format(msg['name'], progress['current'], progress['total']) if progress else msg['name']
+            statuses.append(smsg)
+        smsg = ' / '.join(statuses)
+        self.status_message.change_message('Inspecting {0}'.format(smsg))
+        Logging.log("inspector: " + smsg, Logging.LOG_DEBUG)
 
 
 # Set reinspect event
@@ -50,7 +53,7 @@ class Inspector(threading.Thread):
     '''
 
     # Re-inspect event wait time, in seconds
-    WAIT_TIMEOUT = 60.0
+    WAIT_TIMEOUT = 120.0
 
     def __init__(self, backend):
         super().__init__(name='hsdev inspector')
@@ -149,6 +152,7 @@ class Inspector(threading.Thread):
                               sandboxes=[] if cabal == 'cabal' else [cabal],
                               on_notify=ScanStatus(smgr),
                               wait_complete=True,
+                              timeout=None,
                               docs=Settings.PLUGIN.enable_hdocs)
 
     @use_inspect_modules
@@ -160,6 +164,7 @@ class Inspector(threading.Thread):
                                   files=files,
                                   on_notify=ScanStatus(smgr),
                                   wait_complete=True,
+                                  timeout=None,
                                   ghc=Settings.PLUGIN.ghc_opts,
                                   docs=Settings.PLUGIN.enable_hdocs)
 
@@ -169,6 +174,7 @@ class Inspector(threading.Thread):
             self.backend.scan(paths=[path],
                               on_notify=ScanStatus(smgr),
                               wait_complete=True,
+                              timeout=None,
                               ghc=Settings.PLUGIN.ghc_opts,
                               docs=Settings.PLUGIN.enable_hdocs)
 
@@ -180,6 +186,7 @@ class Inspector(threading.Thread):
             self.backend.scan(projects=[cabal_dir],
                               on_notify=ScanStatus(smgr),
                               wait_complete=True,
+                              timeout=None,
                               docs=Settings.PLUGIN.enable_hdocs)
 
     @use_inspect_modules
@@ -188,5 +195,6 @@ class Inspector(threading.Thread):
             self.backend.scan(files=filenames,
                               on_notify=ScanStatus(smgr),
                               wait_complete=True,
+                              timeout=None,
                               ghc=Settings.PLUGIN.ghc_opts,
                               docs=Settings.PLUGIN.enable_hdocs)

@@ -176,3 +176,6 @@ def inspector():
     function of the same name, reducing the amount of redundant typing.
     '''
     return BackendManager.inspector()
+
+def lost_connection():
+    pass

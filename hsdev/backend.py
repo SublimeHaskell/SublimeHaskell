@@ -37,6 +37,7 @@ class HsDevBackend(Backend.HaskellBackend):
     HSDEV_DEFAULT_HOST = 'localhost'
     HSDEV_MIN_VER = [0, 2, 0, 0]  # minimum hsdev version
     HSDEV_MAX_VER = [0, 2, 4, 0]  # maximum hsdev version
+    HSDEV_CALL_TIMEOUT = 60.0 # second timeout for synchronous requests
 
     def __init__(self):
         super().__init__()
@@ -207,7 +208,7 @@ class HsDevBackend(Backend.HaskellBackend):
         if is_list and split_res:
             result = []
 
-            def inner_notify(reply):
+            def hsdev_command_notify(reply):
                 if 'result-part' in reply:
                     notify_result = on_result([reply['result-part']])[0]
                     HsCallback.call_callback(on_result_part, notify_result)
@@ -221,7 +222,7 @@ class HsDevBackend(Backend.HaskellBackend):
             resp = self.main_client.call(name,
                                          opts,
                                          on_response=on_response,
-                                         on_notify=inner_notify,
+                                         on_notify=hsdev_command_notify,
                                          on_error=on_error,
                                          wait=not async,
                                          timeout=timeout)
@@ -229,13 +230,13 @@ class HsDevBackend(Backend.HaskellBackend):
             return result if not async else resp
 
         else:
-            def processed_response(resp):
+            def process_response(resp):
                 on_response(on_result(resp))
 
             # FIXME: Need a connection pool
             resp = self.main_client.call(name,
                                          opts,
-                                         on_response=processed_response if on_response else None,
+                                         on_response=process_response if on_response else None,
                                          on_notify=on_notify,
                                          on_error=on_error,
                                          wait=not async,
@@ -243,9 +244,9 @@ class HsDevBackend(Backend.HaskellBackend):
 
             return on_result(resp) if not async else resp
 
-    def command(self, name, opts, on_result=result_identity, on_response=None, on_notify=None,
-                on_error=None, on_result_part=None, split_result=None):
-        return self.hsdev_command(name, opts, on_result, async=False, timeout=1, is_list=False,
+    def command(self, name, opts, on_result=result_identity, timeout=HSDEV_CALL_TIMEOUT, on_response=None,
+                on_notify=None, on_error=None, on_result_part=None, split_result=None):
+        return self.hsdev_command(name, opts, on_result, async=False, timeout=timeout, is_list=False,
                                   on_response=on_response, on_notify=on_notify, on_error=on_error,
                                   on_result_part=on_result_part, split_result=split_result)
 
@@ -257,9 +258,9 @@ class HsDevBackend(Backend.HaskellBackend):
                                   on_result_part=on_result_part, split_result=split_result)
 
 
-    def list_command(self, name, opts, on_result=result_identity, on_response=None, on_notify=None,
-                     on_error=None, on_result_part=None, split_result=None):
-        return self.hsdev_command(name, opts, on_result, async=False, timeout=1, is_list=True,
+    def list_command(self, name, opts, on_result=result_identity,timeout=HSDEV_CALL_TIMEOUT,  on_response=None,
+                     on_notify=None, on_error=None, on_result_part=None, split_result=None):
+        return self.hsdev_command(name, opts, on_result, async=False, timeout=timeout, is_list=True,
                                   on_response=on_response, on_notify=on_notify, on_error=on_error,
                                   on_result_part=on_result_part, split_result=split_result)
 
@@ -567,11 +568,11 @@ class HsDevStartupReader(threading.Thread):
         while not self.end_event.is_set():
             srvout = self.stdout.readline().strip()
             if srvout != '':
-                Logging.log('hsdev initial output: {0}'.format(srvout), Logging.LOG_DEBUG)
+                Logging.log('hsdev initial: {0}'.format(srvout), Logging.LOG_DEBUG)
                 start_confirm = re.search(r'[Ss]erver started at port (?P<port>\d+)$', srvout)
                 if start_confirm:
                     self.hsdev_port = int(start_confirm.group('port'))
-                    Logging.log('\'hsdev\' server started at port {0}'.format(self.hsdev_port))
+                    Logging.log('hsdev initial: \'hsdev\' server started at port {0}'.format(self.hsdev_port))
                     self.end_event.set()
             else:
                 # Got EOF, stop loop.
