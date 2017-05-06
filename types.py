@@ -167,14 +167,14 @@ def sorted_types(view, types, point):
         return []
 
 
-def get_type(view, filename, _module_name, line, column, cabal=None):
+def get_type(view, filename, module_name, line, column, cabal=None):
     result = None
 
     # FIXME: Migrate this functionality into the backend API, then into the respective backends:
     #
     # if Settings.PLUGIN.enable_hsdev:
     #     # Convert from hsdev one-based locations to sublime zero-based positions
-    #     return sorted_types(view, get_types(filename) or [], FilePosition(line, column).point(view))
+    return sorted_types(view, get_types(filename) or [], FilePosition(line, column).point(view))
 
     # column = ParseOutput.sublime_column_to_ghc_column(view, line, column)
     # line = line + 1
@@ -184,7 +184,6 @@ def get_type(view, filename, _module_name, line, column, cabal=None):
     #     result = GHCIMod.ghcmod_type(filename, module_name, line, column)
 
     # return parse_type_output(view, result) if result else None
-    return result
 
 
 def get_type_view(view, selection=None):
@@ -201,7 +200,7 @@ def get_type_view(view, selection=None):
     return get_type(view, filename, module_name, line, column)
 
 
-def get_types(filename, on_result):
+def get_types(filename, on_result=None):
     if BackendManager.is_live_backend():
         def to_file_pos(rgn):
             return FilePosition(int(rgn['line']) - 1, int(rgn['column']) - 1)

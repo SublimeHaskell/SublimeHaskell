@@ -117,7 +117,9 @@ class HsDevClient(object):
 
     def get_response(self):
         while '\n' not in self.part:
-            self.part = self.part + self.socket.recv(4096).decode('utf-8')
+            ## 9216: The size of an Ethernet jumbo frame, rounded up to nearest 1k. Just in case someone is actually
+            ## crazy enough to use it. 64k is overkill.
+            self.part = self.part + self.socket.recv(9216).decode('utf-8')
         (pre, _, post) = self.part.partition('\n')
         self.part = post
         return pre
@@ -133,15 +135,15 @@ class HsDevClient(object):
             wait_receive = threading.Event() if wait else None
             result_dict = {}
 
-            def on_response_(resp):
+            def client_call_response(resp):
                 result_dict['result'] = resp
                 HsCallback.call_callback(on_response, resp)
-                if wait_receive:
+                if wait_receive is not None:
                     wait_receive.set()
 
-            def on_error_(exc, details):
+            def client_call_error(exc, details):
                 HsCallback.call_callback(on_error, exc, details)
-                if wait_receive:
+                if wait_receive is not None:
                     wait_receive.set()
 
             req_serial = str(self.request_serial)
@@ -149,7 +151,7 @@ class HsDevClient(object):
 
             if wait or on_response or on_notify or on_error:
                 args_cmd = 'hsdev {0}'.format(command)
-                self.setup_receive_callbacks(req_serial, args_cmd, on_response_, on_notify, on_error_)
+                self.setup_receive_callbacks(req_serial, args_cmd, client_call_response, on_notify, client_call_error)
 
             opts.update({'no-file': True})
             opts.update({'id': req_serial, 'command': command})

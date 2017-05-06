@@ -465,7 +465,7 @@ class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
                 update_completions_async(drop_all=True)
 
     def on_activated(self, view):
-        Logging.log('SublimeHaskellAutocomplete.on_activated invoked.', Logging.LOG_DEBUG)
+        ## Logging.log('SublimeHaskellAutocomplete.on_activated invoked.', Logging.LOG_DEBUG)
         self.set_cabal_status(view)
 
         window = view.window()
