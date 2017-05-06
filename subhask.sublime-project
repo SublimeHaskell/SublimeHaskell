@@ -15,7 +15,8 @@
             "${project}",
             "${project}/..",
             "${home}/Sublime",
-            "${env:USERPROFILE}\\Sublime"
+            "${env:USERPROFILE}\\Sublime",
+            "/Applications/Sublime Text.app/Contents/MacOS"
           ],
         }
       }
