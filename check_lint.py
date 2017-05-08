@@ -92,13 +92,16 @@ class SublimeHaskellHsDevChain(CommandWin.SublimeHaskellTextCommand):
     def go_chain(self, cmds):
         if not cmds:
             self.status_msg.stop()
+            Logging.log('go_chain complete, autofix_show')
             BackendMgr.active_backend().autofix_show(self.msgs, on_response=self.on_autofix)
         else:
             cmd, tail_cmds = cmds[0], cmds[1:]
             agent_func, modify_args, modify_msgs, kwargs = cmd
 
             def go_chain_resp(msgs):
-                Logging.log('go_chain_resp:\n{0}'.format(pprint.pformat(msgs)), Logging.LOG_DEBUG)
+                if Logging.is_log_level(Logging.LOG_DEBUG):
+                    Logging.emit(u'go_chain_resp:\n' + pprint.pformat(msgs))
+
                 self.messages.extend(modify_msgs(msgs))
                 self.msgs.extend(msgs)
                 self.go_chain(tail_cmds)
@@ -109,8 +112,8 @@ class SublimeHaskellHsDevChain(CommandWin.SublimeHaskellTextCommand):
                 self.go_chain([])
 
             Logging.log('go_chain: executing\n{0}'.format(pprint.pformat(cmd)), Logging.LOG_DEBUG)
-            agent_func(modify_args(self.filename), contents=self.contents, wait=False, on_response=go_chain_resp,
-                       on_error=go_chain_err, **kwargs)
+            agent_func(modify_args(self.filename), contents=self.contents, wait_complete=False,
+                       on_response=go_chain_resp, on_error=go_chain_err, **kwargs)
 
     def on_autofix(self, corrections):
         output_messages = [ParseOutput.OutputMessage(
@@ -159,18 +162,27 @@ def ghcmod_command(cmdname):
 
 
 class SublimeHaskellCheck(SublimeHaskellHsDevChain):
+    def __init__(self, view):
+        super().__init__(view)
+
     @ghcmod_command('check')
     def run(self, edit, **kwargs):
         self.run_chain([hsdev_check()], 'Checking', fly_mode=(kwargs.get('fly') or False))
 
 
 class SublimeHaskellLint(SublimeHaskellHsDevChain):
+    def __init__(self, view):
+        super().__init__(view)
+
     @ghcmod_command('lint')
     def run(self, edit, **kwargs):
         self.run_chain([hsdev_lint()], 'Linting', fly_mode=(kwargs.get('fly') or False))
 
 
 class SublimeHaskellCheckAndLint(SublimeHaskellHsDevChain):
+    def __init__(self, view):
+        super().__init__(view)
+
     @ghcmod_command('check_and_lint')
     def run(self, edit, **kwargs):
         self.run_chain([hsdev_check(), messages_as_hints(hsdev_lint())],

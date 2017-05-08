@@ -27,7 +27,6 @@ def is_scanned_source(view=None):
     _, view, file_shown_in_view = Common.get_haskell_command_window_view_file_project(view)
     if file_shown_in_view is None:
         return False
-    ## FIXME:
     return Utils.head_of(BackendManager.active_backend().module(file=file_shown_in_view)) is not None
 
 
@@ -35,9 +34,9 @@ def is_in_project(view=None):
     _, view, file_shown_in_view = Common.get_haskell_command_window_view_file_project(view)
     if file_shown_in_view is None:
         return False
-    ## FIXME:
-    src_module = Utils.head_of(BackendManager.active_backend().module(file=file_shown_in_view))
-    return src_module is not None and src_module.location.project is not None
+    else:
+        src_module = Utils.head_of(BackendManager.active_backend().module(file=file_shown_in_view))
+        return src_module is not None and src_module.location.project is not None
 
 
 def show_declaration_info_panel(view, decl):

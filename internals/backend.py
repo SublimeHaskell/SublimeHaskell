@@ -6,7 +6,6 @@
 
 import SublimeHaskell.internals.utils as Utils
 
-
 class HaskellBackend(object):
     '''Base class for SublimeHaskell backends. Provides the basic interface for managing and communicating with a
     backend (hsdev, hdevtools, ghc-mod).
@@ -139,13 +138,13 @@ class HaskellBackend(object):
     def cabal_list(self, packages, **backend_args):
         raise NotImplementedError("HaskellBackend.cabal_list needs an implementation.")
 
-    def lint(self, files=None, contents=None, hlint=None, **backend_args):
+    def lint(self, files=None, contents=None, hlint=None, wait_complete=True, **backend_args):
         raise NotImplementedError("HaskellBackend.lint needs an implementation.")
 
-    def check(self, files=None, contents=None, ghc=None, **backend_args):
+    def check(self, files=None, contents=None, ghc=None, wait_complete=True, **backend_args):
         raise NotImplementedError("HaskellBackend.lint needs an implementation.")
 
-    def check_lint(self, files=None, contents=None, ghc=None, hlint=None, **backend_args):
+    def check_lint(self, files=None, contents=None, ghc=None, hlint=None, wait_complete=True, **backend_args):
         raise NotImplementedError("HaskellBackend.check_lint needs an implementation.")
 
     def types(self, files=None, contents=None, ghc=None, **backend_args):
@@ -285,13 +284,13 @@ class NullHaskellBackend(object, metaclass=Utils.Singleton):
     def cabal_list(self, packages, **backend_args):
         return []
 
-    def lint(self, files=None, contents=None, hlint=None, **backend_args):
+    def lint(self, files=None, contents=None, hlint=None, wait_complete=False, **backend_args):
         return []
 
-    def check(self, files=None, contents=None, ghc=None, **backend_args):
+    def check(self, files=None, contents=None, ghc=None, wait_complete=False, **backend_args):
         return []
 
-    def check_lint(self, files=None, contents=None, ghc=None, hlint=None, **backend_args):
+    def check_lint(self, files=None, contents=None, ghc=None, hlint=None, wait_complete=False, **backend_args):
         return []
 
     def types(self, files=None, contents=None, ghc=None, **backend_args):

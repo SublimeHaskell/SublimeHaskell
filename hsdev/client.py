@@ -95,22 +95,27 @@ class HsDevClient(object):
             try:
                 resp = json.loads(self.get_response())
                 if 'id' in resp:
+                    if Logging.is_log_level(Logging.LOG_TRACE):
+                        print(u'HsDevClient.listen resp:')
+                        pprint.pprint(resp)
+
                     callbacks = None
                     with self.request_map as requests:
-                        if resp['id'] in requests:
-                            callbacks = requests[resp['id']]
-                    if callbacks:
-                        if 'notify' in resp:
-                            callbacks.call_notify(resp['notify'])
-                        if 'error' in resp:
-                            err = resp.pop("error")
-                            callbacks.call_error(err, resp)
-                            with self.request_map as requests:
-                                requests.pop(resp['id'])
-                        if 'result' in resp:
-                            callbacks.call_response(resp['result'])
-                            with self.request_map as requests:
-                                requests.pop(resp['id'])
+                        resp_id = resp.get('id')
+                        if resp_id is not None:
+                            callbacks = requests.get(resp_id)
+                            if callbacks is not None:
+                                if 'notify' in resp:
+                                    callbacks.call_notify(resp['notify'])
+                                if 'error' in resp:
+                                    err = resp.pop("error")
+                                    callbacks.call_error(err, resp)
+                                    requests.pop(resp['id'])
+                                if 'result' in resp:
+                                    callbacks.call_response(resp['result'])
+                                    requests.pop(resp['id'])
+                        else:
+                            Logging.log('HsDevClient.listen: received response without an id')
             except IOError:
                 self.connection_lost('listen', sys.exc_info()[1])
                 return
@@ -129,7 +134,9 @@ class HsDevClient(object):
         if not self.verify_connected():
             return None if wait else False
 
-        call_cmd = 'hsdev {0} with {1}'.format(command, opts)
+        if Logging.is_log_level(Logging.LOG_DEBUG):
+            print(u'HsDevClient.call cmd \'{0}\' opts\n{1}'.format(command, pprint.pformat(opts)))
+
         try:
             opts = opts or {}
             wait_receive = threading.Event() if wait else None
@@ -163,7 +170,6 @@ class HsDevClient(object):
             # TCP ack to know that that's been done.] OTOH, the first sendall() can also fail...
 
             self.socket.sendall((msg + '\n').encode('utf-8'))
-            Logging.log(call_cmd, Logging.LOG_TRACE)
 
             if wait:
                 wait_receive.wait(timeout)

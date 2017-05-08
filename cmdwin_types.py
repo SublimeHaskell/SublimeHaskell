@@ -43,15 +43,15 @@ class HsDevWindowCommand(SublimeHaskellWindowCommand):
     def is_enabled(self):
         live = BackendMgr.is_live_backend()
         cmd_enabled = super().is_enabled()
-        Logging.log('HsDevWindowCommand.is_enabled: is_live_backend {0}, super {1}'.format(live, cmd_enabled),
-                    Logging.LOG_DEBUG)
+        # Logging.log('HsDevWindowCommand.is_enabled: is_live_backend {0}, super {1}'.format(live, cmd_enabled),
+        #             Logging.LOG_DEBUG)
         return live and cmd_enabled
 
     def is_visible(self):
         live = BackendMgr.is_live_backend()
         cmd_visible = super().is_visible()
-        Logging.log('HsDevWindowCommand.is_enabled: is_live_backend {0}, super {1}'.format(live, cmd_visible),
-                    Logging.LOG_DEBUG)
+        # Logging.log('HsDevWindowCommand.is_enabled: is_live_backend {0}, super {1}'.format(live, cmd_visible),
+        #             Logging.LOG_DEBUG)
         return live and cmd_visible
 
 
@@ -64,13 +64,13 @@ class HsDevTextCommand(SublimeHaskellTextCommand):
     def is_enabled(self):
         live = BackendMgr.is_live_backend()
         cmd_enabled = super().is_enabled()
-        Logging.log('HsDevTextCommand.is_enabled: is_live_backend {0}, super {1}'.format(live, cmd_enabled),
-                    Logging.LOG_DEBUG)
+        # Logging.log('HsDevTextCommand.is_enabled: is_live_backend {0}, super {1}'.format(live, cmd_enabled),
+        #             Logging.LOG_DEBUG)
         return live and cmd_enabled
 
     def is_visible(self):
         live = BackendMgr.is_live_backend()
         cmd_visible = super().is_visible()
-        Logging.log('HsDevTextCommand.is_enabled: is_live_backend {0}, super {1}'.format(live, cmd_visible),
-                    Logging.LOG_DEBUG)
+        # Logging.log('HsDevTextCommand.is_enabled: is_live_backend {0}, super {1}'.format(live, cmd_visible),
+        #             Logging.LOG_DEBUG)
         return live and cmd_visible
