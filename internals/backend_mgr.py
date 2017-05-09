@@ -149,13 +149,15 @@ class BackendManager(object, metaclass=Utils.Singleton):
 
     @staticmethod
     def is_live_backend():
-        '''Determine if the active backend is live and usable, i.e., it is not the null backend.
+        '''Determine if the active backend is live and usable. The null backend is never live.
         '''
         return BackendManager.active_backend().is_live_backend()
 
 
     @staticmethod
     def inspector():
+        '''Get the source inspector object.
+        '''
         return BackendManager().src_inspector
 
 

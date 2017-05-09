@@ -14,7 +14,7 @@ def plugin_loaded():
         os.makedirs(cache_path)
 
     # Probably already loaded... doesn't hurt to reload.
-    Settings.PLUGIN.load()
+    Settings.load_settings()
 
     # Register change detection:
     Settings.PLUGIN.add_change_callback('add_to_PATH', ProcHelper.ProcHelper.update_environment)

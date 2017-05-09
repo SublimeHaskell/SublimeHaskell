@@ -14,8 +14,8 @@ import sublime
 import SublimeHaskell.internals.locked_object as LockedObject
 
 def access_sync(lock_name):
-    """Decorate a function that requires lock synchronization: acquire the lock named `lock_name` (a member of an object)
-    and execute a function. This ensures that readers and writers don't collide with each other."""
+    '''Decorate a function that requires lock synchronization: acquire the lock named `lock_name` (a member of an object)
+    and execute a function. This ensures that readers and writers don't collide with each other.'''
     def decorator(method):
         def synced_method(self, *args, **kwargs):
             # Because we use this on an object's __getattribute__ method, we have to call object.__getattribute__
@@ -27,7 +27,7 @@ def access_sync(lock_name):
     return decorator
 
 
-class SetttingsContainer(object):
+class SettingsContainer(object):
     """Container object for default and user preference settings."""
 
     # Map instance settings keys to attributes and default values.
@@ -45,6 +45,7 @@ class SetttingsContainer(object):
         'auto_completion_popup': ('auto_completion_popup', False),
         'auto_run_tests': ('auto_run_tests', True),
         'backends': ('backends', None),
+        'backend_debug': ('backend_debug', []),
         'enable_auto_build': ('enable_auto_build', False),
         'enable_auto_check': ('enable_auto_check', True),
         'enable_auto_lint': ('enable_auto_lint', True),
@@ -79,6 +80,7 @@ class SetttingsContainer(object):
         self.auto_completion_popup = None
         self.auto_run_tests = None
         self.backends = None
+        self.backend_debug = []
         self.enable_auto_build = None
         self.enable_auto_check = None
         self.enable_auto_lint = None
@@ -103,7 +105,7 @@ class SetttingsContainer(object):
         self.use_improved_syntax = None
 
         # Set attributes to their respective default values:
-        for (attr, default) in SetttingsContainer.attr_dict.values():
+        for attr, default in SettingsContainer.attr_dict.values():
             setattr(self, attr, default)
 
         # Additional change callbacks to propagate:
@@ -118,7 +120,7 @@ class SetttingsContainer(object):
     @access_sync('wlock')
     def load(self):
         settings = get_settings()
-        for (key, (attr, default)) in SetttingsContainer.attr_dict.items():
+        for (key, (attr, default)) in SettingsContainer.attr_dict.items():
             value = settings.get(key, default)
             ## Uncomment to debug. Do NOT use logging because it causes a circular dependency.
             ## print('Settings.load: {0} = {1}'.format(attr, value))
@@ -128,7 +130,7 @@ class SetttingsContainer(object):
 
     def update_setting(self, key):
         settings = get_settings()
-        (attr, default) = SetttingsContainer.attr_dict[key]
+        attr, default = SettingsContainer.attr_dict[key]
         oldval = getattr(self, attr)
         newval = settings.get(key, default)
         if oldval != newval:
@@ -169,8 +171,44 @@ def get_project_setting(view, key, default=None):
 def set_project_setting(view, key, value):
     view.window().project_data().set(key, value)
 
-# Preserve settings across plugin reloads:
-if 'PLUGIN' not in globals():
-    PLUGIN = SetttingsContainer()
-else:
-    PLUGIN = globals()['PLUGIN']
+
+class BackendDebug(object):
+    '''Convenience container for backend debugging settings.
+    '''
+    def __init__(self):
+        self.all_messages = False
+        self.send_messages = False
+        self.recv_messages = False
+        self.iowaits = False
+
+    def load(self, backend_settings):
+        self.all_messages = 'all_messages' in backend_settings
+        self.send_messages = 'send_messages' in backend_settings
+        self.recv_messages = 'recv_messages' in backend_settings
+        self.iowaits = 'iowaits' in backend_settings
+
+
+PLUGIN = SettingsContainer()
+BACKEND = BackendDebug()
+
+def load_settings():
+    '''Instantiate the SettingsContainer module instance, which happens as part of the module loading in the
+    main thread. Across reloads, though, try to keep the update triggers.
+    '''
+    global PLUGIN
+    global BACKEND
+
+    _changes = None
+    if 'PLUGIN' in globals():
+        _plugin = globals()['PLUGIN']
+        if _plugin is not None:
+            _changes = _plugin.changes
+
+    PLUGIN = SettingsContainer()
+    BACKEND = BackendDebug()
+
+    PLUGIN.load()
+    BACKEND.load(PLUGIN.backend_debug or [])
+
+    if _changes is not None:
+        PLUGIN.changes = _changes

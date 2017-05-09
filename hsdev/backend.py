@@ -59,8 +59,6 @@ class HsDevBackend(Backend.HaskellBackend):
             self.hostname = Settings.PLUGIN.hsdev_host
         # Main client connection: usually synchronous
         self.main_client = None
-        # Auxiliary client connection: asynchronous
-        self.aux_client = None
 
     @staticmethod
     def backend_name():
@@ -139,8 +137,7 @@ class HsDevBackend(Backend.HaskellBackend):
         Logging.log('Connecting to \'hsdev\' server at {0}:{1}'.format(self.hostname, self.port), Logging.LOG_INFO)
         retval = True
         self.main_client = HsDevClient.HsDevClient()
-        self.aux_client = HsDevClient.HsDevClient()
-        if self.main_client.connect(self.hostname, self.port) and self.aux_client.connect(self.hostname, self.port):
+        if self.main_client.connect(self.hostname, self.port):
             # For a local hsdev server that we started, send the link command so that it exits when we exit.
             if self.is_local_hsdev:
                 self.link()
@@ -154,7 +151,6 @@ class HsDevBackend(Backend.HaskellBackend):
     def disconnect_backend(self):
         # FIXME: Connection pool
         self.main_client.close()
-        self.aux_client.close()
 
     def stop_backend(self):
         if self.is_local_hsdev:
@@ -167,7 +163,7 @@ class HsDevBackend(Backend.HaskellBackend):
                                                   'console window\'s command line.']))
 
     def is_live_backend(self):
-        return self.main_client.is_connected() and self.aux_client.is_connected()
+        return self.main_client.is_connected()
 
     @staticmethod
     def hsdev_version():
@@ -200,7 +196,7 @@ class HsDevBackend(Backend.HaskellBackend):
         return  retval
 
 
-    def hsdev_command(self, name, opts, on_result, async=False, timeout=None, is_list=False,
+    def hsdev_command(self, name, opts, on_result, async=False, timeout=120.0, is_list=False,
                       on_response=None, on_notify=None, on_error=None, on_result_part=None, split_result=None):
         if split_result is None:
             split_res = on_result_part is not None

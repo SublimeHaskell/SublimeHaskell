@@ -171,5 +171,13 @@
 	// hsdev version 0.2.3.0 and higher: The "hsdev_log_level" preference controls hsdev's logging. Valid values are
 	// 'trace', 'debug', 'info', 'warning', 'error' and 'fatal'.
   "hsdev_log_config": "use silent",
-  "hsdev_log_level": "warning"
+  "hsdev_log_level": "warning",
+
+  // Backend debugging flags/tokens: This is a list of tokens used for backend debugging
+  //
+  // "all_messages": Emit all messages (send and receive)
+  // "send_messages": Emit all sent messages
+  // "recv_messages": Emit all received messages
+  // "iowaits": Emit output if an I/O event occurs due to select/poll/kqueue/... file descriptor sampling.
+  "backend_debug": []
 }
