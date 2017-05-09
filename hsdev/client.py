@@ -46,6 +46,9 @@ class HsDevConnection(object):
 
         return json.loads(req_resp)
 
+    def have_more(self):
+        return len(self.partial) > 0
+
     def close(self):
         try:
             self.socket.close()
@@ -178,6 +181,9 @@ class HsDevClient(object):
 
                     if conn is not None:
                         self.get_response(conn)
+                        # Continue to process incomplete responses -- it means we haven't read enough.
+                        while conn.have_more():
+                            self.get_response(conn)
                     else:
                         Logging.log('HsDevClient.receiver: no corresponding connection {0}'.format(inp.fileobj),
                                     Logging.LOG_ERROR)
