@@ -92,26 +92,21 @@ class SublimeHaskellHsDevChain(CommandWin.SublimeHaskellTextCommand):
     def go_chain(self, cmds):
         if not cmds:
             self.status_msg.stop()
-            Logging.log('go_chain complete, autofix_show')
+            Logging.log('go_chain complete, autofix_show', Logging.LOG_DEBUG)
             BackendMgr.active_backend().autofix_show(self.msgs, on_response=self.on_autofix)
         else:
             cmd, tail_cmds = cmds[0], cmds[1:]
             agent_func, modify_args, modify_msgs, kwargs = cmd
 
             def go_chain_resp(msgs):
-                if Logging.is_log_level(Logging.LOG_DEBUG):
-                    Logging.emit(u'go_chain_resp:\n' + pprint.pformat(msgs))
-
                 self.messages.extend(modify_msgs(msgs))
                 self.msgs.extend(msgs)
                 self.go_chain(tail_cmds)
 
             def go_chain_err(_err, details):
-                Logging.log('go_chain_err: details\n{0}'.format(pprint.pformat(details)), Logging.LOG_DEBUG)
                 self.status_msg.fail()
                 self.go_chain([])
 
-            Logging.log('go_chain: executing\n{0}'.format(pprint.pformat(cmd)), Logging.LOG_DEBUG)
             agent_func(modify_args(self.filename), contents=self.contents, wait_complete=False,
                        on_response=go_chain_resp, on_error=go_chain_err, **kwargs)
 

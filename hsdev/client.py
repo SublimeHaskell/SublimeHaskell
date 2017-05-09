@@ -177,7 +177,7 @@ class HsDevClient(object):
                     if Settings.BACKEND.iowaits:
                         print(u'HsDevClient.reciever: iowait completed.')
                     with self.socket_lock:
-                        conn = self.socket_pool.get(inp.fileobj) or self.socket_used.get(inp.fileobj)
+                        conn = self.socket_used.get(inp.fileobj) or self.socket_pool.get(inp.fileobj)
 
                     if conn is not None:
                         self.get_response(conn)
@@ -272,7 +272,7 @@ class HsDevClient(object):
                     del self.socket_used[sock]
                     self.socket_pool[sock] = conn
 
-                Logging.log('socket_pool cnt {0} socket_used cnt {1}'.format(len(self.socket_pool), len(self.socket_used)),
+                Logging.log('socket_pool {0} socket_used {1}'.format(len(self.socket_pool), len(self.socket_used)),
                             Logging.LOG_DEBUG)
                 return result_dict.get('result') if wait else True
             else:

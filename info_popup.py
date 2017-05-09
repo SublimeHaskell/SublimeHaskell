@@ -50,28 +50,28 @@ class Styles(object):
         if scheme_path not in self.schemes:
             scheme_res = sublime.load_resource(scheme_path)
             if scheme_res:
-                try:
-                    # Go through all styles and collect scope/foreground/fontStyle etc.
-                    scheme_tree = ElementTree.fromstring(scheme_res)
-                    scheme = {}
-
-                    for style in scheme_tree.findall(".//dict[key='scope']"):
-                        cur_style = {}
-                        cur_tag = None
-                        for elem in style.iter():
-                            if elem.tag == 'key':
-                                cur_tag = elem.text  # We are going to fill it next time
-                            elif elem.tag == 'string' and cur_tag is not None:
-                                cur_style[cur_tag] = elem.text
-                                cur_tag = None
-                        if 'scope' in cur_style:
-                            scheme[cur_style['scope']] = cur_style
-
-                    self.schemes[scheme_path] = scheme
-                except ValueError:
-                    pass
+                # Go through all styles and collect scope/foreground/fontStyle etc.
+                self.schemes[scheme_path] = self.collect_scheme(ElementTree.fromstring(scheme_res))
 
         return self.schemes.get(scheme_path, {})
+
+    def collect_scheme(self, scheme_tree):
+        scheme = {}
+        for style in scheme_tree.findall(".//dict[key='scope']"):
+            try:
+                cur_style = {}
+                cur_tag = None
+                for elem in style.iter():
+                    if elem.tag == 'key':
+                        cur_tag = elem.text  # We are going to fill it next time
+                    elif elem.tag == 'string' and cur_tag is not None:
+                        cur_style[cur_tag] = elem.text
+                        cur_tag = None
+                if 'scope' in cur_style:
+                    scheme[cur_style['scope']] = cur_style
+            except ValueError:
+                pass
+        return scheme
 
     def gen_style(self, scheme_path):
         scheme = self.load_scheme(scheme_path)
@@ -116,14 +116,14 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
             return
 
         self.view = view
-        self.current_file_name = self.view.file_name()
+        self.current_file_name = view.file_name()
         # If the column is needed: (line, column) = self.view.rowcol(point) [remove subscript]
-        line = self.view.rowcol(point)[0]
+        line = view.rowcol(point)[0]
         self.decl = None
         self.typed_expr = None
 
         if hover_zone == sublime.HOVER_TEXT:
-            qsymbol = Common.get_qualified_symbol_at_point(self.view, point)
+            qsymbol = Common.get_qualified_symbol_at_point(view, point)
             module_word = qsymbol.module
             ident = qsymbol.name
 
@@ -137,22 +137,20 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
                 # Try get type of hovered symbol
                 self.point = point
                 self.typed_expr = None
-                if types.FILE_TYPES.has(self.current_file_name):
-                    self.typed_expr = self.get_type(types.FILE_TYPES.get(self.current_file_name))
+                if types.SourceHaskellTypeCache().has(self.current_file_name):
+                    self.typed_expr = self.get_type(types.SourceHaskellTypeCache().get(self.current_file_name))
                 else:
-                    types.get_types(self.current_file_name, self.on_types)
+                    type_list = types.query_file_types(self.current_file_name)
+                    self.on_types(type_list)
 
                 # Try whois
-                # FIXME: backend manager whois
                 self.suggest_import = False
                 self.decl = Utils.head_of(BackendManager.active_backend().whois(self.whois_name, self.current_file_name))
-
                 if not self.decl:
-                    # FIXME: backend manager lookup
                     self.suggest_import = True
                     self.decl = Utils.head_of(BackendManager.active_backend().lookup(self.full_name, self.current_file_name))
 
-                self.create_symbol_popup()
+                self.create_symbol_popup(update=True)
 
         elif hover_zone == sublime.HOVER_GUTTER:
             self.view = view
@@ -199,7 +197,7 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
     def get_type(self, type_list):
         filt_types = [t for t in type_list
                       if t.substr(self.view) == self.whois_name and t.region(self.view).contains(self.point)]
-        return filt_types[0] if len(filt_types) else None
+        return Utils.head_of(filt_types)
 
     def on_types(self, type_list):
         self.typed_expr = self.get_type(type_list)

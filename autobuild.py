@@ -11,12 +11,13 @@ import SublimeHaskell.internals.locked_object as LockedObject
 import SublimeHaskell.internals.settings as Settings
 
 
-class SublimeHaskellAutobuild(sublime_plugin.EventListener):
+class SublimeHaskellAutobuilder(object):
     def __init__(self):
         super().__init__()
         self.fly_agent = FlyCheckLint()
         self.fly_agent.start()
 
+    ## TODO: Consolidate this into a single 'on_post_save' so that all of the actions are properly sequenced.
     def on_post_save(self, view):
         cabal_project_dir, _ = Common.get_cabal_project_dir_and_name_of_view(view)
 

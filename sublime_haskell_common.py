@@ -30,7 +30,7 @@ IMPORT_MODULE_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']
 # Get symbol module scope and its name within import statement
 IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']*(\.[A-Z][\w\d\']*)*)' + \
                               r'(\s+as\s+(?P<as>[A-Z][\w\d\']*))?\s*' + \
-                              r'\(.*?((?P<identifier>([a-z][\w\d\']*)?)|(\((?P<operator>[!#$%&*+\.\/<=>?@\\\^|\-~:]*)))$')
+                              r'\(.*?((?P<identifier>([A-Za-z][\w\d\']*)?)|(\((?P<operator>[!#$%&*+\.\/<=>?@\\\^|\-~:]*)))$')
 
 
 def is_enabled_haskell_command(view, must_be_project):
@@ -302,14 +302,14 @@ class QualifiedSymbol(object):
         self.is_operator = is_operator
 
     def __str__(self):
-        return u'QualifiedSymbol(name: {0}, module {1}, '.format(self.name, self.module) + \
-               u'module_as {0}, is_import_list {1}, is_operator {2}'.format(self.module_as, self.is_import_list,
-                                                                            self.is_operator)
+        return u'QualifiedSymbol(name: \'{0}\', module \'{1}\', '.format(self.name, self.module) + \
+               u'module_as \'{0}\', is_import_list \'{1}\', is_operator \'{2}\''.format(self.module_as, self.is_import_list,
+                                                                                        self.is_operator)
 
     def qualified_name(self):
         if self.name is None:
             return self.module
-        return '{0}.{1}'.format(self.module_as or self.module, self.name) if self.module else self.name
+        return u'{0}.{1}'.format(self.module_as or self.module, self.name) if self.module else self.name
 
     def full_name(self):
         if self.name is None:
@@ -325,9 +325,13 @@ def get_qualified_symbol(line):
     Get module context of symbol and symbol itself
     Returns (module, as, name, is_import_list, is_operator), where module (or one of) can be None
     """
+    def normalize_name(re_result):
+        name = next(i for i in [re_result.group('identifier'), re_result.group('operator')] if i is not None)
+        return name if len(name) > 0 else None
+
     res = IMPORT_SYMBOL_RE.search(line)
     if res:
-        return QualifiedSymbol(name=next(i for i in [res.group('identifier'), res.group('operator')] if i is not None),
+        return QualifiedSymbol(name=normalize_name(res),
                                module=res.group('module'),
                                module_as=res.group('as'),
                                is_import_list=True,
@@ -338,7 +342,7 @@ def get_qualified_symbol(line):
     res = SYMBOL_RE.search(line)
     # res always match
     return QualifiedSymbol(module=res.group('module'),
-                           name=next(i for i in [res.group('identifier'), res.group('operator')] if i is not None),
+                           name=normalize_name(res),
                            is_operator=bool(res.group('operator')))
 
 

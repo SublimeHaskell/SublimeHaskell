@@ -131,7 +131,7 @@ class SublimeHaskellComplete(CommandWin.SublimeHaskellTextCommand):
 
     def do_complete(self):
         if self.wide:
-            autocomplete.AUTO_COMPLETER.mark_wide_completion(self.view)
+            autocomplete.AutoCompletion().mark_wide_completion(self.view)
         self.view.run_command("auto_complete")
 
 
@@ -457,7 +457,7 @@ class SublimeHaskellGoToAnyDeclaration(CommandWin.SublimeHaskellWindowCommand):
         self.cache = None
 
     def run(self):
-        with autocomplete.AUTO_COMPLETER.cache as cache_:
+        with autocomplete.AutoCompletion().cache as cache_:
             self.cache = cache_
             self.window.show_quick_panel(cache_.source_locs, self.on_done)
 
@@ -637,10 +637,11 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.HsDevTextCommand):
                 candidates = BackendManager.active_backend().symbol(lookup=unqualified_name, search_type='exact', file=filename)
             else:
                 if module_name and package_name:
+                    symbol_db = symbols.PackageDb.from_string(symdb) if symdb else None
                     candidates = BackendManager.active_backend().symbol(lookup=unqualified_name,
                                                                         search_type='exact',
                                                                         module=module_name,
-                                                                        symdb=symbols.PackageDb.from_string(symdb) if symdb else None,
+                                                                        symdb=symbol_db,
                                                                         package=package_name)
                 else:
                     candidates = []
@@ -817,6 +818,7 @@ class SublimeHaskellGoToDeclaration(CommandWin.HsDevTextCommand):
             else:
                 Common.show_status_message('Source location of {0} not found'.format(qsymbol.name), False)
         else:
+            backend = BackendManager.active_backend()
             whois_name = qsymbol.qualified_name()
             full_name = qsymbol.full_name()
             current_file_name = self.view.file_name()
@@ -825,7 +827,7 @@ class SublimeHaskellGoToDeclaration(CommandWin.HsDevTextCommand):
             candidates = []
             module_candidates = []
             if not qsymbol.is_module():
-                candidates = list(filter(lambda d: d.by_source(), BackendManager.active_backend().whois(whois_name, current_file_name)))
+                candidates = list(filter(lambda d: d.by_source(), backend.whois(whois_name, current_file_name)))
 
                 if candidates:
                     if candidates[0].has_source_location():
@@ -835,15 +837,15 @@ class SublimeHaskellGoToDeclaration(CommandWin.HsDevTextCommand):
                         candidates = []
                         for cand in cands:
                             for i in cand.imported:
-                                candidates = [s for s in BackendManager.active_backend().symbol(lookup=cand.name, search_type='exact', source=True)
+                                candidates = [s for s in backend.symbol(lookup=cand.name, search_type='exact', source=True)
                                               if s.module.name == i.module]
                                 if candidates and candidates[0].has_source_location():
                                     self.view.window().open_file(candidates[0].get_source_location(), sublime.ENCODED_POSITION)
                     return
                 else:
-                    candidates = BackendManager.active_backend().symbol(lookup=qsymbol.name, search_type='exact', source=True)
+                    candidates = backend.symbol(lookup=qsymbol.name, search_type='exact', source=True)
             else:
-                module_candidates = [m for m in BackendManager.active_backend().list_modules(source=True, module=full_name) if m.name == full_name]
+                module_candidates = [m for m in backend.list_modules(source=True, module=full_name) if m.name == full_name]
 
             if not candidates and not module_candidates:
                 Common.show_status_message('Declaration {0} not found'.format(qsymbol.name), False)
@@ -962,7 +964,8 @@ class SublimeHaskellApplyToSelectionCommand(CommandWin.HsDevTextCommand):
 
     def on_done(self, fname):
         self.results = ghc_eval_x(BackendManager.active_backend().ghc_eval(["({0}) ({1})".format(fname, a) for a in self.args]))
-        self.string_results = ghc_eval_x(BackendManager.active_backend().ghc_eval(["({0}) ({1})".format(fname, json.dumps(a)) for a in self.args]))
+        ghc_eval_expr = ["({0}) ({1})".format(fname, json.dumps(a)) for a in self.args]
+        self.string_results = ghc_eval_x(BackendManager.active_backend().ghc_eval(ghc_eval_expr))
 
         self.view.run_command('sublime_haskell_eval_replace',
                               {'results': ghc_eval_merge_results(self.results, self.string_results)})

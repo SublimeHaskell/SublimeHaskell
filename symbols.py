@@ -299,8 +299,10 @@ class Symbol(object):
     def __init__(self, symbol_type, name):
         self.what = symbol_type
         self.name = name
-
         self.tags = {}
+
+    def __str__(self):
+        return u'Symbol({0} \'{1}\' {2})'.format(self.what, self.name, self.tags)
 
 
 class Import(object):
@@ -313,6 +315,10 @@ class Import(object):
         self.import_as = import_as
         self.position = position
         self.location = location
+
+    def __repr__(self):
+        return u'Import({0}{1}{2})'.format(self.module, ' qualified' if self.is_qualified else '',
+                                           ' as ' + self.import_as if self.import_as else '')
 
     def dump(self):
         return self.__dict__
@@ -330,10 +336,9 @@ class Module(Symbol):
         super().__init__('module', module_name)
         self.location = location
         # List of strings
-        if exports is not None:
-            self.exports = exports[:]
+        self.exports = exports[:] if exports is not None else []
         # Dictionary from module name to Import object
-        self.imports = imports[:] if imports else []
+        self.imports = imports[:] if imports is not None else []
         for i in self.imports:
             i.location = self.location
         # Dictionary from name to Symbol
@@ -344,6 +349,11 @@ class Module(Symbol):
 
         # Time as from time.time()
         self.last_inspection_time = last_inspection_time
+
+    def __repr__(self):
+        return u'Module({0} (exports {1}, imports {2} decls {3}))'.format(self.name, len(self.exports), len(self.imports),
+                                                                          len(self.declarations))
+
 
     def add_declaration(self, new_declaration):
         if not new_declaration.module:
@@ -406,6 +416,9 @@ class Declaration(Symbol):
         self.defined = defined
         self.position = position
         self.module = module
+
+    def __repr__(self):
+        return u'Declaration({0} {1} [{2}])'.format(self.what, self.name, self.module)
 
     def defined_module(self):
         return self.defined or self.module
@@ -560,6 +573,9 @@ class Function(Declaration):
         super().__init__(name, 'function', docs, imported or [], defined, position, module)
         self.type = function_type
 
+    def __repr__(self):
+        return u'Function({0} :: {1} [{2}])'.format(wrap_operator(self.name), self.type, self.imported_from_name())
+
     def suggest(self):
         return (UnicodeOpers.use_unicode_operators(u'{0} :: {1}\t{2}'.format(wrap_operator(self.name),
                                                                              self.type,
@@ -677,6 +693,8 @@ class Class(TypeBase):
                  position=None, module=None):
         super().__init__(name, 'class', context, args, definition, docs, imported or [], defined, position, module)
 
+    def __repr__(self):
+        return u'Class({0})'.format(self.name)
 
 def update_with(left, right, default_value, upd_fn):
     """

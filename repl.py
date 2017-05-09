@@ -95,7 +95,7 @@ class SublimeHaskellAutocompleteRepl(sublime_plugin.EventListener):
             repl_id = KNOWN_REPLS.get_repl_view(repl.external_id)
             cwd = repl_id.path if repl_id else None
 
-            return (autocomplete.AUTO_COMPLETER.get_module_completions_for(mod, current_dir=cwd),
+            return (autocomplete.AutoCompletion().get_module_completions_for(mod, current_dir=cwd),
                     sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
 
         # ????

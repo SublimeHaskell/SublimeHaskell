@@ -57,8 +57,7 @@ class HsDevBackend(Backend.HaskellBackend):
         self.hostname = HsDevBackend.HSDEV_DEFAULT_HOST
         if not self.is_local_hsdev and Settings.PLUGIN.hsdev_host:
             self.hostname = Settings.PLUGIN.hsdev_host
-        # Main client connection: usually synchronous
-        self.main_client = None
+        self.client = None
 
     @staticmethod
     def backend_name():
@@ -136,8 +135,8 @@ class HsDevBackend(Backend.HaskellBackend):
     def connect_backend(self):
         Logging.log('Connecting to \'hsdev\' server at {0}:{1}'.format(self.hostname, self.port), Logging.LOG_INFO)
         retval = True
-        self.main_client = HsDevClient.HsDevClient()
-        if self.main_client.connect(self.hostname, self.port):
+        self.client = HsDevClient.HsDevClient()
+        if self.client.connect(self.hostname, self.port):
             # For a local hsdev server that we started, send the link command so that it exits when we exit.
             if self.is_local_hsdev:
                 self.link()
@@ -149,8 +148,7 @@ class HsDevBackend(Backend.HaskellBackend):
         return retval
 
     def disconnect_backend(self):
-        # FIXME: Connection pool
-        self.main_client.close()
+        self.client.close()
 
     def stop_backend(self):
         if self.is_local_hsdev:
@@ -163,7 +161,7 @@ class HsDevBackend(Backend.HaskellBackend):
                                                   'console window\'s command line.']))
 
     def is_live_backend(self):
-        return self.main_client.is_connected()
+        return self.client.is_connected()
 
     @staticmethod
     def hsdev_version():
@@ -214,14 +212,13 @@ class HsDevBackend(Backend.HaskellBackend):
 
             # FIXME: Is this option still used?
             opts.update({'split-result': None})
-            # FIXME: Need a connection pool
-            resp = self.main_client.call(name,
-                                         opts,
-                                         on_response=on_response,
-                                         on_notify=hsdev_command_notify,
-                                         on_error=on_error,
-                                         wait=not async,
-                                         timeout=timeout)
+            resp = self.client.call(name,
+                                    opts,
+                                    on_response=on_response,
+                                    on_notify=hsdev_command_notify,
+                                    on_error=on_error,
+                                    wait=not async,
+                                    timeout=timeout)
 
             return result if not async else resp
 
@@ -229,14 +226,13 @@ class HsDevBackend(Backend.HaskellBackend):
             def process_response(resp):
                 on_response(on_result(resp))
 
-            # FIXME: Need a connection pool
-            resp = self.main_client.call(name,
-                                         opts,
-                                         on_response=process_response if on_response else None,
-                                         on_notify=on_notify,
-                                         on_error=on_error,
-                                         wait=not async,
-                                         timeout=timeout)
+            resp = self.client.call(name,
+                                    opts,
+                                    on_response=process_response if on_response else None,
+                                    on_notify=on_notify,
+                                    on_error=on_error,
+                                    wait=not async,
+                                    timeout=timeout)
 
             return on_result(resp) if not async else resp
 

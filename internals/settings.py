@@ -26,6 +26,7 @@ def access_sync(lock_name):
         return synced_method
     return decorator
 
+KEY_BACKEND_DEBUG = 'backend_debug'
 
 class SettingsContainer(object):
     """Container object for default and user preference settings."""
@@ -45,7 +46,7 @@ class SettingsContainer(object):
         'auto_completion_popup': ('auto_completion_popup', False),
         'auto_run_tests': ('auto_run_tests', True),
         'backends': ('backends', None),
-        'backend_debug': ('backend_debug', []),
+        KEY_BACKEND_DEBUG: ('backend_debug', []),
         'enable_auto_build': ('enable_auto_build', False),
         'enable_auto_check': ('enable_auto_check', True),
         'enable_auto_lint': ('enable_auto_lint', True),
@@ -136,7 +137,10 @@ class SettingsContainer(object):
         if oldval != newval:
             # Only acquire the lock when we really need it.
             with self.wlock:
-                setattr(self, attr, newval)
+                if key == KEY_BACKEND_DEBUG:
+                    BACKEND.load(newval)
+                else:
+                    setattr(self, attr, newval)
                 with self.changes as changes:
                     for change_fn in changes.get(key, []):
                         change_fn(key, newval)
