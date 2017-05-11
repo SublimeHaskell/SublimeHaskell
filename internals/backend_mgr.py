@@ -4,6 +4,8 @@ The backend manager.
 
 import threading
 
+import sublime
+
 import SublimeHaskell.internals.backend as Backend
 import SublimeHaskell.hsdev.backend as HsDev
 import SublimeHaskell.ghcimod.backend as GHCIMod
@@ -15,14 +17,18 @@ import SublimeHaskell.internals.utils as Utils
 class BackendManager(object, metaclass=Utils.Singleton):
     # Known backends and mapping to metadata
     BACKEND_META = {
-        'hsdev': HsDev.HsDevBackend,
-        'ghc-mod': GHCIMod.GHCModBackend,
-        'hdevtool': None
+        HsDev.HsDevBackend.backend_name(): HsDev.HsDevBackend,
+        GHCIMod.GHCModBackend.backend_name(): GHCIMod.GHCModBackend,
+        Backend.NullHaskellBackend.backend_name(): Backend.NullHaskellBackend
     }
 
     # The list of backends in the order in which we try to use them. Can be overridden by the
     # 'backends' preference.
-    DEFAULT_BACKEND_PRIORITY = ['hsdev', 'ghc-mod', 'hdevtool']
+    DEFAULT_BACKEND_PRIORITY = [
+        HsDev.HsDevBackend.backend_name(),
+        GHCIMod.GHCModBackend.backend_name(),
+        Backend.NullHaskellBackend.backend_name()
+    ]
 
     # The manager's states:
     INITIAL = 0
@@ -58,6 +64,26 @@ class BackendManager(object, metaclass=Utils.Singleton):
     def initialize(self):
         BackendManager.ACTIVE_BACKEND = None
         self.state = BackendManager.INITIAL
+
+        usable_backends = self.available_backends()
+        if len(usable_backends) > 0:
+            print('Available backends: {0}'.format(list(map(lambda clazz: clazz.backend_name(), usable_backends))))
+            # Take first available because DEFAULT_KNOWN_BACKENDS are listed in order of priority...
+            the_backend = usable_backends[0](self)
+            self.go_active(the_backend)
+            with self.state_lock:
+                if self.current_state(BackendManager.ACTIVE):
+                    BackendManager.ACTIVE_BACKEND = the_backend
+                elif self.current_state(BackendManager.INITIAL):
+                    BackendManager.ACTIVE_BACKEND = Backend.NullHaskellBackend(self)
+                else:
+                    state_str = BackendManager.STATES_TO_NAME.get(self.state, str(self.state))
+                    Logging.log('BackendManager: Invalid state after go_active: {0}'.format(state_str), Logging.LOG_ERROR)
+        else:
+            # Yell at luser.
+            print('No backends found.')
+
+    def available_backends(self):
         usable_backends = []
 
         for backend in Settings.PLUGIN.backends or BackendManager.DEFAULT_BACKEND_PRIORITY:
@@ -65,22 +91,7 @@ class BackendManager(object, metaclass=Utils.Singleton):
             if backend_clazz is not None and backend_clazz.is_available():
                 usable_backends.append(backend_clazz)
 
-        if len(usable_backends) > 0:
-            print('Available backends: {0}'.format(list(map(lambda clazz: clazz.backend_name(), usable_backends))))
-            # Take first available because DEFAULT_KNOWN_BACKENDS are listed in order of priority...
-            the_backend = usable_backends[0]()
-            self.go_active(the_backend)
-            with self.state_lock:
-                if self.current_state(BackendManager.ACTIVE):
-                    BackendManager.ACTIVE_BACKEND = the_backend
-                elif self.current_state(BackendManager.INITIAL):
-                    BackendManager.ACTIVE_BACKEND = Backend.NullHaskellBackend()
-                else:
-                    state_str = BackendManager.STATES_TO_NAME.get(self.state, str(self.state))
-                    Logging.log('BackendManager: Invalid state after go_active: {0}'.format(state_str), Logging.LOG_ERROR)
-        else:
-            # Yell at luser.
-            print('No backends found.')
+        return usable_backends
 
     def go_active(self, backend):
         '''Walk through the state phases (INITIAL -> STARTUP -> CONNECT -> ACTIVE) to startup and connect a backend.
@@ -119,11 +130,34 @@ class BackendManager(object, metaclass=Utils.Singleton):
         if self.current_state(BackendManager.ACTIVE):
             self.set_state(BackendManager.DISCONNECT)
             backend.disconnect_backend()
+
         if self.current_state(BackendManager.DISCONNECT):
             self.set_state(BackendManager.SHUTDOWN)
+            # Ask the source inspector to terminate -- shutting down the backend takes longer, which means we'll spend
+            # less time in join()
+            self.src_inspector.terminate()
             backend.stop_backend()
+            while self.src_inspector.is_alive():
+                self.src_inspector.join(0.500)
+            self.src_inspector = None
+
         if self.current_state(BackendManager.SHUTDOWN):
+            # Paranoia: If we're shut down, assume no backend... :-)
+            BackendManager.ACTIVE_BACKEND = Backend.NullHaskellBackend(self)
             self.set_state(BackendManager.INITIAL)
+
+    def lost_connection(self):
+        '''Shut down the backend due to a lost connection, such as a reset socket. Backend's state should end up in
+        INITIAL.
+        '''
+        sublime.error_message('\n'.join(['SublimeHaskell: Support backend abruptly disconnected.',
+                                         '',
+                                         'To restart the backend, invoke:',
+                                         '',
+                                         '    SublimeHaskell: Backend: Start',
+                                         ''
+                                         'from the SublimeText command palette.']))
+        self.shutdown_backend()
 
     def set_state(self, state):
         with self.state_lock:
@@ -145,7 +179,7 @@ class BackendManager(object, metaclass=Utils.Singleton):
         if backend is not None and BackendManager().current_state(BackendManager.ACTIVE):
             return backend
         else:
-            return Backend.NullHaskellBackend()
+            return Backend.NullHaskellBackend(BackendManager())
 
     @staticmethod
     def is_live_backend():
@@ -180,4 +214,4 @@ def inspector():
     return BackendManager.inspector()
 
 def lost_connection():
-    pass
+    return BackendManager().lost_connection()

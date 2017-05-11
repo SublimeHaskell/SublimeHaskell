@@ -493,12 +493,8 @@ class StatusMessagesManager(threading.Thread):
             msgs.clear()
             msgs.update(ums)
 
-# Iff STATUS_MSG_MANAGER hasn't been defined in the module yet (globals()), then go ahead and create it.
-if 'STATUS_MSG_MANAGER' not in globals():
-    STATUS_MSG_MANAGER = StatusMessagesManager()
-    STATUS_MSG_MANAGER.start()
-else:
-    STATUS_MSG_MANAGER = globals()['STATUS_MSG_MANAGER']
+STATUS_MSG_MANAGER = StatusMessagesManager()
+STATUS_MSG_MANAGER.start()
 
 def show_status_message(msg, is_ok=None, priority=0):
     """

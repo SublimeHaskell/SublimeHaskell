@@ -39,8 +39,8 @@ class HsDevBackend(Backend.HaskellBackend):
     HSDEV_MAX_VER = [0, 2, 4, 0]  # maximum hsdev version
     HSDEV_CALL_TIMEOUT = 60.0 # second timeout for synchronous requests
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, backend_mgr):
+        super().__init__(backend_mgr)
         # Local hsdev server process and params
         self.is_local_hsdev = Settings.PLUGIN.hsdev_local_process
         self.hsdev_process = None
@@ -135,7 +135,7 @@ class HsDevBackend(Backend.HaskellBackend):
     def connect_backend(self):
         Logging.log('Connecting to \'hsdev\' server at {0}:{1}'.format(self.hostname, self.port), Logging.LOG_INFO)
         retval = True
-        self.client = HsDevClient.HsDevClient()
+        self.client = HsDevClient.HsDevClient(self.backend_mgr)
         if self.client.connect(self.hostname, self.port):
             # For a local hsdev server that we started, send the link command so that it exits when we exit.
             if self.is_local_hsdev:

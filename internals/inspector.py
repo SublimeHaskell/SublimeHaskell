@@ -52,11 +52,13 @@ class Inspector(threading.Thread):
     '''The inspection thread.
     '''
 
-    # Re-inspect event wait time, in seconds
-    WAIT_TIMEOUT = 120.0
+    # Re-inspect event wait time, in seconds. We'll loop WAIT_REPEAT times so that the thread exits faster when the
+    # backend is shut down.
+    WAIT_TIMEOUT = 1.500
+    WAIT_LIMIT = 120.0
 
     def __init__(self, backend):
-        super().__init__(name='hsdev inspector')
+        super().__init__(name='source inspector')
         # Thread control event
         self.end_event = threading.Event()
         # The backend, whose support functions we invoke:
@@ -72,7 +74,7 @@ class Inspector(threading.Thread):
         self.end_event.clear()
         while not self.end_event.is_set():
             if not self.backend.ping():
-                Logging.log('hsdev ping: no pong', Logging.LOG_WARNING)
+                Logging.log('source inspector ping: no positive backend response', Logging.LOG_WARNING)
 
             scan_paths = []
             with self.dirty_paths as dirty_paths:
@@ -113,8 +115,16 @@ class Inspector(threading.Thread):
             if files_to_reinspect and Settings.PLUGIN.enable_hdocs:
                 self.backend.docs(files=files_to_reinspect)
 
-            self.reinspect_event.wait(Inspector.WAIT_TIMEOUT)
-            self.reinspect_event.clear()
+            tmo = 0.0
+            while not self.end_event.is_set() and tmo < Inspector.WAIT_LIMIT:
+                self.reinspect_event.wait(Inspector.WAIT_TIMEOUT)
+                if self.reinspect_event.is_set():
+                    self.start_inspect()
+                    self.reinspect_event.clear()
+                tmo = tmo + Inspector.WAIT_TIMEOUT
+
+    def terminate(self):
+        self.end_event.set()
 
     @dirty
     def force_inspect(self):

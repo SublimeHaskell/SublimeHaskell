@@ -106,8 +106,14 @@
   // Backend selection:
   // ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
 
-	// Enable hsdev: This is the preferred backend
-	"enable_hsdev": true,
+  // The list of backends, listed in order of priority. The first available backend is the one used by SublimeHaskell.
+  // Possible backends:
+  //
+  // hsdev: The hsdev backend
+  // ghc-mod: The ghc-mod backend
+  // none: The null/identity/non-functional backend. You can use this if you really don't want SublimeHaskell to do much with
+  //     the more advanced features such as autocompletion.
+  "backends": ["hsdev", "ghc-mod", "none"],
 
 	// Default host and port to which SublimeHaskell connects, where the hsdev server operates:
 	"hsdev_host": "localhost",
@@ -116,17 +122,8 @@
 	// Start a local hsdev server process?
 	"hsdev_local_process": true,
 
-	// Enables hdevtools (it must be installed, cabal install hdevtools)
-	// See the add_to_PATH settings to specify a custom location.
-	"enable_hdevtools": true,
-
 	// hdevtools socket name or default
 	"hdevtools_socket": "",
-
-	// Enables ghc-mod (you should have it installed,
-	// e.g. via cabal install ghc-mod).
-	// See the add_to_PATH settings to specify a custom location.
-	"enable_ghc_mod": true,
 
   // ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
   // User interaction settings:
@@ -173,11 +170,13 @@
   "hsdev_log_config": "use silent",
   "hsdev_log_level": "warning",
 
-  // Backend debugging flags/tokens: This is a list of tokens used for backend debugging
+  // Backend debugging flags/tokens: This is a list of tokens used for backend debugging, primarily in the hsdev
+  // backend.
   //
   // "all_messages": Emit all messages (send and receive)
   // "send_messages": Emit all sent messages
   // "recv_messages": Emit all received messages
   // "iowaits": Emit output if an I/O event occurs due to select/poll/kqueue/... file descriptor sampling.
+  // "socket_pool": Keep track of the socket pool avail/used sizes.
   "backend_debug": []
 }

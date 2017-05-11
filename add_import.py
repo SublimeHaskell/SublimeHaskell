@@ -14,7 +14,7 @@ import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.cmdwin_types as CommandWin
 
 
-class SublimeHaskellInsertImportForSymbol(CommandWin.HsDevTextCommand):
+class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
     """
     Insert import for symbol
     """

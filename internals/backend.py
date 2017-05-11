@@ -11,8 +11,9 @@ class HaskellBackend(object):
     backend (hsdev, hdevtools, ghc-mod).
     '''
 
-    def __init__(self):
+    def __init__(self, backend_mgr):
         super().__init__()
+        self.backend_mgr = backend_mgr
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # Management functions:
@@ -22,7 +23,7 @@ class HaskellBackend(object):
     def backend_name():
         '''Return the backend's name, e.g. `hsdev` or `ghc-mod`.
         '''
-        raise NotImplementedError("HaskellBackend.disconnect_backend needs an implementation.")
+        raise NotImplementedError("HaskellBackend.backend_name needs an implementation.")
 
     @staticmethod
     def is_availabile():
@@ -168,19 +169,19 @@ class HaskellBackend(object):
     def exit(self):
         raise NotImplementedError("HaskellBackend.exit needs an implementation.")
 
-# pylint: disable=W0613
+# zzpylint: disable=W0613
 
-class NullHaskellBackend(object, metaclass=Utils.Singleton):
+class NullHaskellBackend(HaskellBackend, metaclass=Utils.Singleton):
     ''' For Haskellers: The Identity Backend. For ordinary mortals, this is the null, do-nothing Haskell backend. It does
     something sensible for all functions. The primary use case is to provide something sensible when no other backend is
     available or active.
 
     It is not recommended that any backend derive iteself from this class. Use it as a cheat sheet for what an API method
-    should do -- sure.
+    should do.
     '''
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, backend_mgr):
+        super().__init__(backend_mgr)
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # Management functions:
@@ -190,10 +191,10 @@ class NullHaskellBackend(object, metaclass=Utils.Singleton):
     def backend_name():
         '''Return the backend's name, e.g. `hsdev` or `ghc-mod`.
         '''
-        return "Null/Identity Backend"
+        return "none"
 
     @staticmethod
-    def is_availabile():
+    def is_available():
         return True
 
     def start_backend(self):
@@ -209,7 +210,7 @@ class NullHaskellBackend(object, metaclass=Utils.Singleton):
         pass
 
     def is_live_backend(self):
-        '''The NullHaskellBackend is never alive and usable.
+        '''The NullHaskellBackend is never alive.
         '''
         return False
 

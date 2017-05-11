@@ -273,11 +273,11 @@ class AutoCompletion(object, metaclass=Utils.Singleton):
 
     def get_import_completions(self, view, locations):
 
-        self.current_filename = view.file_name()
-        line_contents = Common.get_line_contents(view, locations[0])
-
         # Autocompletion for import statements
         if Settings.PLUGIN.auto_complete_imports:
+            self.current_filename = view.file_name()
+            line_contents = Common.get_line_contents(view, locations[0])
+
             match_import_list = Common.IMPORT_SYMBOL_RE.search(line_contents)
             if match_import_list:
                 module_name = match_import_list.group('module')

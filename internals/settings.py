@@ -184,12 +184,14 @@ class BackendDebug(object):
         self.send_messages = False
         self.recv_messages = False
         self.iowaits = False
+        self.socket_pool = False
 
     def load(self, backend_settings):
         self.all_messages = 'all_messages' in backend_settings
         self.send_messages = 'send_messages' in backend_settings
         self.recv_messages = 'recv_messages' in backend_settings
         self.iowaits = 'iowaits' in backend_settings
+        self.socket_pool = 'socket_pool' in backend_settings
 
 
 PLUGIN = SettingsContainer()

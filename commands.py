@@ -135,7 +135,7 @@ class SublimeHaskellComplete(CommandWin.SublimeHaskellTextCommand):
         self.view.run_command("auto_complete")
 
 
-class SublimeHaskellBrowseDeclarations(CommandWin.HsDevTextCommand):
+class SublimeHaskellBrowseDeclarations(CommandWin.BackendTextCommand):
     """
     Show all available declarations in scope
     """
@@ -167,7 +167,7 @@ class SublimeHaskellBrowseDeclarations(CommandWin.HsDevTextCommand):
             show_declaration_info(self.view, self.decls[idx])
 
 
-class SublimeHaskellFindDeclarations(CommandWin.HsDevWindowCommand):
+class SublimeHaskellFindDeclarations(CommandWin.BackendWindowCommand):
     def __init__(self, win):
         super().__init__(win)
         self.decls = []
@@ -195,7 +195,7 @@ class SublimeHaskellFindDeclarations(CommandWin.HsDevWindowCommand):
             show_declaration_info(self.window.active_view(), self.decls[idx])
 
 
-class SublimeHaskellHayoo(CommandWin.HsDevWindowCommand):
+class SublimeHaskellHayoo(CommandWin.BackendWindowCommand):
     def __init__(self, win):
         super().__init__(win)
         self.decls = []
@@ -238,7 +238,7 @@ class SublimeHaskellHayoo(CommandWin.HsDevWindowCommand):
         self.window.show_quick_panel(brief_decls, self.on_select)
 
 
-class SublimeHaskellSearch(CommandWin.HsDevWindowCommand):
+class SublimeHaskellSearch(CommandWin.BackendWindowCommand):
     def __init__(self, win):
         super().__init__(win)
         self.search_str = ''
@@ -287,7 +287,7 @@ class SublimeHaskellSearch(CommandWin.HsDevWindowCommand):
 
 
 # General goto command
-class SublimeHaskellGoTo(CommandWin.HsDevWindowCommand):
+class SublimeHaskellGoTo(CommandWin.BackendWindowCommand):
     def __init__(self, win):
         super().__init__(win)
         self.view = win.active_view()
@@ -350,7 +350,7 @@ class SublimeHaskellGoTo(CommandWin.HsDevWindowCommand):
                               sublime.ENCODED_POSITION | sublime.TRANSIENT if transient else sublime.ENCODED_POSITION)
 
 
-class SublimeHaskellGoToModule(CommandWin.HsDevWindowCommand):
+class SublimeHaskellGoToModule(CommandWin.BackendWindowCommand):
     def __init__(self, win):
         super().__init__(win)
         self.modules = []
@@ -387,7 +387,7 @@ class SublimeHaskellGoToHackagePackage(CommandWin.SublimeHaskellTextCommand):
         return Common.is_haskell_symbol_info(self.view)
 
 
-class SublimeHaskellGoToHackageModule(CommandWin.HsDevTextCommand):
+class SublimeHaskellGoToHackageModule(CommandWin.BackendTextCommand):
     def __init__(self, view):
         super().__init__(view)
         self.candidates = []
@@ -466,7 +466,7 @@ class SublimeHaskellGoToAnyDeclaration(CommandWin.SublimeHaskellWindowCommand):
             self.window.open_file(self.cache.source_locs[idx][1], sublime.ENCODED_POSITION)
 
 
-class SublimeHaskellReinspectAll(CommandWin.HsDevWindowCommand):
+class SublimeHaskellReinspectAll(CommandWin.BackendWindowCommand):
     def run(self):
         if BackendManager.is_live_backend():
             Logging.log('reinspect all', Logging.LOG_TRACE)
@@ -475,7 +475,7 @@ class SublimeHaskellReinspectAll(CommandWin.HsDevWindowCommand):
             Common.show_status_message("inspector not connected", is_ok=False)
 
 
-class SublimeHaskellScanContents(CommandWin.HsDevTextCommand):
+class SublimeHaskellScanContents(CommandWin.BackendTextCommand):
     """Scan module contents
     """
     def __init__(self, view):
@@ -500,7 +500,7 @@ class SublimeHaskellScanContents(CommandWin.HsDevTextCommand):
         BackendManager.active_backend().scan(contents=scan_contents, on_response=on_resp, on_error=on_err)
 
 
-class SublimeHaskellInferDocs(CommandWin.HsDevTextCommand):
+class SublimeHaskellInferDocs(CommandWin.BackendTextCommand):
     """
     Infer types and scan docs for current module
     """
@@ -540,7 +540,7 @@ class SublimeHaskellInferDocs(CommandWin.HsDevTextCommand):
         BackendManager.active_backend().docs(files=[self.current_file_name], on_response=on_resp, on_error=on_err)
 
 
-class SublimeHaskellSymbolInfoCommand(CommandWin.HsDevTextCommand):
+class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
     """
     Show information about selected symbol
 
@@ -651,7 +651,7 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.HsDevTextCommand):
 TOGGLE_SYMBOL_INFO = False
 
 
-class SublimeHaskellToggleSymbolInfoCommand(CommandWin.HsDevWindowCommand):
+class SublimeHaskellToggleSymbolInfoCommand(CommandWin.BackendWindowCommand):
     def run(self):
         global TOGGLE_SYMBOL_INFO
         TOGGLE_SYMBOL_INFO = not TOGGLE_SYMBOL_INFO
@@ -664,7 +664,7 @@ class SublimeHaskellContinuousSymbolInfo(sublime_plugin.EventListener):
             view.run_command('sublime_haskell_symbol_info', {'no_browse': True})
 
 
-class SublimeHaskellClearImports(CommandWin.HsDevTextCommand):
+class SublimeHaskellClearImports(CommandWin.BackendTextCommand):
     def __init__(self, view):
         super().__init__(view)
         self.current_file_name = None
@@ -707,7 +707,7 @@ class SublimeHaskellClearImports(CommandWin.HsDevTextCommand):
                 self.view.replace(edit, self.view.line(point), new_imp)
 
 
-class SublimeHaskellBrowseModule(CommandWin.HsDevWindowCommand):
+class SublimeHaskellBrowseModule(CommandWin.BackendWindowCommand):
     """
     Browse module symbols
     """
@@ -803,7 +803,7 @@ class SublimeHaskellBrowseModule(CommandWin.HsDevWindowCommand):
 
         return retval
 
-class SublimeHaskellGoToDeclaration(CommandWin.HsDevTextCommand):
+class SublimeHaskellGoToDeclaration(CommandWin.BackendTextCommand):
     def __init__(self, view):
         super().__init__(view)
         self.select_candidates = None
@@ -924,7 +924,7 @@ def ghc_eval_merge_results(left, right):
     return [x or y for x, y in zip(left, right)]
 
 
-class SublimeHaskellEvalSelectionCommand(CommandWin.HsDevTextCommand):
+class SublimeHaskellEvalSelectionCommand(CommandWin.BackendTextCommand):
     def __init__(self, view):
         super().__init__(view)
         self.args = []
@@ -943,7 +943,7 @@ class SublimeHaskellEvalSelectionCommand(CommandWin.HsDevTextCommand):
         return True
 
 
-class SublimeHaskellApplyToSelectionCommand(CommandWin.HsDevTextCommand):
+class SublimeHaskellApplyToSelectionCommand(CommandWin.BackendTextCommand):
     def __init__(self, view):
         super().__init__(view)
         self.args = []
@@ -974,7 +974,7 @@ class SublimeHaskellApplyToSelectionCommand(CommandWin.HsDevTextCommand):
         pass
 
 
-class SublimeHaskellApplyToSelectionListCommand(CommandWin.HsDevTextCommand):
+class SublimeHaskellApplyToSelectionListCommand(CommandWin.BackendTextCommand):
     def __init__(self, view):
         super().__init__(view)
         self.args = []
@@ -1135,7 +1135,7 @@ class AutoFixState(object):
 AUTOFIX_STATE = AutoFixState()
 
 
-class SublimeHaskellAutoFix(CommandWin.HsDevWindowCommand):
+class SublimeHaskellAutoFix(CommandWin.BackendWindowCommand):
     def __init__(self, window):
         super().__init__(window)
         self.messages = []
@@ -1329,6 +1329,7 @@ class SublimeHaskellStackExec(sublime_plugin.TextCommand):
 
         SublimeHaskellStackExec.SExecRunner(runv, cmdargs).start()
 
+
 class SublimeHaskellStackConfigSwitch(CommandWin.SublimeHaskellWindowCommand):
     def __init__(self, window):
         super().__init__(window)
@@ -1343,3 +1344,30 @@ class SublimeHaskellStackConfigSwitch(CommandWin.SublimeHaskellWindowCommand):
         selected = options[idx]
 
         Settings.set_project_setting(self.view, 'stack_config_file', selected)
+
+
+class SublimeHaskellStartBackend(sublime_plugin.WindowCommand):
+    def __init__(self, window):
+        super().__init__(window)
+
+    def run(self):
+        with Common.status_message_process('Starting up backend', priority=1):
+            BackendManager.BackendManager().initialize()
+
+
+class SublimeHaskellStopBackend(sublime_plugin.WindowCommand):
+    def __init__(self, window):
+        super().__init__(window)
+
+    def run(self):
+        with Common.status_message_process('Shutting down backend', priority=1):
+            BackendManager.BackendManager().shutdown_backend()
+
+
+class SublimeHaskellRestartBackend(sublime_plugin.WindowCommand):
+    def __init__(self, window):
+        super().__init__(window)
+
+    def run(self):
+        self.window.run_command('sublime_haskell_stop_backend')
+        self.window.run_command('sublime_haskell_start_backend')

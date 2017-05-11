@@ -36,26 +36,26 @@ class SublimeHaskellTextCommand(sublime_plugin.TextCommand):
     def is_visible(self):
         return Common.is_enabled_haskell_command(self.view, False)
 
-class HsDevWindowCommand(SublimeHaskellWindowCommand):
+class BackendWindowCommand(SublimeHaskellWindowCommand):
     def __init__(self, view):
         super().__init__(view)
 
     def is_enabled(self):
         live = BackendMgr.is_live_backend()
         cmd_enabled = super().is_enabled()
-        # Logging.log('HsDevWindowCommand.is_enabled: is_live_backend {0}, super {1}'.format(live, cmd_enabled),
+        # Logging.log('BackendWindowCommand.is_enabled: is_live_backend {0}, super {1}'.format(live, cmd_enabled),
         #             Logging.LOG_DEBUG)
         return live and cmd_enabled
 
     def is_visible(self):
         live = BackendMgr.is_live_backend()
         cmd_visible = super().is_visible()
-        # Logging.log('HsDevWindowCommand.is_enabled: is_live_backend {0}, super {1}'.format(live, cmd_visible),
+        # Logging.log('BackendWindowCommand.is_enabled: is_live_backend {0}, super {1}'.format(live, cmd_visible),
         #             Logging.LOG_DEBUG)
         return live and cmd_visible
 
 
-class HsDevTextCommand(SublimeHaskellTextCommand):
+class BackendTextCommand(SublimeHaskellTextCommand):
     '''Enable text commands only if the backend is alive and the source in the view is Haskell source.
     '''
     def __init__(self, view):
@@ -64,13 +64,13 @@ class HsDevTextCommand(SublimeHaskellTextCommand):
     def is_enabled(self):
         live = BackendMgr.is_live_backend()
         cmd_enabled = super().is_enabled()
-        # Logging.log('HsDevTextCommand.is_enabled: is_live_backend {0}, super {1}'.format(live, cmd_enabled),
+        # Logging.log('BackendTextCommand.is_enabled: is_live_backend {0}, super {1}'.format(live, cmd_enabled),
         #             Logging.LOG_DEBUG)
         return live and cmd_enabled
 
     def is_visible(self):
         live = BackendMgr.is_live_backend()
         cmd_visible = super().is_visible()
-        # Logging.log('HsDevTextCommand.is_enabled: is_live_backend {0}, super {1}'.format(live, cmd_visible),
+        # Logging.log('BackendTextCommand.is_enabled: is_live_backend {0}, super {1}'.format(live, cmd_visible),
         #             Logging.LOG_DEBUG)
         return live and cmd_visible
