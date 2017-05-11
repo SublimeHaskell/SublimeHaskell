@@ -37,7 +37,7 @@ class HsDevBackend(Backend.HaskellBackend):
     HSDEV_DEFAULT_HOST = 'localhost'
     HSDEV_MIN_VER = [0, 2, 0, 0]  # minimum hsdev version
     HSDEV_MAX_VER = [0, 2, 4, 0]  # maximum hsdev version
-    HSDEV_CALL_TIMEOUT = 60.0 # second timeout for synchronous requests
+    HSDEV_CALL_TIMEOUT = 300.0 # second timeout for synchronous requests
 
     def __init__(self, backend_mgr):
         super().__init__(backend_mgr)
@@ -148,6 +148,7 @@ class HsDevBackend(Backend.HaskellBackend):
         return retval
 
     def disconnect_backend(self):
+        self.exit()
         self.client.close()
 
     def stop_backend(self):
@@ -194,7 +195,7 @@ class HsDevBackend(Backend.HaskellBackend):
         return  retval
 
 
-    def hsdev_command(self, name, opts, on_result, async=False, timeout=120.0, is_list=False,
+    def hsdev_command(self, name, opts, on_result, async=False, timeout=HSDEV_CALL_TIMEOUT, is_list=False,
                       on_response=None, on_notify=None, on_error=None, on_result_part=None, split_result=None):
         if split_result is None:
             split_res = on_result_part is not None
@@ -481,7 +482,7 @@ class HsDevBackend(Backend.HaskellBackend):
         return self.list_command('ghc eval', {'exprs': exprs, 'file': the_file}, **backend_args)
 
     def exit(self):
-        return self.command('exit', {})
+        return self.async_command('exit', {})
 
 class HsDevStartupReader(threading.Thread):
     '''Separate thread object that reads the local `hsdev` server's `stdout` looking for the server's startup

@@ -3,6 +3,8 @@
 
 import json
 import pprint
+import queue
+import random
 import socket
 import sys
 import threading
@@ -13,47 +15,54 @@ import SublimeHaskell.internals.locked_object as LockedObject
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.hsdev.callback as HsCallback
 import SublimeHaskell.internals.logging as Logging
-import SublimeHaskell.hsdev.iowait as iowait
 
-class HsDevConnection(object):
-    def __init__(self, sock):
+class HsDevConnection(threading.Thread):
+    def __init__(self, sock, req_queue):
         super().__init__()
         self.socket = sock
-        self.partial = ''
+        self.rcvr_event = threading.Event()
+        self.queue = req_queue
 
-    def read_request(self):
+    def run(self):
         '''Read from the connection's socket until encoutering a newline. The remaining part of the input stream
         is stashed in self.part for the next time the connection reads a request.
         '''
-        # Note: We could have read a lot from the socket, which could have resulted in multiple request responses
-        # being read (this can happen when the 'scan' command sends status updates):
-        pre, sep, post = self.partial.partition('\n')
-        if len(sep) > 0:
-            req_resp = pre
-            self.partial = post
-        else:
-            req_resp = self.partial
-            complete_req = False
-            while not complete_req:
-                streaminp = self.socket.recv(10240).decode('utf-8')
-                pre, sep, post = streaminp.partition('\n')
-                req_resp = req_resp + pre
+
+        self.rcvr_event.clear()
+        partial = ''
+        while not self.rcvr_event.is_set():
+            try:
+                # Note: We could have read a lot from the socket, which could have resulted in multiple request responses
+                # being read (this can happen when the 'scan' command sends status updates):
+                pre, sep, post = partial.partition('\n')
                 if len(sep) > 0:
-                    complete_req = True
-                    self.partial = post
+                    req_resp = pre
+                    partial = post
+                else:
+                    req_resp = partial
+                    complete_req = False
+                    while not complete_req:
+                        streaminp = self.socket.recv(10240).decode('utf-8')
+                        pre, sep, post = streaminp.partition('\n')
+                        req_resp = req_resp + pre
+                        if len(sep) > 0:
+                            complete_req = True
+                            partial = post
 
-        return json.loads(req_resp)
+                self.queue.put(json.loads(req_resp))
+            except OSError:
+                self.rcvr_event.set()
 
-    def have_more(self):
-        '''Is there more to read, i.e., was a partially read request stored?
-        '''
-        return len(self.partial) > 0
+    def send_request(self, request):
+        self.socket.sendall(request)
 
     def close(self):
         try:
-            self.socket.close()
-            self.socket = None
-            self.partial = ''
+            self.rcvr_event.set()
+            if self.socket is not None:
+                self.socket.close()
+                self.socket = None
+            self.queue = None
         except OSError:
             pass
 
@@ -75,12 +84,11 @@ class HsDevClient(object):
         # Primitive socket pool:
         self.backend_mgr = backend_mgr
         self.socket_lock = threading.RLock()
-        self.socket_pool = {}
-        self.socket_used = {}
-        self.iowait_q = iowait.IOWait()
+        self.socket_pool = []
         # Request receiver thread:
         self.rcvr_thread = None
         self.rcvr_event = threading.Event()
+        self.request_q = queue.LifoQueue()
         self.request_map = LockedObject.LockedObject({})
         self.request_serial = 1
 
@@ -91,11 +99,11 @@ class HsDevClient(object):
 
     def connect(self, host, port):
         with self.socket_lock:
-            for i in range(0, HsDevClient.N_SOCKETS):
+            for i in range(0, self.N_SOCKETS):
                 sock = self.create_connection(i, host, port)
                 if sock is not None:
-                    self.socket_pool[sock] = HsDevConnection(sock)
-                    self.iowait_q.watch(sock, True, False)
+                    hsconn = HsDevConnection(sock, self.request_q)
+                    self.socket_pool.insert(i, hsconn)
                 else:
                     # Something went wrong, terminate all connnections:
                     for sock in self.socket_pool:
@@ -103,10 +111,13 @@ class HsDevClient(object):
                             sock.close()
                         except OSError:
                             pass
-                    self.socket_pool = {}
-                    self.socket_used = {}
-                    self.iowait_q.clear()
+                    self.socket_pool = []
+                    self.request_q = None
                     return False
+
+            # We were successful, start all of the socket threads...
+            for sock in self.socket_pool:
+                sock.start()
 
             self.rcvr_thread = threading.Thread(target=self.receiver)
             self.rcvr_thread.start()
@@ -114,8 +125,9 @@ class HsDevClient(object):
             Logging.log('Connections established to \'hsdev\' server.', Logging.LOG_INFO)
             return True
 
+    ## Rethink this in terms of multiple threads and a priority queue?
     def create_connection(self, idx, host, port):
-        for retry in range(1, HsDevClient.CONNECT_TRIES):
+        for retry in range(1, self.CONNECT_TRIES):
             try:
                 Logging.log('[pool {0}]: connecting to hsdev server (attempt {1})...'.format(idx, retry), Logging.LOG_INFO)
                 # Use 'localhost' instead of the IP dot-quad for systems (and they exist) that are solely
@@ -126,13 +138,13 @@ class HsDevClient(object):
                 # Captures all of the socket exceptions:
                 Logging.log('[pool {0}]: Failed to connect to hsdev server:'.format(idx), Logging.LOG_WARNING)
                 print(traceback.format_exc())
-                time.sleep(HsDevClient.CONNECT_DELAY)
+                time.sleep(self.CONNECT_DELAY)
 
         return None
 
     def close(self):
         self.rcvr_event.set()
-        self.iowait_q.clear()
+        self.request_q = None
 
         with self.socket_lock:
             for sock in self.socket_pool:
@@ -140,22 +152,16 @@ class HsDevClient(object):
                     sock.close()
                 except OSError:
                     pass
-            for sock in self.socket_used:
-                try:
-                    sock.close()
-                except OSError:
-                    pass
-            self.socket_pool = {}
-            self.socket_used = {}
+            self.socket_pool = []
 
         if self.rcvr_thread is not None:
             while self.rcvr_thread.is_alive():
-                self.rcvr_thread.join(0.500)
+                self.rcvr_thread.join(2.000)
             self.rcvr_thread = None
 
     def is_connected(self):
         with self.socket_lock:
-            return self.socket_pool or self.socket_used
+            return len(self.socket_pool) > 0
 
     def setup_receive_callbacks(self, ident, command, on_response, on_notify, on_error):
         with self.request_map as requests:
@@ -180,61 +186,47 @@ class HsDevClient(object):
         self.rcvr_event.clear()
         while not self.rcvr_event.is_set() and self.verify_connected():
             try:
-                if Settings.BACKEND.iowaits:
-                    print(u'HsDevClient.reciever: entering iowait loop.')
+                # Ensure that get() will return when the backend is shutting down.
+                resp = self.request_q.get(True, 5.0)
+                if Settings.BACKEND.all_messages or Settings.BACKEND.recv_messages:
+                    print(u'HsDevClient.receiver resp:')
+                    pprint.pprint(resp)
 
-                avail_inps = self.iowait_q.wait()
-                for inp in avail_inps:
-                    if Settings.BACKEND.iowaits:
-                        print(u'HsDevClient.reciever: iowait completed.')
+                try:
+                    if 'id' in resp:
+                        with self.request_map as requests:
+                            resp_id = resp.get('id')
+                            if resp_id is None and 'request' in resp:
+                                # Error without an id, id is in the 'request' key's content.
+                                orig_req = json.loads(resp['request'])
+                                resp_id = orig_req.get('id')
 
-                    with self.socket_lock:
-                        conn = self.socket_used.get(inp.fileobj) or self.socket_pool.get(inp.fileobj)
-
-                    if conn is not None:
-                        self.get_response(conn)
-                        # Continue to process incomplete responses -- it means we haven't read enough.
-                        while conn.have_more():
-                            self.get_response(conn)
+                            callbacks = requests.get(resp_id)
+                            if resp_id is not None and callbacks is not None:
+                                if 'notify' in resp:
+                                    if Settings.BACKEND.callbacks:
+                                        print('id {0}: notify callback'.format(resp_id))
+                                    callbacks.call_notify(resp['notify'])
+                                if 'error' in resp:
+                                    if Settings.BACKEND.callbacks:
+                                        print('id {0}: error callback'.format(resp_id))
+                                    err = resp.pop("error")
+                                    callbacks.call_error(err, resp)
+                                    requests.pop(resp_id)
+                                if 'result' in resp:
+                                    if Settings.BACKEND.callbacks:
+                                        print('id {0}: result callback'.format(resp_id))
+                                    callbacks.call_response(resp['result'])
+                                    requests.pop(resp_id)
+                            elif Logging.is_log_level(Logging.LOG_ERROR):
+                                print('HsDevClient.receiver: request w/o id')
+                                pprint.pprint(resp)
                     else:
-                        Logging.log('HsDevClient.receiver: no corresponding connection {0}'.format(inp.fileobj),
-                                    Logging.LOG_ERROR)
-            except OSError:
-                self.connection_lost('receiver', sys.exc_info()[1])
-                self.backend_mgr.lost_connection()
-                return
-
-            except KeyError:
-                if not self.rcvr_event.is_set():
-                    self.connection_lost('receiver', sys.exc_info()[1])
-                    self.backend_mgr.lost_connection()
-                # Otherwise, the thread has already been shut down and we should just return.
-                return
-
-    def get_response(self, hsdev_conn):
-        resp = hsdev_conn.read_request()
-        if Settings.BACKEND.all_messages or Settings.BACKEND.recv_messages:
-            print(u'HsDevClient.receiver resp:')
-            pprint.pprint(resp)
-
-        if 'id' in resp:
-            callbacks = None
-            with self.request_map as requests:
-                resp_id = resp.get('id')
-                if resp_id is not None:
-                    callbacks = requests.get(resp_id)
-                    if callbacks is not None:
-                        if 'notify' in resp:
-                            callbacks.call_notify(resp['notify'])
-                        if 'error' in resp:
-                            err = resp.pop("error")
-                            callbacks.call_error(err, resp)
-                            requests.pop(resp['id'])
-                        if 'result' in resp:
-                            callbacks.call_response(resp['result'])
-                            requests.pop(resp['id'])
-        else:
-            Logging.log('HsDevClient.receover: received response without an id', Logging.LOG_ERROR)
+                        Logging.log('HsDevClient.receover: received response without an id', Logging.LOG_ERROR)
+                finally:
+                    self.request_q.task_done()
+            except queue.Empty:
+                pass
 
     def call(self, command, opts, on_response, on_notify, on_error, wait, timeout):
         # log
@@ -265,38 +257,43 @@ class HsDevClient(object):
 
         opts.update({'no-file': True})
         opts.update({'id': req_serial, 'command': command})
-        msg = json.dumps(opts, separators=(',', ':')) + '\n'
 
         call_cmd = u'HsDevClient.call[{0}] cmd \'{1}\' opts\n{2}'.format(req_serial, command, pprint.pformat(opts))
         if Settings.BACKEND.all_messages or Settings.BACKEND.send_messages:
             print(call_cmd)
 
         try:
-            sock = None
-            conn = None
+            l_pool = len(self.socket_pool)
+            if l_pool > 0:
+                hsconn = None
+                with self.socket_lock:
+                    # Randomly remove a socket from the socket pool
+                    i_conn = random.randrange(l_pool)
+                    hsconn = self.socket_pool[i_conn]
+                    del self.socket_pool[i_conn]
 
-            with self.socket_lock:
-                # Randomly remove a socket from the socket pool
-                try:
-                    sock, conn = self.socket_pool.popitem()
-                    self.socket_used[sock] = conn
-                except KeyError:
-                    pass
+                hsconn.send_request((json.dumps(opts, separators=(',', ':')) + '\n').encode('utf-8'))
 
-            if sock is not None:
-                sock.sendall(msg.encode('utf-8'))
                 if wait:
                     wait_receive.wait(timeout)
+                    if not wait_receive.is_set():
+                        Logging.log('HsDevClient.call: wait_receive event timed out for id {0}'.format(req_serial),
+                                    Logging.LOG_ERROR)
+                        # Delete the request; result_dict will still have nothing in it (presumably)
+                        with self.request_map as requests:
+                            del requests[req_serial]
+
                 # Put the socket back into the pool
                 with self.socket_lock:
-                    del self.socket_used[sock]
-                    self.socket_pool[sock] = conn
+                    self.socket_pool.append(hsconn)
 
                 if Settings.BACKEND.socket_pool:
-                    print('socket_pool {0} socket_used {1}'.format(len(self.socket_pool), len(self.socket_used)))
+                    with self.request_map as request_map:
+                        print('socket_pool {0} request_map {1} queue {2}'.format(len(self.socket_pool), len(request_map),
+                                                                                 self.request_q.qsize()))
                 return result_dict.get('result') if wait else True
             else:
-                Logging.log('HsDevClient.call: Socket pool exhausted?', Logging.LOG_ERROR)
+                Logging.log('HsDevClient.call: Socket pool exhausted.', Logging.LOG_ERROR)
 
         except OSError:
             self.connection_lost('call', sys.exc_info()[1])

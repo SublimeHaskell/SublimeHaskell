@@ -181,15 +181,15 @@
         "command": "sublime_haskell_auto_fix"
     },
     {
-        "caption": "SublimeHaskell: Backend: Start",
+        "caption": "SublimeHaskell: Start backend",
         "command": "sublime_haskell_start_backend"
     },
     {
-        "caption": "SublimeHaskell: Backend: Stop",
+        "caption": "SublimeHaskell: Stop backend",
         "command": "sublime_haskell_stop_backend"
     },
     {
-        "caption": "SublimeHaskell: Backend: Restart",
+        "caption": "SublimeHaskell: Restart backend",
         "command": "sublime_haskell_restart_backend"
     }
 //    {

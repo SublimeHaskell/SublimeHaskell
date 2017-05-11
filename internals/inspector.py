@@ -54,8 +54,7 @@ class Inspector(threading.Thread):
 
     # Re-inspect event wait time, in seconds. We'll loop WAIT_REPEAT times so that the thread exits faster when the
     # backend is shut down.
-    WAIT_TIMEOUT = 1.500
-    WAIT_LIMIT = 120.0
+    WAIT_TIMEOUT = 120.0
 
     def __init__(self, backend):
         super().__init__(name='source inspector')
@@ -115,16 +114,13 @@ class Inspector(threading.Thread):
             if files_to_reinspect and Settings.PLUGIN.enable_hdocs:
                 self.backend.docs(files=files_to_reinspect)
 
-            tmo = 0.0
-            while not self.end_event.is_set() and tmo < Inspector.WAIT_LIMIT:
-                self.reinspect_event.wait(Inspector.WAIT_TIMEOUT)
-                if self.reinspect_event.is_set():
-                    self.start_inspect()
-                    self.reinspect_event.clear()
-                tmo = tmo + Inspector.WAIT_TIMEOUT
+            self.reinspect_event.wait(Inspector.WAIT_TIMEOUT)
+            self.reinspect_event.clear()
 
     def terminate(self):
         self.end_event.set()
+        # Break out of the wait.
+        self.reinspect_event.set()
 
     @dirty
     def force_inspect(self):

@@ -138,7 +138,7 @@ class BackendManager(object, metaclass=Utils.Singleton):
             self.src_inspector.terminate()
             backend.stop_backend()
             while self.src_inspector.is_alive():
-                self.src_inspector.join(0.500)
+                self.src_inspector.join(1.500)
             self.src_inspector = None
 
         if self.current_state(BackendManager.SHUTDOWN):
@@ -154,7 +154,7 @@ class BackendManager(object, metaclass=Utils.Singleton):
                                          '',
                                          'To restart the backend, invoke:',
                                          '',
-                                         '    SublimeHaskell: Backend: Start',
+                                         '    SublimeHaskell: Start backend',
                                          ''
                                          'from the SublimeText command palette.']))
         self.shutdown_backend()

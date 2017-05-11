@@ -1349,25 +1349,61 @@ class SublimeHaskellStackConfigSwitch(CommandWin.SublimeHaskellWindowCommand):
 class SublimeHaskellStartBackend(sublime_plugin.WindowCommand):
     def __init__(self, window):
         super().__init__(window)
+        self.busy = False
 
-    def run(self):
-        with Common.status_message_process('Starting up backend', priority=1):
-            BackendManager.BackendManager().initialize()
+    def run(self, **kwargs):
+        # Prevents the Python main thread from blocking.
+        threading.Thread(target=self.do_startup, kwargs=kwargs).start()
+
+    def do_startup(self, **kwargs):
+        shutdown_cv = kwargs.pop('shutdown_cv', None)
+        self.busy = True
+        try:
+            if shutdown_cv is not None:
+                with shutdown_cv:
+                    shutdown_cv.wait()
+
+            with Common.status_message_process('Starting up backend', priority=1):
+                BackendManager.BackendManager().initialize()
+        finally:
+            self.busy = False
+
+    def is_enabled(self):
+        return not self.busy and BackendManager.BackendManager().current_state(BackendManager.BackendManager.INITIAL)
 
 
 class SublimeHaskellStopBackend(sublime_plugin.WindowCommand):
     def __init__(self, window):
         super().__init__(window)
+        self.busy = False
 
-    def run(self):
+    def run(self, **kwargs):
+        # Prevents the Python main thread from blocking.
+        threading.Thread(target=self.do_shutdown, kwargs=kwargs).start()
+
+    def do_shutdown(self, **kwargs):
+        shutdown_cv = kwargs.pop('shutdown_cv', None)
         with Common.status_message_process('Shutting down backend', priority=1):
-            BackendManager.BackendManager().shutdown_backend()
+            self.busy = True
+            try:
+                BackendManager.BackendManager().shutdown_backend()
+                if shutdown_cv is not None:
+                    with shutdown_cv:
+                        shutdown_cv.notify()
+            finally:
+                self.busy = False
 
+    def is_enabled(self):
+        return not (self.busy or BackendManager.BackendManager().current_state(BackendManager.BackendManager.INITIAL))
 
 class SublimeHaskellRestartBackend(sublime_plugin.WindowCommand):
     def __init__(self, window):
         super().__init__(window)
 
     def run(self):
-        self.window.run_command('sublime_haskell_stop_backend')
-        self.window.run_command('sublime_haskell_start_backend')
+        shutdown_cv = threading.Condition()
+        SublimeHaskellStopBackend(self.window).run(shutdown_cv=shutdown_cv)
+        SublimeHaskellStartBackend(self.window).run(shutdown_cv=shutdown_cv)
+
+    def is_enabled(self):
+        return not BackendManager.BackendManager().current_state(BackendManager.BackendManager.INITIAL)

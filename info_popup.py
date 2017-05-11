@@ -1,4 +1,5 @@
 import html
+import threading
 import webbrowser
 from xml.etree import ElementTree
 
@@ -112,9 +113,13 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
         self.suggest_import = None
 
     def on_hover(self, view, point, hover_zone):
-        if not Common.is_haskell_source(view):
-            return
+        # Note: view.file_name() is not set in certain views, such as the "Haskell Show Types Panel". Avoid
+        # generating lookup errors, which are logged in the console window (for better or worse.)
+        if Common.is_haskell_source(view) and view.file_name():
+            # Ensure that we never block the Python main thread.
+            threading.Thread(target=self.do_hover, args=(view, point, hover_zone)).start()
 
+    def do_hover(self, view, point, hover_zone):
         self.view = view
         self.current_file_name = view.file_name()
         # If the column is needed: (line, column) = self.view.rowcol(point) [remove subscript]

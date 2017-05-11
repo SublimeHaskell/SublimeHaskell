@@ -108,7 +108,7 @@ __all__ = [
 class IOEvent(namedtuple('IOEvent', 'fileobj read write')):
 
     def __new__(cls, fileobj, read=False, write=False):
-        return super(IOEvent, cls).__new__(
+        return super().__new__(
             cls, fileobj, bool(read), bool(write))
 
     @classmethod
@@ -193,7 +193,7 @@ class SelectIOWait(AbstractIOWait):
         self._files_map = {}
 
     def watch(self, *args, **kwargs):
-        super(SelectIOWait, self).watch(*args, **kwargs)
+        super().watch(*args, **kwargs)
         event = IOEvent._from_watch_args(*args, **kwargs)
         fileobj, read, write = event
 
@@ -204,7 +204,7 @@ class SelectIOWait(AbstractIOWait):
 
         files_map = self._files_map
         try:
-            old_fileobj, old_read, old_write = files_map[fileno]
+            old_read, old_write = files_map[fileno][1:]
         except KeyError:
             # This is the first time this file is registered.
             if read:
@@ -227,7 +227,7 @@ class SelectIOWait(AbstractIOWait):
         files_map[fileno] = event
 
     def unwatch(self, fileobj):
-        super(SelectIOWait, self).unwatch(fileobj)
+        super().unwatch(fileobj)
         if hasattr(fileobj, 'fileno'):
             fileno = fileobj.fileno()
         else:
@@ -240,7 +240,7 @@ class SelectIOWait(AbstractIOWait):
             self._wlist.remove(fileno)
 
     def wait(self, timeout=None):
-        super(SelectIOWait, self).wait(timeout)
+        super().wait(timeout)
         files_map = self._files_map
         if not files_map:
             raise ValueError('no file descriptors registered')
@@ -270,22 +270,22 @@ class SelectIOWait(AbstractIOWait):
     if hasattr(dict, 'itervalues'):
         # Python 2.x
         def get_watched(self):
-            super(SelectIOWait, self).get_watched()
+            super().get_watched()
             return self._files_map.values()
     else:
         # Python 3.x
         def get_watched(self):
-            super(SelectIOWait, self).get_watched()
+            super().get_watched()
             return list(self._files_map.values())
 
     def clear(self):
-        super(SelectIOWait, self).clear()
+        super().clear()
         del self._rlist[:]
         del self._wlist[:]
         self._files_map.clear()
 
     def close(self):
-        super(SelectIOWait, self).close()
+        super().close()
         try:
             del self._files_map
         except AttributeError:
@@ -298,7 +298,7 @@ class BasePollIOWait(AbstractIOWait):
         self._files_map = {}
 
     def watch(self, *args, **kwargs):
-        super(BasePollIOWait, self).watch(*args, **kwargs)
+        super().watch(*args, **kwargs)
         event = IOEvent._from_watch_args(*args, **kwargs)
         fileobj, read, write = event
 
@@ -320,7 +320,7 @@ class BasePollIOWait(AbstractIOWait):
         self._files_map[fileno] = event
 
     def unwatch(self, fileobj):
-        super(BasePollIOWait, self).unwatch(fileobj)
+        super().unwatch(fileobj)
         if hasattr(fileobj, 'fileno'):
             fileno = fileobj.fileno()
         else:
@@ -330,7 +330,7 @@ class BasePollIOWait(AbstractIOWait):
         self._poll.unregister(fileno)
 
     def wait(self, timeout=None):
-        super(BasePollIOWait, self).wait(timeout)
+        super().wait(timeout)
         files_map = self._files_map
         if not files_map:
             raise ValueError('no file descriptors registered')
@@ -351,23 +351,23 @@ class BasePollIOWait(AbstractIOWait):
     if hasattr(dict, 'itervalues'):
         # Python 2.x
         def get_watched(self):
-            super(BasePollIOWait, self).get_watched()
+            super().get_watched()
             return self._files_map.values()
     else:
         # Python 3.x
         def get_watched(self):
-            super(BasePollIOWait, self).get_watched()
+            super().get_watched()
             return list(self._files_map.values())
 
     def clear(self):
-        super(BasePollIOWait, self).clear()
+        super().clear()
         files_map = self._files_map
         for fileno in files_map:
             self._poll.unregister(fileno)
         files_map.clear()
 
     def close(self):
-        super(BasePollIOWait, self).close()
+        super().close()
         try:
             del self._poll
             del self._files_map
@@ -384,7 +384,7 @@ class PollIOWait(BasePollIOWait):
     available = hasattr(select, 'poll')
 
     def __init__(self):
-        super(PollIOWait, self).__init__()
+        super().__init__()
         self._poll = select.poll()
         self._read_mask = select.POLLIN | select.POLLPRI
         self._write_mask = select.POLLOUT
@@ -405,7 +405,7 @@ class EPollIOWait(BasePollIOWait):
     available = hasattr(select, 'epoll')
 
     def __init__(self):
-        super(EPollIOWait, self).__init__()
+        super().__init__()
         self._poll = select.epoll()
         self._read_mask = select.EPOLLIN | select.EPOLLPRI
         self._write_mask = select.EPOLLOUT
@@ -423,7 +423,7 @@ class KQueueIOWait(AbstractIOWait):
         self._kqueue = select.kqueue()
 
     def watch(self, *args, **kwargs):
-        super(KQueueIOWait, self).watch(*args, **kwargs)
+        super().watch(*args, **kwargs)
         event = IOEvent._from_watch_args(*args, **kwargs)
         fileobj, read, write = event
 
@@ -451,7 +451,7 @@ class KQueueIOWait(AbstractIOWait):
         files_map[fileno] = (fileobj, read, write, kevents)
 
     def unwatch(self, fileobj):
-        super(KQueueIOWait, self).unwatch(fileobj)
+        super().unwatch(fileobj)
         if hasattr(fileobj, 'fileno'):
             fileno = fileobj.fileno()
         else:
@@ -459,14 +459,14 @@ class KQueueIOWait(AbstractIOWait):
         del self._files_map[fileno]
 
     def wait(self, timeout=None):
-        super(KQueueIOWait, self).wait(timeout)
+        super().wait(timeout)
         files_map = self._files_map
         if not files_map:
             raise ValueError('no file descriptors registered')
 
         # Build the changelist for the kqueue object.
         changelist = []
-        for fileobj, _, _, kevents in files_map.values():
+        for _fileobj, _, _, kevents in files_map.values():
             changelist.extend(kevents)
 
         # Call kqueue() and destroy the changelist.
@@ -491,23 +491,23 @@ class KQueueIOWait(AbstractIOWait):
         result = []
         for fileno, (read, write) in kevents_merged.items():
             try:
-                f = files_map[fileno]
+                activef = files_map[fileno]
             except KeyError:
                 pass
             else:
-                result.append(IOEvent(f[0], read=read, write=write))
+                result.append(IOEvent(activef[0], read=read, write=write))
         return result
 
     def get_watched(self):
-        super(KQueueIOWait, self).get_watched()
+        super().get_watched()
         return [IOEvent(*item[:3]) for item in self._files_map.values()]
 
     def clear(self):
-        super(KQueueIOWait, self).clear()
+        super().clear()
         self._files_map.clear()
 
     def close(self):
-        super(KQueueIOWait, self).close()
+        super().close()
         try:
             self._kqueue.close()
             del self._kqueue

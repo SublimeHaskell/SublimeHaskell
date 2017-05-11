@@ -185,6 +185,7 @@ class BackendDebug(object):
         self.recv_messages = False
         self.iowaits = False
         self.socket_pool = False
+        self.callbacks = False
 
     def load(self, backend_settings):
         self.all_messages = 'all_messages' in backend_settings
@@ -192,6 +193,7 @@ class BackendDebug(object):
         self.recv_messages = 'recv_messages' in backend_settings
         self.iowaits = 'iowaits' in backend_settings
         self.socket_pool = 'socket_pool' in backend_settings
+        self.callbacks = 'callbacks' in backend_settings
 
 
 PLUGIN = SettingsContainer()
