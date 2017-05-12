@@ -1357,6 +1357,7 @@ class SublimeHaskellStartBackend(sublime_plugin.WindowCommand):
 
     def do_startup(self, **kwargs):
         shutdown_cv = kwargs.pop('shutdown_cv', None)
+        restart_ev = kwargs.pop('restart_ev', None)
         self.busy = True
         try:
             if shutdown_cv is not None:
@@ -1365,6 +1366,9 @@ class SublimeHaskellStartBackend(sublime_plugin.WindowCommand):
 
             with Common.status_message_process('Starting up backend', priority=1):
                 BackendManager.BackendManager().initialize()
+
+            if restart_ev is not None:
+                restart_ev.set()
         finally:
             self.busy = False
 
@@ -1399,11 +1403,15 @@ class SublimeHaskellStopBackend(sublime_plugin.WindowCommand):
 class SublimeHaskellRestartBackend(sublime_plugin.WindowCommand):
     def __init__(self, window):
         super().__init__(window)
+        self.restart_ev = threading.Event()
+        self.restart_ev.set()
 
     def run(self):
         shutdown_cv = threading.Condition()
+        self.restart_ev.clear()
         SublimeHaskellStopBackend(self.window).run(shutdown_cv=shutdown_cv)
-        SublimeHaskellStartBackend(self.window).run(shutdown_cv=shutdown_cv)
+        SublimeHaskellStartBackend(self.window).run(shutdown_cv=shutdown_cv, restart_ev=self.restart_ev)
 
     def is_enabled(self):
-        return not BackendManager.BackendManager().current_state(BackendManager.BackendManager.INITIAL)
+        return self.restart_ev.is_set() and \
+               not BackendManager.BackendManager().current_state(BackendManager.BackendManager.INITIAL)
