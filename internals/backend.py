@@ -180,7 +180,7 @@ class NullHaskellBackend(HaskellBackend, metaclass=Utils.Singleton):
     should do.
     '''
 
-    def __init__(self, backend_mgr):
+    def __init__(self, backend_mgr, **kwargs):
         super().__init__(backend_mgr)
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-

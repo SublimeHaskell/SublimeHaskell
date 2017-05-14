@@ -5,6 +5,11 @@ Miscelaneous glue, mostly for interoperability between Python2 and Python3.
 import os
 import os.path
 import platform
+import queue
+import threading
+import traceback
+
+import SublimeHaskell.internals.logging as Logging
 
 def decode_bytes(src):
     return src.decode('utf-8').replace('\r\n', '\n').replace('\r', '\n') if src is not None else None
@@ -38,3 +43,27 @@ class Singleton(type):
         if cls not in cls._instances:
             cls._instances[cls] = super().__call__(*args, **kwargs)
         return cls._instances[cls]
+
+# Background worker
+class Worker(object, metaclass=Singleton):
+    def __init__(self):
+        super().__init__()
+        self.jobs = queue.Queue()
+        self.inner_thread = threading.Thread(target=self.worker_run)
+        self.inner_thread.start()
+
+    def worker_run(self):
+        while True:
+            name, worker_fn, args, kwargs = self.jobs.get()
+            try:
+                Logging.log('worker: {0}'.format(name))
+                worker_fn(*args, **kwargs)
+            except Exception:
+                Logging.log('worker: job {0} failed, see console window traceback'.format(name), Logging.LOG_ERROR)
+                traceback.print_exc()
+
+    def async(self, name, worker_fn, *args, **kwargs):
+        self.jobs.put((name, worker_fn, args, kwargs))
+
+def run_async(name, worker_fn, *args, **kwargs):
+    Worker().async(name, worker_fn, *args, **kwargs)

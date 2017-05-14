@@ -3,10 +3,8 @@
 """SublimeHaskell autocompletion support."""
 
 import re
-import time
 
 import sublime
-import sublime_plugin
 
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.backend_mgr as BackendManager
@@ -14,7 +12,6 @@ import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.locked_object as LockedObject
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.utils as Utils
-import SublimeHaskell.worker as Worker
 
 
 # Checks if we are in a LANGUAGE pragma.
@@ -95,7 +92,7 @@ class CompletionCache(object):
 
 
 # Autocompletion data
-class AutoCompletion(object, metaclass=Utils.Singleton):
+class AutoCompleter(object):
     """Information for completion"""
     def __init__(self):
         self.language_pragmas = []
@@ -106,27 +103,24 @@ class AutoCompletion(object, metaclass=Utils.Singleton):
         self.module_completions = LockedObject.LockedObject({})
 
         # keywords
-        # TODO: keywords can't appear anywhere, we can suggest in right places
-        self.keyword_completions = list(map(
-            lambda k: (k + '\tkeyword', k),
-            ['do', 'case', 'of', 'let', 'in', 'data', 'instance', 'type', 'newtype', 'where',
-             'deriving', 'import', 'module']))
+        self.keywords = ['do', 'case', 'of', 'let', 'in', 'data', 'instance', 'type', 'newtype', 'where',
+                         'deriving', 'import', 'module']
 
         self.current_filename = None
 
         # filename ⇒ preloaded completions + None ⇒ all completions
         self.cache = LockedObject.LockedObject(CompletionCache())
-        self.wide_completion = None
 
-    def mark_wide_completion(self, view):
-        self.wide_completion = view
+    def keyword_completions(self, query):
+        return [(k + '\tkeyword', k) for k in self.keywords if k.startswith(query)] if isinstance(query, str) else []
 
     def get_completions_async(self, file_name=None):
         def log_result(result):
-            Logging.log('completions: {0}'.format(len(result or [])), Logging.LOG_TRACE)
-            return result or []
+            retval = result or []
+            Logging.log('completions: {0}'.format(len(retval)), Logging.LOG_TRACE)
+            return retval
 
-        none_comps = []
+        comps = []
         update_cabal = False
         update_sources = False
         with self.cache as cache_:
@@ -140,13 +134,12 @@ class AutoCompletion(object, metaclass=Utils.Singleton):
         if update_sources:
             self.update_sources_completions()
         with self.cache as cache_:
-            none_comps = cache_.global_completions()
+            comps = cache_.global_completions()
 
         import_names = []
-        comps = none_comps
 
         if file_name is None:
-            return log_result(none_comps)
+            return log_result(comps)
         else:
             Logging.log('preparing completions for {0}'.format(file_name), Logging.LOG_DEBUG)
             current_module = Utils.head_of(BackendManager.active_backend().module(file=file_name))
@@ -199,6 +192,8 @@ class AutoCompletion(object, metaclass=Utils.Singleton):
         if not current_file_name:
             return []
 
+        Logging.log('AutoCompleter.get_completons.', Logging.LOG_DEBUG)
+
         self.current_filename = current_file_name
 
         backend = BackendManager.active_backend()
@@ -209,11 +204,11 @@ class AutoCompletion(object, metaclass=Utils.Singleton):
         Logging.log('qsymbol {0}'.format(qsymbol), Logging.LOG_DEBUG)
         Logging.log('current_file_name {0} qualified_prefix {1}'.format(current_file_name, qualified_prefix), Logging.LOG_DEBUG)
 
-        wide = self.wide_completion == view
-        # if wide:
-        #     self.wide_completion = None
+        view_settings = view.settings()
+        wide = view_settings.get('subhask_wide_completion')
 
         suggestions = []
+        completions = []
         if qsymbol.module:
             if qsymbol.is_import_list:
                 current_module = Utils.head_of(backend.module(file=current_file_name))
@@ -222,29 +217,29 @@ class AutoCompletion(object, metaclass=Utils.Singleton):
                     q_module = Utils.head_of(backend.scope_modules(file=current_file_name,
                                                                    lookup=qsymbol.module,
                                                                    search_type='exact'))
-                    if q_module.by_source():
-                        proj_module = backend.resolve(file=q_module.location.filename, exports=True)
-                        if proj_module:
-                            suggestions = proj_module.declarations.values()
-                    elif q_module.by_cabal():
-                        cabal_module = Utils.head_of(backend.module(lookup=q_module.name,
-                                                                    search_type='exact',
-                                                                    package=q_module.location.package.name))
-                        if cabal_module:
-                            suggestions = cabal_module.declarations.values()
+                    if q_module is not None:
+                        if q_module.by_source():
+                            proj_module = backend.resolve(file=q_module.location.filename, exports=True)
+                            if proj_module:
+                                suggestions = proj_module.declarations.values()
+                        elif q_module.by_cabal():
+                            cabal_module = Utils.head_of(backend.module(lookup=q_module.name,
+                                                                        search_type='exact',
+                                                                        package=q_module.location.package.name))
+                            if cabal_module:
+                                suggestions = cabal_module.declarations.values()
             else:
                 suggestions = backend.complete(qualified_prefix, current_file_name, wide=wide)
 
-            return self.keyword_completions + make_completions(suggestions)
+            completions = make_completions(suggestions)
         else:
             with self.cache as cache_:
-                completions = cache_.global_completions() \
-                              if wide \
-                              else cache_.files.get(current_file_name, cache_.global_completions())
+                if wide:
+                    completions = cache_.global_completions()
+                else:
+                    completions = cache_.files.get(current_file_name, cache_.global_completions())
 
-                return self.keyword_completions + completions
-
-        return []
+        return completions + self.keyword_completions(qsymbol.name)
 
     def completions_for_module(self, module, filename=None):
         """
@@ -271,12 +266,11 @@ class AutoCompletion(object, metaclass=Utils.Singleton):
         """
         return self.completions_for_module(module_name, filename)
 
-    def get_import_completions(self, view, locations):
+    def get_import_completions(self, view, _locations, line_contents):
 
         # Autocompletion for import statements
         if Settings.PLUGIN.auto_complete_imports:
             self.current_filename = view.file_name()
-            line_contents = Common.get_line_contents(view, locations[0])
 
             match_import_list = Common.IMPORT_SYMBOL_RE.search(line_contents)
             if match_import_list:
@@ -303,10 +297,7 @@ class AutoCompletion(object, metaclass=Utils.Singleton):
 
         return []
 
-    def get_special_completions(self, view, locations):
-        # Contents of the current line up to the cursor
-        line_contents = Common.get_line_contents(view, locations[0])
-
+    def get_special_completions(self, line_contents):
         # Autocompletion for LANGUAGE pragmas
         if Settings.PLUGIN.auto_complete_language_pragmas:
             # TODO handle multiple selections
@@ -361,123 +352,3 @@ class AutoCompletion(object, metaclass=Utils.Singleton):
         else:
             mods = backend.list_modules(cabal=True) or []
             return set([m.name for m in mods])
-
-
-def can_complete_qualified_symbol(info):
-    """
-    Helper function, returns whether sublime_haskell_complete can run for (module, symbol, is_import_list)
-    """
-    if not info.module:
-        return False
-
-    if info.is_import_list:
-        return info.module in AutoCompletion().get_current_module_completions()
-    else:
-        return list(filter(lambda m: m.startswith(info.module), AutoCompletion().get_current_module_completions())) != []
-
-
-def update_completions_async(files=None, drop_all=False):
-    if drop_all:
-        Worker.run_async('drop all completions', AutoCompletion().drop_completions_async)
-    else:
-        for file in files or []:
-            Worker.run_async('drop completions', AutoCompletion().drop_completions_async, file)
-    Worker.run_async('init completions', AutoCompletion().init_completions_async)
-
-
-class SublimeHaskellAutocomplete(sublime_plugin.EventListener):
-    def __init__(self):
-        self.project_file_name = None
-
-    def on_query_completions(self, view, _prefix, locations):
-        if not Common.is_haskell_source(view):
-            return []
-
-        begin_time = time.clock()
-        autocompleter = AutoCompletion()
-
-        # Only suggest symbols if the current file is part of a Cabal project.
-
-        completions = autocompleter.get_import_completions(view, locations)
-        completions.append(autocompleter.get_special_completions(view, locations))
-
-        # Export list
-        if 'meta.declaration.exports.haskell' in view.scope_name(view.sel()[0].a):
-            line_contents = Common.get_line_contents(view, locations[0])
-            export_module = EXPORT_MODULE_RE.search(line_contents)
-            if export_module:
-                # qsymbol = Common.get_qualified_symbol_at_region(view, view.sel()[0])
-                # TODO: Implement
-                pass
-
-        # Add current file's completions:
-        completions = autocompleter.get_completions(view, locations) + completions
-
-        end_time = time.clock()
-        Logging.log('time to get completions: {0} seconds'.format(end_time - begin_time), Logging.LOG_DEBUG)
-
-        # Don't put completions with special characters (?, !, ==, etc.)
-        # into completion because that wipes all default Sublime completions:
-        # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
-        # TODO: work around this
-        # comp = [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0].split('\t')[0])]
-        # if Settings.PLUGIN.inhibit_completions and len(comp) != 0:
-        #     return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
-        # return comp
-
-        if Settings.PLUGIN.inhibit_completions:
-            if len(completions) > 0:
-                return (completions, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
-            else:
-                # Because we want to inhibit completions...
-                return []
-        else:
-            return completions
-
-    def set_cabal_status(self, view):
-        filename = view.file_name()
-        if filename:
-            (_, project_name) = Common.get_cabal_project_dir_and_name_of_file(filename)
-            if project_name:
-                # TODO: Set some useful status instead of this
-                view.set_status('sublime_haskell_cabal', '{0}: {1}'.format('cabal', project_name))
-
-    def on_activated_async(self, view):
-        if Common.is_haskell_source(view):
-            filename = view.file_name()
-            if filename:
-                Worker.run_async('get completions for {0}'.format(filename), AutoCompletion().get_completions_async, filename)
-
-    def on_new(self, view):
-        Logging.log('SublimeHaskellAutocomplete.on_new invoked.', Logging.LOG_DEBUG)
-        self.set_cabal_status(view)
-        if Common.is_inspected_source(view):
-            filename = view.file_name()
-            if filename:
-                BackendManager.inspector().mark_file_dirty(filename)
-                update_completions_async(drop_all=True)
-
-    def on_load(self, view):
-        Logging.log('SublimeHaskellAutocomplete.on_load invoked.', Logging.LOG_DEBUG)
-        self.set_cabal_status(view)
-        if Common.is_inspected_source(view):
-            filename = view.file_name()
-            if filename:
-                BackendManager.inspector().mark_file_dirty(filename)
-                update_completions_async(drop_all=True)
-
-    def on_activated(self, view):
-        ## Logging.log('SublimeHaskellAutocomplete.on_activated invoked.', Logging.LOG_DEBUG)
-        self.set_cabal_status(view)
-
-        window = view.window()
-        if window:
-            if not self.project_file_name:
-                self.project_file_name = window.project_file_name()
-            if window.project_file_name() is not None and window.project_file_name() != self.project_file_name:
-                self.project_file_name = window.project_file_name()
-                Logging.log('project switched to {0}, reinspecting'.format(self.project_file_name))
-                Logging.log('reinspect all', Logging.LOG_TRACE)
-                BackendManager.active_backend().remove_all()
-                BackendManager.inspector().start_inspect()
-                BackendManager.inspector().force_inspect()

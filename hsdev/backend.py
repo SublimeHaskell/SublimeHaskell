@@ -39,10 +39,10 @@ class HsDevBackend(Backend.HaskellBackend):
     HSDEV_MAX_VER = [0, 2, 4, 0]  # maximum hsdev version
     HSDEV_CALL_TIMEOUT = 300.0 # second timeout for synchronous requests
 
-    def __init__(self, backend_mgr):
+    def __init__(self, backend_mgr, local=False, port=HSDEV_DEFAULT_PORT, host=HSDEV_DEFAULT_HOST):
         super().__init__(backend_mgr)
         # Local hsdev server process and params
-        self.is_local_hsdev = Settings.PLUGIN.hsdev_local_process
+        self.is_local_hsdev = local
         self.hsdev_process = None
         self.cache = os.path.join(Common.sublime_haskell_cache_path(), 'hsdev')
         self.log_file = os.path.join(Common.sublime_haskell_cache_path(), 'hsdev', 'hsdev.log')
@@ -53,10 +53,10 @@ class HsDevBackend(Backend.HaskellBackend):
         self.drain_stdout = None
         self.drain_stderr = None
         # Connection params
-        self.port = Settings.PLUGIN.hsdev_port or HsDevBackend.HSDEV_DEFAULT_PORT
-        self.hostname = HsDevBackend.HSDEV_DEFAULT_HOST
-        if not self.is_local_hsdev and Settings.PLUGIN.hsdev_host:
-            self.hostname = Settings.PLUGIN.hsdev_host
+        self.port = port
+        self.hostname = host
+        if self.is_local_hsdev:
+            self.hostname = self.HSDEV_DEFAULT_HOST
         self.client = None
 
     @staticmethod
@@ -140,8 +140,6 @@ class HsDevBackend(Backend.HaskellBackend):
             # For a local hsdev server that we started, send the link command so that it exits when we exit.
             if self.is_local_hsdev:
                 self.link()
-            # Start the inspection process...
-            # FIXME: Settings.PLUGIN.add_change_callback('inspect_modules', self.on_inspect_modules_changed)
         else:
             Logging.log('Connections to \'hsdev\' server unsuccessful, see tracebacks to diagnose.', Logging.LOG_ERROR)
             retval = False

@@ -69,8 +69,16 @@ class BackendManager(object, metaclass=Utils.Singleton):
         if len(usable_backends) > 0:
             print('Available backends: {0}'.format(list(map(lambda clazz: clazz.backend_name(), usable_backends))))
             # Take first available because DEFAULT_KNOWN_BACKENDS are listed in order of priority...
-            the_backend = usable_backends[0](self)
+            poss_backends = self.down_select(Settings.PLUGIN.backends, usable_backends)
+            def_backend, n_defaults = self.get_default_backend(poss_backends)
+            if n_defaults > 1:
+                sublime.message_dialog('Multiple default backends detected. Using {0}.'.format(def_backend))
+
+            Logging.log('Starting backend \'{0}\''.format(def_backend))
+            backend_clazz = self.BACKEND_META[poss_backends[def_backend].get('backend')]
+            the_backend = backend_clazz(self, **poss_backends[def_backend].get('options', {}))
             self.go_active(the_backend)
+
             with self.state_lock:
                 if self.current_state(BackendManager.ACTIVE):
                     BackendManager.ACTIVE_BACKEND = the_backend
@@ -86,12 +94,38 @@ class BackendManager(object, metaclass=Utils.Singleton):
     def available_backends(self):
         usable_backends = []
 
-        for backend in Settings.PLUGIN.backends or BackendManager.DEFAULT_BACKEND_PRIORITY:
+        for backend in BackendManager.DEFAULT_BACKEND_PRIORITY:
             backend_clazz = BackendManager.BACKEND_META.get(backend)
             if backend_clazz is not None and backend_clazz.is_available():
                 usable_backends.append(backend_clazz)
 
         return usable_backends
+
+    def down_select(self, user_backends, avail_backends):
+        '''Filter down user-requested backends using the available backends.
+        '''
+        retval = {}
+        backend_names = [b.backend_name() for b in avail_backends]
+        for name in user_backends:
+            args = user_backends.get(name)
+            if args.get('backend') in backend_names:
+                retval[name] = args
+        return retval
+
+    def get_default_backend(self, user_backends):
+        retval = ''
+        n_defaults = 0
+        for name in user_backends:
+            args = user_backends.get(name)
+            if args.get('default', False):
+                n_defaults = n_defaults + 1
+                if retval == '':
+                    retval = name
+        if retval == '':
+            # Huh. No default backend? Use the first key in the dictionary.
+            retval = list(user_backends.keys())[0]
+
+        return (retval, n_defaults)
 
     def go_active(self, backend):
         '''Walk through the state phases (INITIAL -> STARTUP -> CONNECT -> ACTIVE) to startup and connect a backend.

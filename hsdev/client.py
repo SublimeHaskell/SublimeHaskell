@@ -16,22 +16,26 @@ import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.hsdev.callback as HsCallback
 import SublimeHaskell.internals.logging as Logging
 
-class HsDevConnection(threading.Thread):
+class HsDevConnection(object):
     def __init__(self, sock, rcvr_queue, ident):
-        super().__init__(name="receiver {0}".format(ident))
+        super().__init__()
         self.socket = sock
         self.stop_event = threading.Event()
         self.rcvr_queue = rcvr_queue
         self.send_queue = queue.Queue()
         self.conn_ident = ident
+        self.rcvr_thread = threading.Thread(name="hsdev recvr {0}".format(self.conn_ident), target=self.hsconn_receiver)
+        self.send_thread = threading.Thread(name='hsdev sender {0}'.format(self.conn_ident), target=self.hsconn_sender)
 
-    def run(self):
+    def start_connection(self):
+        self.stop_event.clear()
+        self.rcvr_thread.start()
+        self.send_thread.start()
+
+    def hsconn_receiver(self):
         '''Read from the connection's socket until encoutering a newline. The remaining part of the input stream
         is stashed in self.part for the next time the connection reads a request.
         '''
-
-        self.stop_event.clear()
-        threading.Thread(name='hsdev sender {0}'.format(self.conn_ident), target=self.sender).start()
 
         partial = ''
         while not self.stop_event.is_set():
@@ -54,19 +58,23 @@ class HsDevConnection(threading.Thread):
                             partial = post
 
                 if self.rcvr_queue is not None:
-                    # close might have been called between the time that recv() returned and we try to queue up
-                    # the reply.
+                    # Catch the case here where the socket gets closed, but close() has already assigned rcvr_queue
+                    # to None. 
                     self.rcvr_queue.put(json.loads(req_resp))
             except OSError:
                 self.stop_event.set()
 
-    def sender(self):
+    def hsconn_sender(self):
         while not self.stop_event.is_set():
             try:
                 # Block, but timeout, so that we can exit the loop gracefully
                 request = self.send_queue.get(True, 6.0)
-                self.socket.sendall(request)
-                self.send_queue.task_done()
+                if self.socket is not None:
+                    # Socket got closed and set to None in another thread...
+                    self.socket.sendall(request)
+                if self.send_queue is not None:
+                    # Paranoia...
+                    self.send_queue.task_done()
             except queue.Empty:
                 pass
             except OSError:
@@ -74,24 +82,24 @@ class HsDevConnection(threading.Thread):
 
     def send_request(self, request):
         msg = json.dumps(request, separators=(',', ':')) + '\n'
-        self.send_queue.put(msg.encode('utf-8'))
+        if self.send_queue is not None:
+            self.send_queue.put(msg.encode('utf-8'))
 
     def close(self):
         try:
             self.stop_event.set()
 
             if self.socket is not None:
-                try:
-                    # User might still see socket errorrs, but at last we tried to tell hsdev to exit.
-                    msg = json.dumps({'command': 'exit', 'id': '999', 'no-file': True}, separators=(',', ':')) + '\n'
-                    self.socket.sendall(msg.encode('utf-8'))
-                except OSError:
-                    pass
-                finally:
-                    self.socket.close()
-                    self.socket = None
+                self.socket.close()
+                self.socket = None
+            if self.rcvr_thread is not None and self.rcvr_thread.is_alive():
+                self.rcvr_thread.join()
+            if self.send_thread is not None and self.send_thread.is_alive():
+                self.send_thread.join()
             self.rcvr_queue = None
             self.send_queue = None
+            self.rcvr_thread = None
+            self.send_thread = None
         except OSError:
             pass
 
@@ -146,7 +154,7 @@ class HsDevClient(object):
 
         # We were successful, start all of the socket threads...
         for sock in self.socket_pool:
-            sock.start()
+            sock.start_connection()
 
         self.rcvr_thread = threading.Thread(target=self.receiver)
         self.rcvr_thread.start()

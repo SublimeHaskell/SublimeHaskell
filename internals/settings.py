@@ -45,7 +45,7 @@ class SettingsContainer(object):
         'auto_complete_language_pragmas': ('auto_complete_language_pragmas', True),
         'auto_completion_popup': ('auto_completion_popup', False),
         'auto_run_tests': ('auto_run_tests', True),
-        'backends': ('backends', None),
+        'backends': ('backends', {}),
         KEY_BACKEND_DEBUG: ('backend_debug', []),
         'enable_auto_build': ('enable_auto_build', False),
         'enable_auto_check': ('enable_auto_check', True),
@@ -80,7 +80,7 @@ class SettingsContainer(object):
         self.auto_complete_language_pragmas = None
         self.auto_completion_popup = None
         self.auto_run_tests = None
-        self.backends = None
+        self.backends = {}
         self.backend_debug = []
         self.enable_auto_build = None
         self.enable_auto_check = None
@@ -128,6 +128,19 @@ class SettingsContainer(object):
             setattr(self, attr, value)
             install_updater(settings, self, key)
         self.changes = LockedObject.LockedObject({})
+
+        ## New backend upgrade warning:
+        old_stuff = []
+        for old_setting in ['enable_hsdev', 'enable_ghc_mod', 'enable_hsdevtools']:
+            if settings.get(old_setting) is not None:
+                old_stuff.append(old_setting)
+        if len(old_stuff) > 0:
+            sublime.message_dialog('\n'.join(['Old SublimeHaskell backend settings found:',
+                                              ''] +
+                                             old_stuff +
+                                             ['',
+                                              'You are now using the default plugin settings for the \'backend\' preference.',
+                                              'Please look at the default settings and customize as needed.']))
 
     def update_setting(self, key):
         settings = get_settings()

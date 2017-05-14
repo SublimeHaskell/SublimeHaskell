@@ -102,25 +102,40 @@
 	// Additional ghc options for use in ghc-mod and ModuleInspector, for example "-package ghc"
 	"ghc_opts": [],
 
-  // ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
-  // Backend selection:
-  // ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
+  	// ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
+  	// Backend selection:
+  	// ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
 
-  // The list of backends, listed in order of priority. The first available backend is the one used by SublimeHaskell.
-  // Possible backends:
-  //
-  // hsdev: The hsdev backend
-  // ghc-mod: The ghc-mod backend
-  // none: The null/identity/non-functional backend. You can use this if you really don't want SublimeHaskell to do much with
-  //     the more advanced features such as autocompletion.
-  "backends": ["hsdev", "ghc-mod", "none"],
-
-	// Default host and port to which SublimeHaskell connects, where the hsdev server operates:
-	"hsdev_host": "localhost",
-	"hsdev_port": 4567,
-
-	// Start a local hsdev server process?
-	"hsdev_local_process": true,
+  	// The list of backends, listed in order of priority. The first available backend is the one used by SublimeHaskell.
+  	// Possible backends:
+  	//
+  	// hsdev: The hsdev backend
+  	// ghc-mod: The ghc-mod backend
+  	// none: The null/identity/non-functional backend. You can use this if you really don't want SublimeHaskell to do much with
+  	//     the more advanced features such as autocompletion.
+  	"backends": {
+  		"Local hsdev": {
+  			"default": true,
+  			"backend": "hsdev",
+  			"options": {
+  				"local": true,
+	  			"port": 4567
+  			}
+		},
+		"Remote hsdev@localhost:4567": {
+			"default": false,
+  			"backend": "hsdev",
+			"options": {
+				"local": false,
+				"host": "localhost",
+				"port": 4567
+			}
+		},
+		"No backend": {
+			"default": false,
+  			"backend": "none"
+		}
+  	},
 
 	// hdevtools socket name or default
 	"hdevtools_socket": "",
@@ -151,9 +166,9 @@
 	// Additional ghc options for repl
 	"ghci_opts": [],
 
-  // ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
-  // Logging verbosity
-  // ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
+  	// ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
+  	// Logging verbosity
+  	// ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
 
 	// Log level, 0 — no log, 1 — errors, 2 — warnings, 3 — info messages, 4 — debug, 5 — trace
 	"log": 1,
@@ -167,16 +182,15 @@
 	//
 	// hsdev version 0.2.3.0 and higher: The "hsdev_log_level" preference controls hsdev's logging. Valid values are
 	// 'trace', 'debug', 'info', 'warning', 'error' and 'fatal'.
-  "hsdev_log_config": "use silent",
-  "hsdev_log_level": "warning",
+  	"hsdev_log_config": "use silent",
+  	"hsdev_log_level": "warning",
 
-  // Backend debugging flags/tokens: This is a list of tokens used for backend debugging, primarily in the hsdev
-  // backend.
-  //
-  // "all_messages": Emit all messages (send and receive)
-  // "send_messages": Emit all sent messages
-  // "recv_messages": Emit all received messages
-  // "iowaits": Emit output if an I/O event occurs due to select/poll/kqueue/... file descriptor sampling.
-  // "socket_pool": Keep track of the socket pool avail/used sizes.
-  "backend_debug": []
+	// Backend debugging flags/tokens: This is a list of tokens used for backend debugging, primarily in the hsdev
+  	// backend.
+  	//
+  	// "all_messages": Emit all messages (send and receive)
+  	// "send_messages": Emit all sent messages
+  	// "recv_messages": Emit all received messages
+  	// "socket_pool": Keep track of the socket pool avail/used sizes.
+	"backend_debug": []
 }

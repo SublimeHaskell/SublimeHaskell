@@ -23,22 +23,6 @@ import SublimeHaskell.symbols as symbols
 SYMBOL_FILE_REGEX = r'^Defined at: (.*):(\d+):(\d+)$'
 
 
-def is_scanned_source(view=None):
-    _, view, file_shown_in_view = Common.get_haskell_command_window_view_file_project(view)
-    if file_shown_in_view is None:
-        return False
-    return Utils.head_of(BackendManager.active_backend().module(file=file_shown_in_view)) is not None
-
-
-def is_in_project(view=None):
-    _, view, file_shown_in_view = Common.get_haskell_command_window_view_file_project(view)
-    if file_shown_in_view is None:
-        return False
-    else:
-        src_module = Utils.head_of(BackendManager.active_backend().module(file=file_shown_in_view))
-        return src_module is not None and src_module.location.project is not None
-
-
 def show_declaration_info_panel(view, decl):
     info = decl.detailed()
     panel = Common.output_panel(view.window(), info, 'sublime_haskell_symbol_info_panel', syntax='HaskellSymbolInfo')
@@ -72,66 +56,22 @@ def show_declaration_info(view, decl):
     sublime.set_timeout(lambda: view.run_command('sublime_haskell_symbol_info', info), 0)
 
 
-class SublimeHaskellContext(sublime_plugin.EventListener):
-    def __init__(self):
-        super().__init__()
-
-    def on_query_context(self, view, key, _operator, _operand, _matchall):
-        retval = None
-        if key == 'haskell_autofix':
-            retval = view.settings().get('autofix')
-        elif key == 'auto_completion_popup':
-            retval = Settings.PLUGIN.auto_completion_popup
-        elif key == 'haskell_source':
-            retval = Common.is_haskell_source(view)
-        elif key == 'haskell_source_or_repl':
-            retval = Common.is_haskell_source(view) or Common.is_haskell_repl(view)
-        elif key == 'haskell_repl':
-            retval = Common.is_haskell_repl(view)
-        elif key == 'haskell_symbol_info':
-            retval = Common.is_haskell_symbol_info(view)
-        elif key == 'cabal_source':
-            retval = Common.is_cabal_source(view)
-        elif key == 'scanned_source':
-            retval = is_scanned_source(view)
-        elif key == 'in_project':
-            retval = is_in_project(view)
-        elif key == "is_module_completion" or key == "is_import_completion":
-            chars = {
-                "is_module_completion": '.',
-                "is_import_completion": '('}
-
-            region = view.sel()[0]
-            if region.a != region.b:
-                retval = False
-            else:
-                word_region = view.word(region)
-                preline = Common.get_line_contents_before_region(view, word_region)
-                preline += chars[key]
-                retval = autocomplete.can_complete_qualified_symbol(Common.get_qualified_symbol(preline))
-
-        return retval
-
 class SublimeHaskellComplete(CommandWin.SublimeHaskellTextCommand):
     """ Show autocompletion popup """
 
     def __init__(self, view):
         super().__init__(view)
-        self.wide = False
 
     def run(self, edit, characters, **kwargs):
-        self.wide = kwargs.get('wide') or False
+        wide = kwargs.get('wide') or False
+        view_settings = self.view.settings()
+        view_settings.set('subhask_wide_completion', wide)
         if characters:
             for region in self.view.sel():
                 self.view.insert(edit, region.end(), characters)
 
         # if can_complete_qualified_symbol(Common.get_qualified_symbol_at_region(self.view, self.view.sel()[0])):
         self.view.run_command("hide_auto_complete")
-        sublime.set_timeout(self.do_complete, 1)
-
-    def do_complete(self):
-        if self.wide:
-            autocomplete.AutoCompletion().mark_wide_completion(self.view)
         self.view.run_command("auto_complete")
 
 
@@ -473,32 +413,6 @@ class SublimeHaskellReinspectAll(CommandWin.BackendWindowCommand):
             BackendManager.inspector().start_inspect()
         else:
             Common.show_status_message("inspector not connected", is_ok=False)
-
-
-class SublimeHaskellScanContents(CommandWin.BackendTextCommand):
-    """Scan module contents
-    """
-    def __init__(self, view):
-        super().__init__(view)
-        self.current_file_name = None
-        self.status_msg = None
-
-    def run(self, _edit, **kwargs):
-        self.current_file_name = kwargs.get('filename') or self.view.file_name()
-        self.status_msg = Common.status_message_process("Scanning {0}".format(self.current_file_name), priority=3)
-        self.status_msg.start()
-
-        def on_resp(_resp):
-            self.status_msg.stop()
-            autocomplete.update_completions_async([self.current_file_name])
-
-        def on_err(_err, _details):
-            self.status_msg.fail()
-            self.status_msg.stop()
-
-        scan_contents = {self.current_file_name: self.view.substr(sublime.Region(0, self.view.size()))}
-        BackendManager.active_backend().scan(contents=scan_contents, on_response=on_resp, on_error=on_err)
-
 
 class SublimeHaskellInferDocs(CommandWin.BackendTextCommand):
     """
@@ -1351,26 +1265,17 @@ class SublimeHaskellStartBackend(sublime_plugin.WindowCommand):
         super().__init__(window)
         self.busy = False
 
-    def run(self, **kwargs):
+    def run(self):
         # Prevents the Python main thread from blocking.
-        threading.Thread(target=self.do_startup, kwargs=kwargs).start()
+        threading.Thread(target=self.do_startup).start()
 
-    def do_startup(self, **kwargs):
-        shutdown_cv = kwargs.pop('shutdown_cv', None)
-        restart_ev = kwargs.pop('restart_ev', None)
-        self.busy = True
-        try:
-            if shutdown_cv is not None:
-                with shutdown_cv:
-                    shutdown_cv.wait()
-
-            with Common.status_message_process('Starting up backend', priority=1):
+    def do_startup(self):
+        with Common.status_message_process('Starting up backend', priority=1):
+            try:
+                self.busy = True
                 BackendManager.BackendManager().initialize()
-
-            if restart_ev is not None:
-                restart_ev.set()
-        finally:
-            self.busy = False
+            finally:
+                self.busy = False
 
     def is_enabled(self):
         return not self.busy and BackendManager.BackendManager().current_state(BackendManager.BackendManager.INITIAL)
@@ -1381,19 +1286,15 @@ class SublimeHaskellStopBackend(sublime_plugin.WindowCommand):
         super().__init__(window)
         self.busy = False
 
-    def run(self, **kwargs):
+    def run(self):
         # Prevents the Python main thread from blocking.
-        threading.Thread(target=self.do_shutdown, kwargs=kwargs).start()
+        threading.Thread(target=self.do_shutdown).start()
 
-    def do_shutdown(self, **kwargs):
-        shutdown_cv = kwargs.pop('shutdown_cv', None)
+    def do_shutdown(self):
         with Common.status_message_process('Shutting down backend', priority=1):
-            self.busy = True
             try:
+                self.busy = True
                 BackendManager.BackendManager().shutdown_backend()
-                if shutdown_cv is not None:
-                    with shutdown_cv:
-                        shutdown_cv.notify()
             finally:
                 self.busy = False
 
@@ -1404,14 +1305,14 @@ class SublimeHaskellRestartBackend(sublime_plugin.WindowCommand):
     def __init__(self, window):
         super().__init__(window)
         self.restart_ev = threading.Event()
-        self.restart_ev.set()
+        self.restart_ev.clear()
 
     def run(self):
-        shutdown_cv = threading.Condition()
-        self.restart_ev.clear()
-        SublimeHaskellStopBackend(self.window).run(shutdown_cv=shutdown_cv)
-        SublimeHaskellStartBackend(self.window).run(shutdown_cv=shutdown_cv, restart_ev=self.restart_ev)
+        Utils.run_async('setting restart flag', self.restart_ev.set)
+        Utils.run_async('backend shutdown', SublimeHaskellStopBackend(self.window).do_shutdown)
+        Utils.run_async('backend startup', SublimeHaskellStartBackend(self.window).do_startup)
+        Utils.run_async('clearing restart flag', self.restart_ev.clear)
 
     def is_enabled(self):
-        return self.restart_ev.is_set() and \
-               not BackendManager.BackendManager().current_state(BackendManager.BackendManager.INITIAL)
+        return not (self.restart_ev.is_set() or \
+                    BackendManager.BackendManager().current_state(BackendManager.BackendManager.INITIAL))

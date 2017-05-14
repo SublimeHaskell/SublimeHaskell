@@ -5,9 +5,9 @@ import sublime
 
 import SublimeHaskell.internals.locked_object as LockedObject
 import SublimeHaskell.internals.logging as Logging
-import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.settings as Settings
-import SublimeHaskell.worker as Worker
+import SublimeHaskell.internals.utils as Utils
+import SublimeHaskell.sublime_haskell_common as Common
 
 
 # Show scan progress in status bar
@@ -109,7 +109,7 @@ class Inspector(threading.Thread):
                 cabal_to_load[:] = []
 
             for cabal in load_cabal:
-                Worker.run_async('inspect cabal {0}'.format(cabal), self.inspect_cabal, cabal)
+                Utils.run_async('inspect cabal {0}'.format(cabal), self.inspect_cabal, cabal)
 
             if files_to_reinspect and Settings.PLUGIN.enable_hdocs:
                 self.backend.docs(files=files_to_reinspect)
