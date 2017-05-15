@@ -22,14 +22,6 @@ class BackendManager(object, metaclass=Utils.Singleton):
         Backend.NullHaskellBackend.backend_name(): Backend.NullHaskellBackend
     }
 
-    # The list of backends in the order in which we try to use them. Can be overridden by the
-    # 'backends' preference.
-    DEFAULT_BACKEND_PRIORITY = [
-        HsDev.HsDevBackend.backend_name(),
-        GHCIMod.GHCModBackend.backend_name(),
-        Backend.NullHaskellBackend.backend_name()
-    ]
-
     # The manager's states:
     INITIAL = 0
     STARTUP = 1
@@ -94,8 +86,7 @@ class BackendManager(object, metaclass=Utils.Singleton):
     def available_backends(self):
         usable_backends = []
 
-        for backend in BackendManager.DEFAULT_BACKEND_PRIORITY:
-            backend_clazz = BackendManager.BACKEND_META.get(backend)
+        for backend_clazz in BackendManager.BACKEND_META.values():
             if backend_clazz is not None and backend_clazz.is_available():
                 usable_backends.append(backend_clazz)
 
