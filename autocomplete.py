@@ -24,7 +24,7 @@ IMPORT_RE = re.compile(r'.*import(\s+qualified)?\s+')
 IMPORT_RE_PREFIX = re.compile(r'^\s*import(\s+qualified)?\s+([\w\d\.]*)$')
 IMPORT_QUALIFIED_POSSIBLE_RE = re.compile(r'.*import\s+(?P<qualifiedprefix>\S*)$')
 
-# Checks if a word contains only alhanums, -, and _, and dot
+# Checks if a word contains only alphanums, -, and _, and dot
 NO_SPECIAL_CHARS_RE = re.compile(r'^(\w|[\-\.])*$')
 
 # Export module

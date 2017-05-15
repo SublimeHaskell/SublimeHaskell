@@ -12,6 +12,7 @@ import SublimeHaskell.cmdwin_types as CommandWin
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.output_collector as OutputCollector
 import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.symbols as symbols
 
@@ -107,8 +108,7 @@ def run_build_thread(view, cabal_project_dir, msg, cmd, on_done):
 
 def run_chain_build_thread(view, cabal_project_dir, msg, cmds, on_done):
     Common.show_status_message_process(msg, priority=3)
-    thread = threading.Thread(target=wait_for_chain_to_complete, args=(view, cabal_project_dir, msg, cmds, on_done))
-    thread.start()
+    Utils.run_async('run_chain_build_thread', wait_for_chain_to_complete, view, cabal_project_dir, msg, cmds, on_done)
 
 
 def wait_for_build_to_complete(view, cabal_project_dir, msg, cmd, on_done):

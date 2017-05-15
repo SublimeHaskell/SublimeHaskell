@@ -1,5 +1,4 @@
 import html
-import threading
 import webbrowser
 from xml.etree import ElementTree
 
@@ -117,7 +116,7 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
         # generating lookup errors, which are logged in the console window (for better or worse.)
         if Common.is_haskell_source(view) and view.file_name():
             # Ensure that we never block the Python main thread.
-            threading.Thread(target=self.do_hover, args=(view, point, hover_zone)).start()
+            Utils.run_async('SublimeHaskellPopup.on_hover', self.do_hover, view, point, hover_zone)
 
     def do_hover(self, view, point, hover_zone):
         self.view = view

@@ -59,7 +59,7 @@ class HsDevConnection(object):
 
                 if self.rcvr_queue is not None:
                     # Catch the case here where the socket gets closed, but close() has already assigned rcvr_queue
-                    # to None. 
+                    # to None.
                     self.rcvr_queue.put(json.loads(req_resp))
             except OSError:
                 self.stop_event.set()
@@ -198,9 +198,9 @@ class HsDevClient(object):
     def is_connected(self):
         return len(self.socket_pool) > 0
 
-    def setup_receive_callbacks(self, ident, command, on_response, on_notify, on_error):
+    def setup_receive_callbacks(self, ident, command, on_response, on_notify, on_error, orig_request):
         with self.request_map as requests:
-            requests[ident] = HsCallback.HsDevCallbacks(ident, command, on_response, on_notify, on_error)
+            requests[ident] = (HsCallback.HsDevCallbacks(ident, command, on_response, on_notify, on_error), orig_request)
 
     def verify_connected(self):
         return self.is_connected()
@@ -211,7 +211,7 @@ class HsDevClient(object):
 
         # send error to callbacks
         with self.request_map as requests:
-            for on_msg in requests.values():
+            for (on_msg, _) in requests.values():
                 on_msg.on_error('connection lost', {})
             requests.clear()
 
@@ -236,7 +236,7 @@ class HsDevClient(object):
                             resp_id = orig_req.get('id')
 
                         if resp_id is not None:
-                            callbacks = requests.get(resp_id)
+                            callbacks = requests.get(resp_id)[0]
                             if callbacks is not None:
                                 finished_request = False
                                 if 'notify' in resp:
@@ -275,6 +275,11 @@ class HsDevClient(object):
             return None if wait else False
 
         opts = opts or {}
+        with self.serial_lock:
+            req_serial = str(self.request_serial)
+            self.request_serial = self.request_serial + 1
+        opts.update({'no-file': True, 'id': req_serial, 'command': command})
+
         wait_receive = threading.Event() if wait else None
         result_dict = {}
 
@@ -289,16 +294,8 @@ class HsDevClient(object):
             if wait_receive is not None:
                 wait_receive.set()
 
-        with self.serial_lock:
-            req_serial = str(self.request_serial)
-            self.request_serial = self.request_serial + 1
-
-        if wait or on_response or on_notify or on_error:
-            args_cmd = 'hsdev {0}'.format(command)
-            self.setup_receive_callbacks(req_serial, args_cmd, client_call_response, on_notify, client_call_error)
-
-        opts.update({'no-file': True})
-        opts.update({'id': req_serial, 'command': command})
+        args_cmd = 'hsdev {0}'.format(command)
+        self.setup_receive_callbacks(req_serial, args_cmd, client_call_response, on_notify, client_call_error, opts)
 
         call_cmd = u'HsDevClient.call[{0}] cmd \'{1}\' opts\n{2}'.format(req_serial, command, pprint.pformat(opts))
         if Settings.BACKEND.all_messages or Settings.BACKEND.send_messages:
@@ -312,10 +309,11 @@ class HsDevClient(object):
             if wait:
                 wait_receive.wait(timeout)
                 if not wait_receive.is_set():
-                    Logging.log('HsDevClient.call: wait_receive event timed out for id {0}'.format(req_serial),
-                                Logging.LOG_ERROR)
-                    # Delete the request; result_dict will still have nothing in it (presumably)
                     with self.request_map as requests:
+                        req = pprint.pformat(requests[req_serial][1])
+                        errmsg = 'HsDevClient.call: wait_receive event timed out for id {0}\n{1}'.format(req_serial, req)
+                        Logging.log(errmsg, Logging.LOG_ERROR)
+                        # Delete the request; result_dict will still have nothing in it (presumably)
                         del requests[req_serial]
 
             if Settings.BACKEND.socket_pool:

@@ -84,24 +84,16 @@ class BackendManager(object, metaclass=Utils.Singleton):
             print('No backends found.')
 
     def available_backends(self):
-        usable_backends = []
-
-        for backend_clazz in BackendManager.BACKEND_META.values():
-            if backend_clazz is not None and backend_clazz.is_available():
-                usable_backends.append(backend_clazz)
-
-        return usable_backends
+        '''Determine which backends are actually available. Whether a backend is available is backend-specific, usually the
+        backend class examines the PATH environment variable and looks for a specific executable.
+        '''
+        return [clazz for clazz in BackendManager.BACKEND_META.values() if clazz.is_available()]
 
     def down_select(self, user_backends, avail_backends):
         '''Filter down user-requested backends using the available backends.
         '''
-        retval = {}
         backend_names = [b.backend_name() for b in avail_backends]
-        for name in user_backends:
-            args = user_backends.get(name)
-            if args.get('backend') in backend_names:
-                retval[name] = args
-        return retval
+        return dict([(name, user_backends[name]) for name in user_backends if user_backends[name]['backend'] in backend_names])
 
     def get_default_backend(self, user_backends):
         retval = ''

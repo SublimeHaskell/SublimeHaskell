@@ -3,7 +3,6 @@
 
 import os
 import os.path
-import threading
 
 import sublime
 
@@ -14,6 +13,7 @@ import SublimeHaskell.internals.proc_helper as ProcHelper
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.parseoutput as ParseOutput
 import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.internals.utils as Utils
 
 OUTPUT_PANEL_NAME = "haskell_run_output"
 
@@ -364,7 +364,7 @@ class SublimeHaskellRunCommand(SublimeHaskellBaseCommand):
         hide_output(self.window)
 
         # Run in thread
-        threading.Thread(target=run_binary, args=(name, bin_file, base_dir)).start()
+        Utils.run_async(type(self).__name__, run_binary, name, bin_file, base_dir)
 
 
 def run_binary(name, bin_file, base_dir):

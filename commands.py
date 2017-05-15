@@ -391,19 +391,22 @@ class SublimeHaskellGoToHackageModule(CommandWin.BackendTextCommand):
                Common.is_haskell_repl(self.view)
 
 
-class SublimeHaskellGoToAnyDeclaration(CommandWin.SublimeHaskellWindowCommand):
-    def __init__(self, window):
-        super().__init__(window)
-        self.cache = None
+## Not referenced in default commands or anywhere in the plugin:
+## Deprecated for now:
+##
+# class SublimeHaskellGoToAnyDeclaration(CommandWin.SublimeHaskellWindowCommand):
+#     def __init__(self, window):
+#         super().__init__(window)
+#         self.cache = None
 
-    def run(self):
-        with autocomplete.AutoCompletion().cache as cache_:
-            self.cache = cache_
-            self.window.show_quick_panel(cache_.source_locs, self.on_done)
+#     def run(self):
+#         with autocomplete.AutoCompletion().cache as cache_:
+#             self.cache = cache_
+#             self.window.show_quick_panel(cache_.source_locs, self.on_done)
 
-    def on_done(self, idx):
-        if idx >= 0:
-            self.window.open_file(self.cache.source_locs[idx][1], sublime.ENCODED_POSITION)
+#     def on_done(self, idx):
+#         if idx >= 0:
+#             self.window.open_file(self.cache.source_locs[idx][1], sublime.ENCODED_POSITION)
 
 
 class SublimeHaskellReinspectAll(CommandWin.BackendWindowCommand):
@@ -1267,7 +1270,7 @@ class SublimeHaskellStartBackend(sublime_plugin.WindowCommand):
 
     def run(self):
         # Prevents the Python main thread from blocking.
-        threading.Thread(target=self.do_startup).start()
+        Utils.run_async(type(self).__name__ + '.do_startup', self.do_startup)
 
     def do_startup(self):
         with Common.status_message_process('Starting up backend', priority=1):
@@ -1288,7 +1291,7 @@ class SublimeHaskellStopBackend(sublime_plugin.WindowCommand):
 
     def run(self):
         # Prevents the Python main thread from blocking.
-        threading.Thread(target=self.do_shutdown).start()
+        Utils.run_async(type(self).__name__ + '.do_shutdown', self.do_shutdown)
 
     def do_shutdown(self):
         with Common.status_message_process('Shutting down backend', priority=1):

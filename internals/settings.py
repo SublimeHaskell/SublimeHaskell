@@ -54,12 +54,8 @@ class SettingsContainer(object):
         'ghc_opts': ('ghc_opts', []),
         'ghci_opts': ('ghci_opts', []),
         'haskell_build_tool': ('haskell_build_tool', 'stack'),
-        'hdevtools_socket': ('hdevtools_socket', ''),
-        'hsdev_host': ('hsdev_host', 'localhost'),
-        'hsdev_local_process': ('hsdev_local_process', True),
         'hsdev_log_config': ('hsdev_log_config', 'use silent'),
         'hsdev_log_level': ('hsdev_log_level', 'warning'),
-        'hsdev_port': ('hsdev_port', 4567),
         'inhibit_completions': ('inhibit_completions', False),
         'inspect_modules': ('inspect_modules', True),
         'lint_check_fly': ('lint_check_fly', False),
@@ -89,12 +85,8 @@ class SettingsContainer(object):
         self.ghc_opts = None
         self.ghci_opts = None
         self.haskell_build_tool = None
-        self.hdevtools_socket = None
-        self.hsdev_host = None
-        self.hsdev_local_process = None
         self.hsdev_log_config = None
         self.hsdev_log_level = None
-        self.hsdev_port = None
         self.inhibit_completions = None
         self.inspect_modules = None
         self.lint_check_fly = None
@@ -131,16 +123,23 @@ class SettingsContainer(object):
 
         ## New backend upgrade warning:
         old_stuff = []
-        for old_setting in ['enable_hsdev', 'enable_ghc_mod', 'enable_hsdevtools']:
+        for old_setting in ['enable_hsdev', 'enable_ghc_mod', 'enable_hdevtools', 'hdevtools_socket',
+                            'hsdev_host', 'hsdev_local_process', 'hsdev_port']:
             if settings.get(old_setting) is not None:
                 old_stuff.append(old_setting)
         if len(old_stuff) > 0:
-            sublime.message_dialog('\n'.join(['Old SublimeHaskell backend settings found:',
-                                              ''] +
-                                             old_stuff +
-                                             ['',
-                                              'You are now using the default plugin settings for the \'backend\' preference.',
-                                              'Please look at the default settings and customize as needed.']))
+            msg = ['Old SublimeHaskell backend settings found:',
+                   '']
+            msg = msg + old_stuff
+            msg = msg + ['',
+                         'You are now using the default SublimeHaskell settings'
+                         'for the \'backend\' preference.',
+                         '',
+                         'Please look at the default settings and customize/migrate',
+                         'them as needed in your user settings.',
+                         '',
+                         '(Preferences > Package Settings > SublimeHaskell)']
+            sublime.message_dialog('\n'.join(msg))
 
     def update_setting(self, key):
         settings = get_settings()
