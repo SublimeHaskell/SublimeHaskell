@@ -27,19 +27,6 @@ class ScanStatus(object):
         Logging.log("inspector: " + smsg, Logging.LOG_DEBUG)
 
 
-# Set reinspect event
-def dirty(dirty_fn):
-    def wrapped(self, *args, **kwargs):
-        acquired = self.dirty_lock.acquire(blocking=False)
-        try:
-            return dirty_fn(self, *args, **kwargs)
-        finally:
-            if acquired:
-                self.dirty_lock.release()
-                self.reinspect_event.set()
-    return wrapped
-
-
 def use_inspect_modules(inspect_fn):
     def wrapped(self, *args, **kwargs):
         if Settings.PLUGIN.inspect_modules:
@@ -48,18 +35,12 @@ def use_inspect_modules(inspect_fn):
 
 
 # You know, Barn... it's very tempting to name this "InspectorFish" (if you grew up with "Barney Miller." :-)
-class Inspector(threading.Thread):
-    '''The inspection thread.
+class Inspector(object):
+    '''The source inspector.
     '''
 
-    # Re-inspect event wait time, in seconds. We'll loop WAIT_REPEAT times so that the thread exits faster when the
-    # backend is shut down.
-    WAIT_TIMEOUT = 120.0
-
     def __init__(self, backend):
-        super().__init__(name='source inspector')
-        # Thread control event
-        self.end_event = threading.Event()
+        super().__init__()
         # The backend, whose support functions we invoke:
         self.backend = backend
         # (Re-)Inspection state:
@@ -67,71 +48,51 @@ class Inspector(threading.Thread):
         self.cabal_to_load = LockedObject.LockedObject([])
         self.dirty_files = LockedObject.LockedObject([])
         self.dirty_paths = LockedObject.LockedObject([])
-        self.reinspect_event = threading.Event()
 
-    def run(self):
-        self.end_event.clear()
-        while not self.end_event.is_set():
-            if not self.backend.ping():
-                Logging.log('source inspector ping: no positive backend response', Logging.LOG_WARNING)
+    def do_inspection(self):
+        scan_paths = []
+        with self.dirty_paths as dirty_paths:
+            scan_paths = dirty_paths[:]
+            dirty_paths[:] = []
 
-            scan_paths = []
-            with self.dirty_paths as dirty_paths:
-                scan_paths = dirty_paths[:]
-                dirty_paths[:] = []
+        files_to_reinspect = []
+        with self.dirty_files as dirty_files:
+            files_to_reinspect = dirty_files[:]
+            dirty_files[:] = []
 
-            files_to_reinspect = []
-            with self.dirty_files as dirty_files:
-                files_to_reinspect = dirty_files[:]
-                dirty_files[:] = []
+        projects = []
+        files = []
 
+        if len(files_to_reinspect) > 0:
             projects = []
             files = []
+            for finspect in files_to_reinspect:
+                projdir = Common.get_cabal_project_dir_of_file(finspect)
+                if projdir is not None:
+                    projects.append(projdir)
+                else:
+                    files.append(finspect)
 
-            if len(files_to_reinspect) > 0:
-                projects = []
-                files = []
-                for finspect in files_to_reinspect:
-                    projdir = Common.get_cabal_project_dir_of_file(finspect)
-                    if projdir is not None:
-                        projects.append(projdir)
-                    else:
-                        files.append(finspect)
+        projects = list(set(projects))
+        files = list(set(files))
 
-            projects = list(set(projects))
-            files = list(set(files))
+        self.inspect(paths=scan_paths, projects=projects, files=files)
 
-            self.inspect(paths=scan_paths, projects=projects, files=files)
+        load_cabal = []
+        with self.cabal_to_load as cabal_to_load:
+            load_cabal = cabal_to_load[:]
+            cabal_to_load[:] = []
 
-            load_cabal = []
-            with self.cabal_to_load as cabal_to_load:
-                load_cabal = cabal_to_load[:]
-                cabal_to_load[:] = []
+        for cabal in load_cabal:
+            Utils.run_async('inspect cabal {0}'.format(cabal), self.inspect_cabal, cabal)
 
-            for cabal in load_cabal:
-                Utils.run_async('inspect cabal {0}'.format(cabal), self.inspect_cabal, cabal)
+        if files_to_reinspect and Settings.PLUGIN.enable_hdocs:
+            self.backend.docs(files=files_to_reinspect)
 
-            if files_to_reinspect and Settings.PLUGIN.enable_hdocs:
-                self.backend.docs(files=files_to_reinspect)
-
-            self.reinspect_event.wait(Inspector.WAIT_TIMEOUT)
-            self.reinspect_event.clear()
-
-    def terminate(self):
-        self.end_event.set()
-        # Break out of the wait.
-        self.reinspect_event.set()
-
-    @dirty
-    def force_inspect(self):
-        self.reinspect_event.set()
-
-    @dirty
     def start_inspect(self):
         self.mark_cabal()
         self.mark_all_files()
 
-    @dirty
     @use_inspect_modules
     def mark_all_files(self):
         for window in sublime.windows():
@@ -140,14 +101,12 @@ class Inspector(threading.Thread):
             with self.dirty_paths as dirty_paths:
                 dirty_paths.extend(window.folders())
 
-    @dirty
     @use_inspect_modules
     def mark_file_dirty(self, filename):
         if filename is not None:
             with self.dirty_files as dirty_files:
                 dirty_files.append(filename)
 
-    @dirty
     def mark_cabal(self, cabal_name=None):
         with self.cabal_to_load as cabal_to_load:
             cabal_to_load.append(cabal_name or 'cabal')

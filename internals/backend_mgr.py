@@ -51,7 +51,7 @@ class BackendManager(object, metaclass=Utils.Singleton):
         super().__init__()
         self.state = BackendManager.INITIAL
         self.state_lock = threading.RLock()
-        self.src_inspector = None
+        self.src_inspector = Inspector.Inspector(Backend.NullHaskellBackend(self))
 
     def initialize(self):
         BackendManager.ACTIVE_BACKEND = None
@@ -130,13 +130,10 @@ class BackendManager(object, metaclass=Utils.Singleton):
                 return
 
         if self.current_state(BackendManager.CONNECT):
-            # Start the source inspector
-            with self.state_lock:
-                self.src_inspector = Inspector.Inspector(backend)
-                self.src_inspector.start()
-                Logging.log('Inspector started.', Logging.LOG_DEBUG)
-
-                self.src_inspector.start_inspect()
+            self.src_inspector = Inspector.Inspector(backend)
+            Utils.run_async('BackendManager: start inspection', self.src_inspector.start_inspect)
+            Utils.run_async('BackendManager: do inspection', self.src_inspector.do_inspection)
+            Logging.log('Inspector started.', Logging.LOG_DEBUG)
             self.set_state(BackendManager.ACTIVE)
 
     def shutdown_backend(self):
@@ -152,11 +149,7 @@ class BackendManager(object, metaclass=Utils.Singleton):
             self.set_state(BackendManager.SHUTDOWN)
             # Ask the source inspector to terminate -- shutting down the backend takes longer, which means we'll spend
             # less time in join()
-            self.src_inspector.terminate()
             backend.stop_backend()
-            while self.src_inspector.is_alive():
-                self.src_inspector.join(1.500)
-            self.src_inspector = None
 
         if self.current_state(BackendManager.SHUTDOWN):
             # Paranoia: If we're shut down, assume no backend... :-)
