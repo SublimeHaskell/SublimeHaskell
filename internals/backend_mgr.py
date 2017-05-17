@@ -52,43 +52,54 @@ class BackendManager(object, metaclass=Utils.Singleton):
         self.state = BackendManager.INITIAL
         self.state_lock = threading.RLock()
         self.src_inspector = Inspector.Inspector(Backend.NullHaskellBackend(self))
+        self.current_backend_name = Backend.NullHaskellBackend.backend_name()
+        self.possible_backends = {}
+
+        usable_backends = self.available_backends()
+        if len(usable_backends) > 0:
+            # Take first available because DEFAULT_KNOWN_BACKENDS are listed in order of priority...
+            self.possible_backends = self.down_select(Settings.PLUGIN.backends, usable_backends)
+
+            print('Available backends: {0}'.format([clazz.backend_name() for clazz in usable_backends]))
+            print('plugin \'backends\' {0}'.format([name for name in Settings.PLUGIN.backends]))
+            print('Possible/usable backends: {0}'.format([name for name in self.possible_backends]))
+
+            def_backend, n_defaults = self.get_default_backend(self.possible_backends)
+            if n_defaults == 0:
+                sublime.message_dialog('No default backend found. Proceeding without a backend.')
+            else:
+                if n_defaults > 1:
+                    sublime.message_dialog('Multiple default backends detected. Using {0}.'.format(def_backend))
+                self.current_backend_name = def_backend
+        else:
+            # Yell at luser.
+            sublime.message_dialog('\n'.join(['No usable backends (hsdev, ghc-mod) found on PATH or',
+                                              'in the standard Haskell cabal and stack installation',
+                                              'places.',
+                                              '',
+                                              'Please check or update your SublimeHaskell user settings,',
+                                              'or install hsdev or ghc-mod.',
+                                              '',
+                                              'Proceeding without a backend.']))
 
     def initialize(self):
         BackendManager.ACTIVE_BACKEND = None
         self.state = BackendManager.INITIAL
 
-        usable_backends = self.available_backends()
-        if len(usable_backends) > 0:
-            print('Available backends: {0}'.format(list(map(lambda clazz: clazz.backend_name(), usable_backends))))
-            # Take first available because DEFAULT_KNOWN_BACKENDS are listed in order of priority...
-            poss_backends = self.down_select(Settings.PLUGIN.backends, usable_backends)
-            def_backend, n_defaults = self.get_default_backend(poss_backends)
-            the_backend = None
-            if n_defaults == 0:
-                sublime.message_dialog('No default backend found. Proceeding without a backend.')
-                the_backend = Backend.NullHaskellBackend(self)
-            else:
-                if n_defaults > 1:
-                    sublime.message_dialog('Multiple default backends detected. Using {0}.'.format(def_backend))
+        Logging.log('Starting backend \'{0}\''.format(self.current_backend_name), Logging.LOG_INFO)
+        the_backend = self.make_backend(self.possible_backends[self.current_backend_name].get('backend'),
+                                        self.possible_backends[self.current_backend_name].get('options', {}))
 
-                Logging.log('Starting backend \'{0}\''.format(def_backend), Logging.LOG_INFO)
-                backend_clazz = self.BACKEND_META[poss_backends[def_backend].get('backend')]
-                the_backend = backend_clazz(self, **poss_backends[def_backend].get('options', {}))
-
-            if the_backend is not None:
+        if the_backend is not None:
+            with self.state_lock:
                 self.go_active(the_backend)
-
-                with self.state_lock:
-                    if self.current_state(BackendManager.ACTIVE):
-                        BackendManager.ACTIVE_BACKEND = the_backend
-                    elif self.current_state(BackendManager.INITIAL):
-                        BackendManager.ACTIVE_BACKEND = Backend.NullHaskellBackend(self)
-                    else:
-                        state_str = BackendManager.STATES_TO_NAME.get(self.state, str(self.state))
-                        Logging.log('BackendManager: Invalid state after go_active: {0}'.format(state_str), Logging.LOG_ERROR)
-        else:
-            # Yell at luser.
-            print('No backends found.')
+                if self.current_state(BackendManager.ACTIVE):
+                    BackendManager.ACTIVE_BACKEND = the_backend
+                elif self.current_state(BackendManager.INITIAL):
+                    BackendManager.ACTIVE_BACKEND = Backend.NullHaskellBackend(self)
+                else:
+                    state_str = BackendManager.STATES_TO_NAME.get(self.state, str(self.state))
+                    Logging.log('BackendManager: Invalid state after go_active: {0}'.format(state_str), Logging.LOG_ERROR)
 
     def available_backends(self):
         '''Determine which backends are actually available. Whether a backend is available is backend-specific, usually the
@@ -100,7 +111,8 @@ class BackendManager(object, metaclass=Utils.Singleton):
         '''Filter down user-requested backends using the available backends.
         '''
         backend_names = [b.backend_name() for b in avail_backends]
-        return dict([(name, user_backends[name]) for name in user_backends if user_backends[name]['backend'] in backend_names])
+        return dict([(name, user_backends[name]) for name in user_backends
+                     if user_backends[name].get('backend', '') in backend_names])
 
     def get_default_backend(self, user_backends):
         retval = None
@@ -117,37 +129,53 @@ class BackendManager(object, metaclass=Utils.Singleton):
 
         return (retval, n_defaults)
 
+    def make_backend(self, backend_name, options):
+        backend_clazz = self.BACKEND_META.get(backend_name, None)
+        if backend_clazz is not None:
+            return backend_clazz(self, **options)
+        else:
+            return None
+
+    def change_current_backend(self, new_backend_name):
+        the_backend = self.possible_backends.get(new_backend_name, None)
+        if the_backend is not None:
+            self.shutdown_backend()
+            self.current_backend_name = new_backend_name
+            new_backend = self.make_backend(the_backend['backend'], the_backend.get('options', {}))
+            self.go_active(new_backend)
+
     def go_active(self, backend):
         '''Walk through the state phases (INITIAL -> STARTUP -> CONNECT -> ACTIVE) to startup and connect a backend.
         '''
-        if self.current_state(BackendManager.INITIAL):
-            self.set_state(BackendManager.STARTUP)
-            successful_startup = False
-            try:
-                successful_startup = backend.start_backend()
-            finally:
-                if not successful_startup:
-                    self.set_state(BackendManager.INITIAL)
-                else:
-                    # Not sure how the code would do anything but transition from INITIAL to STARTUP (i.e., come into the
-                    # function in the STARTUP state...)
-                    self.set_state(BackendManager.CONNECT)
-                    successful_connect = False
-                    try:
-                        successful_connect = backend.connect_backend()
-                    finally:
-                        if not successful_connect:
-                            self.set_state(BackendManager.SHUTDOWN)
-                            try:
-                                backend.shutdown_backend()
-                            finally:
-                                self.set_state(BackendManager.INITIAL)
-                        else:
-                            self.src_inspector = Inspector.Inspector(backend)
-                            Utils.run_async('BackendManager: start inspection', self.src_inspector.start_inspect)
-                            Utils.run_async('BackendManager: do inspection', self.src_inspector.do_inspection)
-                            Logging.log('Inspector started.', Logging.LOG_DEBUG)
-                            self.set_state(BackendManager.ACTIVE)
+        with self.state_lock:
+            if self.current_state(BackendManager.INITIAL):
+                self.set_state(BackendManager.STARTUP)
+                successful_startup = False
+                try:
+                    successful_startup = backend.start_backend()
+                finally:
+                    if not successful_startup:
+                        self.set_state(BackendManager.INITIAL)
+                    else:
+                        # Not sure how the code would do anything but transition from INITIAL to STARTUP (i.e., come into the
+                        # function in the STARTUP state...)
+                        self.set_state(BackendManager.CONNECT)
+                        successful_connect = False
+                        try:
+                            successful_connect = backend.connect_backend()
+                        finally:
+                            if not successful_connect:
+                                self.set_state(BackendManager.SHUTDOWN)
+                                try:
+                                    self.shutdown_backend()
+                                finally:
+                                    self.set_state(BackendManager.INITIAL)
+                            else:
+                                self.src_inspector = Inspector.Inspector(backend)
+                                Utils.run_async('BackendManager: start inspection', self.src_inspector.start_inspect)
+                                Utils.run_async('BackendManager: do inspection', self.src_inspector.do_inspection)
+                                Logging.log('Inspector started.', Logging.LOG_DEBUG)
+                                self.set_state(BackendManager.ACTIVE)
 
     def shutdown_backend(self):
         '''Step through the backend shutdown process: disconnect (if active), stop backend (if disconnected). Backend

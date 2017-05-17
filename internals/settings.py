@@ -26,7 +26,7 @@ def access_sync(lock_name):
         return synced_method
     return decorator
 
-KEY_BACKEND_DEBUG = 'backend_debug'
+KEY_COMPONENT_DEBUG_DEBUG = 'backend_debug'
 
 class SettingsContainer(object):
     """Container object for default and user preference settings."""
@@ -46,7 +46,7 @@ class SettingsContainer(object):
         'auto_completion_popup': ('auto_completion_popup', False),
         'auto_run_tests': ('auto_run_tests', True),
         'backends': ('backends', {}),
-        KEY_BACKEND_DEBUG: ('backend_debug', []),
+        KEY_COMPONENT_DEBUG_DEBUG: ('backend_debug', []),
         'enable_auto_build': ('enable_auto_build', False),
         'enable_auto_check': ('enable_auto_check', True),
         'enable_auto_lint': ('enable_auto_lint', True),
@@ -149,8 +149,8 @@ class SettingsContainer(object):
         if oldval != newval:
             # Only acquire the lock when we really need it.
             with self.wlock:
-                if key == KEY_BACKEND_DEBUG:
-                    BACKEND.load(newval)
+                if key == KEY_COMPONENT_DEBUG_DEBUG:
+                    COMPONENT_DEBUG.load(newval)
                 else:
                     setattr(self, attr, newval)
                 with self.changes as changes:
@@ -188,7 +188,7 @@ def set_project_setting(view, key, value):
     view.window().project_data().set(key, value)
 
 
-class BackendDebug(object):
+class ComponentDebug(object):
     '''Convenience container for backend debugging settings.
     '''
     def __init__(self):
@@ -209,14 +209,14 @@ class BackendDebug(object):
 
 
 PLUGIN = SettingsContainer()
-BACKEND = BackendDebug()
+COMPONENT_DEBUG = ComponentDebug()
 
 def load_settings():
     '''Instantiate the SettingsContainer module instance, which happens as part of the module loading in the
     main thread. Across reloads, though, try to keep the update triggers.
     '''
     global PLUGIN
-    global BACKEND
+    global COMPONENT_DEBUG
 
     _changes = None
     if 'PLUGIN' in globals():
@@ -225,10 +225,10 @@ def load_settings():
             _changes = _plugin.changes
 
     PLUGIN = SettingsContainer()
-    BACKEND = BackendDebug()
+    COMPONENT_DEBUG = ComponentDebug()
 
     PLUGIN.load()
-    BACKEND.load(PLUGIN.backend_debug or [])
+    COMPONENT_DEBUG.load(PLUGIN.backend_debug or [])
 
     if _changes is not None:
         PLUGIN.changes = _changes

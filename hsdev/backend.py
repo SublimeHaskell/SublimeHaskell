@@ -152,11 +152,11 @@ class HsDevBackend(Backend.HaskellBackend):
     def stop_backend(self):
         if self.is_local_hsdev:
             try:
-                self.hsdev_process.process.wait(60.0)
+                self.hsdev_process.process.wait(90.0)
             except subprocess.TimeoutExpired:
                 sublime.message_dialog('\n'.join(['Time out waiting for \'hsdev\' process to terminate.',
                                                   '',
-                                                  'You may have to kill this process manually from a terminal or'
+                                                  'You may have to kill this process manually from a terminal or',
                                                   'console window\'s command line.']))
 
     def is_live_backend(self):
@@ -480,7 +480,7 @@ class HsDevBackend(Backend.HaskellBackend):
         return self.list_command('ghc eval', {'exprs': exprs, 'file': the_file}, **backend_args)
 
     def exit(self):
-        return self.async_command('exit', {})
+        return self.command('exit', {})
 
 class HsDevStartupReader(threading.Thread):
     '''Separate thread object that reads the local `hsdev` server's `stdout` looking for the server's startup

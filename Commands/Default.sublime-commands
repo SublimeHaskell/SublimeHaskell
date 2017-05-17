@@ -181,6 +181,10 @@
         "command": "sublime_haskell_auto_fix"
     },
     {
+        "caption": "SublimeHaskell: Choose/change backend",
+        "command": "sublime_haskell_choose_backend"
+    },
+    {
         "caption": "SublimeHaskell: Start backend",
         "command": "sublime_haskell_start_backend"
     },

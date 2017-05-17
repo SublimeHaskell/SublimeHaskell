@@ -169,7 +169,18 @@ class HaskellBackend(object):
     def exit(self):
         raise NotImplementedError("HaskellBackend.exit needs an implementation.")
 
-# zzpylint: disable=W0613
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+    # Async dispatch functions:
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+    def dispatch_callbacks(self, resp, **kwargs):
+        on_response = kwargs.pop('on_response', None)
+        if on_response is not None:
+            return on_response(resp)
+        else:
+            return resp
+
+# ylint: disable=W0613
 
 class NullHaskellBackend(HaskellBackend, metaclass=Utils.Singleton):
     ''' For Haskellers: The Identity Backend. For ordinary mortals, this is the null, do-nothing Haskell backend. It does
@@ -213,17 +224,6 @@ class NullHaskellBackend(HaskellBackend, metaclass=Utils.Singleton):
         '''The NullHaskellBackend is never alive.
         '''
         return False
-
-    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
-    # Async dispatch functions:
-    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
-
-    def dispatch_callbacks(self, resp, **kwargs):
-        on_response = kwargs.pop('on_response', None)
-        if on_response is not None:
-            return on_response(resp)
-        else:
-            return resp
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # API/action functions:

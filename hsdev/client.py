@@ -223,7 +223,7 @@ class HsDevClient(object):
             try:
                 # Ensure that get() will return when the backend is shutting down.
                 resp = self.request_q.get(True, 5.0)
-                if Settings.BACKEND.all_messages or Settings.BACKEND.recv_messages:
+                if Settings.COMPONENT_DEBUG.all_messages or Settings.COMPONENT_DEBUG.recv_messages:
                     print(u'HsDevClient.receiver resp:')
                     pprint.pprint(resp)
 
@@ -240,17 +240,17 @@ class HsDevClient(object):
                             if callbacks is not None:
                                 finished_request = False
                                 if 'notify' in resp:
-                                    if Settings.BACKEND.callbacks:
+                                    if Settings.COMPONENT_DEBUG.callbacks:
                                         print('id {0}: notify callback'.format(resp_id))
                                     callbacks.call_notify(resp['notify'])
                                 if 'error' in resp:
-                                    if Settings.BACKEND.callbacks:
+                                    if Settings.COMPONENT_DEBUG.callbacks:
                                         print('id {0}: error callback'.format(resp_id))
                                     err = resp.pop("error")
                                     callbacks.call_error(err, resp)
                                     finished_request = True
                                 if 'result' in resp:
-                                    if Settings.BACKEND.callbacks:
+                                    if Settings.COMPONENT_DEBUG.callbacks:
                                         print('id {0}: result callback'.format(resp_id))
                                     callbacks.call_response(resp['result'])
                                     finished_request = True
@@ -298,7 +298,7 @@ class HsDevClient(object):
         self.setup_receive_callbacks(req_serial, args_cmd, client_call_response, on_notify, client_call_error, opts)
 
         call_cmd = u'HsDevClient.call[{0}] cmd \'{1}\' opts\n{2}'.format(req_serial, command, pprint.pformat(opts))
-        if Settings.BACKEND.all_messages or Settings.BACKEND.send_messages:
+        if Settings.COMPONENT_DEBUG.all_messages or Settings.COMPONENT_DEBUG.send_messages:
             print(call_cmd)
 
         try:
@@ -316,7 +316,7 @@ class HsDevClient(object):
                         # Delete the request; result_dict will still have nothing in it (presumably)
                         del requests[req_serial]
 
-            if Settings.BACKEND.socket_pool:
+            if Settings.COMPONENT_DEBUG.socket_pool:
                 with self.request_map as request_map:
                     print('id {0} request_map {1} queue {2}'.format(req_serial, len(request_map), self.request_q.qsize()))
 

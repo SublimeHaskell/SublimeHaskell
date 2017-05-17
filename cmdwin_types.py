@@ -8,7 +8,7 @@ import sublime_plugin
 
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.backend_mgr as BackendMgr
-import SublimeHaskell.internals.logging as Logging
+# import SublimeHaskell.internals.logging as Logging
 
 
 class SublimeHaskellWindowCommand(sublime_plugin.WindowCommand):

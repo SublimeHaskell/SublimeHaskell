@@ -34,18 +34,10 @@ EXPORT_MODULE_RE = re.compile(r'\bmodule\s+[\w\d\.]*$')
 # Gets available LANGUAGE options and import modules from ghc-mod
 def get_language_pragmas():
     return BackendManager.active_backend().langs()
-    # elif Settings.PLUGIN.enable_ghc_mod:
-    #     return GHCIMod.call_ghcmod_and_wait(['lang']).splitlines()
-    # else:
-    #     return []
 
 
 def get_flags_pragmas():
     return BackendManager.active_backend().flags()
-    # elif Settings.PLUGIN.enable_ghc_mod:
-    #     return GHCIMod.call_ghcmod_and_wait(['flag']).splitlines()
-    # else:
-    #     return []
 
 
 def sort_completions(comps):
@@ -180,7 +172,7 @@ class AutoCompleter(object):
     def init_completions_async(self):
         window = sublime.active_window()
         view = window.active_view() if window else None
-        if view and Common.is_haskell_source(view):
+        if view is not None and Common.is_haskell_source(view):
             filename = view.file_name()
             if filename:
                 self.get_completions_async(filename)

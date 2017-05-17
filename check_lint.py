@@ -132,7 +132,7 @@ class SublimeHaskellHsDevChain(CommandWin.SublimeHaskellTextCommand):
         sublime.set_timeout(lambda: ParseOutput.mark_messages_in_views(output_messages), 0)
 
     def is_enabled(self):
-        return Common.is_haskell_source(None)
+        return Common.is_haskell_source(None) and super().is_enabled()
 
 
 def ghcmod_command(cmdname):
@@ -182,7 +182,7 @@ class SublimeHaskellGhcModCheck(CommandWin.SublimeHaskellWindowCommand):
         run_ghcmod(['check'], 'Checking')
 
     def is_enabled(self):
-        return Common.is_haskell_source(None)
+        return Common.is_haskell_source(None) and super().is_enabled()
 
 
 class SublimeHaskellGhcModLint(CommandWin.SublimeHaskellWindowCommand):
@@ -190,7 +190,7 @@ class SublimeHaskellGhcModLint(CommandWin.SublimeHaskellWindowCommand):
         run_ghcmod(['lint', '-h', '-u'], 'Linting', lint_as_hints)
 
     def is_enabled(self):
-        return Common.is_haskell_source(None)
+        return Common.is_haskell_source(None) and super().is_enabled()
 
 
 class SublimeHaskellGhcModCheckAndLint(CommandWin.SublimeHaskellWindowCommand):
@@ -198,7 +198,7 @@ class SublimeHaskellGhcModCheckAndLint(CommandWin.SublimeHaskellWindowCommand):
         run_ghcmods([['check'], ['lint', '-h', '-u']], 'Checking and Linting', lint_as_hints)
 
     def is_enabled(self):
-        return Common.is_haskell_source(None)
+        return Common.is_haskell_source(None) and super().is_enabled()
 
 
 def run_ghcmods(cmds, msg, alter_messages_cb=None):

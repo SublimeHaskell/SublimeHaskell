@@ -8,28 +8,26 @@ import sublime
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.proc_helper as ProcHelper
-import SublimeHaskell.parseoutput as ParseOutput
+# import SublimeHaskell.parseoutput as ParseOutput
 
 def ghci_package_db(cabal=None):
-    if not cabal or cabal == 'cabal':
-        return None
-    package_conf = (filter(lambda x: re.match(r'packages-(.*)\.conf', x), os.listdir(cabal)) + [None])[0]
-    if package_conf:
-        return os.path.join(cabal, package_conf)
+    if cabal is not None and cabal != 'cabal':
+        package_conf = [pkg for pkg in os.listdir(cabal) if re.match(r'packages-(.*)\.conf', pkg)]
+        if package_conf:
+            return os.path.join(cabal, package_conf)
+
     return None
 
 
-def get_ghc_opts(filename=None, add_package_db=True, cabal=None):
+def get_ghc_opts(filename, add_package_db=True, cabal=None):
     """
     Gets ghc_opts, used in several tools, as list with extra '-package-db' option and '-i' option if filename passed
     """
-    ghc_opts = Settings.PLUGIN.ghc_opts
-    if not ghc_opts:
-        ghc_opts = []
+    ghc_opts = Settings.PLUGIN.ghc_opts or []
     if add_package_db:
         package_db = ghci_package_db(cabal=cabal)
-        if package_db:
-            ghc_opts.append('-package-db {0}'.format(package_db))
+        for pkgdb in package_db or []:
+            ghc_opts.append('-package-db {0}'.format(pkgdb))
 
     if filename:
         ghc_opts.append('-i {0}'.format(ProcHelper.get_source_dir(filename)))
@@ -99,11 +97,13 @@ def ghcmod_type(filename, module_name, line, column, cabal=None):
     return call_ghcmod_and_wait(['type', filename, module_name, str(line), str(column)], filename=filename, cabal=cabal)
 
 
-def ghcmod_info(filename, module_name, symbol_name, cabal=None):
-    """
-    Uses ghc-mod info filename module_name symbol_name to get symbol info
-    """
-    contents = call_ghcmod_and_wait(['info', filename, module_name, symbol_name], filename=filename, cabal=cabal)
-    # TODO: Returned symbol doesn't contain location
-    # But in fact we use ghcmod_info only to retrieve type of symbol
-    return ParseOutput.parse_info(symbol_name, contents)
+## Unreferenced function:
+##
+# def ghcmod_info(filename, module_name, symbol_name, cabal=None):
+#     """
+#     Uses ghc-mod info filename module_name symbol_name to get symbol info
+#     """
+#     contents = call_ghcmod_and_wait(['info', filename, module_name, symbol_name], filename=filename, cabal=cabal)
+#     # TODO: Returned symbol doesn't contain location
+#     # But in fact we use ghcmod_info only to retrieve type of symbol
+#     return ParseOutput.parse_info(symbol_name, contents)
