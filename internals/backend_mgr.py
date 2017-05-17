@@ -63,22 +63,29 @@ class BackendManager(object, metaclass=Utils.Singleton):
             # Take first available because DEFAULT_KNOWN_BACKENDS are listed in order of priority...
             poss_backends = self.down_select(Settings.PLUGIN.backends, usable_backends)
             def_backend, n_defaults = self.get_default_backend(poss_backends)
-            if n_defaults > 1:
-                sublime.message_dialog('Multiple default backends detected. Using {0}.'.format(def_backend))
+            the_backend = None
+            if n_defaults == 0:
+                sublime.message_dialog('No default backend found. Proceeding without a backend.')
+                the_backend = Backend.NullHaskellBackend(self)
+            else:
+                if n_defaults > 1:
+                    sublime.message_dialog('Multiple default backends detected. Using {0}.'.format(def_backend))
 
-            Logging.log('Starting backend \'{0}\''.format(def_backend))
-            backend_clazz = self.BACKEND_META[poss_backends[def_backend].get('backend')]
-            the_backend = backend_clazz(self, **poss_backends[def_backend].get('options', {}))
-            self.go_active(the_backend)
+                Logging.log('Starting backend \'{0}\''.format(def_backend), Logging.LOG_INFO)
+                backend_clazz = self.BACKEND_META[poss_backends[def_backend].get('backend')]
+                the_backend = backend_clazz(self, **poss_backends[def_backend].get('options', {}))
 
-            with self.state_lock:
-                if self.current_state(BackendManager.ACTIVE):
-                    BackendManager.ACTIVE_BACKEND = the_backend
-                elif self.current_state(BackendManager.INITIAL):
-                    BackendManager.ACTIVE_BACKEND = Backend.NullHaskellBackend(self)
-                else:
-                    state_str = BackendManager.STATES_TO_NAME.get(self.state, str(self.state))
-                    Logging.log('BackendManager: Invalid state after go_active: {0}'.format(state_str), Logging.LOG_ERROR)
+            if the_backend is not None:
+                self.go_active(the_backend)
+
+                with self.state_lock:
+                    if self.current_state(BackendManager.ACTIVE):
+                        BackendManager.ACTIVE_BACKEND = the_backend
+                    elif self.current_state(BackendManager.INITIAL):
+                        BackendManager.ACTIVE_BACKEND = Backend.NullHaskellBackend(self)
+                    else:
+                        state_str = BackendManager.STATES_TO_NAME.get(self.state, str(self.state))
+                        Logging.log('BackendManager: Invalid state after go_active: {0}'.format(state_str), Logging.LOG_ERROR)
         else:
             # Yell at luser.
             print('No backends found.')
@@ -96,17 +103,17 @@ class BackendManager(object, metaclass=Utils.Singleton):
         return dict([(name, user_backends[name]) for name in user_backends if user_backends[name]['backend'] in backend_names])
 
     def get_default_backend(self, user_backends):
-        retval = ''
+        retval = None
         n_defaults = 0
         for name in user_backends:
             args = user_backends.get(name)
             if args.get('default', False):
                 n_defaults = n_defaults + 1
-                if retval == '':
+                if retval is None:
                     retval = name
         if retval == '':
-            # Huh. No default backend? Use the first key in the dictionary.
-            retval = list(user_backends.keys())[0]
+            # Huh. No default backend?
+            retval = None
 
         return (retval, n_defaults)
 
@@ -115,26 +122,32 @@ class BackendManager(object, metaclass=Utils.Singleton):
         '''
         if self.current_state(BackendManager.INITIAL):
             self.set_state(BackendManager.STARTUP)
-            if not backend.start_backend():
-                self.set_state(BackendManager.INITIAL)
-                return
-
-        # Not sure how the code would do anything but transition from INITIAL to STARTUP (i.e., come into the function
-        # in the STARTUP state...)
-        if self.current_state(BackendManager.STARTUP):
-            self.set_state(BackendManager.CONNECT)
-            if not backend.connect_backend():
-                self.set_state(BackendManager.SHUTDOWN)
-                backend.shutdown_backend()
-                self.set_state(BackendManager.INITIAL)
-                return
-
-        if self.current_state(BackendManager.CONNECT):
-            self.src_inspector = Inspector.Inspector(backend)
-            Utils.run_async('BackendManager: start inspection', self.src_inspector.start_inspect)
-            Utils.run_async('BackendManager: do inspection', self.src_inspector.do_inspection)
-            Logging.log('Inspector started.', Logging.LOG_DEBUG)
-            self.set_state(BackendManager.ACTIVE)
+            successful_startup = False
+            try:
+                successful_startup = backend.start_backend()
+            finally:
+                if not successful_startup:
+                    self.set_state(BackendManager.INITIAL)
+                else:
+                    # Not sure how the code would do anything but transition from INITIAL to STARTUP (i.e., come into the
+                    # function in the STARTUP state...)
+                    self.set_state(BackendManager.CONNECT)
+                    successful_connect = False
+                    try:
+                        successful_connect = backend.connect_backend()
+                    finally:
+                        if not successful_connect:
+                            self.set_state(BackendManager.SHUTDOWN)
+                            try:
+                                backend.shutdown_backend()
+                            finally:
+                                self.set_state(BackendManager.INITIAL)
+                        else:
+                            self.src_inspector = Inspector.Inspector(backend)
+                            Utils.run_async('BackendManager: start inspection', self.src_inspector.start_inspect)
+                            Utils.run_async('BackendManager: do inspection', self.src_inspector.do_inspection)
+                            Logging.log('Inspector started.', Logging.LOG_DEBUG)
+                            self.set_state(BackendManager.ACTIVE)
 
     def shutdown_backend(self):
         '''Step through the backend shutdown process: disconnect (if active), stop backend (if disconnected). Backend
@@ -225,3 +238,7 @@ def inspector():
 
 def lost_connection():
     return BackendManager().lost_connection()
+
+def ensure_backend():
+    if BackendManager().current_state(BackendManager.INITIAL):
+        BackendManager().initialize()

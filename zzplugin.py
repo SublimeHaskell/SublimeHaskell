@@ -43,19 +43,17 @@ def need_backend(fn_needing_backend):
     '''A class method decorator that will start a SublimeHaskell backend because the wrapped function requires one.
     '''
     def boot_backend_when_needed(self, *args, **kwargs):
-        if BackendManager.BackendManager().current_state(BackendManager.BackendManager.INITIAL):
-            BackendManager.BackendManager().initialize()
+        BackendManager.ensure_backend()
         return fn_needing_backend(self, *args, **kwargs)
     return boot_backend_when_needed
 
 
 def ensure_backend_async(fn_name, fn_needing_backend, *args, **kwargs):
-    '''A method decorator that will start a SublimeHaskell backend because the wrapped function requires one.
+    '''Ensures that a SublimeHaskell backend exists
     '''
     def ensure_backend_booted():
-        if BackendManager.BackendManager().current_state(BackendManager.BackendManager.INITIAL):
-            BackendManager.BackendManager().initialize()
-            fn_needing_backend(*args, **kwargs)
+        BackendManager.ensure_backend()
+        return fn_needing_backend(*args, **kwargs)
 
     Utils.run_async(fn_name, ensure_backend_booted)
 
@@ -86,6 +84,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
     def on_load(self, view):
         if Settings.BACKEND.event_viewer:
             print('{0} invoked.'.format(type(self).__name__ + ".on_load"))
+
         filename = view.file_name()
         if filename:
             if Settings.PLUGIN.use_improved_syntax:
@@ -99,24 +98,26 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
                 # Defer booting the backend until absolutely necessary
                 ensure_backend_async('on_load: inspect source', self.rescan_source, filename)
 
-    @need_backend
     def on_post_save(self, view):
         if Settings.BACKEND.event_viewer:
             print('{0} invoked.'.format(type(self).__name__ + ".on_post_save"))
         filename = view.file_name()
         if filename:
             if Common.is_inspected_source(view):
-                Utils.run_async('on_post_save: inspect source', self.rescan_source, filename)
+                ensure_backend_async('on_post_save: inspect source', self.rescan_source, filename)
+
             if Common.is_haskell_source(view):
                 Types.SourceHaskellTypeCache().remove(filename)
+                BackendManager.ensure_backend()
                 self.trigger_build(view)
 
-    @need_backend
     def on_modified(self, view):
         if Settings.BACKEND.event_viewer:
             print('{0} invoked.'.format(type(self).__name__ + ".on_modified"))
+
         filename = view.file_name()
         if filename and Common.is_haskell_source(view):
+            BackendManager.ensure_backend()
             if Settings.PLUGIN.lint_check_fly:
                 self.fly(view)
             Types.SourceHaskellTypeCache().remove(filename)
