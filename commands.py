@@ -411,12 +411,9 @@ class SublimeHaskellGoToHackageModule(CommandWin.BackendTextCommand):
 
 class SublimeHaskellReinspectAll(CommandWin.BackendWindowCommand):
     def run(self):
-        if BackendManager.is_live_backend():
-            Logging.log('reinspect all', Logging.LOG_TRACE)
-            BackendManager.inspector().start_inspect()
-            BackendManager.inspector().do_inspection()
-        else:
-            Common.show_status_message("inspector not connected", is_ok=False)
+        Logging.log('reinspect all', Logging.LOG_TRACE)
+        BackendManager.inspector().start_inspect()
+        BackendManager.inspector().do_inspection()
 
 class SublimeHaskellInferDocs(CommandWin.BackendTextCommand):
     """

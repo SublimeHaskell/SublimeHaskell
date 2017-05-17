@@ -78,21 +78,16 @@ class SublimeHaskellHsDevChain(CommandWin.SublimeHaskellTextCommand):
                 self.contents[self.filename] = self.view.substr(sublime.Region(0, self.view.size()))
             if not self.fly_mode:
                 ParseOutput.hide_output(self.view)
-                if not BackendMgr.is_live_backend():
-                    Logging.log('hsdev chain fails: hsdev not connected', Logging.LOG_ERROR)
-                    sublime.error_message('check_lint.run_chain: Cannot execute command chain, hsdev not connected.')
+                if cmds:
+                    self.status_msg = Common.status_message_process(msg + ': ' + self.filename, priority=2)
+                    self.status_msg.start()
+                    self.go_chain(cmds)
                 else:
-                    if cmds:
-                        self.status_msg = Common.status_message_process(msg + ': ' + self.filename, priority=2)
-                        self.status_msg.start()
-                        self.go_chain(cmds)
-                    else:
-                        sublime.error_message('Empty command chain (check_lint.run_chain)')
+                    sublime.error_message('Empty command chain (check_lint.run_chain)')
 
     def go_chain(self, cmds):
         if not cmds:
             self.status_msg.stop()
-            Logging.log('go_chain complete, autofix_show', Logging.LOG_DEBUG)
             BackendMgr.active_backend().autofix_show(self.msgs, on_response=self.on_autofix)
         else:
             cmd, tail_cmds = cmds[0], cmds[1:]
@@ -103,7 +98,7 @@ class SublimeHaskellHsDevChain(CommandWin.SublimeHaskellTextCommand):
                 self.msgs.extend(msgs)
                 self.go_chain(tail_cmds)
 
-            def go_chain_err(_err, details):
+            def go_chain_err(_err, _details):
                 self.status_msg.fail()
                 self.go_chain([])
 
@@ -143,15 +138,12 @@ class SublimeHaskellHsDevChain(CommandWin.SublimeHaskellTextCommand):
 def ghcmod_command(cmdname):
     def wrap(outer_fn):
         def wrapper(self, *args, **kwargs):
-            if BackendMgr.is_live_backend():
-                Logging.log("Invoking '{0}' command via backend".format(cmdname), Logging.LOG_TRACE)
-                return outer_fn(self, *args, **kwargs)
+            Logging.log("Invoking '{0}' command via backend".format(cmdname), Logging.LOG_TRACE)
+            return outer_fn(self, *args, **kwargs)
             # FIXME: Need to migrate into ghc-mod backend:
             # elif Settings.PLUGIN.enable_ghc_mod:
             #     Logging.log("Invoking '{0}' command via ghc-mod".format(cmdname), Logging.LOG_TRACE)
             #     self.view.window().run_command('sublime_haskell_ghc_mod_{0}'.format(cmdname))
-            else:
-                Common.show_status_message('Check/Lint: No live backend available.', False)
         return wrapper
     return wrap
 
