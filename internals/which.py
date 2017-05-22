@@ -1,4 +1,5 @@
 import os
+import os.path
 
 import SublimeHaskell.internals.locked_object as LockedObject
 import SublimeHaskell.internals.utils as Utils
@@ -13,6 +14,9 @@ def which(cmd, env_path):
     cmd_is_list = isinstance(cmd, list)
     the_cmd = cmd[0] if cmd_is_list else cmd
     cmd_args = cmd[1:] if cmd_is_list else []
+
+    if os.path.isabs(the_cmd):
+        return cmd
 
     with WHICH_CACHE as cache:
         cval = cache.get(the_cmd)

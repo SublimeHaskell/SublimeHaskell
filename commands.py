@@ -412,8 +412,8 @@ class SublimeHaskellGoToHackageModule(CommandWin.BackendTextCommand):
 class SublimeHaskellReinspectAll(CommandWin.BackendWindowCommand):
     def run(self):
         Logging.log('reinspect all', Logging.LOG_TRACE)
-        BackendManager.inspector().start_inspect()
-        BackendManager.inspector().do_inspection()
+        with BackendManager.inspector() as insp:
+            insp.start_inspect()
 
 class SublimeHaskellInferDocs(CommandWin.BackendTextCommand):
     """

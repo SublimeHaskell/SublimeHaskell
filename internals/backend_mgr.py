@@ -49,12 +49,30 @@ class BackendManager(object, metaclass=Utils.Singleton):
 
     def __init__(self):
         super().__init__()
-        self.state = BackendManager.INITIAL
+        BackendManager.ACTIVE_BACKEND = Backend.NullHaskellBackend(self)
+        self.state = self.INITIAL
         self.state_lock = threading.RLock()
-        self.src_inspector = Inspector.Inspector(Backend.NullHaskellBackend(self))
-        self.current_backend_name = Backend.NullHaskellBackend.backend_name()
+        self.action_lock = threading.Lock()
+        self.src_inspector = Inspector.Inspector(BackendManager.ACTIVE_BACKEND)
+        self.current_backend_name = BackendManager.ACTIVE_BACKEND.backend_name()
         self.possible_backends = {}
 
+        self.get_backends()
+
+
+    def __enter__(self):
+        self.initialize()
+        return self
+
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        return False
+
+
+    def get_backends(self):
+        '''Update the possible backends from settings: interrogate which backend types are available, then
+        filter the requested backends according to availability.
+        '''
         usable_backends = self.available_backends()
         if len(usable_backends) > 0:
             # Take first available because DEFAULT_KNOWN_BACKENDS are listed in order of priority...
@@ -75,31 +93,35 @@ class BackendManager(object, metaclass=Utils.Singleton):
             # Yell at luser.
             sublime.message_dialog('\n'.join(['No usable backends (hsdev, ghc-mod) found on PATH or',
                                               'in the standard Haskell cabal and stack installation',
-                                              'places.',
+                                              'locations.',
                                               '',
                                               'Please check or update your SublimeHaskell user settings,',
                                               'or install hsdev or ghc-mod.',
                                               '',
                                               'Proceeding without a backend.']))
 
+
     def initialize(self):
-        BackendManager.ACTIVE_BACKEND = None
-        self.state = BackendManager.INITIAL
+        if self.current_state(self.INITIAL):
+            with self.action_lock:
+                # Can only start a backend iff in the INITIAL state.
+                Logging.log('Starting backend \'{0}\''.format(self.current_backend_name), Logging.LOG_INFO)
+                backend_info = self.possible_backends[self.current_backend_name]
+                the_backend = self.make_backend(backend_info.get('backend'), backend_info.get('options', {}))
 
-        Logging.log('Starting backend \'{0}\''.format(self.current_backend_name), Logging.LOG_INFO)
-        the_backend = self.make_backend(self.possible_backends[self.current_backend_name].get('backend'),
-                                        self.possible_backends[self.current_backend_name].get('options', {}))
+                if the_backend is not None:
+                    self.state_startup(the_backend)
+                    self.state_connect(the_backend)
+                    self.state_active(the_backend)
 
-        if the_backend is not None:
-            with self.state_lock:
-                self.go_active(the_backend)
-                if self.current_state(BackendManager.ACTIVE):
-                    BackendManager.ACTIVE_BACKEND = the_backend
-                elif self.current_state(BackendManager.INITIAL):
-                    BackendManager.ACTIVE_BACKEND = Backend.NullHaskellBackend(self)
-                else:
-                    state_str = BackendManager.STATES_TO_NAME.get(self.state, str(self.state))
-                    Logging.log('BackendManager: Invalid state after go_active: {0}'.format(state_str), Logging.LOG_ERROR)
+                    if self.current_state(self.INITIAL):
+                        # Something failed during startup, revert to the null backend
+                        self.set_backend(Backend.NullHaskellBackend(self))
+                    elif not self.current_state(self.ACTIVE):
+                        state_str = self.STATES_TO_NAME.get(self.state, str(self.state))
+                        Logging.log('BackendManager: Invalid state after starting backend: {0}'.format(state_str),
+                                    Logging.LOG_ERROR)
+
 
     def available_backends(self):
         '''Determine which backends are actually available. Whether a backend is available is backend-specific, usually the
@@ -107,12 +129,14 @@ class BackendManager(object, metaclass=Utils.Singleton):
         '''
         return [clazz for clazz in BackendManager.BACKEND_META.values() if clazz.is_available()]
 
+
     def down_select(self, user_backends, avail_backends):
         '''Filter down user-requested backends using the available backends.
         '''
         backend_names = [b.backend_name() for b in avail_backends]
         return dict([(name, user_backends[name]) for name in user_backends
                      if user_backends[name].get('backend', '') in backend_names])
+
 
     def get_default_backend(self, user_backends):
         retval = None
@@ -129,6 +153,7 @@ class BackendManager(object, metaclass=Utils.Singleton):
 
         return (retval, n_defaults)
 
+
     def make_backend(self, backend_name, options):
         backend_clazz = self.BACKEND_META.get(backend_name, None)
         if backend_clazz is not None:
@@ -136,66 +161,96 @@ class BackendManager(object, metaclass=Utils.Singleton):
         else:
             return None
 
+
+    def set_backend(self, new_backend):
+        BackendManager.ACTIVE_BACKEND = new_backend
+        with Inspector.Inspector(new_backend) as insp:
+            self.src_inspector = insp
+            insp.start_inspect()
+
+
     def change_current_backend(self, new_backend_name):
         the_backend = self.possible_backends.get(new_backend_name, None)
         if the_backend is not None:
-            self.shutdown_backend()
+            self.shutdown_backend(get_action_lock=True)
             self.current_backend_name = new_backend_name
-            new_backend = self.make_backend(the_backend['backend'], the_backend.get('options', {}))
-            self.go_active(new_backend)
+            self.initialize()
 
-    def go_active(self, backend):
-        '''Walk through the state phases (INITIAL -> STARTUP -> CONNECT -> ACTIVE) to startup and connect a backend.
-        '''
-        with self.state_lock:
-            if self.current_state(BackendManager.INITIAL):
-                self.set_state(BackendManager.STARTUP)
-                successful_startup = False
-                try:
-                    successful_startup = backend.start_backend()
-                finally:
-                    if not successful_startup:
-                        self.set_state(BackendManager.INITIAL)
-                    else:
-                        # Not sure how the code would do anything but transition from INITIAL to STARTUP (i.e., come into the
-                        # function in the STARTUP state...)
-                        self.set_state(BackendManager.CONNECT)
-                        successful_connect = False
-                        try:
-                            successful_connect = backend.connect_backend()
-                        finally:
-                            if not successful_connect:
-                                self.set_state(BackendManager.SHUTDOWN)
-                                try:
-                                    self.shutdown_backend()
-                                finally:
-                                    self.set_state(BackendManager.INITIAL)
-                            else:
-                                self.src_inspector = Inspector.Inspector(backend)
-                                Utils.run_async('BackendManager: start inspection', self.src_inspector.start_inspect)
-                                Utils.run_async('BackendManager: do inspection', self.src_inspector.do_inspection)
-                                Logging.log('Inspector started.', Logging.LOG_DEBUG)
-                                self.set_state(BackendManager.ACTIVE)
 
-    def shutdown_backend(self):
+    def state_startup(self, backend):
+        if self.current_state(self.INITIAL):
+            successful_startup = False
+            try:
+                self.set_state(self.STARTUP)
+                successful_startup = backend.start_backend()
+            finally:
+                if not successful_startup:
+                    self.set_state(self.INITIAL)
+
+
+    def state_connect(self, backend):
+        if self.current_state(self.STARTUP):
+            # Not sure how the code would do anything but transition from INITIAL to STARTUP (i.e., come into the
+            # function in the STARTUP state...)
+            successful_connect = False
+            try:
+                self.set_state(self.CONNECT)
+                successful_connect = backend.connect_backend()
+            finally:
+                if not successful_connect:
+                    try:
+                        self.set_state(BackendManager.SHUTDOWN)
+                        self.shutdown_backend(get_action_lock=False)
+                    finally:
+                        self.set_state(self.INITIAL)
+
+
+    def state_active(self, backend):
+        if self.current_state(self.CONNECT):
+            self.set_state(BackendManager.ACTIVE)
+            self.set_backend(backend)
+
+
+    def shutdown_backend(self, get_action_lock=True):
         '''Step through the backend shutdown process: disconnect (if active), stop backend (if disconnected). Backend
         manager's state should end up in INITIAL.
         '''
-        backend = BackendManager.ACTIVE_BACKEND
-        if self.current_state(BackendManager.ACTIVE):
-            self.set_state(BackendManager.DISCONNECT)
-            backend.disconnect_backend()
+        # If the action lock was previously acquired, don't try to re-acquire it.
+        got_lock = get_action_lock and self.action_lock.acquire()
+        try:
+            self.state_disconnect()
+            self.state_shutdown()
+            self.state_reset_initial()
+        finally:
+            if got_lock:
+                self.action_lock.release()
 
-        if self.current_state(BackendManager.DISCONNECT):
-            self.set_state(BackendManager.SHUTDOWN)
-            # Ask the source inspector to terminate -- shutting down the backend takes longer, which means we'll spend
-            # less time in join()
-            backend.stop_backend()
 
+    def state_disconnect(self):
+        try:
+            if self.current_state(BackendManager.ACTIVE):
+                self.set_state(BackendManager.DISCONNECT)
+                BackendManager.ACTIVE_BACKEND.disconnect_backend()
+        except OSError:
+            # Really, ignore the exceptions that should be caught and dealt with by the backend's disconnection method.
+            pass
+
+
+    def state_shutdown(self):
+        try:
+            if self.current_state(BackendManager.DISCONNECT):
+                self.set_state(BackendManager.SHUTDOWN)
+                BackendManager.ACTIVE_BACKEND.stop_backend()
+        except OSError:
+            pass
+
+
+    def state_reset_initial(self):
         if self.current_state(BackendManager.SHUTDOWN):
             # Paranoia: If we're shut down, assume no backend... :-)
-            BackendManager.ACTIVE_BACKEND = Backend.NullHaskellBackend(self)
+            self.set_backend(Backend.NullHaskellBackend(self))
             self.set_state(BackendManager.INITIAL)
+
 
     def lost_connection(self):
         '''Shut down the backend due to a lost connection, such as a reset socket. Backend's state should end up in
@@ -208,11 +263,13 @@ class BackendManager(object, metaclass=Utils.Singleton):
                                          '    SublimeHaskell: Start backend',
                                          ''
                                          'from the SublimeText command palette.']))
-        self.shutdown_backend()
+        self.shutdown_backend(get_action_lock=True)
+
 
     def set_state(self, state):
         with self.state_lock:
             self.state = state
+
 
     def current_state(self, state):
         '''Test if the current backend state is equal to `state`, with the assurance that this method has the lock on
@@ -220,6 +277,7 @@ class BackendManager(object, metaclass=Utils.Singleton):
         '''
         with self.state_lock:
             return self.state == state
+
 
     @staticmethod
     def active_backend():
@@ -231,6 +289,7 @@ class BackendManager(object, metaclass=Utils.Singleton):
             return backend
         else:
             return Backend.NullHaskellBackend(BackendManager())
+
 
     @staticmethod
     def is_live_backend():
@@ -252,11 +311,13 @@ def active_backend():
     '''
     return BackendManager.active_backend()
 
+
 def is_live_backend():
     '''Determine if the active backend is live and usable. This is a convenience function that accesses the `BackendManager`'s
     static function of the same name and reduces the amount of redundant typing.
     '''
     return BackendManager.is_live_backend()
+
 
 def inspector():
     '''Return the inspector object. This is a convenience function that accesses the `BackendManager`'s static
@@ -264,9 +325,6 @@ def inspector():
     '''
     return BackendManager.inspector()
 
+
 def lost_connection():
     return BackendManager().lost_connection()
-
-def ensure_backend():
-    if BackendManager().current_state(BackendManager.INITIAL):
-        BackendManager().initialize()

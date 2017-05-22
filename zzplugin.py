@@ -43,19 +43,17 @@ def need_backend(fn_needing_backend):
     '''A class method decorator that will start a SublimeHaskell backend because the wrapped function requires one.
     '''
     def boot_backend_when_needed(self, *args, **kwargs):
-        BackendManager.ensure_backend()
-        return fn_needing_backend(self, *args, **kwargs)
+        with BackendManager.BackendManager():
+            return fn_needing_backend(self, *args, **kwargs)
     return boot_backend_when_needed
 
 
-def ensure_backend_async(fn_name, fn_needing_backend, *args, **kwargs):
+def ensure_backend(fn_needing_backend, *args, **kwargs):
     '''Ensures that a SublimeHaskell backend exists
     '''
-    def ensure_backend_booted():
-        BackendManager.ensure_backend()
+    with BackendManager.BackendManager():
         return fn_needing_backend(*args, **kwargs)
 
-    Utils.run_async(fn_name, ensure_backend_booted)
 
 class SublimeHaskellEventListener(sublime_plugin.EventListener):
     '''The plugin's primary SublimeText event listener, consolidating actions related to file I/O (post-save actions,
@@ -71,7 +69,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         self.fly_agent = threading.Thread(target='fly_check')
 
 
-    def on_new(self, view):
+    def on_new_async(self, view):
         if Settings.COMPONENT_DEBUG.event_viewer:
             print('{0} invoked.'.format(type(self).__name__ + ".on_new"))
 
@@ -79,18 +77,17 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         if filename and Common.is_inspected_source(view):
             self.set_cabal_status(view)
             # Defer booting the backend until absolutely necessary
-            ensure_backend_async('on_new: inspect source', self.rescan_source, filename)
+            ensure_backend('on_new: inspect source', self.rescan_source, filename)
 
-    def on_load(self, view):
+    def on_load_async(self, view):
         filename = view.file_name()
-        if filename:
-            if Common.is_inspected_source(view):
-                if Settings.COMPONENT_DEBUG.event_viewer:
-                    print('{0} is_inspected_source {1} invoked.'.format(type(self).__name__ + ".on_load", filename))
+        if filename and Common.is_inspected_source(view):
+            if Settings.COMPONENT_DEBUG.event_viewer:
+                print('{0} is_inspected_source {1} invoked.'.format(type(self).__name__ + ".on_load", filename))
 
-                self.set_cabal_status(view)
-                # Defer booting the backend until absolutely necessary
-                ensure_backend_async('on_load: inspect source', self.rescan_source, filename)
+            self.set_cabal_status(view)
+            # Defer booting the backend until absolutely necessary
+            ensure_backend(self.rescan_source, filename)
 
             if Common.is_haskell_source(view):
                 if Settings.COMPONENT_DEBUG.event_viewer:
@@ -102,18 +99,17 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
                         view.settings().set('syntax', 'Packages/SublimeHaskell/Syntaxes/Haskell-SublimeHaskell.tmLanguage')
                     # TODO Do we also have to fix Literate Haskell?
 
-    def on_post_save(self, view):
+    def on_post_save_async(self, view):
         if Settings.COMPONENT_DEBUG.event_viewer:
             print('{0} invoked.'.format(type(self).__name__ + ".on_post_save"))
-        filename = view.file_name()
-        if filename:
-            if Common.is_inspected_source(view):
-                ensure_backend_async('on_post_save: inspect source', self.rescan_source, filename)
 
+        filename = view.file_name()
+        if filename and Common.is_inspected_source(view):
+            Utils.run_async('rescan source', ensure_backend, self.rescan_source, filename)
             if Common.is_haskell_source(view):
                 Types.SourceHaskellTypeCache().remove(filename)
-                BackendManager.ensure_backend()
                 self.trigger_build(view)
+
 
     def on_modified(self, view):
         if Settings.COMPONENT_DEBUG.event_viewer:
@@ -121,9 +117,8 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
 
         filename = view.file_name()
         if filename and Common.is_haskell_source(view):
-            BackendManager.ensure_backend()
             if Settings.PLUGIN.lint_check_fly:
-                self.fly(view)
+                Utils.run_async('fly check', self.fly, view)
             Types.SourceHaskellTypeCache().remove(filename)
 
     def on_activated(self, view):
@@ -131,24 +126,30 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             print('{0} invoked.'.format(type(self).__name__ + ".on_activated"))
 
         filename = view.file_name()
-        if Common.is_haskell_source(view) and filename:
-            window = view.window()
-            if window:
-                proj_name = window.project_file_name()
-                if proj_name is not None and (not self.project_file_name or proj_name != self.project_file_name):
-                    self.project_file_name = window.project_file_name()
-                    Logging.log('project switched to {0}, reinspecting'.format(self.project_file_name))
+        if filename and Common.is_haskell_source(view):
+            def activated_worker():
+                with BackendManager.BackendManager():
+                    ### FIXME: Checking if the project name changed is not a good way to figure out that we need to
+                    ### reinspect source. It could be one way. But it doesn't account for the fact that we're scanning
+                    ### and entire directory and project hierarchy.
+                    ###
+                    ### Keep a directory map that tells us if we've encountered this directory before?
+                    # window = view.window()
+                    # if window:
+                    #     proj_name = window.project_file_name()
+                    #     if proj_name is not None and (not self.project_file_name or proj_name != self.project_file_name):
+                    #         self.project_file_name = window.project_file_name()
+                    #         Logging.log('project switched to {0}, reinspecting'.format(self.project_file_name))
 
-                    def activated_reinspect_all():
-                        BackendManager.active_backend().remove_all()
-                        BackendManager.inspector().start_inspect()
-                        BackendManager.inspector().do_inspection()
+                    #         def activated_reinspect_all():
+                    #             BackendManager.active_backend().remove_all()
+                    #             BackendManager.inspector().start_inspect()
+                    #             BackendManager.inspector().do_inspection()
 
-                    ensure_backend_async('on_activated: reinspect all', activated_reinspect_all)
+                    #         ensure_backend('on_activated: reinspect all', activated_reinspect_all)
+                    self.autocompleter.get_completions_async(filename)
 
-                Utils.run_async('get completions for {0}'.format(filename),
-                                self.autocompleter.get_completions_async, filename)
-
+            Utils.run_async('on_activated', activated_worker)
             self.set_cabal_status(view)
 
     def on_query_context(self, view, key, _operator, _operand, _matchall):
@@ -187,48 +188,47 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             return []
 
         # Defer starting the backend until as late as possible...
-        BackendManager.ensure_backend()
+        with BackendManager.BackendManager():
+            begin_time = time.clock()
 
-        begin_time = time.clock()
+            # Only suggest symbols if the current file is part of a Cabal project.
+            line_contents = Common.get_line_contents(view, locations[0])
+            completions = self.autocompleter.get_import_completions(view, locations, line_contents)
+            completions = completions + self.autocompleter.get_special_completions(line_contents)
 
-        # Only suggest symbols if the current file is part of a Cabal project.
-        line_contents = Common.get_line_contents(view, locations[0])
-        completions = self.autocompleter.get_import_completions(view, locations, line_contents)
-        completions = completions + self.autocompleter.get_special_completions(line_contents)
+            # Export list
+            if 'meta.declaration.exports.haskell' in view.scope_name(view.sel()[0].a):
+                export_module = Autocomplete.EXPORT_MODULE_RE.search(line_contents)
+                if export_module:
+                    # qsymbol = Common.get_qualified_symbol_at_region(view, view.sel()[0])
+                    # TODO: Implement
+                    pass
 
-        # Export list
-        if 'meta.declaration.exports.haskell' in view.scope_name(view.sel()[0].a):
-            export_module = Autocomplete.EXPORT_MODULE_RE.search(line_contents)
-            if export_module:
-                # qsymbol = Common.get_qualified_symbol_at_region(view, view.sel()[0])
-                # TODO: Implement
-                pass
+            # Add current file's completions:
+            completions = completions + self.autocompleter.get_completions(view, locations)
 
-        # Add current file's completions:
-        completions = completions + self.autocompleter.get_completions(view, locations)
+            end_time = time.clock()
+            Logging.log('time to get completions: {0} seconds'.format(end_time - begin_time), Logging.LOG_DEBUG)
 
-        end_time = time.clock()
-        Logging.log('time to get completions: {0} seconds'.format(end_time - begin_time), Logging.LOG_DEBUG)
+            Autocomplete.sort_completions(completions)
 
-        Autocomplete.sort_completions(completions)
+            # Don't put completions with special characters (?, !, ==, etc.)
+            # into completion because that wipes all default Sublime completions:
+            # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
+            # TODO: work around this
+            # comp = [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0].split('\t')[0])]
+            # if Settings.PLUGIN.inhibit_completions and len(comp) != 0:
+            #     return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
+            # return comp
 
-        # Don't put completions with special characters (?, !, ==, etc.)
-        # into completion because that wipes all default Sublime completions:
-        # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
-        # TODO: work around this
-        # comp = [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0].split('\t')[0])]
-        # if Settings.PLUGIN.inhibit_completions and len(comp) != 0:
-        #     return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
-        # return comp
-
-        if Settings.PLUGIN.inhibit_completions:
-            if len(completions) > 0:
-                return (completions, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
+            if Settings.PLUGIN.inhibit_completions:
+                if len(completions) > 0:
+                    return (completions, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
+                else:
+                    # Because we want to inhibit completions...
+                    return []
             else:
-                # Because we want to inhibit completions...
-                return []
-        else:
-            return completions
+                return completions
 
 
     def set_cabal_status(self, view):
@@ -378,6 +378,6 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
 
 
     def rescan_source(self, filename):
-        BackendManager.inspector().mark_file_dirty(filename)
-        BackendManager.inspector().do_inspection()
+        with BackendManager.inspector() as insp:
+            insp.mark_file_dirty(filename)
         self.update_completions_async(drop_all=True)

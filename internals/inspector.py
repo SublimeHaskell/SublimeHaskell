@@ -49,6 +49,16 @@ class Inspector(object):
         self.dirty_files = LockedObject.LockedObject([])
         self.dirty_paths = LockedObject.LockedObject([])
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, _exc_val, _exc_tb):
+        if exc_type is None:
+            self.do_inspection()
+        # Propagate the exception
+        return False
+
+
     def do_inspection(self):
         scan_paths = []
         with self.dirty_paths as dirty_paths:

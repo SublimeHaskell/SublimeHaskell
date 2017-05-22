@@ -107,8 +107,6 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
         self.point = None
         self.decl = None
         self.typed_expr = None
-        self.whois_name = None
-        self.full_name = None
         self.suggest_import = None
 
     def on_hover(self, view, point, hover_zone):
@@ -128,6 +126,7 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
 
         if hover_zone == sublime.HOVER_TEXT:
             qsymbol = Common.get_qualified_symbol_at_point(view, point)
+            ## print('hover: qualified symbol {0}'.format(qsymbol))
             module_word = qsymbol.module
             ident = qsymbol.name
 
@@ -135,24 +134,24 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
                 pass
 
             if ident:
-                self.whois_name = qsymbol.qualified_name()
-                self.full_name = qsymbol.full_name()
+                whois_name = qsymbol.qualified_name()
+                full_name = qsymbol.full_name()
 
                 # Try get type of hovered symbol
                 self.point = point
                 self.typed_expr = None
                 if types.SourceHaskellTypeCache().has(self.current_file_name):
-                    self.typed_expr = self.get_type(types.SourceHaskellTypeCache().get(self.current_file_name))
+                    self.typed_expr = self.get_type(types.SourceHaskellTypeCache().get(self.current_file_name), whois_name)
                 else:
                     type_list = types.query_file_types(self.current_file_name)
-                    self.on_types(type_list)
+                    self.on_types(type_list, whois_name)
 
                 # Try whois
                 self.suggest_import = False
-                self.decl = Utils.head_of(BackendManager.active_backend().whois(self.whois_name, self.current_file_name))
+                self.decl = Utils.head_of(BackendManager.active_backend().whois(whois_name, self.current_file_name))
                 if not self.decl:
                     self.suggest_import = True
-                    self.decl = Utils.head_of(BackendManager.active_backend().lookup(self.full_name, self.current_file_name))
+                    self.decl = Utils.head_of(BackendManager.active_backend().lookup(full_name, self.current_file_name))
 
                 self.create_symbol_popup(update=True)
 
@@ -198,13 +197,13 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
                 self.view.show_popup(popup_text, sublime.HIDE_ON_MOUSE_MOVE_AWAY, self.point, 600, 600,
                                      self.on_navigate, self.on_hide)
 
-    def get_type(self, type_list):
+    def get_type(self, type_list, qual_name):
         filt_types = [t for t in type_list
-                      if t.substr(self.view) == self.whois_name and t.region(self.view).contains(self.point)]
+                      if t.substr(self.view) == qual_name and t.region(self.view).contains(self.point)]
         return Utils.head_of(filt_types)
 
-    def on_types(self, type_list):
-        self.typed_expr = self.get_type(type_list)
+    def on_types(self, type_list, qual_name):
+        self.typed_expr = self.get_type(type_list, qual_name)
         if self.typed_expr:
             self.create_symbol_popup(update=True)
 
