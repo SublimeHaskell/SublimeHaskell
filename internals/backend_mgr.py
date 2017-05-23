@@ -1,6 +1,7 @@
-"""
-The backend manager.
-"""
+'''SublimeHaskell relies on interactions with a backend, such as *hsdev* and *ghc-mod*, to do actions such as symbol completion,
+type queries and source checking. The backend manager, :py:class:`BackendManager` controls the backend's life cycle, from
+intial startup to shutdown.
+'''
 
 import threading
 
@@ -15,24 +16,45 @@ import SublimeHaskell.internals.inspector as Inspector
 import SublimeHaskell.internals.utils as Utils
 
 class BackendManager(object, metaclass=Utils.Singleton):
+    '''The backend manager.
+
+    The backend manager is a *singleton* object instantiation of this class.
+    '''
+
     # Known backends and mapping to metadata
     BACKEND_META = {
         HsDev.HsDevBackend.backend_name(): HsDev.HsDevBackend,
         GHCIMod.GHCModBackend.backend_name(): GHCIMod.GHCModBackend,
         Backend.NullHaskellBackend.backend_name(): Backend.NullHaskellBackend
     }
+    '''Backend name (*type* in the settings) to backend class mapping.'''
 
     # The manager's states:
     INITIAL = 0
+    '''State in which a backend can be started via :py:meth:`intialize`. Transitions into the :py:const:`STARTUP`
+    state.'''
     STARTUP = 1
+    '''Indicates that a backend is being started. If successful, transitions into the :py:const:`CONNECT` state.'''
     CONNECT = 2
+    '''State in which SublimeHaskell conencts to the started backend. Transitions to the :py:const:`ACTIVE` state
+    if successfull.'''
     ACTIVE = 3
+    '''Indicates that the backend is active and operating. Transitions to :py:const:`DISCONNECT` state when
+    shutting down the backend.'''
     DISCONNECT = 4
-    RESTART = 5
+    '''State where SublimeHaskell disconnects from the backend before shutting it down. Transitions to :py:const:`SHUTDOWN`
+    state.'''
+    # RESTART = 5
     SHUTDOWN = 6
+    '''Indicates that SublimeHaskell is now terminating the backend, after disconnecting. Transitions to the
+    :py:const:`INACTIVE` state.'''
+    INACTIVE = 7
+    '''Indicates that the backend was shut down and there is no backend -- SublimeHaskell has no active backend.
+    There is no transition out of this state and the backend manager's state has to be manually set to :py:const:`INITIAL`
+    in order to start a backend.'''
 
-    # The currently active backend
     ACTIVE_BACKEND = None
+    '''The currently active backend.'''
 
     # Pretty-printing state support:
     STATES_TO_NAME = {
@@ -41,13 +63,14 @@ class BackendManager(object, metaclass=Utils.Singleton):
         2: 'CONNECT',
         3: 'ACTIVE',
         4: 'DISCONNECT',
-        5: 'RESTART',
-        6: 'SHUTDOWN'
+        # 5: 'RESTART',
+        6: 'SHUTDOWN',
+        7: 'INACTIVE'
     }
 
-    # Current state:
-
     def __init__(self):
+        '''
+        '''
         super().__init__()
         BackendManager.ACTIVE_BACKEND = Backend.NullHaskellBackend(self)
         self.state = self.INITIAL
@@ -61,17 +84,29 @@ class BackendManager(object, metaclass=Utils.Singleton):
 
 
     def __enter__(self):
+        '''Top half of Python context management. This ensures that the backend is started and running when used in a
+        *with* statement.
+        '''
         self.initialize()
         return self
 
 
     def __exit__(self, exc_type, exc_value, exc_tb):
+        '''Bottom half of Python context management. Nothing useful is done here and exceptions are not suppressed.
+        '''
         return False
 
 
     def get_backends(self):
-        '''Update the possible backends from settings: interrogate which backend types are available, then
-        filter the requested backends according to availability.
+        '''Update the possible backends from settings:
+
+        * Interrogate which backend types are available (usable backends)
+        * Filter the requested backends in the *backends* setting according to availability (the backend's type is in the
+          usable backends) to produce the possible backends,
+        * Extract the default backend's name from the possible backends and set the current backend's name to the
+          default backend.
+
+        Updates the :py:attr:`possible_backends` and :py:attr:`current_backend_name` attributes.
         '''
         usable_backends = self.available_backends()
         if len(usable_backends) > 0:
@@ -99,6 +134,11 @@ class BackendManager(object, metaclass=Utils.Singleton):
                                               'or install hsdev or ghc-mod.',
                                               '',
                                               'Proceeding without a backend.']))
+
+
+    def updated_settings(self, key, _val):
+        if key == 'backends':
+            self.get_backends()
 
 
     def initialize(self):
@@ -220,7 +260,7 @@ class BackendManager(object, metaclass=Utils.Singleton):
         try:
             self.state_disconnect()
             self.state_shutdown()
-            self.state_reset_initial()
+            self.state_inactive()
         finally:
             if got_lock:
                 self.action_lock.release()
@@ -245,11 +285,11 @@ class BackendManager(object, metaclass=Utils.Singleton):
             pass
 
 
-    def state_reset_initial(self):
+    def state_inactive(self):
         if self.current_state(BackendManager.SHUTDOWN):
             # Paranoia: If we're shut down, assume no backend... :-)
             self.set_backend(Backend.NullHaskellBackend(self))
-            self.set_state(BackendManager.INITIAL)
+            self.set_state(BackendManager.INACTIVE)
 
 
     def lost_connection(self):
@@ -277,6 +317,11 @@ class BackendManager(object, metaclass=Utils.Singleton):
         '''
         with self.state_lock:
             return self.state == state
+
+
+    def is_inactive_state(self):
+        with self.state_lock:
+            return self.state == self.INITIAL or self.state == self.INACTIVE
 
 
     @staticmethod

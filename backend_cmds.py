@@ -21,12 +21,13 @@ class SublimeHaskellStartBackend(sublime_plugin.WindowCommand):
         with Common.status_message_process('Starting up {0} backend'.format(backend_mgr.current_backend_name), priority=1):
             try:
                 self.busy = True
+                backend_mgr.set_state(BackendManager.BackendManager.INITIAL)
                 backend_mgr.initialize()
             finally:
                 self.busy = False
 
     def is_enabled(self):
-        return not self.busy and BackendManager.BackendManager().current_state(BackendManager.BackendManager.INITIAL)
+        return not self.busy and BackendManager.BackendManager().is_inactive_state()
 
 
 class SublimeHaskellStopBackend(sublime_plugin.WindowCommand):
@@ -48,7 +49,7 @@ class SublimeHaskellStopBackend(sublime_plugin.WindowCommand):
                 self.busy = False
 
     def is_enabled(self):
-        return not (self.busy or BackendManager.BackendManager().current_state(BackendManager.BackendManager.INITIAL))
+        return not (self.busy or BackendManager.BackendManager().is_inactive_state())
 
 
 class SublimeHaskellRestartBackend(sublime_plugin.WindowCommand):
@@ -61,8 +62,7 @@ class SublimeHaskellRestartBackend(sublime_plugin.WindowCommand):
         Utils.run_async('restarting backend', self.do_restart)
 
     def is_enabled(self):
-        return not (self.restart_ev.is_set() or \
-                    BackendManager.BackendManager().current_state(BackendManager.BackendManager.INITIAL))
+        return not (self.restart_ev.is_set() or BackendManager.BackendManager().is_inactive_state())
 
     def do_restart(self):
         self.restart_ev.set()

@@ -31,6 +31,7 @@ def plugin_loaded():
     # Register change detection:
     Settings.PLUGIN.add_change_callback('add_to_PATH', ProcHelper.ProcHelper.update_environment)
     Settings.PLUGIN.add_change_callback('add_standard_dirs', ProcHelper.ProcHelper.update_environment)
+    Settings.PLUGIN.add_change_callback('backends', BackendManager.BackendManager().updated_settings)
 
 
 def plugin_unloaded():
