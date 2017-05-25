@@ -111,7 +111,7 @@ class BackendManager(object, metaclass=Utils.Singleton):
         usable_backends = self.available_backends()
         if len(usable_backends) > 0:
             # Take first available because DEFAULT_KNOWN_BACKENDS are listed in order of priority...
-            self.possible_backends = self.down_select(Settings.PLUGIN.backends, usable_backends)
+            self.possible_backends = self.filter_possible(Settings.PLUGIN.backends, usable_backends)
 
             print('Available backends: {0}'.format([clazz.backend_name() for clazz in usable_backends]))
             print('plugin \'backends\' {0}'.format([name for name in Settings.PLUGIN.backends]))
@@ -147,7 +147,11 @@ class BackendManager(object, metaclass=Utils.Singleton):
                 # Can only start a backend iff in the INITIAL state.
                 Logging.log('Starting backend \'{0}\''.format(self.current_backend_name), Logging.LOG_INFO)
                 backend_info = self.possible_backends[self.current_backend_name]
-                the_backend = self.make_backend(backend_info.get('backend'), backend_info.get('options', {}))
+                backend_clazz = self.BACKEND_META.get(backend_info.get('backend'), None)
+                if backend_clazz is not None:
+                    the_backend = backend_clazz(self, **backend_info.get('options', {}))
+                else:
+                    the_backend = None
 
                 if the_backend is not None:
                     self.state_startup(the_backend)
@@ -170,7 +174,7 @@ class BackendManager(object, metaclass=Utils.Singleton):
         return [clazz for clazz in BackendManager.BACKEND_META.values() if clazz.is_available()]
 
 
-    def down_select(self, user_backends, avail_backends):
+    def filter_possible(self, user_backends, avail_backends):
         '''Filter down user-requested backends using the available backends.
         '''
         backend_names = [b.backend_name() for b in avail_backends]
@@ -187,20 +191,8 @@ class BackendManager(object, metaclass=Utils.Singleton):
                 n_defaults = n_defaults + 1
                 if retval is None:
                     retval = name
-        if retval == '':
-            # Huh. No default backend?
-            retval = None
 
         return (retval, n_defaults)
-
-
-    def make_backend(self, backend_name, options):
-        backend_clazz = self.BACKEND_META.get(backend_name, None)
-        if backend_clazz is not None:
-            return backend_clazz(self, **options)
-        else:
-            return None
-
 
     def set_backend(self, new_backend):
         BackendManager.ACTIVE_BACKEND = new_backend
@@ -214,6 +206,7 @@ class BackendManager(object, metaclass=Utils.Singleton):
         if the_backend is not None:
             self.shutdown_backend(get_action_lock=True)
             self.current_backend_name = new_backend_name
+            self.set_state(self.INITIAL)
             self.initialize()
 
 
@@ -258,37 +251,38 @@ class BackendManager(object, metaclass=Utils.Singleton):
         # If the action lock was previously acquired, don't try to re-acquire it.
         got_lock = get_action_lock and self.action_lock.acquire()
         try:
-            self.state_disconnect()
-            self.state_shutdown()
+            the_backend = BackendManager.ACTIVE_BACKEND
+            self.set_backend(Backend.NullHaskellBackend(self))
+            self.state_disconnect(the_backend)
+            self.state_shutdown(the_backend)
             self.state_inactive()
         finally:
             if got_lock:
                 self.action_lock.release()
 
 
-    def state_disconnect(self):
+    def state_disconnect(self, backend):
         try:
             if self.current_state(BackendManager.ACTIVE):
                 self.set_state(BackendManager.DISCONNECT)
-                BackendManager.ACTIVE_BACKEND.disconnect_backend()
+                backend.disconnect_backend()
         except OSError:
             # Really, ignore the exceptions that should be caught and dealt with by the backend's disconnection method.
             pass
 
 
-    def state_shutdown(self):
+    def state_shutdown(self, backend):
         try:
             if self.current_state(BackendManager.DISCONNECT):
                 self.set_state(BackendManager.SHUTDOWN)
-                BackendManager.ACTIVE_BACKEND.stop_backend()
+                backend.stop_backend()
         except OSError:
             pass
 
 
     def state_inactive(self):
         if self.current_state(BackendManager.SHUTDOWN):
-            # Paranoia: If we're shut down, assume no backend... :-)
-            self.set_backend(Backend.NullHaskellBackend(self))
+            # Nothing to do here, at the moment.
             self.set_state(BackendManager.INACTIVE)
 
 
@@ -322,6 +316,9 @@ class BackendManager(object, metaclass=Utils.Singleton):
     def is_inactive_state(self):
         with self.state_lock:
             return self.state == self.INITIAL or self.state == self.INACTIVE
+
+    def inspector_busy(self):
+        return self.src_inspector.is_busy()
 
 
     @staticmethod
@@ -369,6 +366,10 @@ def inspector():
     function of the same name, reducing the amount of redundant typing.
     '''
     return BackendManager.inspector()
+
+
+def inspector_busy():
+    return BackendManager().inspector_busy()
 
 
 def lost_connection():

@@ -57,7 +57,7 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal=None):
     try:
         command = ['ghc-mod'] + ghc_opts_args + arg_list
 
-        # Logging.log('running ghc-mod: {0}'.format(command))
+        print('running ghc-mod: {0}'.format(command))
 
         # Set cwd to user directory
         # Otherwise ghc-mod will fail with 'cannot satisfy package...'
@@ -76,7 +76,6 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal=None):
         if exit_code != 0:
             raise Exception("%s exited with status %d and stderr: %s" % (' '.join(command), exit_code, err))
 
-        # return crlf2lf(out)
         return out
 
     except OSError as os_exc:

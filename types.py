@@ -9,7 +9,7 @@ import sublime
 import sublime_plugin
 
 import SublimeHaskell.cmdwin_types as CommandWin
-import SublimeHaskell.ghcimod.ghci_backend as GHCIMod
+import SublimeHaskell.ghcimod.ghcmod_ops as GHCIMod
 import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.internals.unicode_opers as UnicodeOpers
 import SublimeHaskell.internals.utils as Utils

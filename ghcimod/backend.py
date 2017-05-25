@@ -5,7 +5,7 @@ The ghc-mod backend
 import SublimeHaskell.internals.backend as Backend
 import SublimeHaskell.internals.proc_helper as ProcHelper
 import SublimeHaskell.internals.which as Which
-import SublimeHaskell.ghcimod.ghci_backend as GHCIMod
+import SublimeHaskell.ghcimod.ghcmod_ops as GHCIMod
 
 class GHCModBackend(Backend.HaskellBackend):
     """This class encapsulates all of the functions that interact with the `hsdev` backend.
@@ -36,7 +36,7 @@ class GHCModBackend(Backend.HaskellBackend):
     def is_live_backend(self):
         '''The NullHaskellBackend is never alive.
         '''
-        return False
+        return True
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # API/action functions:
@@ -113,7 +113,14 @@ class GHCModBackend(Backend.HaskellBackend):
         return self.dispatch_callbacks([], **backend_args)
 
     def check(self, files=None, contents=None, ghc=None, wait_complete=False, **backend_args):
-        return self.dispatch_callbacks([], **backend_args)
+        args = ['check'] + files
+        ghc_stdout = GHCIMod.call_ghcmod_and_wait(args, files[0])
+
+        # stdout contains NULL as line endings within one message, replace NULLs with indents for later error parsing.
+        out = ghc_stdout.replace('\0', '\n  ')
+        print('ghc-mod check: stdout = {0}'.format(ghc_stdout))
+        print('ghc-mod check: out = {0}'.format(out))
+        return self.dispatch_callbacks(out, **backend_args)
 
     def check_lint(self, files=None, contents=None, ghc=None, hlint=None, wait_complete=False, **backend_args):
         return self.dispatch_callbacks([], **backend_args)
