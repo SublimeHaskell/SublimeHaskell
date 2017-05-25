@@ -143,6 +143,22 @@ class HaskellBackend(object):
         raise NotImplementedError("HaskellBackend.lint needs an implementation.")
 
     def check(self, files=None, contents=None, ghc=None, wait_complete=True, **backend_args):
+        '''Runs the compiler over a file (or its contents, if provided) and returns a list of warnings and errors,
+           as well as their locations in the source::
+
+              [{'level': 'error',
+                'note': {'message': "<message>", 'suggestion': None},
+                'region': {'from': {'column': 15, 'line': 18},
+                           'to': {'column': 23, 'line': 18}},
+                 'source': {'file': 'Source.hs',
+                            'project': None}},
+                {'level': 'error',
+                 'note': {'message': "<message 2>", 'suggestion': None},
+                 'region': {'from': {'column': 29, 'line': 22},
+                            'to': {'column': 37, 'line': 22}},
+                 'source': {'file': 'Source.hs',
+                            'project': None}}]}
+        '''
         raise NotImplementedError("HaskellBackend.lint needs an implementation.")
 
     def check_lint(self, files=None, contents=None, ghc=None, hlint=None, wait_complete=True, **backend_args):

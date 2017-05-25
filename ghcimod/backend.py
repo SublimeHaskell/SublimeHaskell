@@ -118,7 +118,6 @@ class GHCModBackend(Backend.HaskellBackend):
 
         # stdout contains NULL as line endings within one message, replace NULLs with indents for later error parsing.
         out = ghc_stdout.replace('\0', '\n  ')
-        print('ghc-mod check: stdout = {0}'.format(ghc_stdout))
         print('ghc-mod check: out = {0}'.format(out))
         return self.dispatch_callbacks(out, **backend_args)
 

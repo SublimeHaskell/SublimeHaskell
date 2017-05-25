@@ -54,10 +54,7 @@ class ProcHelper(object):
         try:
             normcmd = Which.which(command, proc_env['PATH'])
             if normcmd is not None:
-                self.process = subprocess.Popen(normcmd
-                                                , stdin=subprocess.PIPE
-                                                , env=proc_env
-                                                , **popen_kwargs)
+                self.process = subprocess.Popen(normcmd, stdin=subprocess.PIPE, env=proc_env, **popen_kwargs)
             else:
                 self.process = None
                 self.process_err = "SublimeHaskell.ProcHelper: {0} was not found on PATH!".format(command[0])
