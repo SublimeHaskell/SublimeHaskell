@@ -70,7 +70,7 @@ def get_haskell_command_window_view_file_project(view=None):
         file_name = view.file_name()
     return window, view, file_name
 
-def get_cabal_project_dir_and_name_of_view(view):
+def locate_cabal_project_from_view(view):
     """Return the path to the .cabal file project for the source file in the
     specified view. The view must show a saved file, the file must be Haskell
     source code, and the file must be under a directory containing a .cabal file.
@@ -80,33 +80,36 @@ def get_cabal_project_dir_and_name_of_view(view):
     file_shown_in_view = view.file_name()
     if file_shown_in_view is None:
         return None, None
-    # Check that the file is Haskell source code:
-    syntax_file_for_view = view.settings().get('syntax').lower()
-    if 'haskell' not in syntax_file_for_view:
-        return None, None
-    return get_cabal_project_dir_and_name_of_file(file_shown_in_view)
+    else:
+        # Check that the file is Haskell source code:
+        syntax_file_for_view = view.settings().get('syntax').lower()
+        if 'haskell' not in syntax_file_for_view:
+            return None, None
+        else:
+            return locate_cabal_project(file_shown_in_view)
 
 
-def get_cabal_project_dir_of_view(view):
-    return get_cabal_project_dir_and_name_of_view(view)[0]
-
-
-def get_cabal_project_dir_and_name_of_file(filename):
+def locate_cabal_project(filename):
     """Return the path to the .cabal file and name of project for the specified file."""
     # Check that a .cabal file is present:
     directory_of_file = os.path.dirname(filename)
     cabal_file_path = find_file_in_parent_dir(directory_of_file, '*.cabal')
-    if cabal_file_path is None:
+    if cabal_file_path is not None:
+        # Return the directory containing the .cabal file:
+        project_path, cabal_file = os.path.split(cabal_file_path)
+        project_name = os.path.splitext(cabal_file)[0]
+        return project_path, project_name
+    else:
         return None, None
-    # Return the directory containing the .cabal file:
-    project_path, cabal_file = os.path.split(cabal_file_path)
-    project_name = os.path.splitext(cabal_file)[0]
-    return project_path, project_name
+
+
+def get_cabal_project_dir_of_view(view):
+    return locate_cabal_project_from_view(view)[0]
 
 
 def get_cabal_project_dir_of_file(filename):
     """Return the path to the .cabal file project for the specified file."""
-    return get_cabal_project_dir_and_name_of_file(filename)[0]
+    return locate_cabal_project(filename)[0]
 
 
 def get_cabal_in_dir(cabal_dir):

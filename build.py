@@ -146,7 +146,7 @@ class SublimeHaskellBaseCommand(CommandWin.SublimeHaskellWindowCommand):
             run_selected(projs[0])
             return
 
-        _, cabal_project_name = Common.get_cabal_project_dir_and_name_of_view(self.window.active_view())
+        _, cabal_project_name = Common.locate_cabal_project_from_view(self.window.active_view())
         Logging.log('Current project: {0}'.format(cabal_project_name))
 
         # Sort by name
@@ -204,7 +204,7 @@ def get_projects():
         active_projects = []
         while src_files:
             src = src_files.pop()
-            proj_dir, proj_name = Common.get_cabal_project_dir_and_name_of_file(src)
+            proj_dir, proj_name = Common.locate_cabal_project(src)
             if proj_dir:
                 active_projects.append((proj_name, proj_dir))
                 src_files = [f for f in src_files if not f.startswith(proj_dir)]
@@ -350,7 +350,7 @@ class SublimeHaskellTypecheckCommand(SublimeHaskellBaseCommand):
 # Auto build current project
 class SublimeHaskellBuildAutoCommand(SublimeHaskellBaseCommand):
     def run(self):
-        current_project_dir, current_project_name = Common.get_cabal_project_dir_and_name_of_view(self.window.active_view())
+        current_project_dir, current_project_name = Common.locate_cabal_project_from_view(self.window.active_view())
         if current_project_name and current_project_dir:
             build_mode = Settings.PLUGIN.auto_build_mode
             # run_tests = Settings.PLUGIN.auto_run_tests
@@ -413,7 +413,7 @@ class SublimeHaskellRunCommand(SublimeHaskellBaseCommand):
             Common.sublime_status_message('Nothing to run')
             return
 
-        _, cabal_project_name = Common.get_cabal_project_dir_and_name_of_view(self.window.active_view())
+        _, cabal_project_name = Common.locate_cabal_project_from_view(self.window.active_view())
 
         # Show current project first
         projs.sort(key=lambda s: (not s[0].startswith(cabal_project_name), s[0]))

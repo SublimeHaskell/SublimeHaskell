@@ -21,12 +21,14 @@ def plugin_loaded():
     '''All of the good stuff that happens when SublimeHaskell is loaded.
     '''
     cache_path = Common.sublime_haskell_cache_path()
+    backend_mgr = BackendManager.BackendManager()
 
     if not os.path.exists(cache_path):
         os.makedirs(cache_path)
 
-    # Probably already loaded... doesn't hurt to reload.
+    # Probably already loaded... doesn't hurt to reload. Refresh the backend manager's list of backends, while we're at it.
     Settings.load_settings()
+    backend_mgr.get_backends()
 
     # Register change detection:
     Settings.PLUGIN.add_change_callback('add_to_PATH', ProcHelper.ProcHelper.update_environment)
@@ -40,28 +42,18 @@ def plugin_unloaded():
     BackendManager.BackendManager().shutdown_backend()
 
 
-def need_backend(fn_needing_backend):
-    '''A class method decorator that will start a SublimeHaskell backend because the wrapped function requires one.
-    '''
-    def boot_backend_when_needed(self, *args, **kwargs):
-        with BackendManager.BackendManager():
-            return fn_needing_backend(self, *args, **kwargs)
-    return boot_backend_when_needed
-
-
-def ensure_backend(fn_needing_backend, *args, **kwargs):
-    '''Ensures that a SublimeHaskell backend exists
-    '''
-    with BackendManager.BackendManager():
-        return fn_needing_backend(*args, **kwargs)
-
-
 class SublimeHaskellEventListener(sublime_plugin.EventListener):
     '''The plugin's primary SublimeText event listener, consolidating actions related to file I/O (post-save actions,
     buffer modifications and flycheck linting.) It is also a good place to localize the plugin's various singletons.
     '''
+
+    COMPLETION_CHARS = {'is_module_completion': '.',
+                        'is_import_completion': '('}
+
     def __init__(self):
         super().__init__()
+        self.backend_mgr = BackendManager.BackendManager()
+        self.type_cache = Types.SourceHaskellTypeCache()
         self.project_file_name = ''
         self.autocompleter = Autocomplete.AutoCompleter()
         # Fly mode state:
@@ -71,28 +63,26 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
 
 
     def on_new_async(self, view):
-        if Settings.COMPONENT_DEBUG.event_viewer:
-            print('{0} invoked.'.format(type(self).__name__ + ".on_new"))
-
         filename = view.file_name()
         if filename and Common.is_inspected_source(view):
+            if Settings.COMPONENT_DEBUG.event_viewer:
+                print('{0} invoked.'.format(type(self).__name__ + ".on_new"))
+
             self.set_cabal_status(view)
-            # Defer booting the backend until absolutely necessary
-            ensure_backend('on_new: inspect source', self.rescan_source, filename)
+            self.rescan_source(filename)
 
     def on_load_async(self, view):
         filename = view.file_name()
         if filename and Common.is_inspected_source(view):
             if Settings.COMPONENT_DEBUG.event_viewer:
-                print('{0} is_inspected_source {1} invoked.'.format(type(self).__name__ + ".on_load", filename))
+                print('{0} is_inspected_source {1}.'.format(type(self).__name__ + ".on_load", filename))
 
             self.set_cabal_status(view)
-            # Defer booting the backend until absolutely necessary
-            ensure_backend(self.rescan_source, filename)
+            self.rescan_source(filename)
 
             if Common.is_haskell_source(view):
                 if Settings.COMPONENT_DEBUG.event_viewer:
-                    print('{0} is_haskell_source {1} invoked.'.format(type(self).__name__ + ".on_load", filename))
+                    print('{0} is_haskell_source {1}.'.format(type(self).__name__ + ".on_load", filename))
 
                 if Settings.PLUGIN.use_improved_syntax:
                     name = os.path.basename(filename.lower())
@@ -100,36 +90,37 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
                         view.settings().set('syntax', 'Packages/SublimeHaskell/Syntaxes/Haskell-SublimeHaskell.tmLanguage')
                     # TODO Do we also have to fix Literate Haskell?
 
-    def on_post_save_async(self, view):
-        if Settings.COMPONENT_DEBUG.event_viewer:
-            print('{0} invoked.'.format(type(self).__name__ + ".on_post_save"))
-
+    def on_post_save(self, view):
         filename = view.file_name()
         if filename and Common.is_inspected_source(view):
-            Utils.run_async('rescan source', ensure_backend, self.rescan_source, filename)
+            if Settings.COMPONENT_DEBUG.event_viewer:
+                print('{0} invoked.'.format(type(self).__name__ + ".on_post_save"))
+
+            Utils.run_async('rescan source', self.rescan_source, filename)
+
             if Common.is_haskell_source(view):
-                Types.SourceHaskellTypeCache().remove(filename)
+                self.type_cache.remove(filename)
                 self.trigger_build(view)
 
 
     def on_modified(self, view):
-        if Settings.COMPONENT_DEBUG.event_viewer:
-            print('{0} invoked.'.format(type(self).__name__ + ".on_modified"))
-
         filename = view.file_name()
         if filename and Common.is_haskell_source(view):
+            if Settings.COMPONENT_DEBUG.event_viewer:
+                print('{0} invoked.'.format(type(self).__name__ + ".on_modified"))
+
             if Settings.PLUGIN.lint_check_fly:
                 Utils.run_async('fly check', self.fly, view)
-            Types.SourceHaskellTypeCache().remove(filename)
+            self.type_cache.remove(filename)
 
     def on_activated(self, view):
-        if Settings.COMPONENT_DEBUG.event_viewer:
-            print('{0} invoked.'.format(type(self).__name__ + ".on_activated"))
-
         filename = view.file_name()
         if filename and Common.is_haskell_source(view):
+            if Settings.COMPONENT_DEBUG.event_viewer:
+                print('{0} invoked.'.format(type(self).__name__ + ".on_activated"))
+
             def activated_worker():
-                with BackendManager.BackendManager():
+                with self.backend_mgr:
                     ### FIXME: Checking if the project name changed is not a good way to figure out that we need to
                     ### reinspect source. It could be one way. But it doesn't account for the fact that we're scanning
                     ### and entire directory and project hierarchy.
@@ -182,14 +173,14 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         return retval
 
     def on_query_completions(self, view, prefix, locations):
-        if Settings.COMPONENT_DEBUG.event_viewer:
-            print('{0} invoked (prefix: {1}).'.format(type(self).__name__ + '.on_query_completions', prefix))
-
         if not Common.is_haskell_source(view):
             return []
 
         # Defer starting the backend until as late as possible...
-        with BackendManager.BackendManager():
+        if Settings.COMPONENT_DEBUG.event_viewer:
+            print('{0} invoked (prefix: {1}).'.format(type(self).__name__ + '.on_query_completions', prefix))
+
+        with self.backend_mgr:
             begin_time = time.clock()
 
             # Only suggest symbols if the current file is part of a Cabal project.
@@ -235,15 +226,15 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
     def set_cabal_status(self, view):
         filename = view.file_name()
         if filename:
-            # If directory is important: (dir, project_name) = Common.get_cabal_project_dir_and_name_of_file(filename)
-            project_name = Common.get_cabal_project_dir_and_name_of_file(filename)[1]
-            if project_name:
+            # If directory is important: (dir, project_name) = Common.locate_cabal_project(filename)
+            proj_dir, project_name = Common.locate_cabal_project(filename)
+            if proj_dir is not None and project_name is not None:
                 # TODO: Set some useful status instead of this
-                view.set_status('sublime_haskell_cabal', '{0}: {1}'.format('cabal', project_name))
+                view.set_status('sublime_haskell_cabal', 'cabal: {0}'.format(project_name))
 
 
     def trigger_build(self, view):
-        cabal_project_dir, _ = Common.get_cabal_project_dir_and_name_of_view(view)
+        cabal_project_dir, _ = Common.locate_cabal_project_from_view(view)
 
         # don't flycheck
         self.nofly()
@@ -261,18 +252,15 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             view.window().run_command('sublime_haskell_lint')
 
 
-    @need_backend
     def completion_context(self, view, key):
-        chars = {'is_module_completion': '.',
-                 'is_import_completion': '('}
-
         retval = False
-        region = view.sel()[0]
-        if region.a == region.b:
-            word_region = view.word(region)
-            preline = Common.get_line_contents_before_region(view, word_region)
-            preline += chars[key]
-            retval = self.can_complete_qualified_symbol(Common.get_qualified_symbol(preline))
+        with self.backend_mgr:
+            region = view.sel()[0]
+            if region.a == region.b:
+                word_region = view.word(region)
+                preline = Common.get_line_contents_before_region(view, word_region)
+                preline += self.COMPLETION_CHARS[key]
+                retval = self.can_complete_qualified_symbol(Common.get_qualified_symbol(preline))
 
         return retval
 
@@ -379,6 +367,8 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
 
 
     def rescan_source(self, filename):
-        with BackendManager.inspector() as insp:
-            insp.mark_file_dirty(filename)
-        self.update_completions_async(drop_all=True)
+        with self.backend_mgr:
+            with self.backend_mgr.inspector() as insp:
+                insp.mark_file_dirty(filename)
+
+            self.update_completions_async(drop_all=True)
