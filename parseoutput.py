@@ -4,15 +4,12 @@ import os
 import os.path
 import re
 import time
-import threading
 
 import sublime
 
 import SublimeHaskell.cmdwin_types as CommandWin
 import SublimeHaskell.internals.logging as Logging
-import SublimeHaskell.internals.output_collector as OutputCollector
 import SublimeHaskell.internals.settings as Settings
-import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.symbols as symbols
 
@@ -26,8 +23,6 @@ OUTPUT_REGEX = re.compile(r'\s*^(\S*):(\d+):(\d+):(.*$(?:\n^[ \t].*$)*)', re.MUL
 RESULT_FILE_REGEX = r'^\s{2}(\S*?): line (\d+), column (\d+):$'
 
 OUTPUT_PANEL_NAME = 'sublime_haskell_output_panel'
-
-BUILD_LOG_PANEL_NAME = 'sublime_haskell_build_log_panel'
 
 # Global list of errors.
 ERRORS = []
@@ -102,58 +97,6 @@ def set_global_error_messages(messages):
     ERRORS.extend(messages)
 
 
-def run_build_thread(view, cabal_project_dir, msg, cmd, on_done):
-    run_chain_build_thread(view, cabal_project_dir, msg, [cmd], on_done)
-
-
-def run_chain_build_thread(view, cabal_project_dir, msg, cmds, on_done):
-    Common.show_status_message_process(msg, priority=3)
-    Utils.run_async('run_chain_build_thread', wait_for_chain_to_complete, view, cabal_project_dir, msg, cmds, on_done)
-
-
-def wait_for_build_to_complete(view, cabal_project_dir, msg, cmd, on_done):
-    """Run a command, wait for it to complete, then parse and display
-    the resulting errors."""
-
-    wait_for_chain_to_complete(view, cabal_project_dir, msg, [cmd], on_done)
-
-
-def wait_for_chain_to_complete(view, cabal_project_dir, msg, cmds, on_done):
-    """Chains several commands, wait for them to complete, then parse and display
-    the resulting errors."""
-
-    # First hide error panel to show that something is going on
-    sublime.set_timeout(lambda: hide_output(view), 0)
-
-    # run and wait commands, fail on first fail
-    # exit_code has scope outside of the loop
-    # stdout = ''
-    collected_out = []
-    exit_code = 0
-    output_log = Common.output_panel(view.window(), '',
-                                     panel_name=BUILD_LOG_PANEL_NAME,
-                                     panel_display=Settings.PLUGIN.show_output_window)
-    for cmd in cmds:
-        Common.output_text(output_log, ' '.join(cmd) + '...\n')
-
-        # Don't tie stderr to stdout, since we're interested in the error messages
-        out = OutputCollector.OutputCollector(output_log, cmd, cwd=cabal_project_dir)
-        exit_code, cmd_out = out.wait()
-        collected_out.append(cmd_out)
-
-        # Bail if the command failed...
-        if exit_code != 0:
-            break
-
-    if len(collected_out) > 0 or exit_code == 0:
-        # We're going to show the errors in the output panel...
-        Common.hide_panel(view.window(), panel_name=BUILD_LOG_PANEL_NAME)
-
-    # Notify UI thread that commands are done
-    sublime.set_timeout(on_done, 0)
-    parse_output_messages_and_show(view, msg, cabal_project_dir, exit_code, ''.join(collected_out))
-
-
 def format_output_messages(messages):
     """Formats list of messages"""
     summary = {'error': 0, 'warning': 0, 'hint': 0}
@@ -187,32 +130,6 @@ def show_output_result_text(view, msg, text, exit_code, base_dir):
     # Show panel if there is any text to show (without the part that we add)
     if text and Settings.PLUGIN.show_error_window:
         sublime.set_timeout(lambda: write_output(view, output, base_dir), 0)
-
-
-def parse_output_messages_and_show(view, msg, base_dir, exit_code, stderr):
-    """Parse errors and display resulting errors"""
-
-    # The process has terminated; parse and display the output:
-    parsed_messages = parse_output_messages(view, base_dir, stderr)
-    # The unparseable part (for other errors)
-    unparsable = OUTPUT_REGEX.sub('', stderr).strip()
-
-    # Set global error list
-    set_global_error_messages(parsed_messages)
-
-    # If we couldn't parse any messages, just show the stderr
-    # Otherwise the parsed errors and the unparsable stderr remainder
-    outputs = []
-
-    if parsed_messages:
-        outputs += [format_output_messages(parsed_messages)]
-        if unparsable:
-            outputs += ['', '']
-    if unparsable:
-        outputs += ["Collected output:\n", unparsable]
-
-    show_output_result_text(view, msg, '\n'.join(outputs), exit_code, base_dir)
-    sublime.set_timeout(lambda: mark_messages_in_views(parsed_messages), 0)
 
 
 def mark_messages_in_views(errors):

@@ -42,10 +42,11 @@ class BackendWindowCommand(SublimeHaskellWindowCommand):
 
     def is_enabled(self):
         live = BackendMgr.is_live_backend()
+        inspector_busy = BackendMgr.inspector_busy()
         cmd_enabled = super().is_enabled()
         # Logging.log('BackendWindowCommand.is_enabled: is_live_backend {0}, super {1}'.format(live, cmd_enabled),
         #             Logging.LOG_DEBUG)
-        return live and cmd_enabled
+        return live and not inspector_busy and cmd_enabled
 
     def is_visible(self):
         live = BackendMgr.is_live_backend()
@@ -63,10 +64,11 @@ class BackendTextCommand(SublimeHaskellTextCommand):
 
     def is_enabled(self):
         live = BackendMgr.is_live_backend()
+        inspector_busy = BackendMgr.inspector_busy()
         cmd_enabled = super().is_enabled()
         # Logging.log('BackendTextCommand.is_enabled: is_live_backend {0}, super {1}'.format(live, cmd_enabled),
         #             Logging.LOG_DEBUG)
-        return live and cmd_enabled
+        return live and not inspector_busy and cmd_enabled
 
     def is_visible(self):
         live = BackendMgr.is_live_backend()

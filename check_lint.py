@@ -8,7 +8,7 @@ import threading
 import sublime
 
 import SublimeHaskell.cmdwin_types as CommandWin
-import SublimeHaskell.ghcimod.ghci_backend as GHCIMod
+import SublimeHaskell.ghcimod.ghcmod_ops as GHCIMod
 import SublimeHaskell.hsdev.result_parse as HsResultParse
 import SublimeHaskell.internals.backend_mgr as BackendMgr
 import SublimeHaskell.internals.logging as Logging
@@ -47,11 +47,10 @@ def hsdev_lint():
 
 
 def messages_as_hints(cmd):
-    (msg_fn, arg, _, kwargs) = cmd
-    return (msg_fn, arg, lambda ms: [dict(m, level='hint') for m in ms], kwargs)
+    return (cmd[0], cmd[1], lambda ms: [dict(m, level='hint') for m in ms], cmd[3])
 
 
-class SublimeHaskellHsDevChain(CommandWin.SublimeHaskellTextCommand):
+class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
     def __init__(self, view):
         super().__init__(view)
         self.messages = []
@@ -64,7 +63,7 @@ class SublimeHaskellHsDevChain(CommandWin.SublimeHaskellTextCommand):
         self.status_msg = None
 
     def run(self, edit):
-        pass
+        raise NotImplementedError("SublimeHaskellDevChain.run needs an implementation.")
 
     def run_chain(self, cmds, msg, fly_mode=False):
         self.messages = []
@@ -86,10 +85,7 @@ class SublimeHaskellHsDevChain(CommandWin.SublimeHaskellTextCommand):
                     sublime.error_message('Empty command chain (check_lint.run_chain)')
 
     def go_chain(self, cmds):
-        if not cmds:
-            self.status_msg.stop()
-            BackendMgr.active_backend().autofix_show(self.msgs, on_response=self.on_autofix)
-        else:
+        if cmds:
             cmd, tail_cmds = cmds[0], cmds[1:]
             agent_func, modify_args, modify_msgs, kwargs = cmd
 
@@ -104,13 +100,15 @@ class SublimeHaskellHsDevChain(CommandWin.SublimeHaskellTextCommand):
 
             agent_func(modify_args(self.filename), contents=self.contents, wait_complete=False,
                        on_response=go_chain_resp, on_error=go_chain_err, **kwargs)
+        else:
+            self.status_msg.stop()
+            BackendMgr.active_backend().autofix_show(self.msgs, on_response=self.on_autofix)
 
     def on_autofix(self, corrections):
-        output_messages = [ParseOutput.OutputMessage(
-            m['source']['file'],
-            HsResultParse.parse_region(m['region']).to_zero_based(),
-            m['level'].capitalize() + ': ' + m['note']['message'].replace('\n', '\n  '),
-            m['level']) for m in self.messages]
+        output_messages = [ParseOutput.OutputMessage(m['source']['file'],
+                                                     HsResultParse.parse_region(m['region']).to_zero_based(),
+                                                     m['level'].capitalize() + ': ' + m['note']['message'].replace('\n', '\n  '),
+                                                     m['level']) for m in self.messages]
 
         self.corrections = corrections
         for corr in self.corrections:
@@ -207,7 +205,9 @@ def run_ghcmods(cmds, msg, alter_messages_cb=None):
     and show output.
     alter_messages_cb accepts dictionary (cmd => list of output messages)
     """
-    _window, view, file_shown_in_view = Common.get_haskell_command_window_view_file_project()
+
+    # Original: _window, view, file_shown_in_view = Common.get_haskell_command_window_view_file_project()
+    view, file_shown_in_view = Common.get_haskell_command_window_view_file_project()[1:3]
     if not file_shown_in_view:
         return
 

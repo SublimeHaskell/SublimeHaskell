@@ -2,6 +2,7 @@
 import errno
 import os
 import re
+import subprocess
 
 import sublime
 
@@ -53,41 +54,30 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal=None):
     """
 
     ghc_opts_args = get_ghc_opts_args(filename, add_package_db=False, cabal=cabal)
+    command = ['ghc-mod'] + ghc_opts_args + arg_list
 
-    try:
-        command = ['ghc-mod'] + ghc_opts_args + arg_list
+    # Set cwd to user directory
+    # Otherwise ghc-mod will fail with 'cannot satisfy package...'
+    # Seems, that user directory works well
+    # Current source directory is set with -i argument in get_ghc_opts_args
+    #
+    # When cabal project is available current directory is set to the project root
+    # to avoid troubles with possible template haskell openFile calls
+    ghc_mod_current_dir = ProcHelper.get_source_dir(filename)
+    if filename:
+        cabal_project_dir = Common.get_cabal_project_dir_of_file(filename)
+        if cabal_project_dir:
+            ghc_mod_current_dir = cabal_project_dir
 
-        # Logging.log('running ghc-mod: {0}'.format(command))
+    exit_code, out, err = ProcHelper.ProcHelper.run_process(command, cwd=ghc_mod_current_dir)
 
-        # Set cwd to user directory
-        # Otherwise ghc-mod will fail with 'cannot satisfy package...'
-        # Seems, that user directory works well
-        # Current source directory is set with -i argument in get_ghc_opts_args
-        #
-        # When cabal project is available current directory is set to the project root
-        # to avoid troubles with possible template haskell openFile calls
-        ghc_mod_current_dir = ProcHelper.get_source_dir(filename)
-        if filename:
-            cabal_project_dir = Common.get_cabal_project_dir_of_file(filename)
-            if cabal_project_dir:
-                ghc_mod_current_dir = cabal_project_dir
-        exit_code, out, err = ProcHelper.ProcHelper.run_process(command, cwd=ghc_mod_current_dir)
+    # print('call_ghcmod_and_wait: out = {0}'.format(out))
+    # print('call_ghcmod_and_wait: err = {0}'.format(err))
 
-        if exit_code != 0:
-            raise Exception("%s exited with status %d and stderr: %s" % (' '.join(command), exit_code, err))
+    if exit_code != 0:
+        raise Exception("%s exited with status %d and stderr: %s" % (' '.join(command), exit_code, err))
 
-        # return crlf2lf(out)
-        return out
-
-    except OSError as os_exc:
-        if os_exc.errno == errno.ENOENT:
-            Common.output_error_async(sublime.active_window(),
-                                      "SublimeHaskell: ghc-mod was not found!\n"
-                                      "It is used for LANGUAGE and import autocompletions and type inference.\n"
-                                      "Try adjusting the 'add_to_PATH' setting.\n"
-                                      "You can also turn this off using the 'enable_ghc_mod' setting.")
-        # Re-raise so that calling code doesn't try to work on the `None` return value
-        raise os_exc
+    return out
 
 
 def ghcmod_type(filename, module_name, line, column, cabal=None):

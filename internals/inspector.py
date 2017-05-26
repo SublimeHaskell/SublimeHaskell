@@ -48,6 +48,7 @@ class Inspector(object):
         self.cabal_to_load = LockedObject.LockedObject([])
         self.dirty_files = LockedObject.LockedObject([])
         self.dirty_paths = LockedObject.LockedObject([])
+        self.busy = False
 
     def __enter__(self):
         return self
@@ -60,44 +61,48 @@ class Inspector(object):
 
 
     def do_inspection(self):
-        scan_paths = []
-        with self.dirty_paths as dirty_paths:
-            scan_paths = dirty_paths[:]
-            dirty_paths[:] = []
+        self.busy = True
+        try:
+            scan_paths = []
+            with self.dirty_paths as dirty_paths:
+                scan_paths = dirty_paths[:]
+                dirty_paths[:] = []
 
-        files_to_reinspect = []
-        with self.dirty_files as dirty_files:
-            files_to_reinspect = dirty_files[:]
-            dirty_files[:] = []
+            files_to_reinspect = []
+            with self.dirty_files as dirty_files:
+                files_to_reinspect = dirty_files[:]
+                dirty_files[:] = []
 
-        projects = []
-        files = []
-
-        if len(files_to_reinspect) > 0:
             projects = []
             files = []
-            for finspect in files_to_reinspect:
-                projdir = Common.get_cabal_project_dir_of_file(finspect)
-                if projdir is not None:
-                    projects.append(projdir)
-                else:
-                    files.append(finspect)
 
-        projects = list(set(projects))
-        files = list(set(files))
+            if len(files_to_reinspect) > 0:
+                projects = []
+                files = []
+                for finspect in files_to_reinspect:
+                    projdir = Common.get_cabal_project_dir_of_file(finspect)
+                    if projdir is not None:
+                        projects.append(projdir)
+                    else:
+                        files.append(finspect)
 
-        self.inspect(paths=scan_paths, projects=projects, files=files)
+            projects = list(set(projects))
+            files = list(set(files))
 
-        load_cabal = []
-        with self.cabal_to_load as cabal_to_load:
-            load_cabal = cabal_to_load[:]
-            cabal_to_load[:] = []
+            self.inspect(paths=scan_paths, projects=projects, files=files)
 
-        for cabal in load_cabal:
-            Utils.run_async('inspect cabal {0}'.format(cabal), self.inspect_cabal, cabal)
+            load_cabal = []
+            with self.cabal_to_load as cabal_to_load:
+                load_cabal = cabal_to_load[:]
+                cabal_to_load[:] = []
 
-        if files_to_reinspect and Settings.PLUGIN.enable_hdocs:
-            self.backend.docs(files=files_to_reinspect)
+            for cabal in load_cabal:
+                Utils.run_async('inspect cabal {0}'.format(cabal), self.inspect_cabal, cabal)
+
+            if files_to_reinspect and Settings.PLUGIN.enable_hdocs:
+                self.backend.docs(files=files_to_reinspect)
+        finally:
+            self.busy = False
 
     def start_inspect(self):
         self.mark_cabal()
@@ -173,3 +178,6 @@ class Inspector(object):
                               timeout=None,
                               ghc=Settings.PLUGIN.ghc_opts,
                               docs=Settings.PLUGIN.enable_hdocs)
+
+    def is_busy(self):
+        return self.busy
