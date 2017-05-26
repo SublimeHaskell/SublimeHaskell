@@ -16,9 +16,7 @@ import SublimeHaskell.internals.inspector as Inspector
 import SublimeHaskell.internals.utils as Utils
 
 class BackendManager(object, metaclass=Utils.Singleton):
-    '''The backend manager.
-
-    The backend manager is a *singleton* object instantiation of this class.
+    '''The backend manager is a *singleton* object instantiation of this class.
     '''
 
     # Known backends and mapping to metadata
@@ -69,7 +67,35 @@ class BackendManager(object, metaclass=Utils.Singleton):
     }
 
     def __init__(self):
-        '''
+        '''Initializes the backend manager.
+        
+        .. py:attribute:: state
+
+        The :py:class:`BackendManager`'s current state.
+
+        .. py:attribute:: state_lock
+
+        Recursive lock to mediate access to :py:attr:`state`.
+
+        .. py:attribute:: action_lock
+
+        Hard lock to serialize backend life cycle actions. This lock is acquired while initializing and shutting down
+        the backend.
+
+        .. py:attribute:: src_inspector
+
+        The source inspector object, :py:class:`Inspector`.
+
+        .. py:attribute:: current_backend_name
+
+        The name of the current backend. This starts out as the default backend's name, but can be changed to a different
+        backend name.
+
+        .. py:attribute:: possible_backends
+
+        Filtered list of backend names. This is a subset of the *backends* settings, filtered on whether the backend's *type*
+        is avaiable. For example, if *hsdev* is not installed (not available), then none of the *hsdev* backend names are
+        possible (and not in this list).
         '''
         super().__init__()
         BackendManager.ACTIVE_BACKEND = Backend.NullHaskellBackend(self)
