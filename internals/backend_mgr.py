@@ -106,8 +106,6 @@ class BackendManager(object, metaclass=Utils.Singleton):
         self.current_backend_name = BackendManager.ACTIVE_BACKEND.backend_name()
         self.possible_backends = {}
 
-        self.get_backends()
-
 
     def __enter__(self):
         '''Top half of Python context management. This ensures that the backend is started and running when used in a
@@ -139,9 +137,9 @@ class BackendManager(object, metaclass=Utils.Singleton):
             # Take first available because DEFAULT_KNOWN_BACKENDS are listed in order of priority...
             self.possible_backends = self.filter_possible(Settings.PLUGIN.backends, usable_backends)
 
-            print('Available backends: {0}'.format([clazz.backend_name() for clazz in usable_backends]))
+            print('Available backend types: {0}'.format([clazz.backend_name() for clazz in usable_backends]))
             print('plugin \'backends\' {0}'.format([name for name in Settings.PLUGIN.backends]))
-            print('Possible/usable backends: {0}'.format([name for name in self.possible_backends]))
+            print('Possible/usable \'backends\': {0}'.format([name for name in self.possible_backends]))
 
             def_backend, n_defaults = self.get_default_backend(self.possible_backends)
             if n_defaults == 0:
@@ -172,8 +170,8 @@ class BackendManager(object, metaclass=Utils.Singleton):
             with self.action_lock:
                 # Can only start a backend iff in the INITIAL state.
                 Logging.log('Starting backend \'{0}\''.format(self.current_backend_name), Logging.LOG_INFO)
-                backend_info = self.possible_backends[self.current_backend_name]
-                backend_clazz = self.BACKEND_META.get(backend_info.get('backend'), None)
+                backend_info = self.possible_backends.get(self.current_backend_name, {})
+                backend_clazz = self.BACKEND_META.get(backend_info.get('backend') or Backend.NullHaskellBackend.backend_name())
                 if backend_clazz is not None:
                     the_backend = backend_clazz(self, **backend_info.get('options', {}))
                 else:

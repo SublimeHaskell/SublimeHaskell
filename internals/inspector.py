@@ -1,4 +1,5 @@
 
+import os.path
 import threading
 
 import sublime
@@ -122,11 +123,28 @@ class Inspector(object):
             with self.dirty_files as dirty_files:
                 dirty_files.append(filename)
 
-    def mark_cabal(self, cabal_name=None):
-        with self.cabal_to_load as cabal_to_load:
-            cabal_to_load.append(cabal_name or 'cabal')
+    @use_inspect_modules
+    def mark_cabal(self):
+        '''Scam all open window views, adding actual cabal files  or those indirectly identified by the Haskell sources
+        to the list of cabal files to inspect.
+        '''
+        with self.cabal_to_load:
+            cand_cabals = []
+            for window in sublime.windows():
+                for view in window.views():
+                    fname = view.file_name()
+                    if fname is not None:
+                        if fname.endswith('.cabal'):
+                            cand_cabals.append(fname)
+                        elif fname.endswith('.hs'):
+                            proj_dir, proj_name = Common.locate_cabal_project(fname)
+                            if proj_dir is not None and proj_name is not None:
+                                cabal_path = os.path.join(proj_dir, proj_name + '.cabal')
+                                cand_cabals.append(cabal_path)
+            # Make the list of cabal files unique
+            self.cabal_to_load.set(list(set(cand_cabals)))
 
-    def inspect_cabal(self, cabal=None):
+    def inspect_cabal(self, cabal):
         with Common.status_message_process('Inspecting {0}'.format(cabal or 'cabal'), priority=1) as smgr:
             self.backend.scan(cabal=(cabal == 'cabal'),
                               sandboxes=[] if cabal == 'cabal' else [cabal],

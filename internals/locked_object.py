@@ -23,3 +23,7 @@ class LockedObject(object):
 
     def __exit__(self, otype, value, traceback):
         self.object_lock.__exit__(otype, value, traceback)
+
+    def set(self, value):
+        with self.object_lock:
+            self.object = value

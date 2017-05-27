@@ -160,7 +160,7 @@ class SublimeHaskellReplCabal(CommandWin.SublimeHaskellWindowCommand):
         if not self.view:
             Common.show_status_message("No file active", False)
         else:
-            project_dir, project_name = Common.get_cabal_project_dir_and_name_of_view(self.view)
+            project_dir, project_name = Common.locate_cabal_project_from_view(self.view)
             if not project_dir:
                 Common.show_status_message("Not in project", False)
             ## FIXME:
@@ -200,7 +200,7 @@ class SublimeHaskellReplLoad(CommandWin.SublimeHaskellWindowCommand):
         if not view:
             Common.show_status_message("No file active", False)
         else:
-            project_dir = Common.get_cabal_project_dir_and_name_of_view(view)[0]
+            project_dir = Common.locate_cabal_project_from_view(view)[0]
             if not project_dir:
                 self.window.run_command("sublime_haskell_repl_ghci_current_file", {})
             else:

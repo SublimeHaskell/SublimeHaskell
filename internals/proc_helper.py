@@ -192,7 +192,7 @@ def get_source_dir(filename):
         return os.path.expanduser('~')
         # return os.getcwd()
 
-    cabal_dir, _ = Common.get_cabal_project_dir_and_name_of_file(filename)
+    cabal_dir, _ = Common.locate_cabal_project(filename)
     if not cabal_dir:
         return os.path.dirname(filename)
 
