@@ -11,6 +11,7 @@ import SublimeHaskell.internals.backend_mgr as BackendMgr
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.output_collector as OutputCollector
 import SublimeHaskell.internals.proc_helper as ProcHelper
+import SublimeHaskell.internals.regexes as Regexes
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.parseoutput as ParseOutput
@@ -190,9 +191,11 @@ def get_projects():
         def childof(path, prefix):
             return npath(path).startswith(npath(prefix))
 
-        return dict((info['name'], info) for info in filter(
-            lambda p: any([childof(p['path'], f) for f in folders]) or any([childof(src, p['path']) for src in view_files]),
-            (BackendMgr.active_backend().list_projects() or [])))
+        def relevant_project(proj):
+            return any([childof(proj['path'], f) for f in folders]) or any([childof(src, proj['path']) for src in view_files])
+
+        projects = BackendMgr.active_backend().list_projects() or []
+        return dict((info['name'], info) for info in filter(relevant_project, projects))
     else:
         folder_files = [src for f in sublime.active_window().folders() for src in Common.list_files_in_dir_recursively(f) \
                         if os.path.splitext(src)[1] in [".hs", ".cabal"]
@@ -200,7 +203,7 @@ def get_projects():
         view_files = [v.file_name() for v in sublime.active_window().views()
                       if (Common.is_haskell_source(v) or Common.is_cabal_source(v)) and v.file_name()
                      ]
-        src_files = list(map(lambda p: os.path.normcase(os.path.normpath(p)), folder_files + view_files))
+        src_files = [os.path.normcase(os.path.normpath(p)) for p in folder_files + view_files]
         active_projects = []
         while src_files:
             src = src_files.pop()
@@ -307,7 +310,7 @@ def parse_output_messages_and_show(view, msg, base_dir, exit_code, stderr):
     # The process has terminated; parse and display the output:
     parsed_messages = ParseOutput.parse_output_messages(view, base_dir, stderr)
     # The unparseable part (for other errors)
-    unparsable = ParseOutput.OUTPUT_REGEX.sub('', stderr).strip()
+    unparsable = Regexes.OUTPUT_REGEX.sub('', stderr).strip()
 
     # Set global error list
     ParseOutput.set_global_error_messages(parsed_messages)

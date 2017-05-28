@@ -9,18 +9,10 @@ import sublime
 
 import SublimeHaskell.cmdwin_types as CommandWin
 import SublimeHaskell.internals.logging as Logging
+import SublimeHaskell.internals.regexes as Regexes
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.symbols as symbols
-
-# This regex matches an unindented line, followed by zero or more
-# indented, non-empty lines.
-# It also eats whitespace before the first line.
-# The first line is divided into a filename, a line number, and a column.
-OUTPUT_REGEX = re.compile(r'\s*^(\S*):(\d+):(\d+):(.*$(?:\n^[ \t].*$)*)', re.MULTILINE)
-
-# Extract the filename, line, column, and description from an error message:
-RESULT_FILE_REGEX = r'^\s{2}(\S*?): line (\d+), column (\d+):$'
 
 OUTPUT_PANEL_NAME = 'sublime_haskell_output_panel'
 
@@ -179,10 +171,6 @@ def errors_for_view(view):
     return sorted(errs, key=lambda e: e.region)
 
 
-def update_messages_in_view(view, errors):
-    mark_messages_in_view(errors, view)
-
-
 # These next and previous commands were shamelessly copied
 # from the great SublimeClang plugin.
 
@@ -290,7 +278,7 @@ def write_output(view, text, cabal_project_dir, panel_out=True):
                                      panel_name=OUTPUT_PANEL_NAME,
                                      syntax='HaskellOutputPanel',
                                      panel_display=panel_out)
-    ERROR_VIEW.settings().set("result_file_regex", RESULT_FILE_REGEX)
+    ERROR_VIEW.settings().set("result_file_regex", Regexes.RESULT_FILE_REGEX)
     ERROR_VIEW.settings().set("result_base_dir", cabal_project_dir)
 
 
@@ -337,7 +325,7 @@ def ghc_column_to_sublime_column(view, line, column):
 
 def parse_output_messages(view, base_dir, text):
     "Parse text into a list of OutputMessage objects."
-    matches = OUTPUT_REGEX.finditer(text)
+    matches = Regexes.OUTPUT_REGEX.finditer(text)
 
     def to_error(errmsg):
         filename, line, column, messy_details = errmsg.groups()

@@ -175,14 +175,6 @@ class SublimeHaskellCheckAndLint(SublimeHaskellHsDevChain):
                        fly_mode=(kwargs.get('fly') or False))
 
 
-class SublimeHaskellGhcModCheck(CommandWin.SublimeHaskellWindowCommand):
-    def run(self):
-        run_ghcmod(['check'], 'Checking')
-
-    def is_enabled(self):
-        return Common.is_haskell_source(None) and super().is_enabled()
-
-
 class SublimeHaskellGhcModLint(CommandWin.SublimeHaskellWindowCommand):
     def run(self):
         run_ghcmod(['lint', '-h', '-u'], 'Linting', lint_as_hints)

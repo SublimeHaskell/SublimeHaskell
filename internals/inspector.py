@@ -135,12 +135,11 @@ class Inspector(object):
                     fname = view.file_name()
                     if fname is not None:
                         if fname.endswith('.cabal'):
-                            cand_cabals.append(fname)
+                            cand_cabals.append(os.path.dirname(fname))
                         elif fname.endswith('.hs'):
-                            proj_dir, proj_name = Common.locate_cabal_project(fname)
-                            if proj_dir is not None and proj_name is not None:
-                                cabal_path = os.path.join(proj_dir, proj_name + '.cabal')
-                                cand_cabals.append(cabal_path)
+                            proj_dir = Common.locate_cabal_project(fname)[0]
+                            if proj_dir is not None :
+                                cand_cabals.append(proj_dir)
             # Make the list of cabal files unique
             self.cabal_to_load.set(list(set(cand_cabals)))
 

@@ -9,7 +9,6 @@ import sublime
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.proc_helper as ProcHelper
-# import SublimeHaskell.parseoutput as ParseOutput
 
 def ghci_package_db(cabal=None):
     if cabal is not None and cabal != 'cabal':
@@ -43,7 +42,7 @@ def get_ghc_opts_args(filename=None, add_package_db=True, cabal=None):
     opts = get_ghc_opts(filename, add_package_db, cabal)
     args = []
     for opt in opts:
-        args.extend(["-g", "\"" + opt + "\""])
+        args.extend(['-g', opt])
     return args
 
 
@@ -54,7 +53,7 @@ def call_ghcmod_and_wait(arg_list, filename=None, cabal=None):
     """
 
     ghc_opts_args = get_ghc_opts_args(filename, add_package_db=False, cabal=cabal)
-    command = ['ghc-mod'] + ghc_opts_args + arg_list
+    command = ['ghc-mod', '-b', '\n'] + ghc_opts_args + arg_list
 
     # Set cwd to user directory
     # Otherwise ghc-mod will fail with 'cannot satisfy package...'

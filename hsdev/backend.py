@@ -5,6 +5,7 @@ The `hsdev` backend.
 from functools import reduce
 import io
 import os
+import os.path
 import re
 import subprocess
 import threading
@@ -20,6 +21,7 @@ import SublimeHaskell.internals.output_collector as OutputCollector
 import SublimeHaskell.internals.proc_helper as ProcHelper
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.which as Which
+import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.sublime_haskell_common as Common
 
 
@@ -39,13 +41,31 @@ class HsDevBackend(Backend.HaskellBackend):
     HSDEV_MAX_VER = [0, 2, 4, 0]  # maximum hsdev version
     HSDEV_CALL_TIMEOUT = 300.0 # second timeout for synchronous requests
 
-    def __init__(self, backend_mgr, local=False, port=HSDEV_DEFAULT_PORT, host=HSDEV_DEFAULT_HOST):
+    def __init__(self, backend_mgr, local=True, port=HSDEV_DEFAULT_PORT, host=HSDEV_DEFAULT_HOST, **kwargs):
         super().__init__(backend_mgr)
+
+        # Sanity checking:
+        exec_with = kwargs.get('exec-with')
+        install_dir = kwargs.get('install-dir')
+        if exec_with is not None and install_dir is None:
+            sublime.error_message('\n'.join(['\'exec_with\' requires an \'install_dir\'.',
+                                             '',
+                                             'Please check your \'backends\' configuration and retry.']))
+            raise RuntimeError('\'exec_with\' requires an \'install_dir\'.')
+        elif exec_with is not None and exec_with not in ['stack', 'cabal']:
+            sublime.error_message('\n'.join(['Invalid backend \'exec_with\': {0}'.format(exec_with),
+                                             '',
+                                             'Valid values are "cabal" or "stack".',
+                                             'Please check your \'backends\' configuration and retry.']))
+            raise RuntimeError('Invalid backend \'exec_with\': {0}'.format(exec_with))
+
         # Local hsdev server process and params
         self.is_local_hsdev = local
         self.hsdev_process = None
         self.cache = os.path.join(Common.sublime_haskell_cache_path(), 'hsdev')
         self.log_file = os.path.join(Common.sublime_haskell_cache_path(), 'hsdev', 'hsdev.log')
+        self.exec_with = exec_with
+        self.install_dir = Utils.normalize_path(install_dir) if install_dir is not None else None
         # Keep track of the hsdev version early. Needed to patch command line arguments later.
         hsdev_path = Which.which('hsdev', ProcHelper.ProcHelper.get_extended_path())
         self.version = HsDevBackend.hsdev_version() if hsdev_path is not None else [0, 0, 0, 0]
@@ -82,7 +102,11 @@ class HsDevBackend(Backend.HaskellBackend):
             log_config = Settings.PLUGIN.hsdev_log_config
             log_level = Settings.PLUGIN.hsdev_log_level
 
-            cmd = self.concat_args([(True, ["hsdev", "run"]),
+            cmd = self.concat_args([(self.exec_with is not None and self.exec_with == 'cabal', ['cabal', 'exec']),
+                                    (self.exec_with is not None and self.exec_with == 'stack', ['stack', 'exec']),
+                                    (True, ["hsdev"]),
+                                    (self.exec_with is not None, ['--']),
+                                    (True, ["run"]),
                                     (self.port, ["--port", str(self.port)]),
                                     (self.cache, ["--cache", self.cache]),
                                     (self.log_file, ["--log", self.log_file]),
@@ -91,7 +115,11 @@ class HsDevBackend(Backend.HaskellBackend):
 
             Logging.log('hsdev command: {0}'.format(cmd), Logging.LOG_DEBUG)
 
-            hsdev_proc = ProcHelper.ProcHelper(cmd)
+            proc_args = {}
+            if self.install_dir is not None:
+                proc_args['cwd'] = self.install_dir
+
+            hsdev_proc = ProcHelper.ProcHelper(cmd, **proc_args)
             if hsdev_proc.process is not None:
                 # Use TextIOWrapper here because it combines decoding with newline handling,
                 # which means less to maintain.
@@ -161,6 +189,20 @@ class HsDevBackend(Backend.HaskellBackend):
 
     def is_live_backend(self):
         return self.client.is_connected()
+
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+    # File/project tracking functions:
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+    def add_project_file(self, filename, project, project_dir):
+        pass
+
+    def remove_project_file(self, filename, project, project_dir):
+        pass
+
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+    # Utility functions used to implement the API:
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
     @staticmethod
     def hsdev_version():
@@ -261,7 +303,9 @@ class HsDevBackend(Backend.HaskellBackend):
                                   on_response=on_response, on_notify=on_notify, on_error=on_error,
                                   on_result_part=on_result_part, split_result=split_result)
 
-    # Commands
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+    # API implementation:
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
     def link(self, hold=False):
         return self.command('link', {'hold': hold})

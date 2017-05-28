@@ -26,7 +26,7 @@ def access_sync(lock_name):
         return synced_method
     return decorator
 
-KEY_COMPONENT_DEBUG_DEBUG = 'backend_debug'
+KEY_COMPONENT_DEBUG_DEBUG = 'component_debug'
 
 class SettingsContainer(object):
     """Container object for default and user preference settings."""
@@ -46,7 +46,7 @@ class SettingsContainer(object):
         'auto_completion_popup': ('auto_completion_popup', False),
         'auto_run_tests': ('auto_run_tests', True),
         'backends': ('backends', {}),
-        KEY_COMPONENT_DEBUG_DEBUG: ('backend_debug', []),
+        KEY_COMPONENT_DEBUG_DEBUG: ('component_debug', []),
         'enable_auto_build': ('enable_auto_build', False),
         'enable_auto_check': ('enable_auto_check', True),
         'enable_auto_lint': ('enable_auto_lint', True),
@@ -77,7 +77,7 @@ class SettingsContainer(object):
         self.auto_completion_popup = None
         self.auto_run_tests = None
         self.backends = {}
-        self.backend_debug = []
+        self.component_debug = []
         self.enable_auto_build = None
         self.enable_auto_check = None
         self.enable_auto_lint = None
@@ -228,7 +228,7 @@ def load_settings():
     COMPONENT_DEBUG = ComponentDebug()
 
     PLUGIN.load()
-    COMPONENT_DEBUG.load(PLUGIN.backend_debug or [])
+    COMPONENT_DEBUG.load(PLUGIN.component_debug or [])
 
     if _changes is not None:
         PLUGIN.changes = _changes

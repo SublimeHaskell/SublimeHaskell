@@ -69,6 +69,16 @@ class HaskellBackend(object):
         raise NotImplementedError('HaskellBackend.is_alive_backend needs an implementation.')
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+    # File/project tracking functions:
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+    def add_project_file(self, filename, project, project_dir):
+        raise NotImplementedError('HaskellBackend.add_project_file needs an implementation.')
+
+    def remove_project_file(self, filename, project, project_dir):
+        raise NotImplementedError('HaskellBackend.remove_project_file needs an implementation.')
+
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # API/action functions:
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
@@ -99,6 +109,26 @@ class HaskellBackend(object):
         raise NotImplementedError("HaskellBackend.list_packages needs an implementation.")
 
     def list_projects(self, **backend_args):
+        '''Query the list of active projects. The return is a list of dictionary items, where each directionary
+        entry is::
+
+            {'cabal': '<absolute path to .cabal file>',
+             'description': {'executables': [{'info': {'build-depends': [<module dependencies>],
+                                                       'extensions': [],
+                                                       'ghc-options': [<ghc options>],
+                                                       'language': 'Haskell2010',
+                                                       'source-dirs': [<source directories>]},
+                                              'name': '<project name>',
+                                              'path': '<main haskell source file>'}],
+                             'library': None,
+                             'tests': [],
+                             'version': '<version string>'},
+             'name': '<project name>',
+             'path': '<absolute path to top of the project>'}
+
+         The *name* and *path* elements are mandatory. *description* should be collected from the Cabal file,
+         but generally appears to be optional (SublimeHaskell doesn't use it.)
+         '''
         raise NotImplementedError("HaskellBackend.list_projects needs an implementation.")
 
     def symbol(self, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
@@ -140,23 +170,36 @@ class HaskellBackend(object):
         raise NotImplementedError("HaskellBackend.cabal_list needs an implementation.")
 
     def lint(self, files=None, contents=None, hlint=None, wait_complete=True, **backend_args):
+        '''Runs 'hlint' over a file (or its contents, if provided) and returns a list of suggestions with their
+        locations in the source. Each suggestion is a dictionary with the following structure::
+
+            {'level': 'hint',
+             'note': {'corrector': {'contents': '<text to insert as a correction>',
+                                    'region': {'from': {'column': 0, 'line': 21},
+                                               'to': {'column': 25, 'line': 21}}},
+                      'message': '<hint text>'},
+             'region': {'from': {'column': 1, 'line': 22},
+                        'to': {'column': 26, 'line': 22}},
+             'source': {'file': '<absolute path to source>',
+                        'project': None}}
+        '''
         raise NotImplementedError("HaskellBackend.lint needs an implementation.")
 
     def check(self, files=None, contents=None, ghc=None, wait_complete=True, **backend_args):
         '''Runs the compiler over a file (or its contents, if provided) and returns a list of warnings and errors,
-           as well as their locations in the source::
+           as well as their locations in the source. Each error or warning has the following dictionary structure::
 
               [{'level': 'error',
                 'note': {'message': "<message>", 'suggestion': None},
                 'region': {'from': {'column': 15, 'line': 18},
                            'to': {'column': 23, 'line': 18}},
-                 'source': {'file': 'Source.hs',
+                 'source': {'file': '<absolute path to source>',
                             'project': None}},
-                {'level': 'error',
+                {'level': 'warning',
                  'note': {'message': "<message 2>", 'suggestion': None},
                  'region': {'from': {'column': 29, 'line': 22},
                             'to': {'column': 37, 'line': 22}},
-                 'source': {'file': 'Source.hs',
+                 'source': {'file': '<absolute path to source>',
                             'project': None}}]}
         '''
         raise NotImplementedError("HaskellBackend.lint needs an implementation.")
@@ -240,6 +283,16 @@ class NullHaskellBackend(HaskellBackend, metaclass=Utils.Singleton):
         '''The NullHaskellBackend is never alive.
         '''
         return False
+
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+    # File/project tracking functions:
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+    def add_project_file(self, filename, project, project_dir):
+        pass
+
+    def remove_project_file(self, filename, project, project_dir):
+        pass
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # API/action functions:

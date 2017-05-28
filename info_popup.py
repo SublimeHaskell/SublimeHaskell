@@ -10,7 +10,7 @@ import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.internals.unicode_opers as UnicodeOpers
 import SublimeHaskell.symbols as symbols
 import SublimeHaskell.internals.backend_mgr as BackendManager
-import SublimeHaskell.parseoutput as parseoutput
+import SublimeHaskell.parseoutput as ParseOutput
 import SublimeHaskell.types as types
 
 
@@ -158,7 +158,7 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
         elif hover_zone == sublime.HOVER_GUTTER:
             self.view = view
             self.current_file_name = self.view.file_name()
-            errs = list(filter(lambda e: e.region.start.line == line, parseoutput.errors_for_view(self.view)))
+            errs = list(filter(lambda e: e.region.start.line == line, ParseOutput.errors_for_view(self.view)))
             if errs:
                 popup_parts = [SUBHASK_STYLES.gen_style(self.view.settings().get('color_scheme'))]
                 for err in errs:
@@ -214,7 +214,7 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
                 webbrowser.open(url)
             elif url[0:8] == 'autofix:':
                 rgn = symbols.Region.from_str(url[8:])
-                errs = parseoutput.errors_for_view(self.view)
+                errs = ParseOutput.errors_for_view(self.view)
                 # Give err_text, err_rgn scope other than the loop.
                 err_text = ''
                 err_rgn = None
@@ -222,9 +222,9 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
                 for err in errs:
                     if err.correction is not None and err.correction.corrector.region == rgn:
                         err.erase_from_view()
-                        parseoutput.ERRORS.remove(err)
+                        ParseOutput.ERRORS.remove(err)
                         errs.remove(err)
-                        parseoutput.update_messages_in_view(self.view, errs)
+                        ParseOutput.mark_messages_in_view(errs, self.view)
 
                         corrector = err.correction.corrector
                         err_rgn = corrector.to_region(self.view)

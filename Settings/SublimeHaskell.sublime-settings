@@ -131,6 +131,26 @@
                 "port": 4567
             }
         },
+        "Cabal-sandboxed local hsdev": {
+            "default": true,
+            "backend": "hsdev",
+            "options": {
+              "local": true,
+              "port": 4567,
+              "exec-with": "cabal",
+              "install-dir": "$HOME/play/haskell/hsdev"
+            }
+        },
+        "Stack-exec-ed local hsdev": {
+            "default": true,
+            "backend": "hsdev",
+            "options": {
+              "local": true,
+              "port": 4567,
+              "exec-with": "stack",
+              "install-dir": "$HOME/play/haskell/hsdev"
+            }
+        },
         "No backend": {
             "default": false,
             "backend": "none"
@@ -189,5 +209,5 @@
     // "send_messages": Emit all sent messages
     // "recv_messages": Emit all received messages
     // "socket_pool": Keep track of the socket pool avail/used sizes.
-    "backend_debug": []
+    "component_debug": []
 }
