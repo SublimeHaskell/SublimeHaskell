@@ -5,6 +5,7 @@ import sublime_plugin
 import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.internals.settings as Settings
 
 
 class SublimeHaskellStartBackend(sublime_plugin.WindowCommand):
@@ -89,7 +90,17 @@ class SublimeHaskellChooseBackend(sublime_plugin.WindowCommand):
         if idx >= 0:
             def start_new_backend():
                 backend_name = self.backend_names[idx]
-                with Common.status_message_process('Changing backend to \'{0}\' backend'.format(backend_name), priority=2):
+                with Common.status_message_process('Changing backend to \'{0}\''.format(backend_name), priority=2):
                     BackendManager.BackendManager().change_current_backend(backend_name)
+                    cabal_project_status(self.window.active_view(), BackendManager.BackendManager())
 
             Utils.run_async('change backend: startup', start_new_backend)
+
+def cabal_project_status(view, backend_mgr):
+    vsettings = view.settings()
+    project_name = vsettings.get(Settings.SETTING_SUBHASK_PROJECT)
+    if project_name is None:
+        project_name = '_unknown_'
+
+    active_backend = backend_mgr.active_backend()
+    view.set_status('sublime_haskell_cabal', 'cabal: {0} [{1}]'.format(project_name, active_backend.backend_name()))

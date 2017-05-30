@@ -13,6 +13,13 @@ import sublime
 
 import SublimeHaskell.internals.locked_object as LockedObject
 
+SETTING_SUBHASK_PROJECT = 'subhask_project_name'
+'''View-private setting that identifies the project to which a view belongs. This is the cabal file's name, without the
+'.cabal'extension.'''
+
+SETTING_SUBHASK_PROJDIR = 'subhask_project_dir'
+'''View-private setting that identifies the project directory in which the project's cabal file can be found.'''
+
 def access_sync(lock_name):
     '''Decorate a function that requires lock synchronization: acquire the lock named `lock_name` (a member of an object)
     and execute a function. This ensures that readers and writers don't collide with each other.'''

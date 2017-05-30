@@ -112,10 +112,15 @@ class Inspector(object):
     @use_inspect_modules
     def mark_all_files(self):
         for window in sublime.windows():
-            with self.dirty_files as dirty_files:
+            dirty_files = []
+            with self.dirty_files:
                 dirty_files.extend(list(filter(lambda f: f and f.endswith('.hs'), [v.file_name() for v in window.views()])))
-            with self.dirty_paths as dirty_paths:
+                self.dirty_files.set(dirty_files)
+
+            dirty_paths = []
+            with self.dirty_paths:
                 dirty_paths.extend(window.folders())
+                self.dirty_paths.set(dirty_paths)
 
     @use_inspect_modules
     def mark_file_dirty(self, filename):
@@ -138,7 +143,7 @@ class Inspector(object):
                             cand_cabals.append(os.path.dirname(fname))
                         elif fname.endswith('.hs'):
                             proj_dir = Common.locate_cabal_project(fname)[0]
-                            if proj_dir is not None :
+                            if proj_dir is not None:
                                 cand_cabals.append(proj_dir)
             # Make the list of cabal files unique
             self.cabal_to_load.set(list(set(cand_cabals)))

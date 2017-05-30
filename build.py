@@ -141,25 +141,24 @@ class SublimeHaskellBaseCommand(CommandWin.SublimeHaskellWindowCommand):
             on_selected(psel[0], psel[1]['path'])
 
         if len(projs) == 0:
-            Common.show_status_message("No projects found, did you add a '.cabal' file?", is_ok=False, priority=5)
-            return
-        if len(projs) == 1:  # There's only one project, build it
+            Common.show_status_message("No active projects found.", is_ok=False, priority=5)
+        elif len(projs) == 1:
+            # There's only one project, build it
             run_selected(projs[0])
-            return
+        else:
+            _, cabal_project_name = Common.locate_cabal_project_from_view(self.window.active_view())
+            Logging.log('Current project: {0}'.format(cabal_project_name))
 
-        _, cabal_project_name = Common.locate_cabal_project_from_view(self.window.active_view())
-        Logging.log('Current project: {0}'.format(cabal_project_name))
+            # Sort by name
+            projs.sort(key=lambda p: p[0])
 
-        # Sort by name
-        projs.sort(key=lambda p: p[0])
+            current_project_idx = next((i for i, p in enumerate(projs) if p[0] == cabal_project_name), -1)
 
-        current_project_idx = next((i for i, p in enumerate(projs) if p[0] == cabal_project_name), -1)
+            def on_done(idx):
+                if idx != -1:
+                    run_selected(projs[idx])
 
-        def on_done(idx):
-            if idx != -1:
-                run_selected(projs[idx])
-
-        self.window.show_quick_panel(list(map(lambda m: [m[0], m[1]['path']], projs)), on_done, 0, current_project_idx)
+            self.window.show_quick_panel(list(map(lambda m: [m[0], m[1]['path']], projs)), on_done, 0, current_project_idx)
 
 
 def is_stack_project(project_dir):
@@ -179,40 +178,21 @@ def stack_dist_path(project_dir):
 
 # Retrieve projects as dictionary that refers to this app instance
 def get_projects():
-    if BackendMgr.is_live_backend():
-        folders = sublime.active_window().folders()
-        view_files = [v.file_name() for v in sublime.active_window().views()
-                      if (Common.is_haskell_source(v) or Common.is_cabal_source(v)) and v.file_name()
-                     ]
+    folders = sublime.active_window().folders()
+    view_files = [v.file_name() for v in sublime.active_window().views()
+                  if (Common.is_haskell_source(v) or Common.is_cabal_source(v)) and v.file_name()]
 
-        def npath(path):
-            return os.path.normcase(os.path.normpath(path))
+    def npath(path):
+        return os.path.normcase(os.path.normpath(path))
 
-        def childof(path, prefix):
-            return npath(path).startswith(npath(prefix))
+    def childof(path, prefix):
+        return npath(path).startswith(npath(prefix))
 
-        def relevant_project(proj):
-            return any([childof(proj['path'], f) for f in folders]) or any([childof(src, proj['path']) for src in view_files])
+    def relevant_project(proj):
+        return any([childof(proj['path'], f) for f in folders]) or any([childof(src, proj['path']) for src in view_files])
 
-        projects = BackendMgr.active_backend().list_projects() or []
-        return dict((info['name'], info) for info in filter(relevant_project, projects))
-    else:
-        folder_files = [src for f in sublime.active_window().folders() for src in Common.list_files_in_dir_recursively(f) \
-                        if os.path.splitext(src)[1] in [".hs", ".cabal"]
-                       ]
-        view_files = [v.file_name() for v in sublime.active_window().views()
-                      if (Common.is_haskell_source(v) or Common.is_cabal_source(v)) and v.file_name()
-                     ]
-        src_files = [os.path.normcase(os.path.normpath(p)) for p in folder_files + view_files]
-        active_projects = []
-        while src_files:
-            src = src_files.pop()
-            proj_dir, proj_name = Common.locate_cabal_project(src)
-            if proj_dir:
-                active_projects.append((proj_name, proj_dir))
-                src_files = [f for f in src_files if not f.startswith(proj_dir)]
-
-        return dict((name, {'name': name, 'path': path}) for name, path in active_projects)
+    projects = BackendMgr.active_backend().list_projects() or []
+    return dict((info['name'], info) for info in projects if relevant_project(info))
 
 
 def run_build(view, project_name, project_dir, config):

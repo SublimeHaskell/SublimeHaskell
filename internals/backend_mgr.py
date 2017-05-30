@@ -68,7 +68,7 @@ class BackendManager(object, metaclass=Utils.Singleton):
 
     def __init__(self):
         '''Initializes the backend manager.
-        
+
         .. py:attribute:: state
 
         The :py:class:`BackendManager`'s current state.
@@ -96,6 +96,10 @@ class BackendManager(object, metaclass=Utils.Singleton):
         Filtered list of backend names. This is a subset of the *backends* settings, filtered on whether the backend's *type*
         is avaiable. For example, if *hsdev* is not installed (not available), then none of the *hsdev* backend names are
         possible (and not in this list).
+
+        .. py:attribute:: project_cache
+
+        A mapping between project names and files associated with each project.
         '''
         super().__init__()
         BackendManager.ACTIVE_BACKEND = Backend.NullHaskellBackend(self)
@@ -105,6 +109,7 @@ class BackendManager(object, metaclass=Utils.Singleton):
         self.src_inspector = Inspector.Inspector(BackendManager.ACTIVE_BACKEND)
         self.current_backend_name = BackendManager.ACTIVE_BACKEND.backend_name()
         self.possible_backends = {}
+        self.project_cache = {}
 
 
     def __enter__(self):
@@ -232,6 +237,7 @@ class BackendManager(object, metaclass=Utils.Singleton):
             self.current_backend_name = new_backend_name
             self.set_state(self.INITIAL)
             self.initialize()
+            self.reassociate_all_files()
 
 
     def state_startup(self, backend):
@@ -344,6 +350,25 @@ class BackendManager(object, metaclass=Utils.Singleton):
     def inspector_busy(self):
         return self.src_inspector.is_busy()
 
+
+    def add_project_file(self, filename, project_name, project_dir):
+        ## Update the project cache if needed (does not persist...)
+        if project_dir not in self.project_cache:
+            self.project_cache[project_dir] = {}
+
+        # Update our project cache, passing it on to the backend.
+        cache_entry = self.project_cache[project_dir]
+        if filename not in cache_entry:
+            cache_entry[filename] = (1, project_name)
+            # Let backend know that we're associating the project with a file...
+            self.active_backend().add_project_file(filename, project_name, project_dir)
+
+    def reassociate_all_files(self):
+        for project_dir in self.project_cache:
+            proj_cache = self.project_cache[project_dir]
+            for project_file in proj_cache:
+                proj_info = proj_cache[project_file]
+                self.active_backend().add_project_file(project_file, proj_info[1], project_dir)
 
     @staticmethod
     def active_backend():

@@ -23,6 +23,9 @@ __pycache__/
 *.log
 .build
 
+# misc stuff
+pylint.out
+
 # ST3 stuff
 subhask.sublime-workspace
 

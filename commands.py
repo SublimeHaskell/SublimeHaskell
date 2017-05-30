@@ -7,7 +7,7 @@ import webbrowser
 import sublime
 import sublime_plugin
 
-import SublimeHaskell.autocomplete as autocomplete
+# import SublimeHaskell.autocomplete as autocomplete
 import SublimeHaskell.cmdwin_types as CommandWin
 import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.hsdev.result_parse as HsDevResultParse

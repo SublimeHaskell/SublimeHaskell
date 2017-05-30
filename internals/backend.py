@@ -4,6 +4,7 @@
 
 # [SublimeLinter pylint-disable:"W0613"]
 
+import pprint
 import SublimeHaskell.internals.utils as Utils
 
 class HaskellBackend(object):
@@ -14,6 +15,8 @@ class HaskellBackend(object):
     def __init__(self, backend_mgr):
         super().__init__()
         self.backend_mgr = backend_mgr
+        # The file to (project, project directory) mapping
+        self.file_to_project = {}
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # Management functions:
@@ -73,10 +76,12 @@ class HaskellBackend(object):
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
     def add_project_file(self, filename, project, project_dir):
-        raise NotImplementedError('HaskellBackend.add_project_file needs an implementation.')
+        # print('add_project_file {0} {1} {2}'.format(filename, project, project_dir))
+        if filename not in self.file_to_project:
+            self.file_to_project[filename] = (project, project_dir)
 
-    def remove_project_file(self, filename, project, project_dir):
-        raise NotImplementedError('HaskellBackend.remove_project_file needs an implementation.')
+    def remove_project_file(self, filename):
+        self.file_to_project.pop(filename)
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # API/action functions:
@@ -109,7 +114,7 @@ class HaskellBackend(object):
         raise NotImplementedError("HaskellBackend.list_packages needs an implementation.")
 
     def list_projects(self, **backend_args):
-        '''Query the list of active projects. The return is a list of dictionary items, where each directionary
+        '''Query the list of known projects. The return is a list of dictionary items, where each directionary
         entry is::
 
             {'cabal': '<absolute path to .cabal file>',
@@ -127,9 +132,16 @@ class HaskellBackend(object):
              'path': '<absolute path to top of the project>'}
 
          The *name* and *path* elements are mandatory. *description* should be collected from the Cabal file,
-         but generally appears to be optional (SublimeHaskell doesn't use it.)
+         but generally appears to be optional (SublimeHaskell doesn't use it at the moment, but the *hsdev*
+         backend generates the info.)
          '''
-        raise NotImplementedError("HaskellBackend.list_projects needs an implementation.")
+        project_info = []
+        for pinfo in self.file_to_project.values():
+            if pinfo not in project_info:
+                project_info.append(pinfo)
+
+        project_list = [dict([('name', pinfo[0]), ('path', pinfo[1])]) for pinfo in project_info]
+        return self.dispatch_callbacks(project_list, **backend_args)
 
     def symbol(self, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
                cabal=False, symdb=None, package=None, source=False, standalone=False, local_names=False, **backend_args):
@@ -241,7 +253,7 @@ class HaskellBackend(object):
 
 # ylint: disable=W0613
 
-class NullHaskellBackend(HaskellBackend, metaclass=Utils.Singleton):
+class NullHaskellBackend(HaskellBackend):
     ''' For Haskellers: The Identity Backend. For ordinary mortals, this is the null, do-nothing Haskell backend. It does
     something sensible for all functions. The primary use case is to provide something sensible when no other backend is
     available or active.
@@ -289,7 +301,7 @@ class NullHaskellBackend(HaskellBackend, metaclass=Utils.Singleton):
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
     def add_project_file(self, filename, project, project_dir):
-        pass
+        super().add_project_file(filename, project, project_dir)
 
     def remove_project_file(self, filename, project, project_dir):
         pass
@@ -325,7 +337,8 @@ class NullHaskellBackend(HaskellBackend, metaclass=Utils.Singleton):
         return self.dispatch_callbacks([], **backend_args)
 
     def list_projects(self, **backend_args):
-        return self.dispatch_callbacks([], **backend_args)
+        # Yes, I know. This is gratuitous. But clear in what is intended.
+        return super().list_projects(**backend_args)
 
     def symbol(self, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
                cabal=False, symdb=None, package=None, source=False, standalone=False, local_names=False, **backend_args):

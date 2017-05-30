@@ -56,7 +56,7 @@ class Worker(object, metaclass=Singleton):
         while True:
             name, worker_fn, args, kwargs = self.jobs.get()
             try:
-                Logging.log('worker: {0}'.format(name))
+                Logging.log('worker: {0}'.format(name), Logging.LOG_DEBUG)
                 worker_fn(*args, **kwargs)
             except Exception:
                 Logging.log('worker: job {0} failed, see console window traceback'.format(name), Logging.LOG_ERROR)

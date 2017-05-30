@@ -7,6 +7,7 @@ import sublime
 import sublime_plugin
 
 import SublimeHaskell.autocomplete as Autocomplete
+import SublimeHaskell.backend_cmds as BackendCmds
 import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.internals.locked_object as LockedObject
 import SublimeHaskell.internals.logging as Logging
@@ -77,19 +78,11 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
     COMPLETION_CHARS = {'is_module_completion': '.',
                         'is_import_completion': '('}
 
-    SETTING_SUBHASK_PROJECT = 'subhask_project_name'
-    '''View-private setting that identifies the project to which a view belongs. This is the cabal file's name, without the
-    '.cabal'extension.'''
-
-    SETTING_SUBHASK_PROJDIR = 'subhask_project_dir'
-    '''View-private setting that identifies the project directory in which the project's cabal file can be found.'''
-
     def __init__(self):
         super().__init__()
         self.backend_mgr = BackendManager.BackendManager()
         self.type_cache = Types.SourceHaskellTypeCache()
         self.autocompleter = Autocomplete.AutoCompleter()
-        self.project_cache = {}
         # Fly mode state:
         self.fly_view = LockedObject.LockedObject({'view': None, 'mtime': None})
         self.fly_event = threading.Event()
@@ -250,27 +243,18 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
     def assoc_to_project(self, view, filename):
         ## SURPRISE! These settings persist across invocations of ST! (Actually, not a bad thing.)
         vsettings = view.settings()
-        project_name = vsettings.get(self.SETTING_SUBHASK_PROJECT)
-        project_dir = vsettings.get(self.SETTING_SUBHASK_PROJDIR)
+        project_name = vsettings.get(Settings.SETTING_SUBHASK_PROJECT)
+        project_dir = vsettings.get(Settings.SETTING_SUBHASK_PROJDIR)
         if project_dir is None or project_name is None:
             project_dir, project_name = Common.locate_cabal_project(filename)
             if project_name is None:
                 project_name = '_unknown_'
 
-            vsettings.set(self.SETTING_SUBHASK_PROJECT, project_name)
-            vsettings.set(self.SETTING_SUBHASK_PROJDIR, project_dir)
+            vsettings.set(Settings.SETTING_SUBHASK_PROJECT, project_name)
+            vsettings.set(Settings.SETTING_SUBHASK_PROJDIR, project_dir)
 
-        ## Update the project cache if needed (does not persist...)
-        if project_dir not in self.project_cache:
-            self.project_cache[project_dir] = {}
-
-        # Update our project cache, passing it on to the backend.
-        cache_entry = self.project_cache[project_dir]
-        if filename not in cache_entry:
-            cache_entry[filename] = 1
-            self.backend_mgr.active_backend().add_project_file(filename, project_name, project_dir)
-
-        view.set_status('sublime_haskell_cabal', 'cabal: {0}'.format(project_name))
+        self.backend_mgr.add_project_file(filename, project_name, project_dir)
+        BackendCmds.cabal_project_status(view, self.backend_mgr)
 
 
     def trigger_build(self, view):

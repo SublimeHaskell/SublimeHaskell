@@ -197,7 +197,7 @@ class HsDevBackend(Backend.HaskellBackend):
     def add_project_file(self, filename, project, project_dir):
         pass
 
-    def remove_project_file(self, filename, project, project_dir):
+    def remove_project_file(self, filename):
         pass
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-

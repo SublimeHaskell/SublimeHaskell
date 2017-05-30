@@ -11,6 +11,7 @@ import sublime
 import sublime_plugin
 
 import SublimeHaskell.internals.locked_object as LockedObject
+import SublimeHaskell.internals.settings as Settings
 
 # Maximum seconds to wait for window to appear
 # This dirty hack is used in wait_for_window function
@@ -76,17 +77,25 @@ def locate_cabal_project_from_view(view):
     source code, and the file must be under a directory containing a .cabal file.
     Otherwise, return None.
     """
-    # Check that the view is showing a saved file:
-    file_shown_in_view = view.file_name()
-    if file_shown_in_view is None:
-        return None, None
+
+    # Use cached info whenever possible.
+    vsettings = view.settings()
+    proj_name = vsettings.get(Settings.SETTING_SUBHASK_PROJECT)
+    projdir = vsettings.get(Settings.SETTING_SUBHASK_PROJDIR)
+    if proj_name is not None and projdir is not None:
+        return projdir, proj_name
     else:
-        # Check that the file is Haskell source code:
-        syntax_file_for_view = view.settings().get('syntax').lower()
-        if 'haskell' not in syntax_file_for_view:
+        # Check that the view is showing a saved file:
+        file_shown_in_view = view.file_name()
+        if file_shown_in_view is None:
             return None, None
         else:
-            return locate_cabal_project(file_shown_in_view)
+            # Check that the file is Haskell source code:
+            syntax_file_for_view = view.settings().get('syntax').lower()
+            if 'haskell' not in syntax_file_for_view:
+                return None, None
+            else:
+                return locate_cabal_project(file_shown_in_view)
 
 
 def locate_cabal_project(filename):
