@@ -114,7 +114,7 @@ class GHCModBackend(Backend.HaskellBackend):
             #     cmd += ['--']
 
             cmd += ['-b', '\\n', '--line-prefix', self.GHCMOD_OUTPUT_MARKER + ',' + self.GHCMOD_ERROR_MARKER]
-            cmd += GHCIMod.get_ghc_opts_args(filename, add_package_db=True, cabal=project_dir)
+            cmd += self.get_ghc_opts_args(filename, add_package_db=True, cabal=project_dir)
             cmd += ['legacy-interactive']
 
             Logging.log('ghc-mod command: {0}'.format(cmd), Logging.LOG_DEBUG)
@@ -311,6 +311,42 @@ class GHCModBackend(Backend.HaskellBackend):
             retval = backend_info[1]
 
         return retval
+
+
+    def ghci_package_db(self, cabal):
+        if cabal is not None and cabal != 'cabal':
+            package_conf = [pkg for pkg in os.listdir(cabal) if re.match(r'packages-(.*)\.conf', pkg)]
+            if package_conf:
+                return os.path.join(cabal, package_conf)
+
+        return None
+
+
+    def get_ghc_opts(self, filename, add_package_db, cabal):
+        """
+        Gets ghc_opts, used in several tools, as list with extra '-package-db' option and '-i' option if filename passed
+        """
+        ghc_opts = Settings.PLUGIN.ghc_opts or []
+        if add_package_db:
+            package_db = self.ghci_package_db(cabal=cabal)
+            for pkgdb in package_db or []:
+                ghc_opts.append('-package-db {0}'.format(pkgdb))
+
+        if filename:
+            ghc_opts.append('-i {0}'.format(ProcHelper.get_source_dir(filename)))
+
+        return ghc_opts
+
+
+    def get_ghc_opts_args(self, filename, add_package_db, cabal):
+        """
+        Same as ghc_opts, but uses '-g' option for each option
+        """
+        opts = self.get_ghc_opts(filename, add_package_db, cabal)
+        args = []
+        for opt in opts:
+            args.extend(['-g', opt])
+        return args
 
     def command_backend(self, filename, cmd):
         resp_stdout = []

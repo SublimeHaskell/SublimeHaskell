@@ -195,10 +195,10 @@ class HsDevBackend(Backend.HaskellBackend):
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
     def add_project_file(self, filename, project, project_dir):
-        pass
+        super().add_project_file(filename, project, project_dir)
 
     def remove_project_file(self, filename):
-        pass
+        super().remove_project_file(filename)
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # Utility functions used to implement the API:

@@ -10,41 +10,6 @@ import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.proc_helper as ProcHelper
 
-def ghci_package_db(cabal=None):
-    if cabal is not None and cabal != 'cabal':
-        package_conf = [pkg for pkg in os.listdir(cabal) if re.match(r'packages-(.*)\.conf', pkg)]
-        if package_conf:
-            return os.path.join(cabal, package_conf)
-
-    return None
-
-
-def get_ghc_opts(filename, add_package_db=True, cabal=None):
-    """
-    Gets ghc_opts, used in several tools, as list with extra '-package-db' option and '-i' option if filename passed
-    """
-    ghc_opts = Settings.PLUGIN.ghc_opts or []
-    if add_package_db:
-        package_db = ghci_package_db(cabal=cabal)
-        for pkgdb in package_db or []:
-            ghc_opts.append('-package-db {0}'.format(pkgdb))
-
-    if filename:
-        ghc_opts.append('-i {0}'.format(ProcHelper.get_source_dir(filename)))
-
-    return ghc_opts
-
-
-def get_ghc_opts_args(filename=None, add_package_db=True, cabal=None):
-    """
-    Same as ghc_opts, but uses '-g' option for each option
-    """
-    opts = get_ghc_opts(filename, add_package_db, cabal)
-    args = []
-    for opt in opts:
-        args.extend(['-g', opt])
-    return args
-
 
 def call_ghcmod_and_wait(arg_list, filename=None, cabal=None):
     """
