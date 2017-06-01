@@ -79,23 +79,26 @@ def locate_cabal_project_from_view(view):
     """
 
     # Use cached info whenever possible.
+    ## SURPRISE! These settings persist across invocations of ST! (Actually, not a bad thing.)
     vsettings = view.settings()
-    proj_name = vsettings.get(Settings.SETTING_SUBHASK_PROJECT)
+    projname = vsettings.get(Settings.SETTING_SUBHASK_PROJECT)
     projdir = vsettings.get(Settings.SETTING_SUBHASK_PROJDIR)
-    if proj_name is not None and projdir is not None:
-        return projdir, proj_name
-    else:
+    if projname is None or projdir is None:
         # Check that the view is showing a saved file:
+        projdir = None
+        projname = None
+
         file_shown_in_view = view.file_name()
-        if file_shown_in_view is None:
-            return None, None
-        else:
+        if file_shown_in_view is not None:
             # Check that the file is Haskell source code:
             syntax_file_for_view = view.settings().get('syntax').lower()
-            if 'haskell' not in syntax_file_for_view:
-                return None, None
-            else:
-                return locate_cabal_project(file_shown_in_view)
+            if 'haskell' in syntax_file_for_view:
+                projdir, projname = locate_cabal_project(file_shown_in_view)
+                if projdir is not None and projname is not None:
+                    vsettings.set(Settings.SETTING_SUBHASK_PROJECT, projname)
+                    vsettings.set(Settings.SETTING_SUBHASK_PROJDIR, projdir)
+
+    return (projdir, projname)
 
 
 def locate_cabal_project(filename):

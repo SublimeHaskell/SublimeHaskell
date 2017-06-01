@@ -14,11 +14,6 @@ import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.utils as Utils
 
 
-# Checks if we are in a LANGUAGE pragma.
-LANGUAGE_RE = re.compile(r'.*{-#\s+LANGUAGE.*')
-# Checks if we are in OPTIONS_GHC pragma
-OPTIONS_GHC_RE = re.compile(r'.*{-#\s+OPTIONS_GHC.*')
-
 # Checks if we are in an import statement.
 IMPORT_RE = re.compile(r'.*import(\s+qualified)?\s+')
 IMPORT_RE_PREFIX = re.compile(r'^\s*import(\s+qualified)?\s+([\w\d\.]*)$')
@@ -29,15 +24,6 @@ NO_SPECIAL_CHARS_RE = re.compile(r'^(\w|[\-\.])*$')
 
 # Export module
 EXPORT_MODULE_RE = re.compile(r'\bmodule\s+[\w\d\.]*$')
-
-
-# Gets available LANGUAGE options and import modules from ghc-mod
-def get_language_pragmas():
-    return BackendManager.active_backend().langs()
-
-
-def get_flags_pragmas():
-    return BackendManager.active_backend().flags()
 
 
 def sort_completions(comps):
@@ -104,6 +90,7 @@ class AutoCompleter(object):
         self.cache = LockedObject.LockedObject(CompletionCache())
 
     def keyword_completions(self, query):
+        print('keyword completions')
         return [(k + '\tkeyword', k) for k in self.keywords if k.startswith(query)] if isinstance(query, str) else []
 
     def get_completions_async(self, file_name=None):
@@ -180,6 +167,7 @@ class AutoCompleter(object):
     def get_completions(self, view, locations):
         "Get all the completions related to the current file."
 
+        print('{0}.get_completions'.format(type(self).__name__))
         current_file_name = view.file_name()
         if not current_file_name:
             return []
@@ -289,22 +277,19 @@ class AutoCompleter(object):
 
         return []
 
-    def get_special_completions(self, line_contents):
-        # Autocompletion for LANGUAGE pragmas
+    def get_lang_completions(self, project_name):
+        retval = []
         if Settings.PLUGIN.auto_complete_language_pragmas:
-            # TODO handle multiple selections
-            match_language = LANGUAGE_RE.match(line_contents)
-            if match_language:
-                if not self.language_pragmas:
-                    self.language_pragmas = get_language_pragmas()
-                return [(c,) * 2 for c in self.language_pragmas]
-            match_options = OPTIONS_GHC_RE.match(line_contents)
-            if match_options:
-                if not self.flags_pragmas:
-                    self.flags_pragmas = get_flags_pragmas()
-                return [(c,) * 2 for c in self.flags_pragmas]
+            retval = [[c, c] for c in BackendManager.active_backend().langs(project_name)]
 
-        return []
+        return retval
+
+    def get_flag_completions(self, project_name):
+        retval = []
+        if Settings.PLUGIN.auto_complete_language_pragmas:
+            retval = [[c, c] for c in BackendManager.active_backend().flags(project_name)]
+
+        return retval
 
     def get_module_completions_for(self, qualified_prefix, modules=None, current_dir=None):
         def module_next_name(mname):

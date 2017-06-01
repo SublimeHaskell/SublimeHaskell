@@ -6,7 +6,8 @@ import io
 import os.path
 import pprint
 import re
-import subprocess
+import threading
+import sys
 
 import sublime
 
@@ -16,6 +17,7 @@ import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.proc_helper as ProcHelper
 # import SublimeHaskell.internals.regexes as Regexes
 import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.internals.output_collector as OutputCollector
 import SublimeHaskell.internals.which as Which
 
 FILE_LINE_COL_REGEX = r'\s*^(?P<file>\S*):(?P<line>\d+):(?P<col>\d+):(\s*(?P<flag>\*|[Ww]arning:)\s+)?'
@@ -27,11 +29,6 @@ GHC_LINT_REGEX = re.compile(FILE_LINE_COL_REGEX + r'(?P<msg>.*$)(?P<details>(\n(
 class GHCModBackend(Backend.HaskellBackend):
     """This class encapsulates all of the functions that interact with the `hsdev` backend.
     """
-
-    ## Have ghc-mod prefix output with X's and O's (errors and regular output)
-    ## Apologies to Ellie King. :-)
-    GHCMOD_OUTPUT_MARKER = 'O: '
-    GHCMOD_ERROR_MARKER = 'X: '
 
     def __init__(self, backend_mgr, **kwargs):
         super().__init__(backend_mgr)
@@ -76,10 +73,7 @@ class GHCModBackend(Backend.HaskellBackend):
     def stop_backend(self):
         # Yup. A single blank line terminates ghc-mod legacy-interactive.
         for project in self.project_backends:
-            try:
-                print('', file=self.project_backends[project].process.stdin, flush=True)
-            except OSError:
-                pass
+            self.project_backends[project].shutdown()
         self.project_backends = {}
 
     def is_live_backend(self):
@@ -98,32 +92,8 @@ class GHCModBackend(Backend.HaskellBackend):
 
         # print('{0}.add_project_file: {1} {2} {3}'.format(type(self).__name__, filename, project, project_dir))
         if project not in self.project_backends:
-            Logging.log('Starting \'ghc-mod\' for project {0}'.format(project), Logging.LOG_INFO)
-
-            cmd = []
-
-            # if self.exec_with is not None:
-            #     if self.exec_with == 'cabal':
-            #         cmd += ['cabal']
-            #     elif self.exec_with == 'stack':
-            #         cmd += ['stack']
-
-            cmd += ['ghc-mod']
-
-            # if self.exec_with is not None:
-            #     cmd += ['--']
-
-            cmd += ['-b', '\\n', '--line-prefix', self.GHCMOD_OUTPUT_MARKER + ',' + self.GHCMOD_ERROR_MARKER]
-            cmd += self.get_ghc_opts_args(filename, add_package_db=True, cabal=project_dir)
-            cmd += ['legacy-interactive']
-
-            Logging.log('ghc-mod command: {0}'.format(cmd), Logging.LOG_DEBUG)
-
-            proc = ProcHelper.ProcHelper(cmd, stderr=subprocess.STDOUT, cwd=project_dir)
-            if proc.process is not None:
-                proc.process.stdin = io.TextIOWrapper(proc.process.stdin, 'utf-8')
-                proc.process.stdout = io.TextIOWrapper(proc.process.stdout, 'utf-8')
-                self.project_backends[project] = proc
+            opt_args = self.get_ghc_opts_args(filename, add_package_db=True, cabal=project_dir)
+            self.project_backends[project] = GHCModClient(project, project_dir, opt_args)
 
     def remove_project_file(self, filename):
         pass
@@ -137,6 +107,8 @@ class GHCModBackend(Backend.HaskellBackend):
 
     def scan(self, cabal=False, sandboxes=None, projects=None, files=None, paths=None, ghc=None, contents=None,
              docs=False, infer=False, **backend_args):
+        print('ghc-mod scan: cabal {0} sandboxes {1} projects {2} files {3} paths {4} ghc {5} contents {6}'.format(
+            cabal, sandboxes, projects, files, paths, ghc, contents))
         return self.dispatch_callbacks([], **backend_args)
 
     def docs(self, projects=None, files=None, modules=None, **backend_args):
@@ -201,83 +173,35 @@ class GHCModBackend(Backend.HaskellBackend):
         return self.dispatch_callbacks([], **backend_args)
 
     def lint(self, files=None, contents=None, hlint=None, wait_complete=False, **backend_args):
-        def to_error(project_dir, errmsg):
-            line, column = int(errmsg.group('line')), int(errmsg.group('col'))
-
-            # HACK ALERT: If the file name is not absolute, that means ghc-mod reported it relative to the
-            # project directory. So we have to reconstitute the full file name expected by SublimeHaskell.
-            filename = errmsg.group('file')
-            if not os.path.isabs(filename):
-                filename = os.path.normpath(os.path.join(project_dir, filename))
-
-            # ghc-mod does not return the start and end of the region, so we can't craft a corrector.
-            return {'level': 'hint',
-                    'note': {'message': '{0}{1}'.format(errmsg.group('msg'), errmsg.group('details')),
-                             'suggestions': None},
-                    'region': {'from': {'column': 1, 'line': line},
-                               'to': {'column': column, 'line': line}},
-                    'source': {'file': filename,
-                               'project': None}
-                   }
-
-        lint_output = []
-        for file in files:
-            project_dir = self.get_project_dir(file)
-            resp, _ = self.command_backend(file, 'lint -h -u ' + file)
-            if Settings.COMPONENT_DEBUG.recv_messages:
-                print('ghc-mod: lint: resp =\n{0}'.format(pprint.pformat(resp)))
-            lint_output.extend([to_error(project_dir, m) for m in GHC_LINT_REGEX.finditer('\n'.join(resp))])
-
-        if Settings.COMPONENT_DEBUG.recv_messages:
-            print('ghc-mod: lint:\n{0}'.format(pprint.pformat(lint_output)))
+        lint_cmd = ' '.join(['lint', '--hlintOpt', '-u'] + (hlint or []))
+        lint_output = self.translate_regex_output(lint_cmd, files, contents, GHC_LINT_REGEX, self.translate_lint)
         return self.dispatch_callbacks(lint_output, **backend_args)
 
     def check(self, files=None, contents=None, ghc=None, wait_complete=False, **backend_args):
-        def to_error(project_dir, errmsg):
-            # filename, line, column, flag, messy_details = errmsg.groups()
-            line, column = int(errmsg.group('line')), int(errmsg.group('col'))
-
-            # HACK ALERT: If the file name is not absolute, that means ghc-mod reported it relative to the
-            # project directory. So we have to reconstitute the full file name expected by SublimeHaskell.
-            filename = errmsg.group('file')
-            if not os.path.isabs(filename):
-                filename = os.path.normpath(os.path.join(project_dir, filename))
-
-            flag = errmsg.group('flag')
-            level_type = 'error' if flag is None or not flag.lower().startswith('warning') else 'warning'
-
-            return {'level': level_type,
-                    'note': {'message': errmsg.group('details'), 'suggestions': None},
-                    'region': {'from': {'column': 1, 'line': line},
-                               'to': {'column': column, 'line': line}},
-                    'source': {'file': filename,
-                               'project': None}
-                   }
-
-        check_output = []
-        for file in files:
-            project_dir = self.get_project_dir(file)
-            resp, _ = self.command_backend(file, 'check ' + file)
-            if Settings.COMPONENT_DEBUG.recv_messages:
-                print('ghc-mod: check: resp =\n{0}'.format(pprint.pformat(resp)))
-            check_output.extend([to_error(project_dir, m) for m in GHC_CHECK_REGEX.finditer('\n'.join(resp))])
-
-        if Settings.COMPONENT_DEBUG.recv_messages:
-            print('ghc-mod: check:\n{0}'.format(pprint.pformat(check_output)))
+        check_cmd = 'check '
+        check_output = self.translate_regex_output(check_cmd, files, contents, GHC_CHECK_REGEX, self.translate_check)
         return self.dispatch_callbacks(check_output, **backend_args)
 
     def check_lint(self, files=None, contents=None, ghc=None, hlint=None, wait_complete=False, **backend_args):
+        '''ghc-mod cannot generate corrections to autofix. Returns an empty list.
+        '''
         return self.dispatch_callbacks([], **backend_args)
 
     def types(self, files=None, contents=None, ghc=None, **backend_args):
         return self.dispatch_callbacks([], **backend_args)
 
-    def langs(self, **backend_args):
-        langs = GHCIMod.call_ghcmod_and_wait(['lang']).splitlines()
+    def langs(self, project_name, **backend_args):
+        backend = self.project_backends.get(project_name)
+        langs, _ = backend.command_backend('lang') if backend is not None else []
+        if Settings.COMPONENT_DEBUG.recv_messages:
+            print('ghc-mod langs: resp =\n{0}'.format(langs))
         return self.dispatch_callbacks(langs, **backend_args)
 
-    def flags(self, **backend_args):
-        flags = GHCIMod.call_ghcmod_and_wait(['flag']).splitlines()
+    def flags(self, project_name, **backend_args):
+        backend = self.project_backends.get(project_name)
+        flags, _ = backend.command_backend('flag') if backend is not None else []
+        if Settings.COMPONENT_DEBUG.recv_messages:
+            print('ghc-mod langs: resp =\n{0}'.format(flags))
         return self.dispatch_callbacks(flags, **backend_args)
 
     def autofix_show(self, messages, **backend_args):
@@ -296,14 +220,6 @@ class GHCModBackend(Backend.HaskellBackend):
     # Utility functions:
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
-    def get_backend(self, filename):
-        retval = None
-        backend_info = self.file_to_project.get(filename)
-        if backend_info is not None:
-            retval = self.project_backends.get(backend_info[0])
-
-        return retval
-
     def get_project_dir(self, filename):
         retval = None
         backend_info = self.file_to_project.get(filename)
@@ -312,6 +228,102 @@ class GHCModBackend(Backend.HaskellBackend):
 
         return retval
 
+    def get_backend(self, filename):
+        backend_info = self.file_to_project.get(filename)
+        if backend_info is not None:
+            backend = self.project_backends.get(backend_info[0])
+            if backend is not None:
+                return backend
+            else:
+                Logging.log('{0}: {1} does not have an active ghc-mod!'.format(type(self).__name__, backend_info[0]))
+        else:
+            Logging.log('{0}: {1} does map to a project!'.format(type(self).__name__, filename))
+
+        return None
+
+    def command_backend(self, filename, cmd):
+        backend = self.get_backend(filename)
+        if backend is not None:
+            return backend.command_backend(cmd)
+        else:
+            return ([], [])
+
+    def backend_map_file(self, filename, contents):
+        backend = self.get_backend(filename)
+        if backend is not None:
+            return backend.map_file(filename, contents)
+        else:
+            return ([], [])
+
+    def backend_unmap_file(self, filename):
+        backend = self.get_backend(filename)
+        if backend is not None:
+            return backend.unmap_file(filename)
+        else:
+            return ([], [])
+
+    def translate_regex_output(self, cmd, files, contents, regex, xlat_func):
+        retval = []
+        for file in files:
+            project_dir = self.get_project_dir(file)
+            mapped_file = False
+            if file in contents:
+                # Use the current file's contents and arrange to map those contents
+                self.backend_map_file(file, contents[file])
+                mapped_file = True
+
+            try:
+                resp, _ = self.command_backend(file, cmd + ' ' + file)
+                if Settings.COMPONENT_DEBUG.recv_messages:
+                    print('ghc-mod: {0}: resp =\n{1}'.format(cmd, pprint.pformat(resp)))
+                retval.extend([xlat_func(project_dir, m) for m in regex.finditer('\n'.join(resp))])
+            finally:
+                if mapped_file:
+                    self.backend_unmap_file(file)
+
+        if Settings.COMPONENT_DEBUG.recv_messages:
+            print('ghc-mod: {0}:\n{1}'.format(cmd, pprint.pformat(retval)))
+
+        return retval
+
+    def translate_check(self, project_dir, errmsg):
+        line, column = int(errmsg.group('line')), int(errmsg.group('col'))
+
+        # HACK ALERT: If the file name is not absolute, that means ghc-mod reported it relative to the
+        # project directory. So we have to reconstitute the full file name expected by SublimeHaskell.
+        filename = errmsg.group('file')
+        if not os.path.isabs(filename):
+            filename = os.path.normpath(os.path.join(project_dir, filename))
+
+        flag = errmsg.group('flag')
+        level_type = 'error' if flag is None or not flag.lower().startswith('warning') else 'warning'
+
+        return {'level': level_type,
+                'note': {'message': errmsg.group('details'), 'suggestions': None},
+                'region': {'from': {'column': 1, 'line': line},
+                           'to': {'column': column, 'line': line}},
+                'source': {'file': filename,
+                           'project': None}
+               }
+
+    def translate_lint(self, project_dir, errmsg):
+        line, column = int(errmsg.group('line')), int(errmsg.group('col'))
+
+        # HACK ALERT: If the file name is not absolute, that means ghc-mod reported it relative to the
+        # project directory. So we have to reconstitute the full file name expected by SublimeHaskell.
+        filename = errmsg.group('file')
+        if not os.path.isabs(filename):
+            filename = os.path.normpath(os.path.join(project_dir, filename))
+
+        # ghc-mod does not return the start and end of the region, so we can't craft a corrector.
+        return {'level': 'hint',
+                'note': {'message': '{0}{1}'.format(errmsg.group('msg'), errmsg.group('details')),
+                         'suggestions': None},
+                'region': {'from': {'column': 1, 'line': line},
+                           'to': {'column': column, 'line': line}},
+                'source': {'file': filename,
+                           'project': None}
+               }
 
     def ghci_package_db(self, cabal):
         if cabal is not None and cabal != 'cabal':
@@ -348,31 +360,118 @@ class GHCModBackend(Backend.HaskellBackend):
             args.extend(['-g', opt])
         return args
 
-    def command_backend(self, filename, cmd):
+class GHCModClient(object):
+    ## Have ghc-mod prefix output with X's and O's (errors and regular output)
+    ## Apologies to Ellie King. :-)
+    GHCMOD_OUTPUT_MARKER = 'O: '
+    GHCMOD_ERROR_MARKER = 'X: '
+
+    def __init__(self, project, project_dir, opt_args):
+        Logging.log('Starting \'ghc-mod\' for project {0}'.format(project), Logging.LOG_INFO)
+
+        self.ghcmod = None
+        self.action_lock = None
+        self.stderr_drain = None
+
+        cmd = []
+
+        # if self.exec_with is not None:
+        #     if self.exec_with == 'cabal':
+        #         cmd += ['cabal']
+        #     elif self.exec_with == 'stack':
+        #         cmd += ['stack']
+
+        cmd += ['ghc-mod']
+
+        # if self.exec_with is not None:
+        #     cmd += ['--']
+
+        cmd += ['-b', '\\n', '--line-prefix', self.GHCMOD_OUTPUT_MARKER + ',' + self.GHCMOD_ERROR_MARKER]
+        cmd += opt_args
+        cmd += ['legacy-interactive']
+
+        Logging.log('ghc-mod command: {0}'.format(cmd), Logging.LOG_DEBUG)
+
+        self.ghcmod = ProcHelper.ProcHelper(cmd, cwd=project_dir)
+        if self.ghcmod.process is not None:
+            self.ghcmod.process.stdin = io.TextIOWrapper(self.ghcmod.process.stdin, 'utf-8')
+            self.ghcmod.process.stdout = io.TextIOWrapper(self.ghcmod.process.stdout, 'utf-8')
+            self.action_lock = threading.Lock()
+            self.stderr_drain = OutputCollector.DescriptorDrain('ghc-mod ' + project, self.ghcmod.process.stderr)
+            self.stderr_drain.start()
+
+    def shutdown(self):
+        if self.ghcmod is not None:
+            try:
+                print('', file=self.ghcmod.process.stdin, flush=True)
+            except OSError:
+                pass
+        if self.stderr_drain is not None and self.stderr_drain.is_alive():
+            self.stderr_drain.stop()
+            self.stderr_drain.join()
+
+        self.ghcmod = None
+        self.action_lock = None
+        self.stderr_drain = None
+
+    def read_response(self):
         resp_stdout = []
         resp_stderr = []
         try:
-            backend = self.get_backend(filename)
-            if backend is not None:
-                print(cmd, file=backend.process.stdin, flush=True)
-                done = False
-                while not done:
-                    resp = backend.process.stdout.readline()
-                    if resp == '':
-                        # EOF???
-                        done = True
+            got_reply = False
+            while not got_reply:
+                resp = self.ghcmod.process.stdout.readline()
+                if resp == '':
+                    # EOF???
+                    got_reply = True
+                else:
+                    prefix = resp[0:3]
+                    resp = resp.rstrip()[3:]
+                    if prefix == self.GHCMOD_OUTPUT_MARKER:
+                        if resp == 'OK':
+                            got_reply = True
+                        else:
+                            resp_stdout.append(resp.rstrip())
+                    elif prefix == self.GHCMOD_ERROR_MARKER:
+                        resp_stderr.append(resp.rstrip())
+                    elif prefix == 'NG ':
+                        sys.stdout.write('Error response: ' + resp)
+                        got_reply = True
                     else:
-                        prefix = resp[0:3]
-                        resp = resp.rstrip()[3:]
-                        if prefix == self.GHCMOD_OUTPUT_MARKER:
-                            if resp == 'OK':
-                                done = True
-                            else:
-                                resp_stdout.append(resp.rstrip())
-                        elif prefix == self.GHCMOD_ERROR_MARKER:
-                            resp_stderr.append(resp.rstrip())
+                        sys.stdout.write('Unexpected reply from ghc-mod client: ' + resp)
+                        got_reply = True
         except OSError:
-            ## FIXME: Needs to do something clever here to cleanup on error
-            pass
+            self.shutdown()
 
         return (resp_stdout, resp_stderr)
+
+    def command_backend(self, cmd):
+        with self.action_lock:
+            try:
+                print(cmd, file=self.ghcmod.process.stdin, flush=True)
+                return self.read_response()
+            except OSError:
+                self.shutdown()
+                return ([], [])
+
+    def map_file(self, file, contents):
+        with self.action_lock:
+            try:
+                print('map-file ' + file, file=self.ghcmod.process.stdin)
+                self.ghcmod.process.stdin.write(contents)
+                self.ghcmod.process.stdin.write('\n' + chr(4) + '\n')
+                self.ghcmod.process.stdin.flush()
+                return self.read_response()
+            except OSError:
+                self.shutdown()
+                return ([], [])
+
+
+    def unmap_file(self, file):
+        with self.action_lock:
+            try:
+                print('unmap-file ' + file, file=self.ghcmod.process.stdin, flush=True)
+                return self.read_response()
+            except OSError:
+                self.shutdown()
+                return ([], [])

@@ -109,10 +109,10 @@ class DescriptorDrain(threading.Thread):
     def run(self):
         while not self.stop_me.is_set():
             line = self.fobject.readline()
-            if isinstance(line, bytearray):
+            if not isinstance(line, ''.__class__):
                 line = Utils.decode_bytes(line)
-            line = line.rstrip()
             if line != '':
+                line = line.rstrip()
                 print('<{0}> {1}'.format(self.label, line))
             else:
                 # Got EOF. Stop.

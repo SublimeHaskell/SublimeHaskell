@@ -78,32 +78,32 @@ class SublimeHaskellAutocompleteRepl(sublime_plugin.EventListener):
                 "steplocal", "stepmodule", "trace", "type", "undef", "unset"]
         return [(":{0}".format(cmd), ":{0}".format(cmd)) for cmd in cmds]
 
-    def on_query_completions(self, view, _prefix, locations):
-        if not HAS_SUBLIME_REPL or not Common.is_haskell_repl(view):
-            return []
+    # def on_query_completions(self, view, _prefix, locations):
+    #     if not HAS_SUBLIME_REPL or not Common.is_haskell_repl(view):
+    #         return []
 
-        repl = sublimerepl.manager.repl_view(view)
+    #     repl = sublimerepl.manager.repl_view(view)
 
-        line_contents = Common.get_line_contents(view, locations[0])
-        command = COMMAND_RE.match(line_contents)
-        if command:
-            return self.repl_commands_completions()
+    #     line_contents = Common.get_line_contents(view, locations[0])
+    #     command = COMMAND_RE.match(line_contents)
+    #     if command:
+    #         return self.repl_commands_completions()
 
-        imp = IMPORT_RE.match(line_contents)
-        if imp:
-            mod = imp.group('module')
-            repl_id = KNOWN_REPLS.get_repl_view(repl.external_id)
-            cwd = repl_id.path if repl_id else None
+    #     imp = IMPORT_RE.match(line_contents)
+    #     if imp:
+    #         mod = imp.group('module')
+    #         repl_id = KNOWN_REPLS.get_repl_view(repl.external_id)
+    #         cwd = repl_id.path if repl_id else None
 
-            return (autocomplete.AutoCompletion().get_module_completions_for(mod, current_dir=cwd),
-                    sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
+    #         return (autocomplete.AutoCompletion().get_module_completions_for(mod, current_dir=cwd),
+    #                 sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
 
-        # ????
-        completions = []
+    #     # ????
+    #     completions = []
 
-        if Settings.PLUGIN.inhibit_completions and len(completions) != 0:
-            return (completions, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
-        return completions
+    #     if Settings.PLUGIN.inhibit_completions and len(completions) != 0:
+    #         return (completions, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
+    #     return completions
 
 
 def repl_args(**kwargs):

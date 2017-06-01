@@ -1,5 +1,6 @@
 
 import os
+import re
 import threading
 import time
 
@@ -103,10 +104,11 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         self.assoc_to_project(view, filename)
         self.rescan_source(filename)
 
-    @view_has_valid_file
-    @is_inspected_source
     def on_load_async(self, view):
         filename = view.file_name()
+        if filename is None or not Common.is_inspected_source(view):
+            return
+
         if Settings.COMPONENT_DEBUG.event_viewer:
             print('{0} is_inspected_source {1}.'.format(type(self).__name__ + ".on_load", filename))
 
@@ -123,10 +125,11 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
                     view.settings().set('syntax', 'Packages/SublimeHaskell/Syntaxes/Haskell-SublimeHaskell.tmLanguage')
                 # TODO: Do we also have to fix Literate Haskell? Probably yes, but not today.
 
-    @view_has_valid_file
-    @is_inspected_source
     def on_post_save(self, view):
         filename = view.file_name()
+        if filename is None or not Common.is_inspected_source(view):
+            return
+
         if Settings.COMPONENT_DEBUG.event_viewer:
             print('{0} invoked.'.format(type(self).__name__ + ".on_post_save"))
 
@@ -137,10 +140,11 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             self.trigger_build(view)
 
 
-    @view_has_valid_file
-    @is_haskell_source
     def on_modified(self, view):
         filename = view.file_name()
+        if filename is None or not Common.is_haskell_source(view):
+            return
+
         if Settings.COMPONENT_DEBUG.event_viewer:
             print('{0} invoked.'.format(type(self).__name__ + ".on_modified"))
 
@@ -148,10 +152,11 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             Utils.run_async('fly check', self.fly, view)
         self.type_cache.remove(filename)
 
-    @view_has_valid_file
-    @is_inspected_source
     def on_activated(self, view):
         filename = view.file_name()
+        if filename is None or not Common.is_inspected_source(view):
+            return
+
         if Settings.COMPONENT_DEBUG.event_viewer:
             print('{0} invoked.'.format(type(self).__name__ + ".on_activated"))
 
@@ -191,69 +196,75 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             retval = self.completion_context(view, key)
         return retval
 
-    @is_haskell_source
+    LANGUAGE_RE = re.compile(r'.*{-#\s+LANGUAGE.*')
+    OPTIONS_GHC_RE = re.compile(r'.*{-#\s+OPTIONS_GHC.*')
+
     def on_query_completions(self, view, prefix, locations):
         # Defer starting the backend until as late as possible...
         if Settings.COMPONENT_DEBUG.event_viewer:
             print('{0} invoked (prefix: {1}).'.format(type(self).__name__ + '.on_query_completions', prefix))
 
+        if not Common.is_haskell_source(view):
+            return []
+
+        completions = None
         with self.backend_mgr:
             begin_time = time.clock()
 
             # Only suggest symbols if the current file is part of a Cabal project.
             line_contents = Common.get_line_contents(view, locations[0])
-            completions = self.autocompleter.get_import_completions(view, locations, line_contents)
-            completions = completions + self.autocompleter.get_special_completions(line_contents)
+            project_name = Common.locate_cabal_project_from_view(view)[1]
+            completion_flags = 0
 
-            # Export list
-            if 'meta.declaration.exports.haskell' in view.scope_name(view.sel()[0].a):
-                export_module = Autocomplete.EXPORT_MODULE_RE.search(line_contents)
-                if export_module:
-                    # qsymbol = Common.get_qualified_symbol_at_region(view, view.sel()[0])
-                    # TODO: Implement
-                    pass
+            if self.LANGUAGE_RE.match(line_contents):
+                completions = self.autocompleter.get_lang_completions(project_name)
+                completion_flags = sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS
+            elif self.OPTIONS_GHC_RE.match(line_contents):
+                completions = self.autocompleter.get_flag_completions(project_name)
+                completion_flags = sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS
+            else:
+                completions = self.autocompleter.get_import_completions(view, locations, line_contents)
 
-            # Add current file's completions:
-            completions = completions + self.autocompleter.get_completions(view, locations)
+                # Export list
+                if 'meta.declaration.exports.haskell' in view.scope_name(view.sel()[0].a):
+                    export_module = Autocomplete.EXPORT_MODULE_RE.search(line_contents)
+                    if export_module:
+                        # qsymbol = Common.get_qualified_symbol_at_region(view, view.sel()[0])
+                        # TODO: Implement
+                        pass
+
+                # Add current file's completions:
+                completions = completions + self.autocompleter.get_completions(view, locations)
 
             end_time = time.clock()
-            Logging.log('time to get completions: {0} seconds'.format(end_time - begin_time), Logging.LOG_DEBUG)
+            Logging.log('time to get completions: {0} seconds'.format(end_time - begin_time), Logging.LOG_INFO)
 
-            Autocomplete.sort_completions(completions)
+            if len(completions) == 0:
+                completions = None
+            elif completions is not None:
+                Autocomplete.sort_completions(completions)
 
-            # Don't put completions with special characters (?, !, ==, etc.)
-            # into completion because that wipes all default Sublime completions:
-            # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
-            # TODO: work around this
-            # comp = [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0].split('\t')[0])]
-            # if Settings.PLUGIN.inhibit_completions and len(comp) != 0:
-            #     return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
-            # return comp
+                # Don't put completions with special characters (?, !, ==, etc.)
+                # into completion because that wipes all default Sublime completions:
+                # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
+                # TODO: work around this
+                # comp = [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0].split('\t')[0])]
+                # if Settings.PLUGIN.inhibit_completions and len(comp) != 0:
+                #     return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
+                # return comp
 
-            if Settings.PLUGIN.inhibit_completions:
-                if len(completions) > 0:
-                    return (completions, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
-                else:
-                    # Because we want to inhibit completions...
-                    return []
-            else:
-                return completions
+                if Settings.PLUGIN.inhibit_completions:
+                    # Inhibit the default completions from the completions file
+                    completion_flags = sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS
+
+        return (completions, completion_flags) if completions is not None else []
 
 
     def assoc_to_project(self, view, filename):
-        ## SURPRISE! These settings persist across invocations of ST! (Actually, not a bad thing.)
-        vsettings = view.settings()
-        project_name = vsettings.get(Settings.SETTING_SUBHASK_PROJECT)
-        project_dir = vsettings.get(Settings.SETTING_SUBHASK_PROJDIR)
-        if project_dir is None or project_name is None:
-            project_dir, project_name = Common.locate_cabal_project(filename)
-            if project_name is None:
-                project_name = '_unknown_'
-
-            vsettings.set(Settings.SETTING_SUBHASK_PROJECT, project_name)
-            vsettings.set(Settings.SETTING_SUBHASK_PROJDIR, project_dir)
-
-        self.backend_mgr.add_project_file(filename, project_name, project_dir)
+        ## Update file -> project tracking
+        project_dir, project_name = Common.locate_cabal_project(filename)
+        if project_dir is not None and project_name is not None:
+            self.backend_mgr.add_project_file(filename, project_name, project_dir)
         BackendCmds.cabal_project_status(view, self.backend_mgr)
 
 
@@ -310,14 +321,13 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
 
 
     def is_scanned_source(self, view):
-        _, view, file_shown_in_view = Common.get_haskell_command_window_view_file_project(view)
-        if file_shown_in_view is None:
-            return False
-        return Utils.head_of(BackendManager.active_backend().module(file=file_shown_in_view)) is not None
+        file_shown_in_view = Common.get_haskell_command_window_view_file_project(view)[2]
+        return file_shown_in_view is not None and \
+               Utils.head_of(BackendManager.active_backend().module(file=file_shown_in_view)) is not None
 
 
     def is_in_project(self, view):
-        _, view, file_shown_in_view = Common.get_haskell_command_window_view_file_project(view)
+        file_shown_in_view = Common.get_haskell_command_window_view_file_project(view)[2]
         if file_shown_in_view is None:
             return False
         else:

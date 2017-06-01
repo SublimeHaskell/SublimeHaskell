@@ -222,10 +222,10 @@ class HaskellBackend(object):
     def types(self, files=None, contents=None, ghc=None, **backend_args):
         raise NotImplementedError("HaskellBackend.types needs an implementation.")
 
-    def langs(self, **backend_args):
+    def langs(self, project_name, **backend_args):
         raise NotImplementedError("HaskellBackend.langs needs an implementation.")
 
-    def flags(self, **backend_args):
+    def flags(self, project_name, **backend_args):
         raise NotImplementedError("HaskellBackend.flags needs an implementation.")
 
     def autofix_show(self, messages, **backend_args):
@@ -262,7 +262,7 @@ class NullHaskellBackend(HaskellBackend):
     should do.
     '''
 
-    def __init__(self, backend_mgr, **kwargs):
+    def __init__(self, backend_mgr):
         super().__init__(backend_mgr)
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
@@ -303,8 +303,8 @@ class NullHaskellBackend(HaskellBackend):
     def add_project_file(self, filename, project, project_dir):
         super().add_project_file(filename, project, project_dir)
 
-    def remove_project_file(self, filename, project, project_dir):
-        pass
+    def remove_project_file(self, filename):
+        super().remove_project_file(filename)
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # API/action functions:
@@ -390,10 +390,10 @@ class NullHaskellBackend(HaskellBackend):
     def types(self, files=None, contents=None, ghc=None, **backend_args):
         return self.dispatch_callbacks([], **backend_args)
 
-    def langs(self, **backend_args):
+    def langs(self, _projectname, **backend_args):
         return self.dispatch_callbacks([], **backend_args)
 
-    def flags(self, **backend_args):
+    def flags(self, _projectname, **backend_args):
         return self.dispatch_callbacks([], **backend_args)
 
     def autofix_show(self, messages, **backend_args):

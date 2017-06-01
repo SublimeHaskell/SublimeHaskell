@@ -27,10 +27,6 @@ def hsdev_check():
 def hsdev_lint():
     return (BackendMgr.active_backend().lint, file_as_file_list, {})
 
-# def hsdev_check_lint():
-#     return (hsdev.client.ghcmod_check_lint,
-#             lambda file: [file], lambda ms: ms, { 'ghc': Settings.PLUGIN.ghc_opts })
-
 
 def messages_as_hints(cmd):
     return (cmd[0], cmd[1], lambda ms: [dict(m, level='hint') for m in ms], cmd[3])
@@ -39,7 +35,6 @@ def messages_as_hints(cmd):
 class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
     def __init__(self, view):
         super().__init__(view)
-        self.messages = []
         self.msgs = []
         self.corrections = []
         self.corrections_dict = {}
@@ -52,12 +47,11 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
         raise NotImplementedError("SublimeHaskellDevChain.run needs an implementation.")
 
     def run_chain(self, cmds, msg, fly_mode=False):
-        self.messages = []
-        self.msgs = []
-        self.corrections = []
-        self.fly_mode = fly_mode
         self.filename = self.view.file_name()
         if self.filename:
+            self.msgs = []
+            self.corrections = []
+            self.fly_mode = fly_mode
             self.contents = {}
             if self.view.is_dirty():
                 self.contents[self.filename] = self.view.substr(sublime.Region(0, self.view.size()))
@@ -76,7 +70,6 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
             agent_func, modify_args, kwargs = cmd
 
             def go_chain_resp(msgs):
-                self.messages.extend(msgs)
                 self.msgs.extend(msgs)
                 self.go_chain(tail_cmds)
 
@@ -88,14 +81,13 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
                        on_response=go_chain_resp, on_error=go_chain_err, **kwargs)
         else:
             self.status_msg.stop()
-            print(self.msgs)
             BackendMgr.active_backend().autofix_show(self.msgs, on_response=self.on_autofix)
 
     def on_autofix(self, corrections):
         output_messages = [ParseOutput.OutputMessage(m['source']['file'],
                                                      HsResultParse.parse_region(m['region']).to_zero_based(),
                                                      m['level'].capitalize() + ': ' + m['note']['message'].replace('\n', '\n  '),
-                                                     m['level']) for m in self.messages]
+                                                     m['level']) for m in self.msgs]
 
         self.corrections = corrections
         for corr in self.corrections:

@@ -504,10 +504,10 @@ class HsDevBackend(Backend.HaskellBackend):
                                            'ghc-opts': ghc or []},
                                  **backend_args)
 
-    def langs(self, **backend_args):
+    def langs(self, _projectname, **backend_args):
         return self.command('langs', {}, **backend_args)
 
-    def flags(self, **backend_args):
+    def flags(self, _projectname, **backend_args):
         return self.command('flags', {}, **backend_args)
 
     def autofix_show(self, messages, **backend_args):

@@ -1,6 +1,5 @@
 {
 	"scope": "source.haskell",
-
 	"completions":
 	[
 		"class",
