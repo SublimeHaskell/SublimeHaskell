@@ -25,6 +25,7 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
         self.edit = None
         self.candidates = None
         self.module_name = None
+        self.project_name = None
 
     def run(self, edit, **kwargs):
         filename = kwargs.get('filename')
@@ -34,6 +35,7 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
         self.full_name = decl
         self.current_file_name = filename
         self.edit = edit
+        self.project_name = Common.locate_cabal_project_from_view(self.view)[1]
 
         if module_name is not None:
             self.add_import(module_name)
@@ -83,7 +85,7 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
                     imp_module = HsDevResultParse.parse_module(modinfo)
         else:
             # Otherwise, use the actual file
-            imp_module = Utils.head_of(BackendManager.active_backend().module(file=self.current_file_name))
+            imp_module = Utils.head_of(BackendManager.active_backend().module(self.project_name, file=self.current_file_name))
 
         if imp_module is not None:
             imports = sorted(imp_module.imports, key=lambda i: i.position.line)

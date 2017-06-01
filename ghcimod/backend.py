@@ -11,14 +11,14 @@ import sys
 
 import sublime
 
-import SublimeHaskell.ghcimod.ghcmod_ops as GHCIMod
+# import SublimeHaskell.internals.regexes as Regexes
 import SublimeHaskell.internals.backend as Backend
 import SublimeHaskell.internals.logging as Logging
-import SublimeHaskell.internals.proc_helper as ProcHelper
-# import SublimeHaskell.internals.regexes as Regexes
-import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.output_collector as OutputCollector
+import SublimeHaskell.internals.proc_helper as ProcHelper
+import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.which as Which
+import SublimeHaskell.symbols as symbols
 
 FILE_LINE_COL_REGEX = r'\s*^(?P<file>\S*):(?P<line>\d+):(?P<col>\d+):(\s*(?P<flag>\*|[Ww]arning:)\s+)?'
 GHC_CHECK_REGEX = re.compile(FILE_LINE_COL_REGEX + r'(?P<details>.*$(\n^(?:\*?\s+).*$)*)',
@@ -107,8 +107,8 @@ class GHCModBackend(Backend.HaskellBackend):
 
     def scan(self, cabal=False, sandboxes=None, projects=None, files=None, paths=None, ghc=None, contents=None,
              docs=False, infer=False, **backend_args):
-        print('ghc-mod scan: cabal {0} sandboxes {1} projects {2} files {3} paths {4} ghc {5} contents {6}'.format(
-            cabal, sandboxes, projects, files, paths, ghc, contents))
+        # print('ghc-mod scan: cabal {0} sandboxes {1} projects {2} files {3} paths {4} ghc {5} contents {6}'.format(
+        #     cabal, sandboxes, projects, files, paths, ghc, contents))
         return self.dispatch_callbacks([], **backend_args)
 
     def docs(self, projects=None, files=None, modules=None, **backend_args):
@@ -134,12 +134,12 @@ class GHCModBackend(Backend.HaskellBackend):
         # Yes, I know. This is gratuitous. But clear in what is intended.
         return super().list_projects(**backend_args)
 
-    def symbol(self, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
+    def symbol(self, lookup='', search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
                cabal=False, symdb=None, package=None, source=False, standalone=False, local_names=False, **backend_args):
         return self.dispatch_callbacks([], **backend_args)
 
-    def module(self, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
-               cabal=False, symdb=None, package=None, source=False, standalone=False, **backend_args):
+    def module(self, project_name, lookup='', search_type='prefix', project=None, file=None, module=None, deps=None,
+               sandbox=None, cabal=False, symdb=None, package=None, source=False, standalone=False, **backend_args):
         return self.dispatch_callbacks(None, **backend_args)
 
     def resolve(self, file, exports=False, **backend_args):
@@ -157,8 +157,29 @@ class GHCModBackend(Backend.HaskellBackend):
     def whois(self, name, file, **backend_args):
         return self.dispatch_callbacks([], **backend_args)
 
-    def scope_modules(self, file, lookup='', search_type='prefix', **backend_args):
-        return self.dispatch_callbacks([], **backend_args)
+    def scope_modules(self, project_name, _filename, lookup='', search_type='prefix', **backend_args):
+        def lookup_match(elt):
+            ## Note: The tests are ordered from most to least likely. In fact, I'm not sure if infix or regex is actually
+            ## used in the code.
+            return (search_type == 'exact' and elt == lookup) or \
+                   (search_type == 'prefix' and elt.startswith(lookup)) or \
+                   (search_type == 'suffix' and elt.endswith(lookup)) or \
+                   (search_type == 'infix' and lookup in elt) or \
+                   (search_type == 'regex' and re.search(lookup, elt))
+
+        backend = self.project_backends.get(project_name)
+        modules, _ = backend.command_backend('list -d') if backend is not None else []
+        if Settings.COMPONENT_DEBUG.recv_messages:
+            print('ghc-mod scope_modules: resp =\n{0}'.format(modules))
+
+        filtered_mods = [symbols.Module(mod[1], [], [], {},
+                                        symbols.InstalledLocation(mod[0], symbols.PackageDb(global_db=True)))
+                         for mod in (m.split() for m in modules if lookup_match(m[1]))]
+
+        if Settings.COMPONENT_DEBUG.recv_messages:
+            print('ghc-mod scope_modules: filtered_mods\n{0}'.format(pprint.pformat(filtered_mods)))
+
+        return self.dispatch_callbacks(filtered_mods, **backend_args)
 
     def scope(self, file, lookup='', search_type='prefix', global_scope=False, **backend_args):
         return self.dispatch_callbacks([], **backend_args)

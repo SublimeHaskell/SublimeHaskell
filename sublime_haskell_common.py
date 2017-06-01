@@ -76,6 +76,9 @@ def locate_cabal_project_from_view(view):
     specified view. The view must show a saved file, the file must be Haskell
     source code, and the file must be under a directory containing a .cabal file.
     Otherwise, return None.
+
+    :rtype: Tuple
+    :return: (project directory path, project name)
     """
 
     # Use cached info whenever possible.

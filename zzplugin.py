@@ -134,8 +134,9 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         def activated_worker():
             with self.backend_mgr:
                 self.assoc_to_project(view, filename)
+                project_name = Common.locate_cabal_project_from_view(view)[1]
                 if Common.is_haskell_source(view):
-                    self.autocompleter.get_completions_async(filename)
+                    self.autocompleter.get_completions_async(project_name, filename)
 
         Utils.run_async('on_activated', activated_worker)
 
@@ -162,13 +163,27 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         elif key == 'in_project':
             retval = self.is_in_project(view)
         elif key == "is_module_completion" or key == "is_import_completion":
-            # Completion context is the only branch here where a backend is needed,
-            # so that function is decorated, rather than then entirety of on_query_context.
-            retval = self.completion_context(view, key)
+            # Completion context is the only branch here where a backend is needed.
+            retval = False
+            with self.backend_mgr:
+                project_dir, project_name = Common.locate_cabal_project_from_view(view)
+                region = view.sel()[0]
+                if region.a == region.b:
+                    word_region = view.word(region)
+                    preline = Common.get_line_contents_before_region(view, word_region)
+                    preline += self.COMPLETION_CHARS[key]
+                    qsymbol = Common.get_qualified_symbol(preline)
+                    if qsymbol.module:
+                        mod_completions = self.autocompleter.get_current_module_completions(project_name, project_dir)
+                        if qsymbol.is_import_list:
+                            retval = qsymbol.module in mod_completions
+                        else:
+                            retval = [m for m in mod_completions if m.startswith(qsymbol.module)] != []
+
         return retval
 
-    LANGUAGE_RE = re.compile(r'.*{-#\s+LANGUAGE.*')
-    OPTIONS_GHC_RE = re.compile(r'.*{-#\s+OPTIONS_GHC.*')
+    LANGUAGE_RE = re.compile(r'{-#\s+LANGUAGE.*')
+    OPTIONS_GHC_RE = re.compile(r'{-#\s+OPTIONS_GHC.*')
 
     def on_query_completions(self, view, prefix, locations):
         # Defer starting the backend until as late as possible...
@@ -183,55 +198,46 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             begin_time = time.clock()
 
             # Only suggest symbols if the current file is part of a Cabal project.
+            filename = view.file_name()
             line_contents = Common.get_line_contents(view, locations[0])
             project_name = Common.locate_cabal_project_from_view(view)[1]
             completion_flags = sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS
 
             curselector = view.scope_name(locations[0])
-            rematch = self.LANGUAGE_RE.match(line_contents)
-            print('curselector {0} line_contents {1} rematch {2}'.format(curselector, line_contents, rematch))
-            if rematch:
+            if self.LANGUAGE_RE.search(line_contents):
                 completions = self.autocompleter.get_lang_completions(project_name)
-                completion_flags = sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS
-            elif self.OPTIONS_GHC_RE.match(line_contents):
+            elif self.OPTIONS_GHC_RE.search(line_contents):
                 completions = self.autocompleter.get_flag_completions(project_name)
+            elif 'meta.import.haskell' in curselector:
+                # Inside an import: Complete the imported module name:
+                completions = self.autocompleter.get_import_completions(project_name, filename, locations, line_contents)
+            elif 'meta.declaration.exports.haskell' in curselector:
+                # Export list
+                export_module = Autocomplete.EXPORT_MODULE_RE.search(line_contents)
+                if export_module:
+                    # qsymbol = Common.get_qualified_symbol_at_region(view, view.sel()[0])
+                    # TODO: Implement
+                    pass
             else:
-                if 'meta.import.haskell' in curselector:
-                    # inside an import
-                    print('import completions')
-                    completions = self.autocompleter.get_import_completions(view, locations, line_contents)
-                elif 'meta.declaration.exports.haskell' in curselector:
-                    # Export list
-                    export_module = Autocomplete.EXPORT_MODULE_RE.search(line_contents)
-                    if export_module:
-                        # qsymbol = Common.get_qualified_symbol_at_region(view, view.sel()[0])
-                        # TODO: Implement
-                        pass
-                else:
-                    # Add current file's completions:
-                    print('default completions')
-                    completions = self.autocompleter.get_completions(view, locations)
-                    if not Settings.PLUGIN.inhibit_completions:
-                        completion_flags = 0 
+                # Add current file's completions:
+                completions = self.autocompleter.get_completions(view, locations)
+                Autocomplete.sort_completions(completions)
+                if not Settings.PLUGIN.inhibit_completions:
+                    completion_flags = 0
 
             end_time = time.clock()
             Logging.log('time to get completions: {0} seconds'.format(end_time - begin_time), Logging.LOG_INFO)
 
-            if len(completions) == 0:
-                completions = None
-            elif completions is not None:
-                Autocomplete.sort_completions(completions)
+        # Don't put completions with special characters (?, !, ==, etc.)
+        # into completion because that wipes all default Sublime completions:
+        # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
+        # TODO: work around this
+        # comp = [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0].split('\t')[0])]
+        # if Settings.PLUGIN.inhibit_completions and len(comp) != 0:
+        #     return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
+        # return comp
 
-                # Don't put completions with special characters (?, !, ==, etc.)
-                # into completion because that wipes all default Sublime completions:
-                # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
-                # TODO: work around this
-                # comp = [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0].split('\t')[0])]
-                # if Settings.PLUGIN.inhibit_completions and len(comp) != 0:
-                #     return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
-                # return comp
-
-        return (completions, completion_flags) if completions is not None else []
+        return (completions, completion_flags) if completions else []
 
 
     def assoc_to_project(self, view, filename):
@@ -259,30 +265,6 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             view.window().run_command('sublime_haskell_get_types')
         elif Settings.PLUGIN.enable_auto_lint:
             view.window().run_command('sublime_haskell_lint')
-
-
-    def completion_context(self, view, key):
-        retval = False
-        with self.backend_mgr:
-            region = view.sel()[0]
-            if region.a == region.b:
-                word_region = view.word(region)
-                preline = Common.get_line_contents_before_region(view, word_region)
-                preline += self.COMPLETION_CHARS[key]
-                retval = self.can_complete_qualified_symbol(Common.get_qualified_symbol(preline))
-
-        return retval
-
-    def can_complete_qualified_symbol(self, info):
-        '''Helper function, returns whether sublime_haskell_complete can run for (module, symbol, is_import_list)
-        '''
-        if not info.module:
-            return False
-        else:
-            if info.is_import_list:
-                return info.module in self.autocompleter.get_current_module_completions()
-            else:
-                return [m for m in self.autocompleter.get_current_module_completions() if m.startswith(info.module)] != []
 
 
     def update_completions_async(self, files=None, drop_all=False):

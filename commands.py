@@ -241,7 +241,9 @@ class SublimeHaskellGoTo(CommandWin.BackendWindowCommand):
         decls = []
 
         if project:
-            current_project = Utils.head_of(BackendManager.active_backend().module(file=self.current_filename)).location.project
+            project_name = Common.locate_cabal_project_from_view(self.view)[1]
+            modules = BackendManager.active_backend().module(project_name, file=self.current_filename)
+            current_project = Utils.head_of(modules).location.project
             if not current_project:
                 Common.show_status_message('File {0} is not in project'.format(self.current_filename), False)
                 return
@@ -339,13 +341,15 @@ class SublimeHaskellGoToHackageModule(CommandWin.BackendTextCommand):
             if pack and mod:
                 webbrowser.open('http://hackage.haskell.org/package/{0}/docs/{1}.html'.format(pack, mod.replace('.', '-')))
         else:
+            project_name = Common.locate_cabal_project_from_view(self.view)[1]
             qsymbol = Common.get_qualified_symbol_at_region(self.view, self.view.sel()[0])
 
             modules = []
             if qsymbol.is_module():  # module
                 scope = self.view.file_name()
                 if scope:
-                    modules = [m for m in BackendManager.active_backend().scope_modules(scope,
+                    modules = [m for m in BackendManager.active_backend().scope_modules(project_name,
+                                                                                        scope,
                                                                                         lookup=qsymbol.module,
                                                                                         search_type='exact')
                                if m.by_cabal()]
@@ -592,7 +596,8 @@ class SublimeHaskellClearImports(CommandWin.BackendTextCommand):
         if not self.current_file_name:
             self.current_file_name = self.view.file_name()
 
-        imp_module = Utils.head_of(BackendManager.active_backend().module(file=self.current_file_name))
+        project_name = Common.locate_cabal_project_from_view(self.view)[1]
+        imp_module = Utils.head_of(BackendManager.active_backend().module(project_name, file=self.current_file_name))
         if not imp_module:
             Logging.log("module not scanned")
             return
@@ -641,26 +646,27 @@ class SublimeHaskellBrowseModule(CommandWin.BackendWindowCommand):
         self.current_file_name = self.window.active_view().file_name()
 
         the_module = None
+        project_name = Common.locate_cabal_project_from_view(self.window.active_view())[1]
 
         if filename:
-            the_module = Utils.head_of(BackendManager.active_backend().module(file=filename))
+            the_module = Utils.head_of(BackendManager.active_backend().module(project_name, file=filename))
             if not the_module:
                 Common.show_status_message('Module {0} not found'.format(filename))
                 return
         elif module_name:
-            cand_mods = self.candidate_modules(module_name, scope, symdb)
+            cand_mods = self.candidate_modules(project_name, module_name, scope, symdb)
             if len(cand_mods) == 0:
                 Common.show_status_message('Module {0} not found'.format(module_name))
                 return
             elif len(cand_mods) == 1:
-                the_module = self.get_module_info(cand_mods[0], module_name)
+                the_module = self.get_module_info(project_name, cand_mods[0], module_name)
                 if the_module:
                     the_module = Utils.head_of(the_module)
             else:
                 self.candidates.extend([(m, [m.name, m.location.to_string()]) for m in cand_mods])
         else:
             if self.current_file_name:
-                cand_mods = BackendManager.active_backend().scope_modules(self.current_file_name)
+                cand_mods = BackendManager.active_backend().scope_modules(project_name, self.current_file_name)
             else:
                 symbol_db = symbols.PackageDb.from_string(symdb) if symdb else None
                 cand_mods = BackendManager.active_backend().list_modules(symdb=symbol_db)
@@ -693,30 +699,29 @@ class SublimeHaskellBrowseModule(CommandWin.BackendWindowCommand):
         if idx >= 0:
             show_declaration_info(self.window.active_view(), self.candidates[idx])
 
-    def candidate_modules(self, module_name, scope, symdb):
+    def candidate_modules(self, project_name, module_name, scope, symdb):
         retval = None
         if scope is not None:
-            retval = BackendManager.active_backend().scope_modules(scope, lookup=module_name, search_type='exact')
+            retval = BackendManager.active_backend().scope_modules(project_name, scope, lookup=module_name, search_type='exact')
         elif self.current_file_name is not None:
-            retval = BackendManager.active_backend().scope_modules(self.current_file_name, lookup=module_name,
+            retval = BackendManager.active_backend().scope_modules(project_name, self.current_file_name, lookup=module_name,
                                                                    search_type='exact')
         else:
             retval = BackendManager.active_backend().list_modules(module=module_name,
                                                                   symdb=symbols.PackageDb.from_string(symdb) if symdb else None)
         return retval
 
-    def get_module_info(self, module, module_name):
-        retval = None
+    def get_module_info(self, project_name, module, module_name):
+        args = None
         if module.by_source():
-            retval = BackendManager.active_backend().module(lookup=module_name, search_type='exact',
-                                                            file=module.location.filename)
+            args = {'lookup': module_name, 'search_type': 'exact', 'file': module.location.filename}
         elif module.by_cabal():
-            retval = BackendManager.active_backend().module(lookup=module_name, search_type='exact', symdb=module.location.db,
-                                                            package=module.location.package.name)
+            args = {'lookup': module_name, 'search_type': 'exact', 'symdb': module.location.db,
+                    'package': module.location.package.name}
         else:
-            retval = BackendManager.active_backend().module(lookup=module_name, search_type='exact')
+            args = {'lookup': module_name, 'search_type': 'exact'}
 
-        return retval
+        return BackendManager.active_backend().module(project_name, **args) if args is not None else None
 
 class SublimeHaskellGoToDeclaration(CommandWin.BackendTextCommand):
     def __init__(self, view):

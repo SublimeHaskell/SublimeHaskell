@@ -4,8 +4,7 @@
 
 # [SublimeLinter pylint-disable:"W0613"]
 
-import pprint
-import SublimeHaskell.internals.utils as Utils
+# import pprint
 
 class HaskellBackend(object):
     '''Base class for SublimeHaskell backends. Provides the basic interface for managing and communicating with a
@@ -38,13 +37,15 @@ class HaskellBackend(object):
         return False
 
     def start_backend(self):
-        '''This method allows the `HaskellBackend` subclass to start a local process, if needed, with which it interacts.
-        `hsdev`'s local backend option takes advantage of it.
+        '''Start the backend.
 
-        Returns `True` if backend startup was successful. If no local external process is created, just return 'True'.
+        This is the method where a subclass starts the backend, generally a local process with which SublimeHaskell
+        communicates. A good example of this is the :py:class:`HsDevBackend` when it starts up a local *hsdev* process.
 
-        The `HaskellBackend` base class returns `False` to return the backend manager's state to BackendManager.INITIAL.
-        You can't start up something that doesn't exist.
+        :rtype: Boolean
+        :return: `True` if backend startup was successful.
+
+        The `HaskellBackend` base class returns `False`. You can't start up something that doesn't exist.
         '''
         return False
 
@@ -114,8 +115,11 @@ class HaskellBackend(object):
         raise NotImplementedError("HaskellBackend.list_packages needs an implementation.")
 
     def list_projects(self, **backend_args):
-        '''Query the list of known projects. The return is a list of dictionary items, where each directionary
-        entry is::
+        '''Query the list of known projects.
+
+        :rtype: List
+
+        Each element in the returned list has the following structure::
 
             {'cabal': '<absolute path to .cabal file>',
              'description': {'executables': [{'info': {'build-depends': [<module dependencies>],
@@ -131,10 +135,10 @@ class HaskellBackend(object):
              'name': '<project name>',
              'path': '<absolute path to top of the project>'}
 
-         The *name* and *path* elements are mandatory. *description* should be collected from the Cabal file,
-         but generally appears to be optional (SublimeHaskell doesn't use it at the moment, but the *hsdev*
-         backend generates the info.)
-         '''
+        The *name* and *path* elements are mandatory. *description* should be collected from the Cabal file,
+        but generally appears to be optional (SublimeHaskell doesn't use it at the moment, but the *hsdev*
+        backend generates the info.)
+        '''
         project_info = []
         for pinfo in self.file_to_project.values():
             if pinfo not in project_info:
@@ -147,8 +151,8 @@ class HaskellBackend(object):
                cabal=False, symdb=None, package=None, source=False, standalone=False, local_names=False, **backend_args):
         raise NotImplementedError("HaskellBackend.symbol needs an implementation.")
 
-    def module(self, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
-               cabal=False, symdb=None, package=None, source=False, standalone=False, **backend_args):
+    def module(self, project_name, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None,
+               sandbox=None, cabal=False, symdb=None, package=None, source=False, standalone=False, **backend_args):
         raise NotImplementedError("HaskellBackend.module needs an implementation.")
 
     def resolve(self, file, exports=False, **backend_args):
@@ -166,7 +170,15 @@ class HaskellBackend(object):
     def whois(self, name, file, **backend_args):
         raise NotImplementedError("HaskellBackend.whois needs an implementation.")
 
-    def scope_modules(self, file, lookup='', search_type='prefix', **backend_args):
+    def scope_modules(self, project_name, file, lookup='', search_type='prefix', **backend_args):
+        '''Get modules accessible from a module (source file) or within a project.
+
+        :param str project_name: The project to interrogate
+        :param str file: The source file to interrogate
+        :param str lookup: The module name to query
+        :param str search_type: How match the lookup: 'prefix', 'suffix', 'exact', 'infix' (contains), 'regex'
+        :rtype: List of :py:class:`Module` symbol instances.
+        '''
         raise NotImplementedError("HaskellBackend.scope_modules needs an implementation.")
 
     def scope(self, file, lookup='', search_type='prefix', global_scope=False, **backend_args):
@@ -251,7 +263,6 @@ class HaskellBackend(object):
         else:
             return resp
 
-# ylint: disable=W0613
 
 class NullHaskellBackend(HaskellBackend):
     ''' For Haskellers: The Identity Backend. For ordinary mortals, this is the null, do-nothing Haskell backend. It does
@@ -344,8 +355,8 @@ class NullHaskellBackend(HaskellBackend):
                cabal=False, symdb=None, package=None, source=False, standalone=False, local_names=False, **backend_args):
         return self.dispatch_callbacks([], **backend_args)
 
-    def module(self, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
-               cabal=False, symdb=None, package=None, source=False, standalone=False, **backend_args):
+    def module(self, project_name, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None,
+               sandbox=None, cabal=False, symdb=None, package=None, source=False, standalone=False, **backend_args):
         return self.dispatch_callbacks(None, **backend_args)
 
     def resolve(self, file, exports=False, **backend_args):
@@ -363,7 +374,7 @@ class NullHaskellBackend(HaskellBackend):
     def whois(self, name, file, **backend_args):
         return self.dispatch_callbacks([], **backend_args)
 
-    def scope_modules(self, file, lookup='', search_type='prefix', **backend_args):
+    def scope_modules(self, project_name, file, lookup='', search_type='prefix', **backend_args):
         return self.dispatch_callbacks([], **backend_args)
 
     def scope(self, file, lookup='', search_type='prefix', global_scope=False, **backend_args):

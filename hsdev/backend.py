@@ -411,8 +411,8 @@ class HsDevBackend(Backend.HaskellBackend):
         return self.list_command('symbol', {'query': query, 'filters': filters, 'locals': local_names},
                                  ResultParse.parse_decls, **backend_args)
 
-    def module(self, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
-               cabal=False, symdb=None, package=None, source=False, standalone=False, **backend_args):
+    def module(self, _projectname, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None,
+               sandbox=None, cabal=False, symdb=None, package=None, source=False, standalone=False, **backend_args):
         query = {'input': lookup, 'type': search_type}
 
         filters = []
@@ -454,7 +454,7 @@ class HsDevBackend(Backend.HaskellBackend):
     def whois(self, name, file, **backend_args):
         return self.list_command('whois', {'name': name, 'file': file}, ResultParse.parse_declarations, **backend_args)
 
-    def scope_modules(self, file, lookup='', search_type='prefix', **backend_args):
+    def scope_modules(self, _projcname, file, lookup='', search_type='prefix', **backend_args):
         return self.list_command('scope modules', {'query': {'input': lookup, 'type': search_type}, 'file': file},
                                  ResultParse.parse_modules_brief, **backend_args)
 

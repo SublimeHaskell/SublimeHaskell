@@ -196,8 +196,6 @@ def sorted_types(view, types, point):
 
 
 def get_type(view, filename, module_name, line, column, cabal=None):
-    result = None
-
     # FIXME: Migrate this functionality into the backend API, then into the respective backends:
     #
     # if Settings.PLUGIN.enable_hsdev:
@@ -216,14 +214,13 @@ def get_type(view, filename, module_name, line, column, cabal=None):
 
 def get_type_view(view, selection=None):
     filename = view.file_name()
+    project_name = Common.locate_cabal_project_from_view(view)[1]
 
     if selection is None:
         selection = view.sel()[0]
 
     line, column = view.rowcol(selection.b)
-    backend = BackendManager.active_backend()
-    if backend is not None:
-        module_name = Utils.head_of(backend.module(file=filename))
+    module_name = Utils.head_of(BackendManager.active_backend().module(project_name, file=filename))
 
     return get_type(view, filename, module_name, line, column)
 
@@ -270,15 +267,13 @@ class SublimeHaskellShowType(CommandWin.SublimeHaskellTextCommand):
         if not filename:
             filename = self.view.file_name()
 
+        project_name = Common.locate_cabal_project_from_view(view)[1]
+
         if (not line) or (not column):
             line, column = self.view.rowcol(self.view.sel()[0].b)
 
-        backend = BackendManager.active_backend()
-        if backend is not None:
-            module_name = Utils.head_of(backend.module(file=filename))
-            return get_type(self.view, filename, module_name, line, column)
-        else:
-            return []
+        module_name = Utils.head_of(BackendManager.active_backend().module(project_name, file=filename))
+        return get_type(self.view, filename, module_name, line, column)
 
     def get_best_type(self, types):
         if not types:
