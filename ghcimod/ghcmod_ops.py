@@ -1,13 +1,5 @@
 
-import errno
-import os
-import re
-import subprocess
-
-import sublime
-
 import SublimeHaskell.sublime_haskell_common as Common
-import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.proc_helper as ProcHelper
 
 

@@ -44,32 +44,6 @@ def plugin_unloaded():
     BackendManager.BackendManager().shutdown_backend()
 
 
-## Decorators that are pre-condiction predicates to whether EventListener actions fire:
-
-def view_has_valid_file(action_fn):
-    '''Ensure that the view's file name is valid, i.e., not 'None'.'''
-    def inner_func(self, view, *args, **kwargs):
-        if view.file_name() is not None:
-            action_fn(self, view, *args, **kwargs)
-
-    return inner_func
-
-def is_inspected_source(action_fn):
-    '''Ensure the view has inspectable source, i.e., Haskell or cabal source code.'''
-    def inner_func(self, view, *args, **kwargs):
-        if Common.is_inspected_source(view):
-            action_fn(self, view, *args, **kwargs)
-
-    return inner_func
-
-def is_haskell_source(action_fn):
-    '''Ensure the view is Haskell source.'''
-    def inner_func(self, view, *args, **kwargs):
-        if Common.is_haskell_source(view):
-            action_fn(self, view, *args, **kwargs)
-
-    return inner_func
-
 class SublimeHaskellEventListener(sublime_plugin.EventListener):
     '''The plugin's primary SublimeText event listener. Actions related to file I/O (post-save actions, buffer modifications
     and flycheck linting. It also carries the plugin's state, which is not very accessible from anywhere else in the plugin,
@@ -90,21 +64,18 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         self.fly_agent = threading.Thread(target='fly_check')
 
 
-    def on_load(self, _view):
-        if Settings.COMPONENT_DEBUG.event_viewer:
-            print('{0}'.format(type(self).__name__ + ".on_load"))
-
-    @view_has_valid_file
-    @is_inspected_source
-    def on_new_async(self, view):
+    def on_new(self, view):
         filename = view.file_name()
+        if filename is None or not Common.is_inspected_source(view):
+            return
+
         if Settings.COMPONENT_DEBUG.event_viewer:
             print('{0} invoked.'.format(type(self).__name__ + ".on_new"))
 
         self.assoc_to_project(view, filename)
         self.rescan_source(filename)
 
-    def on_load_async(self, view):
+    def on_load(self, view):
         filename = view.file_name()
         if filename is None or not Common.is_inspected_source(view):
             return
@@ -214,27 +185,34 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             # Only suggest symbols if the current file is part of a Cabal project.
             line_contents = Common.get_line_contents(view, locations[0])
             project_name = Common.locate_cabal_project_from_view(view)[1]
-            completion_flags = 0
+            completion_flags = sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS
 
-            if self.LANGUAGE_RE.match(line_contents):
+            curselector = view.scope_name(locations[0])
+            rematch = self.LANGUAGE_RE.match(line_contents)
+            print('curselector {0} line_contents {1} rematch {2}'.format(curselector, line_contents, rematch))
+            if rematch:
                 completions = self.autocompleter.get_lang_completions(project_name)
                 completion_flags = sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS
             elif self.OPTIONS_GHC_RE.match(line_contents):
                 completions = self.autocompleter.get_flag_completions(project_name)
-                completion_flags = sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS
             else:
-                completions = self.autocompleter.get_import_completions(view, locations, line_contents)
-
-                # Export list
-                if 'meta.declaration.exports.haskell' in view.scope_name(view.sel()[0].a):
+                if 'meta.import.haskell' in curselector:
+                    # inside an import
+                    print('import completions')
+                    completions = self.autocompleter.get_import_completions(view, locations, line_contents)
+                elif 'meta.declaration.exports.haskell' in curselector:
+                    # Export list
                     export_module = Autocomplete.EXPORT_MODULE_RE.search(line_contents)
                     if export_module:
                         # qsymbol = Common.get_qualified_symbol_at_region(view, view.sel()[0])
                         # TODO: Implement
                         pass
-
-                # Add current file's completions:
-                completions = completions + self.autocompleter.get_completions(view, locations)
+                else:
+                    # Add current file's completions:
+                    print('default completions')
+                    completions = self.autocompleter.get_completions(view, locations)
+                    if not Settings.PLUGIN.inhibit_completions:
+                        completion_flags = 0 
 
             end_time = time.clock()
             Logging.log('time to get completions: {0} seconds'.format(end_time - begin_time), Logging.LOG_INFO)
@@ -252,10 +230,6 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
                 # if Settings.PLUGIN.inhibit_completions and len(comp) != 0:
                 #     return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
                 # return comp
-
-                if Settings.PLUGIN.inhibit_completions:
-                    # Inhibit the default completions from the completions file
-                    completion_flags = sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS
 
         return (completions, completion_flags) if completions is not None else []
 
