@@ -140,7 +140,41 @@ class GHCModBackend(Backend.HaskellBackend):
 
     def module(self, project_name, lookup='', search_type='prefix', project=None, file=None, module=None, deps=None,
                sandbox=None, cabal=False, symdb=None, package=None, source=False, standalone=False, **backend_args):
-        return self.dispatch_callbacks(None, **backend_args)
+        modsyms = None
+        if search_type == 'exact' and re.match('\w+(\.\w+)+', lookup):
+            backend = self.project_backends.get(project_name)
+            modinfo, err = backend.command_backend('browse -d -o ' + lookup) if backend is not None else []
+            if Settings.COMPONENT_DEBUG.recv_messages:
+                print('ghc-mod modules: err = {0}'.format('\n'.join(err)))
+                print('ghc-mod modules: resp =\n{0}'.format(pprint.pformat(modinfo)))
+
+            if not err or 'EXCEPTION' not in ' '.join(err):
+                moddecls = {}
+                for mdecl in modinfo:
+                    decl = None
+                    name, declinfo = mdecl.split(' :: ')
+                    if declinfo.startswith('class'):
+                        ctx, args = (None, [])   # self.split_context_args(declinfo[5:])
+                        decl = symbols.Class(name, ctx, args)
+                    elif declinfo.startswith('data'):
+                        ctx, args = (None, [])   # self.split_context_args(declinfo[5:])
+                        decl = symbols.Data(name, ctx, args)
+                    elif declinfo.startswith('newtype'):
+                        ctx, args = (None, [])   # self.split_context_args(declinfo[8:])
+                        decl = symbols.Newtype(name, ctx, args)
+                    else:
+                        # Default to function
+                        decl = symbols.Function(name, declinfo)
+
+                    if decl is not None:
+                        moddecls[name] = decl
+
+                if Settings.COMPONENT_DEBUG.recv_messages:
+                    print('ghc-mod modules: moddecls =\n{0}'.format(pprint.pformat(moddecls)))
+
+                modsyms = symbols.Module(lookup, [], [], moddecls, symbols.PackageDb(global_db=True))
+
+        return self.dispatch_callbacks([modsyms] if modsyms else [], **backend_args)
 
     def resolve(self, file, exports=False, **backend_args):
         return self.dispatch_callbacks([], **backend_args)
@@ -158,15 +192,6 @@ class GHCModBackend(Backend.HaskellBackend):
         return self.dispatch_callbacks([], **backend_args)
 
     def scope_modules(self, project_name, _filename, lookup='', search_type='prefix', **backend_args):
-        def lookup_match(elt):
-            ## Note: The tests are ordered from most to least likely. In fact, I'm not sure if infix or regex is actually
-            ## used in the code.
-            return (search_type == 'exact' and elt == lookup) or \
-                   (search_type == 'prefix' and elt.startswith(lookup)) or \
-                   (search_type == 'suffix' and elt.endswith(lookup)) or \
-                   (search_type == 'infix' and lookup in elt) or \
-                   (search_type == 'regex' and re.search(lookup, elt))
-
         backend = self.project_backends.get(project_name)
         modules, _ = backend.command_backend('list -d') if backend is not None else []
         if Settings.COMPONENT_DEBUG.recv_messages:
@@ -174,7 +199,7 @@ class GHCModBackend(Backend.HaskellBackend):
 
         filtered_mods = [symbols.Module(mod[1], [], [], {},
                                         symbols.InstalledLocation(mod[0], symbols.PackageDb(global_db=True)))
-                         for mod in (m.split() for m in modules if lookup_match(m[1]))]
+                         for mod in (m.split() for m in modules if self.lookup_match(m[1], lookup, search_type))]
 
         if Settings.COMPONENT_DEBUG.recv_messages:
             print('ghc-mod scope_modules: filtered_mods\n{0}'.format(pprint.pformat(filtered_mods)))
@@ -345,6 +370,22 @@ class GHCModBackend(Backend.HaskellBackend):
                 'source': {'file': filename,
                            'project': None}
                }
+
+    def lookup_match(self, elt, lookup, search_type):
+        ## Note: The tests are ordered from most to least likely. In fact, I'm not sure if infix or regex is actually
+        ## used in the code.
+        return (search_type == 'exact' and elt == lookup) or \
+               (search_type == 'prefix' and elt.startswith(lookup)) or \
+               (search_type == 'suffix' and elt.endswith(lookup)) or \
+               (search_type == 'infix' and lookup in elt) or \
+               (search_type == 'regex' and re.search(lookup, elt))
+
+    def split_context_args(self, signature):
+        sig = signature.split(' => ')
+        if len(sig) == 1:
+            return (None, sig[0].split())
+        else:
+            return (sig[0], sig[1].split())
 
     def ghci_package_db(self, cabal):
         if cabal is not None and cabal != 'cabal':

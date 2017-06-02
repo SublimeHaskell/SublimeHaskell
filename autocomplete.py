@@ -31,11 +31,16 @@ def sort_completions(comps):
 
 
 def sorted_completions(comps):
-    return list(set(comps))  # unique + sort
+    retval = list(set(comps))  # unique
+    retval.sort()
+    return retval
 
 
 def make_completions(suggestions):
-    return sorted_completions([s.suggest() for s in suggestions or []])
+    # return sorted_completions([s.suggest() for s in suggestions or []])
+    retval = [s.suggest() for s in suggestions or []]
+    retval.sort()
+    return retval
 
 
 def make_locations(comps):
