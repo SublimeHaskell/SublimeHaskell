@@ -76,7 +76,8 @@ class CompletionCache(object):
 
 # Autocompletion data
 class AutoCompleter(object):
-    """Information for completion"""
+    '''All of the logic (or lack thereof) behind Haskell symbol completions.
+    '''
     def __init__(self):
         self.language_pragmas = []
         self.flags_pragmas = []
@@ -95,8 +96,7 @@ class AutoCompleter(object):
         self.cache = LockedObject.LockedObject(CompletionCache())
 
     def keyword_completions(self, query):
-        print('keyword completions')
-        return [(k + '\tkeyword', k) for k in self.keywords if k.startswith(query)] if isinstance(query, str) else []
+        return [(k + '\tkeyword', k) for k in self.keywords if k.startswith(query)] if isinstance(query, ''.__class__) else []
 
     def get_completions_async(self, project_name, file_name):
         def log_result(result):
@@ -148,7 +148,7 @@ class AutoCompleter(object):
             return log_result(cache_.files[file_name])
 
     def drop_completions_async(self, file_name=None):
-        Logging.log('drop prepared completions')
+        Logging.log('drop prepared completions', Logging.LOG_DEBUG)
         with self.cache as cache_:
             if file_name is None:
                 cache_.files.clear()
@@ -160,14 +160,6 @@ class AutoCompleter(object):
 
     def update_sources_completions(self):
         pass
-
-    def init_completions_async(self):
-        window = sublime.active_window()
-        view = window.active_view() if window else None
-        if view is not None and Common.is_haskell_source(view):
-            filename = view.file_name()
-            if filename:
-                self.get_completions_async(filename)
 
     def get_completions(self, view, locations):
         "Get all the completions related to the current file."

@@ -12,6 +12,7 @@ import SublimeHaskell.internals.backend_mgr as BackendMgr
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.parseoutput as ParseOutput
 import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.symbols as symbols
 
 
@@ -117,7 +118,7 @@ class SublimeHaskellCheck(SublimeHaskellHsDevChain):
         super().__init__(view)
 
     def run(self, edit, **kwargs):
-        self.run_chain([hsdev_check()], 'Checking', fly_mode=(kwargs.get('fly') or False))
+        Utils.run_async('SublimeHaskellCheck', self.run_chain, [hsdev_check()], 'Checking', fly_mode=kwargs.get('fly', False))
 
 
 class SublimeHaskellLint(SublimeHaskellHsDevChain):
@@ -125,7 +126,7 @@ class SublimeHaskellLint(SublimeHaskellHsDevChain):
         super().__init__(view)
 
     def run(self, edit, **kwargs):
-        self.run_chain([hsdev_lint()], 'Linting', fly_mode=(kwargs.get('fly') or False))
+        Utils.run_async('SublimeHaskellLint', self.run_chain, [hsdev_lint()], 'Linting', fly_mode=kwargs.get('fly', False))
 
 
 class SublimeHaskellCheckAndLint(SublimeHaskellHsDevChain):
@@ -133,9 +134,8 @@ class SublimeHaskellCheckAndLint(SublimeHaskellHsDevChain):
         super().__init__(view)
 
     def run(self, edit, **kwargs):
-        self.run_chain([hsdev_check(), hsdev_lint()],
-                       'Checking and Linting',
-                       fly_mode=(kwargs.get('fly') or False))
+        Utils.run_async('SublimeHaskellCheckAndLint', self.run_chain, [hsdev_check(), hsdev_lint()], 'Checking and Linting',
+                        fly_mode=kwargs.get('fly', False))
 
 
 def ghcmod_browse_module(module_name, cabal=None):

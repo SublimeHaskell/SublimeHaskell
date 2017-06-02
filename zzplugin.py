@@ -73,7 +73,8 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             print('{0} invoked.'.format(type(self).__name__ + ".on_new"))
 
         self.assoc_to_project(view, filename)
-        self.rescan_source(filename)
+        project_name = Common.locate_cabal_project_from_view(view)[1]
+        self.rescan_source(project_name, filename)
 
     def on_load(self, view):
         filename = view.file_name()
@@ -84,7 +85,8 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             print('{0} is_inspected_source {1}.'.format(type(self).__name__ + ".on_load", filename))
 
         self.assoc_to_project(view, filename)
-        self.rescan_source(filename)
+        project_name = Common.locate_cabal_project_from_view(view)[1]
+        self.rescan_source(project_name, filename)
 
         if Common.is_haskell_source(view):
             if Settings.COMPONENT_DEBUG.event_viewer:
@@ -221,7 +223,6 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             else:
                 # Add current file's completions:
                 completions = self.autocompleter.get_completions(view, locations)
-                Autocomplete.sort_completions(completions)
                 if not Settings.PLUGIN.inhibit_completions:
                     completion_flags = 0
 
@@ -267,13 +268,15 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             view.window().run_command('sublime_haskell_lint')
 
 
-    def update_completions_async(self, files=None, drop_all=False):
+    def update_completions_async(self, project_name, files=None, drop_all=False):
         if drop_all:
             Utils.run_async('drop all completions', self.autocompleter.drop_completions_async)
         else:
             for file in files or []:
                 Utils.run_async('drop completions', self.autocompleter.drop_completions_async, file)
-        Utils.run_async('init completions', self.autocompleter.init_completions_async)
+
+        for file in files or []:
+            Utils.run_async('init completions', self.autocompleter.get_completions_async, project_name, file)
 
 
     def is_scanned_source(self, view):
@@ -356,9 +359,9 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         BackendManager.active_backend().scan(contents=scan_contents, on_response=scan_resp, on_error=scan_err)
 
 
-    def rescan_source(self, filename):
+    def rescan_source(self, project_name, filename):
         with self.backend_mgr:
             with self.backend_mgr.inspector() as insp:
                 insp.mark_file_dirty(filename)
 
-            self.update_completions_async(drop_all=True)
+            self.update_completions_async(project_name, [filename], drop_all=True)

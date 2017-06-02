@@ -9,8 +9,8 @@ import sublime
 import sublime_plugin
 
 import SublimeHaskell.cmdwin_types as CommandWin
-import SublimeHaskell.ghcimod.ghcmod_ops as GHCIMod
 import SublimeHaskell.internals.backend_mgr as BackendManager
+import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.unicode_opers as UnicodeOpers
 import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.parseoutput as ParseOutput
@@ -240,7 +240,7 @@ def query_file_types(filename):
                 rgn = resp['region']
                 return RegionType(resp['note']['type'], to_file_pos(rgn['from']), to_file_pos(rgn['to']))
 
-            res = BackendManager.active_backend().types(files=[filename], ghc=GHCIMod.get_ghc_opts(filename))
+            res = BackendManager.active_backend().types(files=[filename], ghc=Settings.PLUGIN.ghc_opts)
             if res is not None:
                 types = [to_region_type(r) for r in res]
                 SourceHaskellTypeCache().set(filename, types, False)

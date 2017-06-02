@@ -141,7 +141,7 @@ class GHCModBackend(Backend.HaskellBackend):
     def module(self, project_name, lookup='', search_type='prefix', project=None, file=None, module=None, deps=None,
                sandbox=None, cabal=False, symdb=None, package=None, source=False, standalone=False, **backend_args):
         modsyms = None
-        if search_type == 'exact' and re.match('\w+(\.\w+)+', lookup):
+        if search_type == 'exact' and re.match(r'\w+(\.\w+)+', lookup):
             backend = self.project_backends.get(project_name)
             modinfo, err = backend.command_backend('browse -d -o ' + lookup) if backend is not None else []
             if Settings.COMPONENT_DEBUG.recv_messages:
@@ -152,16 +152,19 @@ class GHCModBackend(Backend.HaskellBackend):
                 moddecls = {}
                 for mdecl in modinfo:
                     decl = None
-                    name, declinfo = mdecl.split(' :: ')
-                    if declinfo.startswith('class'):
-                        ctx, args = (None, [])   # self.split_context_args(declinfo[5:])
+                    name, declinfo = self.get_name_decl(mdecl)
+                    if declinfo.startswith('class '):
+                        ctx, args = self.split_context_args(name, declinfo[5:])
                         decl = symbols.Class(name, ctx, args)
-                    elif declinfo.startswith('data'):
-                        ctx, args = (None, [])   # self.split_context_args(declinfo[5:])
+                    elif declinfo.startswith('data '):
+                        ctx, args = self.split_context_args(name, declinfo[5:])
                         decl = symbols.Data(name, ctx, args)
-                    elif declinfo.startswith('newtype'):
-                        ctx, args = (None, [])   # self.split_context_args(declinfo[8:])
+                    elif declinfo.startswith('newtype '):
+                        ctx, args = self.split_context_args(name, declinfo[8:])
                         decl = symbols.Newtype(name, ctx, args)
+                    elif declinfo.startswith('type '):
+                        ctx, args = self.split_context_args(name, declinfo[5:])
+                        decl = symbols.Type(name, ctx, args)
                     else:
                         # Default to function
                         decl = symbols.Function(name, declinfo)
@@ -192,13 +195,23 @@ class GHCModBackend(Backend.HaskellBackend):
         return self.dispatch_callbacks([], **backend_args)
 
     def scope_modules(self, project_name, _filename, lookup='', search_type='prefix', **backend_args):
+        def make_pkg(pkg):
+            pkg_info = pkg.split('-', 2)
+            pkg_name = pkg_info[0]
+            if len(pkg_info) > 0:
+                pkg_ver = pkg_info[1]
+            else:
+                pkg_ver = '<no version>'
+
+            return symbols.Package(pkg_name, pkg_ver)
+
         backend = self.project_backends.get(project_name)
-        modules, _ = backend.command_backend('list -d') if backend is not None else []
+        modules, _ = backend.command_backend('list -d') if backend is not None else ([], [])
         if Settings.COMPONENT_DEBUG.recv_messages:
             print('ghc-mod scope_modules: resp =\n{0}'.format(modules))
 
         filtered_mods = [symbols.Module(mod[1], [], [], {},
-                                        symbols.InstalledLocation(mod[0], symbols.PackageDb(global_db=True)))
+                                        symbols.InstalledLocation(make_pkg(mod[0]), symbols.PackageDb(global_db=True)))
                          for mod in (m.split() for m in modules if self.lookup_match(m[1], lookup, search_type))]
 
         if Settings.COMPONENT_DEBUG.recv_messages:
@@ -380,12 +393,28 @@ class GHCModBackend(Backend.HaskellBackend):
                (search_type == 'infix' and lookup in elt) or \
                (search_type == 'regex' and re.search(lookup, elt))
 
-    def split_context_args(self, signature):
+    def split_context_args(self, name, signature):
+        def trim_name(args):
+            trim = 0
+            if sig[0] == name:
+                trim = len(name)
+            elif sig[0].startswith(name + ' '):
+                trim = len(name) + 1
+            return args[trim:]
+
         sig = signature.split(' => ')
         if len(sig) == 1:
-            return (None, sig[0].split())
+            return (None, trim_name(sig[0]).split())
         else:
-            return (sig[0], sig[1].split())
+            return (sig[0], trim_name(sig[1]).split())
+
+    def get_name_decl(self, signature):
+        sig = signature.split(' :: ')
+        if len(sig) > 1:
+            return (sig[0], sig[1])
+        else:
+            print('name_declinfo: one element: {0}'.format(sig))
+            return (sig[0], '')
 
     def ghci_package_db(self, cabal):
         if cabal is not None and cabal != 'cabal':
