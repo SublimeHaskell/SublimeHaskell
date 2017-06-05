@@ -12,7 +12,6 @@ import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.output_collector as OutputCollector
 import SublimeHaskell.parseoutput as ParseOutput
-import SublimeHaskell.ghcimod.ghcmod_ops as GHCIMod
 
 
 def show_hdevtools_error_and_disable():

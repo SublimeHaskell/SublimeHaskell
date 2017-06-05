@@ -246,7 +246,9 @@ class GHCModBackend(Backend.HaskellBackend):
         '''
         return self.dispatch_callbacks([], **backend_args)
 
-    def types(self, files=None, contents=None, ghc=None, **backend_args):
+    def types(self, project_name, file, module_name, line, column, ghc_flags=None, contents=None, **backend_args):
+        # (filename, module_name, line, column, cabal=None)
+        # return call_ghcmod_and_wait(['type', filename, module_name, str(line), str(column)], filename=filename, cabal=cabal)
         return self.dispatch_callbacks([], **backend_args)
 
     def langs(self, project_name, **backend_args):
@@ -300,24 +302,10 @@ class GHCModBackend(Backend.HaskellBackend):
 
         return None
 
-    def command_backend(self, filename, cmd):
+    def command_backend(self, filename, cmd, do_map=False, file=None, contents=None):
         backend = self.get_backend(filename)
         if backend is not None:
-            return backend.command_backend(cmd)
-        else:
-            return ([], [])
-
-    def backend_map_file(self, filename, contents):
-        backend = self.get_backend(filename)
-        if backend is not None:
-            return backend.map_file(filename, contents)
-        else:
-            return ([], [])
-
-    def backend_unmap_file(self, filename):
-        backend = self.get_backend(filename)
-        if backend is not None:
-            return backend.unmap_file(filename)
+            return backend.command_backend(cmd, do_map, file, contents)
         else:
             return ([], [])
 
@@ -325,20 +313,16 @@ class GHCModBackend(Backend.HaskellBackend):
         retval = []
         for file in files:
             project_dir = self.get_project_dir(file)
-            mapped_file = False
             if file in contents:
-                # Use the current file's contents and arrange to map those contents
-                self.backend_map_file(file, contents[file])
-                mapped_file = True
-
-            try:
-                resp, _ = self.command_backend(file, cmd + ' ' + file)
-                if Settings.COMPONENT_DEBUG.recv_messages:
-                    print('ghc-mod: {0}: resp =\n{1}'.format(cmd, pprint.pformat(resp)))
-                retval.extend([xlat_func(project_dir, m) for m in regex.finditer('\n'.join(resp))])
-            finally:
-                if mapped_file:
-                    self.backend_unmap_file(file)
+                map_file = True
+                fcontent = contents[file]
+            else:
+                map_file = False
+                fcontent = None
+            resp, _ = self.command_backend(file, cmd + ' ' + file, map_file, file, fcontent)
+            if Settings.COMPONENT_DEBUG.recv_messages:
+                print('ghc-mod: {0}: resp =\n{1}'.format(cmd, pprint.pformat(resp)))
+            retval.extend([xlat_func(project_dir, m) for m in regex.finditer('\n'.join(resp))])
 
         if Settings.COMPONENT_DEBUG.recv_messages:
             print('ghc-mod: {0}:\n{1}'.format(cmd, pprint.pformat(retval)))
@@ -395,26 +379,17 @@ class GHCModBackend(Backend.HaskellBackend):
 
     def split_context_args(self, name, signature):
         def trim_name(args):
-            trim = 0
-            if sig[0] == name:
-                trim = len(name)
-            elif sig[0].startswith(name + ' '):
-                trim = len(name) + 1
-            return args[trim:]
+            return args[1:] if args[0] == name else args
 
         sig = signature.split(' => ')
         if len(sig) == 1:
-            return (None, trim_name(sig[0]).split())
+            return (None, trim_name(sig[0].split()))
         else:
-            return (sig[0], trim_name(sig[1]).split())
+            return (sig[0], trim_name(sig[1].split()))
 
     def get_name_decl(self, signature):
         sig = signature.split(' :: ')
-        if len(sig) > 1:
-            return (sig[0], sig[1])
-        else:
-            print('name_declinfo: one element: {0}'.format(sig))
-            return (sig[0], '')
+        return (sig[0], sig[1] if len(sig) > 1 else '')
 
     def ghci_package_db(self, cabal):
         if cabal is not None and cabal != 'cabal':
@@ -451,6 +426,17 @@ class GHCModBackend(Backend.HaskellBackend):
             args.extend(['-g', opt])
         return args
 
+    ## Unreferenced function:
+    ##
+    # def ghcmod_info(filename, module_name, symbol_name, cabal=None):
+    #     """
+    #     Uses ghc-mod info filename module_name symbol_name to get symbol info
+    #     """
+    #     contents = call_ghcmod_and_wait(['info', filename, module_name, symbol_name], filename=filename, cabal=cabal)
+    #     # TODO: Returned symbol doesn't contain location
+    #     # But in fact we use ghcmod_info only to retrieve type of symbol
+    #     return ParseOutput.parse_info(symbol_name, contents)
+
 class GHCModClient(object):
     ## Have ghc-mod prefix output with X's and O's (errors and regular output)
     ## Apologies to Ellie King. :-)
@@ -463,8 +449,8 @@ class GHCModClient(object):
         self.ghcmod = None
         self.action_lock = None
         self.stderr_drain = None
-
-        cmd = []
+        self.cmd = []
+        self.diag_prefix = 'ghc-mod ' + project
 
         # if self.exec_with is not None:
         #     if self.exec_with == 'cabal':
@@ -472,23 +458,23 @@ class GHCModClient(object):
         #     elif self.exec_with == 'stack':
         #         cmd += ['stack']
 
-        cmd += ['ghc-mod']
+        self.cmd += ['ghc-mod']
 
         # if self.exec_with is not None:
         #     cmd += ['--']
 
-        cmd += ['-b', '\\n', '--line-prefix', self.GHCMOD_OUTPUT_MARKER + ',' + self.GHCMOD_ERROR_MARKER]
-        cmd += opt_args
-        cmd += ['legacy-interactive']
+        self.cmd += ['-b', '\\n', '--line-prefix', self.GHCMOD_OUTPUT_MARKER + ',' + self.GHCMOD_ERROR_MARKER]
+        self.cmd += opt_args
+        self.cmd += ['legacy-interactive']
 
-        Logging.log('ghc-mod command: {0}'.format(cmd), Logging.LOG_DEBUG)
+        Logging.log('ghc-mod command: {0}'.format(self.cmd), Logging.LOG_DEBUG)
 
-        self.ghcmod = ProcHelper.ProcHelper(cmd, cwd=project_dir)
+        self.ghcmod = ProcHelper.ProcHelper(self.cmd, cwd=project_dir)
         if self.ghcmod.process is not None:
             self.ghcmod.process.stdin = io.TextIOWrapper(self.ghcmod.process.stdin, 'utf-8')
             self.ghcmod.process.stdout = io.TextIOWrapper(self.ghcmod.process.stdout, 'utf-8')
             self.action_lock = threading.Lock()
-            self.stderr_drain = OutputCollector.DescriptorDrain('ghc-mod ' + project, self.ghcmod.process.stderr)
+            self.stderr_drain = OutputCollector.DescriptorDrain(self.diag_prefix, self.ghcmod.process.stderr)
             self.stderr_drain.start()
 
     def shutdown(self):
@@ -524,7 +510,8 @@ class GHCModClient(object):
                         else:
                             resp_stdout.append(resp.rstrip())
                     elif prefix == self.GHCMOD_ERROR_MARKER:
-                        resp_stderr.append(resp.rstrip())
+                        Logging.log('{0}: {1}'.format(self.diag_prefix, resp))
+                        resp_stderr.append(resp)
                     elif prefix == 'NG ':
                         sys.stdout.write('Error response: ' + resp)
                         got_reply = True
@@ -536,33 +523,25 @@ class GHCModClient(object):
 
         return (resp_stdout, resp_stderr)
 
-    def command_backend(self, cmd):
+    def command_backend(self, cmd, do_map=False, file=None, contents=None):
         with self.action_lock:
             try:
-                print(cmd, file=self.ghcmod.process.stdin, flush=True)
-                return self.read_response()
-            except OSError:
-                self.shutdown()
-                return ([], [])
-
-    def map_file(self, file, contents):
-        with self.action_lock:
-            try:
-                print('map-file ' + file, file=self.ghcmod.process.stdin)
-                self.ghcmod.process.stdin.write(contents)
-                self.ghcmod.process.stdin.write('\n' + chr(4) + '\n')
-                self.ghcmod.process.stdin.flush()
-                return self.read_response()
-            except OSError:
-                self.shutdown()
-                return ([], [])
-
-
-    def unmap_file(self, file):
-        with self.action_lock:
-            try:
-                print('unmap-file ' + file, file=self.ghcmod.process.stdin, flush=True)
-                return self.read_response()
+                if do_map:
+                    print('map-file ' + file, file=self.ghcmod.process.stdin)
+                    self.ghcmod.process.stdin.write(contents)
+                    self.ghcmod.process.stdin.write('\n' + chr(4) + '\n')
+                    self.ghcmod.process.stdin.flush()
+                    self.read_response()
+                try:
+                    print(cmd, file=self.ghcmod.process.stdin, flush=True)
+                    return self.read_response()
+                except OSError:
+                    self.shutdown()
+                    return ([], [])
+                finally:
+                    if do_map:
+                        print('unmap-file ' + file, file=self.ghcmod.process.stdin, flush=True)
+                        self.read_response()
             except OSError:
                 self.shutdown()
                 return ([], [])

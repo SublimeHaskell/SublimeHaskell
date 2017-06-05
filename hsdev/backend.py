@@ -499,9 +499,9 @@ class HsDevBackend(Backend.HaskellBackend):
                                      'hlint-opts': hlint or []},
                       **backend_args)
 
-    def types(self, files=None, contents=None, ghc=None, **backend_args):
-        return self.list_command('types', {'files': self.files_and_contents(files, contents),
-                                           'ghc-opts': ghc or []},
+    def types(self, _projectname, file, _modulename, _line, _column, ghc_flags=None, contents=None, **backend_args):
+        return self.list_command('types', {'files': self.files_and_contents(file, contents),
+                                           'ghc-opts': ghc_flags or []},
                                  **backend_args)
 
     def langs(self, _projectname, **backend_args):

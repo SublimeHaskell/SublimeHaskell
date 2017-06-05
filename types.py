@@ -17,9 +17,10 @@ import SublimeHaskell.parseoutput as ParseOutput
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.symbols as Symbols
 
+## Unused
 # Used to find out the module name.
-MODULE_RE_STR = r'module\s+([^\s\(]*)'  # "module" followed by everything that is neither " " nor "("
-MODULE_RE = re.compile(MODULE_RE_STR)
+# MODULE_RE_STR = r'module\s+([^\s\(]*)'  # "module" followed by everything that is neither " " nor "("
+# MODULE_RE = re.compile(MODULE_RE_STR)
 
 # Parses the output of `ghc-mod type`.
 # Example: 39 1 40 17 "[Char]"
@@ -195,12 +196,10 @@ def sorted_types(view, types, point):
                   key=lambda t: t.region(view).size()) if types is not None else []
 
 
-def get_type(view, filename, module_name, line, column, cabal=None):
-    # FIXME: Migrate this functionality into the backend API, then into the respective backends:
-    #
-    # if Settings.PLUGIN.enable_hsdev:
-    #     # Convert from hsdev one-based locations to sublime zero-based positions
-    return sorted_types(view, query_file_types(filename) or [], FilePosition(line, column).point(view))
+def get_type(view, project_name, filename, module_name, line, column):
+    # line and column are 0-based buffer positions
+    file_types = query_file_types(project_name, [filename], module_name, line, column) or []
+    return sorted_types(view, file_types, FilePosition(line, column).point(view))
 
     # column = ParseOutput.sublime_column_to_ghc_column(view, line, column)
     # line = line + 1
@@ -212,7 +211,7 @@ def get_type(view, filename, module_name, line, column, cabal=None):
     # return parse_type_output(view, result) if result else None
 
 
-def get_type_view(view, selection=None):
+def get_type_view(view, project_name, selection=None):
     filename = view.file_name()
     project_name = Common.locate_cabal_project_from_view(view)[1]
 
@@ -222,28 +221,28 @@ def get_type_view(view, selection=None):
     line, column = view.rowcol(selection.b)
     module_name = Utils.head_of(BackendManager.active_backend().module(project_name, file=filename))
 
-    return get_type(view, filename, module_name, line, column)
+    return get_type(view, project_name, filename, module_name, line, column)
 
 
-def query_file_types(filename):
+def query_file_types(project_name, filename, module_name, line, column):
     '''Query all of the types associated with a file's contents.
     '''
     types = []
-    if BackendManager.is_live_backend():
-        if SourceHaskellTypeCache().has(filename):
-            types = SourceHaskellTypeCache().get(filename)
-        else:
-            def to_file_pos(rgn):
-                return FilePosition(int(rgn['line']) - 1, int(rgn['column']) - 1)
+    if SourceHaskellTypeCache().has(filename[0]):
+        types = SourceHaskellTypeCache().get(filename[0])
+    else:
+        def to_file_pos(rgn):
+            return FilePosition(int(rgn['line']) - 1, int(rgn['column']) - 1)
 
-            def to_region_type(resp):
-                rgn = resp['region']
-                return RegionType(resp['note']['type'], to_file_pos(rgn['from']), to_file_pos(rgn['to']))
+        def to_region_type(resp):
+            rgn = resp['region']
+            return RegionType(resp['note']['type'], to_file_pos(rgn['from']), to_file_pos(rgn['to']))
 
-            res = BackendManager.active_backend().types(files=[filename], ghc=Settings.PLUGIN.ghc_opts)
-            if res is not None:
-                types = [to_region_type(r) for r in res]
-                SourceHaskellTypeCache().set(filename, types, False)
+        res = BackendManager.active_backend().types(project_name, filename, module_name, line, column,
+                                                    ghc_flags=Settings.PLUGIN.ghc_opts)
+        if res is not None:
+            types = [to_region_type(r) for r in res]
+            SourceHaskellTypeCache().set(filename[0], types, False)
 
     return types
 
@@ -256,24 +255,22 @@ class SublimeHaskellShowType(CommandWin.SublimeHaskellTextCommand):
         self.output_view = None
 
     def run(self, edit, **kwargs):
-        filename = kwargs.get('filename')
+        filename = kwargs.get('filename', self.view.file_name())
         line = kwargs.get('line')
         column = kwargs.get('column')
 
-        result = self.get_types(filename, int(line) if line else None, int(column) if column else None)
-        self.show_types(result)
-
-    def get_types(self, filename=None, line=None, column=None):
-        if not filename:
-            filename = self.view.file_name()
-
-        project_name = Common.locate_cabal_project_from_view(view)[1]
-
-        if (not line) or (not column):
+        if line is None or column is None:
             line, column = self.view.rowcol(self.view.sel()[0].b)
 
+        line, column = int(line), int(column)
+        project_name = Common.locate_cabal_project_from_view(self.view)[1]
+
+        result = self.get_types(project_name, filename, line, column)
+        self.show_types(result)
+
+    def get_types(self, project_name, filename, line, column):
         module_name = Utils.head_of(BackendManager.active_backend().module(project_name, file=filename))
-        return get_type(self.view, filename, module_name, line, column)
+        return get_type(self.view, project_name, filename, module_name, line, column)
 
     def get_best_type(self, types):
         if not types:
@@ -287,15 +284,14 @@ class SublimeHaskellShowType(CommandWin.SublimeHaskellTextCommand):
             return types[0]
 
     def show_types(self, types):
-        if not types:
+        if types:
+            self.types = types
+            self.output_view = Common.output_panel(self.view.window(), '',
+                                                   panel_name=TYPES_PANEL_NAME,
+                                                   syntax='Haskell-SublimeHaskell')
+            self.view.window().show_quick_panel([t.typename for t in self.types], self.on_done, 0, -1, self.on_changed)
+        else:
             Common.show_status_message("Can't infer type", False)
-            return
-
-        self.types = types
-        self.output_view = Common.output_panel(self.view.window(), '',
-                                               panel_name=TYPES_PANEL_NAME,
-                                               syntax='Haskell-SublimeHaskell')
-        self.view.window().show_quick_panel([t.typename for t in self.types], self.on_done, 0, -1, self.on_changed)
 
     def on_done(self, idx):
         self.view.erase_regions('typed')
@@ -320,11 +316,18 @@ class SublimeHaskellShowType(CommandWin.SublimeHaskellTextCommand):
 
 class SublimeHaskellShowTypes(SublimeHaskellShowType):
     def run(self, edit, **kwargs):
-        filename = kwargs.get('filename')
+        filename = kwargs.get('filename', self.view.file_name())
         line = kwargs.get('line')
         column = kwargs.get('column')
 
-        result = self.get_types(filename, int(line) if line else None, int(column) if column else None)
+        if line is None or column is None:
+            line, column = self.view.rowcol(self.view.sel()[0].b)
+
+        line, column = int(line), int(column)
+
+        project_name = Common.locate_cabal_project_from_view(self.view)[1]
+
+        result = self.get_types(project_name, filename, line, column)
         self.show_types(result)
 
     def show_types(self, types):
@@ -350,14 +353,12 @@ class SublimeHaskellGetTypes(CommandWin.SublimeHaskellTextCommand):
     def __init__(self, view):
         super().__init__(view)
 
-        self.filename = None
-
     def run(self, edit, **kwargs):
-        self.filename = kwargs.get('filename')
-        if not self.filename:
-            self.filename = self.view.file_name()
-        if not SourceHaskellTypeCache().has(self.filename):
-            query_file_types(self.filename)
+        filename = kwargs.get('filename', self.view.file_name())
+        project_name = Common.locate_cabal_project_from_view(self.view)[1]
+
+        if not SourceHaskellTypeCache().has(filename):
+            get_type_view(self.view, project_name)
 
 
 class SublimeHaskellShowAllTypes(CommandWin.SublimeHaskellTextCommand):
@@ -368,11 +369,11 @@ class SublimeHaskellShowAllTypes(CommandWin.SublimeHaskellTextCommand):
         self.output_view = None
 
     def run(self, edit, **kwargs):
-        self.filename = kwargs.get('filename')
-        if not self.filename:
-            self.filename = self.view.file_name()
+        self.filename = kwargs.get('filename', self.view.file_name())
+        project_name = Common.locate_cabal_project_from_view(self.view)[1]
+
         if not SourceHaskellTypeCache().has(self.filename):
-            query_file_types(self.filename)
+            get_type_view(self.view, project_name)
         else:
             self.on_types(SourceHaskellTypeCache().get(self.filename))
 
@@ -417,6 +418,9 @@ class SublimeHaskellHideAllTypes(CommandWin.SublimeHaskellTextCommand):
 
 
 class SublimeHaskellToggleAllTypes(CommandWin.SublimeHaskellTextCommand):
+    def __init__(self, view):
+        super().__init__(view)
+
     def run(self, edit):
         if SourceHaskellTypeCache().shown(self.view.file_name()):
             self.view.run_command('sublime_haskell_hide_all_types')
@@ -429,8 +433,15 @@ class SublimeHaskellToggleAllTypes(CommandWin.SublimeHaskellTextCommand):
 
 # Works only with the cursor being in the name of a toplevel function so far.
 class SublimeHaskellInsertType(SublimeHaskellShowType):
+    def __init__(self, view):
+        super().__init__(view)
+
     def run(self, edit):
-        result = self.get_best_type(self.get_types())
+        filename = self.view.file_name()
+        line, column = self.view.rowcol(self.view.sel()[0].b)
+        project_name = Common.locate_cabal_project_from_view(self.view)[1]
+
+        result = self.get_best_type(self.get_types(project_name, filename, int(line), int(column)))
         if result:
             res = result.region(self.view)
             qsymbol = Common.get_qualified_symbol_at_region(self.view, self.view.word(res.begin()))
@@ -444,11 +455,12 @@ class SublimeHaskellInsertType(SublimeHaskellShowType):
 class ExpandSelectionInfo(object):
     def __init__(self, view, selection=None):
         self.view = view
+        project_name = Common.locate_cabal_project_from_view(self.view)[1]
         self.selection = selection if selection is not None else view.sel()[0]
         if SourceHaskellTypeCache().has(self.view.file_name()):
             types = sorted_types(self.view, SourceHaskellTypeCache().get(self.view.file_name()), self.selection.b)
         else:
-            types = get_type_view(self.view, self.selection)
+            types = get_type_view(self.view, project_name, selection=self.selection)
         self.regions = [TypedRegion.from_region_type(t, view) for t in types] if types else None
         self.expanded_index = None
 

@@ -1,19 +1,16 @@
 # -*- coding: UTF-8 -*-
 
 import os
-import re
 
 import sublime
 
 import SublimeHaskell.cmdwin_types as CommandWin
-import SublimeHaskell.ghcimod.ghcmod_ops as GHCIMod
 import SublimeHaskell.hsdev.result_parse as HsResultParse
 import SublimeHaskell.internals.backend_mgr as BackendMgr
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.parseoutput as ParseOutput
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.utils as Utils
-import SublimeHaskell.symbols as symbols
 
 
 def file_as_file_list(file):
@@ -136,46 +133,3 @@ class SublimeHaskellCheckAndLint(SublimeHaskellHsDevChain):
     def run(self, edit, **kwargs):
         Utils.run_async('SublimeHaskellCheckAndLint', self.run_chain, [hsdev_check(), hsdev_lint()], 'Checking and Linting',
                         fly_mode=kwargs.get('fly', False))
-
-
-def ghcmod_browse_module(module_name, cabal=None):
-    """
-    Returns symbols.Module with all declarations
-    """
-    contents = GHCIMod.call_ghcmod_and_wait(['browse', '-d', module_name], cabal=cabal).splitlines()
-
-    if not contents:
-        return None
-
-    mod_decls = symbols.Module(module_name)
-
-    function_regex = r'(?P<name>\w+)\s+::\s+(?P<type>.*)'
-    type_regex = r'(?P<what>(class|type|data|newtype))\s+(?P<name>\w+)(\s+(?P<args>\w+(\s+\w+)*))?'
-
-    def to_decl(line):
-        matched = re.search(function_regex, line)
-        if matched:
-            return symbols.Function(matched.group('name'), matched.group('type'))
-        else:
-            matched = re.search(type_regex, line)
-            if matched:
-                decl_type = matched.group('what')
-                decl_name = matched.group('name')
-                decl_args = matched.group('args')
-                decl_args = decl_args.split() if decl_args else []
-
-                if decl_type == 'class':
-                    return symbols.Class(decl_name, None, decl_args)
-                elif decl_type == 'data':
-                    return symbols.Data(decl_name, None, decl_args)
-                elif decl_type == 'type':
-                    return symbols.Type(decl_name, None, decl_args)
-                elif decl_type == 'newtype':
-                    return symbols.Newtype(decl_name, None, decl_args)
-            else:
-                return symbols.Declaration(line)
-
-    for decl in map(to_decl, contents):
-        mod_decls.add_declaration(decl)
-
-    return mod_decls

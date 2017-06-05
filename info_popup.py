@@ -130,10 +130,10 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
             module_word = qsymbol.module
             ident = qsymbol.name
 
-            if ident is None and module_word:  # TODO: Any ideas for popup about module?
+            if module_word is not None:
+                # TODO: Any ideas for popup about module?
                 pass
-
-            if ident:
+            elif ident is not None:
                 whois_name = qsymbol.qualified_name()
                 full_name = qsymbol.full_name()
 
@@ -143,7 +143,10 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
                 if types.SourceHaskellTypeCache().has(self.current_file_name):
                     self.typed_expr = self.get_type(types.SourceHaskellTypeCache().get(self.current_file_name), whois_name)
                 else:
-                    type_list = types.query_file_types(self.current_file_name)
+                    line, column = self.view.rowcol(self.view.sel()[0].b)
+                    project_name = Common.locate_cabal_project_from_view(self.view)[1]
+
+                    type_list = types.query_file_types(project_name, self.current_file_name, int(line), int(column))
                     self.on_types(type_list, whois_name)
 
                 # Try whois

@@ -231,7 +231,7 @@ class HaskellBackend(object):
     def check_lint(self, files=None, contents=None, ghc=None, hlint=None, wait_complete=True, **backend_args):
         raise NotImplementedError("HaskellBackend.check_lint needs an implementation.")
 
-    def types(self, files=None, contents=None, ghc=None, **backend_args):
+    def types(self, project_name, file, module_name, line, column, ghc_flags=None, contents=None, **backend_args):
         raise NotImplementedError("HaskellBackend.types needs an implementation.")
 
     def langs(self, project_name, **backend_args):
@@ -398,7 +398,7 @@ class NullHaskellBackend(HaskellBackend):
     def check_lint(self, files=None, contents=None, ghc=None, hlint=None, wait_complete=False, **backend_args):
         return self.dispatch_callbacks([], **backend_args)
 
-    def types(self, files=None, contents=None, ghc=None, **backend_args):
+    def types(self, project_name, file, module_name, line, column, ghc_flags=None, contents=None, **backend_args):
         return self.dispatch_callbacks([], **backend_args)
 
     def langs(self, _projectname, **backend_args):
