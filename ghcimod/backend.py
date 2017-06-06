@@ -191,6 +191,7 @@ class GHCModBackend(Backend.HaskellBackend):
         return self.dispatch_callbacks([], **backend_args)
 
     def whois(self, name, file, **backend_args):
+        # backend = self.project_backends.get(project_name)
         return self.dispatch_callbacks([], **backend_args)
 
     def scope_modules(self, project_name, _filename, lookup='', search_type='prefix', **backend_args):
@@ -248,32 +249,29 @@ class GHCModBackend(Backend.HaskellBackend):
     def types(self, project_name, file, module_name, line, column, ghc_flags=None, contents=None, **backend_args):
         # (filename, module_name, line, column, cabal=None)
         # return call_ghcmod_and_wait(['type', filename, module_name, str(line), str(column)], filename=filename, cabal=cabal)
-        project_info = self.file_to_project.get(file[0])
         type_output = []
-        if project_info is not None:
-            backend = self.project_backends.get(project_name)
-            rel_filepath = os.path.relpath(file[0], start=project_info[1])
-            # Convert 0-based to 1-based line/col:
-            type_cmd = 'type {0} {1} {2}'.format(rel_filepath, line + 1, column + 1)
-            if Settings.COMPONENT_DEBUG.send_messages or Settings.COMPONENT_DEBUG.all_messages:
-                print('ghc-mod types: type_cmd \'{0}\''.format(type_cmd))
+        backend = self.project_backends.get(project_name)
+        # Convert 0-based to 1-based line/col:
+        type_cmd = 'type {0} {1} {2}'.format(file[0], line + 1, column + 1)
+        if Settings.COMPONENT_DEBUG.send_messages or Settings.COMPONENT_DEBUG.all_messages:
+            print('ghc-mod types: type_cmd \'{0}\''.format(type_cmd))
 
-            result, _ = backend.command_backend(type_cmd)
+        result, _ = backend.command_backend(type_cmd)
 
-            if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
-                print('ghc-mod types: type_output\n{0}'.format(pprint.pformat(type_output)))
+        if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
+            print('ghc-mod types: type_output\n{0}'.format(pprint.pformat(type_output)))
 
 
-            for tyline in result:
-                line = tyline.split(maxsplit=4)
-                type_output.append({'note': {'expr': '',
-                                             'type': line[4].replace('"', '')},
-                                    'source': {},
-                                    'region': {'from': {'line': line[0],
-                                                        'column': line[1]},
-                                               'to': {'line': line[2],
-                                                      'column': line[3]}},
-                                    'level': None})
+        for tyline in result:
+            line = tyline.split(maxsplit=4)
+            type_output.append({'note': {'expr': '',
+                                         'type': line[4].replace('"', '')},
+                                'source': {},
+                                'region': {'from': {'line': line[0],
+                                                    'column': line[1]},
+                                           'to': {'line': line[2],
+                                                  'column': line[3]}},
+                                'level': None})
         return self.dispatch_callbacks(type_output, **backend_args)
 
     def langs(self, project_name, **backend_args):

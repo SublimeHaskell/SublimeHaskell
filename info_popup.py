@@ -14,19 +14,6 @@ import SublimeHaskell.parseoutput as ParseOutput
 import SublimeHaskell.types as types
 
 
-CSS_CLASSES = {
-    'comment': 'comment',
-    'function': 'entity.name.function',
-    'type': 'entity.name.type',
-    'operator': 'keyword.operator',
-    'keyword': 'keyword.declaration',
-    'tyvar': 'variable.generic',
-    'error': 'sublimehaskell.mark.error',
-    'warning': 'sublimehaskell.mark.warning',
-    'hint': 'sublimehaskell.mark.hint'
-}
-
-
 # Unused module variable:
 # style_header = "<style>" \
 #     "a { text-decoration: underline; }" \
@@ -45,6 +32,18 @@ class Styles(object):
     """
     def __init__(self):
         self.schemes = {}
+
+    CSS_CLASSES = {
+        'comment': 'comment',
+        'function': 'entity.name.function',
+        'type': 'entity.name.type',
+        'operator': 'keyword.operator',
+        'keyword': 'keyword.declaration',
+        'tyvar': 'variable.generic',
+        'error': 'sublimehaskell.mark.error',
+        'warning': 'sublimehaskell.mark.warning',
+        'hint': 'sublimehaskell.mark.hint'
+    }
 
     def load_scheme(self, scheme_path):
         if scheme_path not in self.schemes:
@@ -80,7 +79,7 @@ class Styles(object):
         parts.append("<style>")
         parts.append("a { text-decoration: underline; }")
         # generate CSS style for each class
-        for cls, scope in CSS_CLASSES.items():
+        for cls, scope in self.CSS_CLASSES.items():
             # find scope or its parent in scheme
             scope_parts = scope.split('.')
             scopes = ['.'.join(scope_parts[0:i+1]) for i in range(0, len(scope_parts))]
