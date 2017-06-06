@@ -239,7 +239,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         #     return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         # return comp
 
-        return (completions, completion_flags) if completions else []
+        return (completions, completion_flags)  # if completions else []
 
 
     def on_hover(self, view, point, hover_zone):

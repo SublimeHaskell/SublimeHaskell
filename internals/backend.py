@@ -77,7 +77,6 @@ class HaskellBackend(object):
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
     def add_project_file(self, filename, project, project_dir):
-        # print('add_project_file {0} {1} {2}'.format(filename, project, project_dir))
         if filename not in self.file_to_project:
             self.file_to_project[filename] = (project, project_dir)
 

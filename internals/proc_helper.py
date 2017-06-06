@@ -185,20 +185,17 @@ class ProcHelper(object):
 
 
 def get_source_dir(filename):
-    """
-    Get root of hs-source-dirs for filename in project
-    """
+    '''Get root of hs-source-dirs for filename in project.
+    '''
     if not filename:
         return os.path.expanduser('~')
-        # return os.getcwd()
 
-    cabal_dir, _ = Common.locate_cabal_project(filename)
+    cabal_dir, cabal_proj = Common.locate_cabal_project(filename)
     if not cabal_dir:
+        # No cabal file -> Punt and assume the source directory for the file and project is the same as the file.
         return os.path.dirname(filename)
 
-    _, cabal_file = Common.get_cabal_in_dir(cabal_dir)
-    exit_code, out, _ = ProcHelper.run_process(['hsinspect', cabal_file])
-
+    exit_code, out, _ = ProcHelper.run_process(['hsinspect', os.path.join(cabal_dir, cabal_proj + '.cabal')])
     if exit_code == 0:
         info = json.loads(out)
 

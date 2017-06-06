@@ -247,16 +247,20 @@ class GHCModBackend(Backend.HaskellBackend):
         return self.dispatch_callbacks([], **backend_args)
 
     def types(self, project_name, file, module_name, line, column, ghc_flags=None, contents=None, **backend_args):
-        # (filename, module_name, line, column, cabal=None)
-        # return call_ghcmod_and_wait(['type', filename, module_name, str(line), str(column)], filename=filename, cabal=cabal)
         type_output = []
-        backend = self.project_backends.get(project_name)
+        if contents is not None and file[0] in contents:
+            map_file = True
+            fcontent = contents[file[0]]
+        else:
+            map_file = False
+            fcontent = None
+
         # Convert 0-based to 1-based line/col:
         type_cmd = 'type {0} {1} {2}'.format(file[0], line + 1, column + 1)
         if Settings.COMPONENT_DEBUG.send_messages or Settings.COMPONENT_DEBUG.all_messages:
             print('ghc-mod types: type_cmd \'{0}\''.format(type_cmd))
 
-        result, _ = backend.command_backend(type_cmd)
+        result, _ = self.command_backend(file[0], type_cmd, map_file, file[0], fcontent)
 
         if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
             print('ghc-mod types: type_output\n{0}'.format(pprint.pformat(type_output)))
@@ -336,7 +340,7 @@ class GHCModBackend(Backend.HaskellBackend):
         retval = []
         for file in files:
             project_dir = self.get_project_dir(file)
-            if file in contents:
+            if contents is not None and file in contents:
                 map_file = True
                 fcontent = contents[file]
             else:
