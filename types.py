@@ -192,14 +192,31 @@ def parse_type_output(view, msg):
 
 
 def sorted_types(view, types, point):
-    return sorted(filter(lambda t: t.region(view).contains(point), types),
+    return sorted([ty for ty in types if ty.region(view).contains(point)],
                   key=lambda t: t.region(view).size()) if types is not None else []
 
 
 def get_type(view, project_name, filename, module_name, line, column):
     # line and column are 0-based buffer positions
-    file_types = query_file_types(project_name, [filename], module_name, line, column) or []
-    return sorted_types(view, file_types, FilePosition(line, column).point(view))
+    # file_types = query_file_types(project_name, [filename], module_name, line, column) or []
+    types = []
+    if SourceHaskellTypeCache().has(filename):
+        types = SourceHaskellTypeCache().get(filename)
+    else:
+        def to_file_pos(rgn):
+            return FilePosition(int(rgn['line']) - 1, int(rgn['column']) - 1)
+
+        def to_region_type(resp):
+            rgn = resp['region']
+            return RegionType(resp['note']['type'], to_file_pos(rgn['from']), to_file_pos(rgn['to']))
+
+        res = BackendManager.active_backend().types(project_name, [filename], module_name, line, column,
+                                                    ghc_flags=Settings.PLUGIN.ghc_opts)
+        if res is not None:
+            types = [to_region_type(r) for r in res]
+            SourceHaskellTypeCache().set(filename[0], types, False)
+
+    return sorted_types(view, types, FilePosition(line, column).point(view))
 
     # column = ParseOutput.sublime_column_to_ghc_column(view, line, column)
     # line = line + 1
@@ -222,29 +239,6 @@ def get_type_view(view, project_name, selection=None):
     module_name = Utils.head_of(BackendManager.active_backend().module(project_name, file=filename))
 
     return get_type(view, project_name, filename, module_name, line, column)
-
-
-def query_file_types(project_name, filename, module_name, line, column):
-    '''Query all of the types associated with a file's contents.
-    '''
-    types = []
-    if SourceHaskellTypeCache().has(filename[0]):
-        types = SourceHaskellTypeCache().get(filename[0])
-    else:
-        def to_file_pos(rgn):
-            return FilePosition(int(rgn['line']) - 1, int(rgn['column']) - 1)
-
-        def to_region_type(resp):
-            rgn = resp['region']
-            return RegionType(resp['note']['type'], to_file_pos(rgn['from']), to_file_pos(rgn['to']))
-
-        res = BackendManager.active_backend().types(project_name, filename, module_name, line, column,
-                                                    ghc_flags=Settings.PLUGIN.ghc_opts)
-        if res is not None:
-            types = [to_region_type(r) for r in res]
-            SourceHaskellTypeCache().set(filename[0], types, False)
-
-    return types
 
 
 class SublimeHaskellShowType(CommandWin.SublimeHaskellTextCommand):

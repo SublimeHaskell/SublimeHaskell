@@ -96,41 +96,28 @@ class Styles(object):
         parts.append("</style>")
         return "".join(parts)
 
-SUBHASK_STYLES = Styles()
 
+class SublimeHaskellHoverPopup(object):
+    # HTML style formatting
+    STYLES = Styles()
 
-class SublimeHaskellPopup(sublime_plugin.EventListener):
-    def __init__(self):
+    def __init__(self, view, filename, point, hover_zone):
         super().__init__()
-        self.view = None
-        self.current_file_name = None
-        self.point = None
-        self.decl = None
-        self.typed_expr = None
-        self.suggest_import = None
-
-    def on_hover(self, view, point, hover_zone):
-        # Note: view.file_name() is not set in certain views, such as the "Haskell Show Types Panel". Avoid
-        # generating lookup errors, which are logged in the console window (for better or worse.)
-        if Common.is_haskell_source(view) and view.file_name():
-            # Ensure that we never block the Python main thread.
-            Utils.run_async('SublimeHaskellPopup.on_hover', self.do_hover, view, point, hover_zone)
-
-    def do_hover(self, view, point, hover_zone):
         self.view = view
-        self.current_file_name = view.file_name()
-        # If the column is needed: (line, column) = self.view.rowcol(point) [remove subscript]
-        line = view.rowcol(point)[0]
-        self.decl = None
-        self.typed_expr = None
+        self.filename = filename
+        self.point = point
+        self.hover_zone = hover_zone
+        self.line = view.rowcol(point)[0]
 
-        if hover_zone == sublime.HOVER_TEXT:
-            qsymbol = Common.get_qualified_symbol_at_point(view, point)
+
+    def do_hover(self):
+        if self.hover_zone == sublime.HOVER_TEXT:
+            qsymbol = Common.get_qualified_symbol_at_point(self.view, self.point)
             ## print('hover: qualified symbol {0}'.format(qsymbol))
             module_word = qsymbol.module
             ident = qsymbol.name
 
-            if module_word is not None:
+            if module_word is not None and ident is None:
                 # TODO: Any ideas for popup about module?
                 pass
             elif ident is not None:
@@ -138,32 +125,27 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
                 full_name = qsymbol.full_name()
 
                 # Try get type of hovered symbol
-                self.point = point
-                self.typed_expr = None
-                if types.SourceHaskellTypeCache().has(self.current_file_name):
-                    self.typed_expr = self.get_type(types.SourceHaskellTypeCache().get(self.current_file_name), whois_name)
+                typed_expr = None
+                if types.SourceHaskellTypeCache().has(self.filename):
+                    typed_expr = self.get_type(types.SourceHaskellTypeCache().get(self.filename), whois_name)
                 else:
-                    line, column = self.view.rowcol(self.view.sel()[0].b)
                     project_name = Common.locate_cabal_project_from_view(self.view)[1]
-
-                    type_list = types.query_file_types(project_name, self.current_file_name, int(line), int(column))
-                    self.on_types(type_list, whois_name)
+                    point_rgn = sublime.Region(self.point, self.point)
+                    typed_expr = self.get_type(types.get_type_view(self.view, project_name, point_rgn), whois_name)
 
                 # Try whois
-                self.suggest_import = False
-                self.decl = Utils.head_of(BackendManager.active_backend().whois(whois_name, self.current_file_name))
-                if not self.decl:
-                    self.suggest_import = True
-                    self.decl = Utils.head_of(BackendManager.active_backend().lookup(full_name, self.current_file_name))
+                suggest_import = False
+                decl = Utils.head_of(BackendManager.active_backend().whois(whois_name, self.filename))
+                if not decl:
+                    suggest_import = True
+                    decl = Utils.head_of(BackendManager.active_backend().lookup(full_name, self.filename))
 
-                self.create_symbol_popup(update=True)
+                self.create_symbol_popup(typed_expr, decl, suggest_import)
 
-        elif hover_zone == sublime.HOVER_GUTTER:
-            self.view = view
-            self.current_file_name = self.view.file_name()
-            errs = list(filter(lambda e: e.region.start.line == line, ParseOutput.errors_for_view(self.view)))
+        elif self.hover_zone == sublime.HOVER_GUTTER:
+            errs = [err for err in ParseOutput.errors_for_view(self.view) if err.region.start.line == self.line]
             if errs:
-                popup_parts = [SUBHASK_STYLES.gen_style(self.view.settings().get('color_scheme'))]
+                popup_parts = [self.STYLES.gen_style(self.view.settings().get('color_scheme'))]
                 for err in errs:
                     msg = UnicodeOpers.use_unicode_operators(symbols.escape_text(err.message))
                     # Decorate first word with style
@@ -178,37 +160,35 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
                     if err.correction is not None:
                         popup_parts.append(err.correction.popup())
                 popup_text = u''.join(popup_parts)
-                self.view.show_popup(popup_text, sublime.HIDE_ON_MOUSE_MOVE_AWAY, point, 600, 600,
-                                     self.on_navigate, self.on_hide)
-
-    def create_symbol_popup(self, update=False):
-        if self.typed_expr or self.decl:
-            popup_parts = [SUBHASK_STYLES.gen_style(self.view.settings().get('color_scheme'))]
-            if self.typed_expr:
-                popup_parts.append(u'<p><span class="function">{0}</span>{1}</p>'.format(
-                    self.typed_expr.substr(self.view),
-                    symbols.format_type(UnicodeOpers.use_unicode_operators(u' :: {0}'.format(self.typed_expr.typename)))))
-            if self.decl:
-                popup_msg = [u'<a href="import:{0}">Add import</a>'.format(html.escape(self.decl.name))] \
-                            if self.suggest_import \
-                            else []
-                popup_parts.append(self.decl.popup(popup_msg))
-            popup_text = u''.join(popup_parts)
-            if update and self.view.is_popup_visible():
-                self.view.update_popup(popup_text)
-            else:
                 self.view.show_popup(popup_text, sublime.HIDE_ON_MOUSE_MOVE_AWAY, self.point, 600, 600,
                                      self.on_navigate, self.on_hide)
+
+
+    def create_symbol_popup(self, typed_expr, decl, suggest_import):
+        if typed_expr or decl:
+            popup_parts = [self.STYLES.gen_style(self.view.settings().get('color_scheme'))]
+            if typed_expr:
+                popup_parts.append(u'<p><span class="function">{0}</span>{1}</p>'.format(
+                    typed_expr.substr(self.view),
+                    symbols.format_type(UnicodeOpers.use_unicode_operators(' :: {0}'.format(typed_expr.typename)))))
+            if decl:
+                popup_msg = [u'<a href="import:{0}">Add import</a>'.format(html.escape(decl.name))] \
+                            if suggest_import else []
+                popup_parts.append(decl.popup(popup_msg))
+
+            popup_text = u''.join(popup_parts)
+            if not self.view.is_popup_visible():
+                self.view.show_popup(popup_text, sublime.HIDE_ON_MOUSE_MOVE_AWAY, self.point, 600, 600,
+                                     self.on_navigate, self.on_hide)
+            else:
+                self.view.update_popup(popup_text)
+
 
     def get_type(self, type_list, qual_name):
         filt_types = [t for t in type_list
                       if t.substr(self.view) == qual_name and t.region(self.view).contains(self.point)]
         return Utils.head_of(filt_types)
 
-    def on_types(self, type_list, qual_name):
-        self.typed_expr = self.get_type(type_list, qual_name)
-        if self.typed_expr:
-            self.create_symbol_popup(update=True)
 
     def on_navigate(self, url):
         if self.view.is_popup_visible():
@@ -221,6 +201,7 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
                 # Give err_text, err_rgn scope other than the loop.
                 err_text = ''
                 err_rgn = None
+                repl_text = None
 
                 for err in errs:
                     if err.correction is not None and err.correction.corrector.region == rgn:
@@ -233,16 +214,15 @@ class SublimeHaskellPopup(sublime_plugin.EventListener):
                         err_rgn = corrector.to_region(self.view)
                         err_text = corrector.contents
 
-                        sublime.set_timeout(lambda: self.view.run_command('sublime_haskell_replace_text',
-                                                                          {'text': err_text,
-                                                                           'begin': err_rgn.begin(),
-                                                                           'end': err_rgn.end()}),
-                                            0)
-                        return
+                        repl_text = {'text': err_text,
+                                     'begin': err_rgn.begin(),
+                                     'end': err_rgn.end()}
+                        sublime.set_timeout(lambda: self.view.run_command('sublime_haskell_replace_text', repl_text), 0)
             elif url[0:7] == "import:":
+                decl_name = html.unescape(url[7:])
                 self.view.run_command('sublime_haskell_insert_import_for_symbol',
                                       {'filename': self.view.file_name(),
-                                       'decl': self.decl.name})
+                                       'decl': decl_name})
             else:
                 self.view.window().open_file(url, sublime.ENCODED_POSITION | sublime.TRANSIENT)
 

@@ -16,7 +16,7 @@ def use_unicode_operators(src, force=False):
     Set unicode symbols for some standard haskell operators
     """
     if force or Settings.PLUGIN.unicode_symbol_info:
-        repl = src
+        repl = src[:]
         for oper, unicode_oper in UNICODE_OPERS.items():
             repl = repl.replace(oper, unicode_oper)
         return repl

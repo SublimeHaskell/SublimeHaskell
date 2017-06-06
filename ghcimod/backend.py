@@ -144,8 +144,7 @@ class GHCModBackend(Backend.HaskellBackend):
         if search_type == 'exact' and re.match(r'\w+(\.\w+)+', lookup):
             backend = self.project_backends.get(project_name)
             modinfo, err = backend.command_backend('browse -d -o ' + lookup) if backend is not None else []
-            if Settings.COMPONENT_DEBUG.recv_messages:
-                print('ghc-mod modules: err = {0}'.format('\n'.join(err)))
+            if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
                 print('ghc-mod modules: resp =\n{0}'.format(pprint.pformat(modinfo)))
 
             if not err or 'EXCEPTION' not in ' '.join(err):
@@ -172,7 +171,7 @@ class GHCModBackend(Backend.HaskellBackend):
                     if decl is not None:
                         moddecls[name] = decl
 
-                if Settings.COMPONENT_DEBUG.recv_messages:
+                if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
                     print('ghc-mod modules: moddecls =\n{0}'.format(pprint.pformat(moddecls)))
 
                 modsyms = symbols.Module(lookup, [], [], moddecls, symbols.PackageDb(global_db=True))
@@ -207,14 +206,14 @@ class GHCModBackend(Backend.HaskellBackend):
 
         backend = self.project_backends.get(project_name)
         modules, _ = backend.command_backend('list -d') if backend is not None else ([], [])
-        if Settings.COMPONENT_DEBUG.recv_messages:
+        if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
             print('ghc-mod scope_modules: resp =\n{0}'.format(modules))
 
         filtered_mods = [symbols.Module(mod[1], [], [], {},
                                         symbols.InstalledLocation(make_pkg(mod[0]), symbols.PackageDb(global_db=True)))
                          for mod in (m.split() for m in modules if self.lookup_match(m[1], lookup, search_type))]
 
-        if Settings.COMPONENT_DEBUG.recv_messages:
+        if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
             print('ghc-mod scope_modules: filtered_mods\n{0}'.format(pprint.pformat(filtered_mods)))
 
         return self.dispatch_callbacks(filtered_mods, **backend_args)
@@ -249,19 +248,45 @@ class GHCModBackend(Backend.HaskellBackend):
     def types(self, project_name, file, module_name, line, column, ghc_flags=None, contents=None, **backend_args):
         # (filename, module_name, line, column, cabal=None)
         # return call_ghcmod_and_wait(['type', filename, module_name, str(line), str(column)], filename=filename, cabal=cabal)
-        return self.dispatch_callbacks([], **backend_args)
+        project_info = self.file_to_project.get(file[0])
+        type_output = []
+        if project_info is not None:
+            backend = self.project_backends.get(project_name)
+            rel_filepath = os.path.relpath(file[0], start=project_info[1])
+            # Convert 0-based to 1-based line/col:
+            type_cmd = 'type {0} {1} {2}'.format(rel_filepath, line + 1, column + 1)
+            if Settings.COMPONENT_DEBUG.send_messages or Settings.COMPONENT_DEBUG.all_messages:
+                print('ghc-mod types: type_cmd \'{0}\''.format(type_cmd))
+
+            result, _ = backend.command_backend(type_cmd)
+
+            if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
+                print('ghc-mod types: type_output\n{0}'.format(pprint.pformat(type_output)))
+
+
+            for tyline in result:
+                line = tyline.split(maxsplit=4)
+                type_output.append({'note': {'expr': '',
+                                             'type': line[4].replace('"', '')},
+                                    'source': {},
+                                    'region': {'from': {'line': line[0],
+                                                        'column': line[1]},
+                                               'to': {'line': line[2],
+                                                      'column': line[3]}},
+                                    'level': None})
+        return self.dispatch_callbacks(type_output, **backend_args)
 
     def langs(self, project_name, **backend_args):
         backend = self.project_backends.get(project_name)
         langs, _ = backend.command_backend('lang') if backend is not None else []
-        if Settings.COMPONENT_DEBUG.recv_messages:
+        if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
             print('ghc-mod langs: resp =\n{0}'.format(langs))
         return self.dispatch_callbacks(langs, **backend_args)
 
     def flags(self, project_name, **backend_args):
         backend = self.project_backends.get(project_name)
         flags, _ = backend.command_backend('flag') if backend is not None else []
-        if Settings.COMPONENT_DEBUG.recv_messages:
+        if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
             print('ghc-mod langs: resp =\n{0}'.format(flags))
         return self.dispatch_callbacks(flags, **backend_args)
 
@@ -320,11 +345,11 @@ class GHCModBackend(Backend.HaskellBackend):
                 map_file = False
                 fcontent = None
             resp, _ = self.command_backend(file, cmd + ' ' + file, map_file, file, fcontent)
-            if Settings.COMPONENT_DEBUG.recv_messages:
+            if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
                 print('ghc-mod: {0}: resp =\n{1}'.format(cmd, pprint.pformat(resp)))
             retval.extend([xlat_func(project_dir, m) for m in regex.finditer('\n'.join(resp))])
 
-        if Settings.COMPONENT_DEBUG.recv_messages:
+        if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
             print('ghc-mod: {0}:\n{1}'.format(cmd, pprint.pformat(retval)))
 
         return retval

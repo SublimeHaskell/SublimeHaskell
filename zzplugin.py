@@ -15,6 +15,7 @@ import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.proc_helper as ProcHelper
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.utils as Utils
+import SublimeHaskell.info_popup as InfoPop
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.types as Types
 
@@ -239,6 +240,15 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         # return comp
 
         return (completions, completion_flags) if completions else []
+
+
+    def on_hover(self, view, point, hover_zone):
+        # Note: view.file_name() is not set in certain views, such as the "Haskell Show Types Panel". Avoid
+        # generating lookup errors, which are logged in the console window (for better or worse.)
+        if Common.is_haskell_source(view) and view.file_name():
+            # Ensure that we never block the Python main thread.
+            info_pop = InfoPop.SublimeHaskellHoverPopup(view, view.file_name(), point, hover_zone)
+            Utils.run_async('SublimeHaskellPopup.on_hover', info_pop.do_hover)
 
 
     def assoc_to_project(self, view, filename):
