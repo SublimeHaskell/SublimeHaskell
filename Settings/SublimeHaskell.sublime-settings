@@ -106,13 +106,28 @@
     // Backend selection:
     // ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
 
-    // The list of backends, listed in order of priority. The first available backend is the one used by SublimeHaskell.
-    // Possible backends:
+    // The backend dictionary, whose structure is:
     //
-    // hsdev: The hsdev backend
-    // ghc-mod: The ghc-mod backend
-    // none: The null/identity/non-functional backend. You can use this if you really don't want SublimeHaskell to do much with
-    //     the more advanced features such as autocompletion.
+    //  "name of backend": {
+    //    "default": "true|false",           // Only one should be true
+    //    "backend": "hsdev|ghc-mod|none",   // Self explanatory
+    //   "options": {
+    //     // see below
+    //    }
+    //  }
+    //
+    // Options for hsdev:
+    //
+    //     port:        [default: 4567]      TCP port where SublimeHaskell will connect to hsdev
+    //     host:        [defualt: localhost] Host name SublimeHaskell will connect to hsdev
+    //     local:       [default: true]      Should SublimeHaskell create a local hsdev server process?
+    //     exec-with:   [default: ""]        Should SublimeHaskell use "stack" or "cabal" to when starting
+    //                                       the hsdev executable?
+    //     install-dir: [default ""]         Used in conjunction with "exec-with"; this is the directory where SublimeHaskell
+    //                                       can find  the hsdev executable.
+    //
+    // There are no additional options for either the ghc-mod or none backends
+
     "backends": {
         "Local hsdev": {
             "default": true,
@@ -121,6 +136,10 @@
               "local": true,
               "port": 4567
             }
+        },
+        "ghc-mod": {
+            "default": false,
+            "backend": "ghc-mod"
         },
         "Remote hsdev@localhost:4567": {
             "default": false,
@@ -132,7 +151,7 @@
             }
         },
         "Cabal-sandboxed local hsdev": {
-            "default": true,
+            "default": false,
             "backend": "hsdev",
             "options": {
               "local": true,
@@ -141,8 +160,8 @@
               "install-dir": "$HOME/play/haskell/hsdev"
             }
         },
-        "Stack-exec-ed local hsdev": {
-            "default": true,
+        "Stack-exec local hsdev": {
+            "default": false,
             "backend": "hsdev",
             "options": {
               "local": true,

@@ -263,7 +263,7 @@ class GHCModBackend(Backend.HaskellBackend):
         result, _ = self.command_backend(file[0], type_cmd, map_file, file[0], fcontent)
 
         if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
-            print('ghc-mod types: type_output\n{0}'.format(pprint.pformat(type_output)))
+            print('ghc-mod types: type_output\n{0}'.format(pprint.pformat(result)))
 
 
         for tyline in result:

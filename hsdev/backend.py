@@ -148,6 +148,8 @@ class HsDevBackend(Backend.HaskellBackend):
                     # kill the process too!
                     startup_reader.stop()
                     hsdev_proc.process.kill()
+                    if hsdev_proc.process_err is not None:
+                        Logging.log('Possible reason for timeout: {0}'.format(hsdev_proc.process_err))
                     self.hsdev_process = None
                     retval = False
 
@@ -543,8 +545,8 @@ class HsDevStartupReader(threading.Thread):
 
         while not self.end_event.is_set():
             srvout = self.stdout.readline().strip()
+            Logging.log('hsdev initial: {0}'.format(srvout), Logging.LOG_DEBUG)
             if srvout != '':
-                Logging.log('hsdev initial: {0}'.format(srvout), Logging.LOG_DEBUG)
                 start_confirm = re.search(r'[Ss]erver started at port (?P<port>\d+)$', srvout)
                 if start_confirm:
                     self.hsdev_port = int(start_confirm.group('port'))
