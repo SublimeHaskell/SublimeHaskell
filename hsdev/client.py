@@ -236,30 +236,7 @@ class HsDevClient(object):
                             resp_id = orig_req.get('id')
 
                         if resp_id is not None:
-                            callbacks = requests.get(resp_id)[0]
-                            if callbacks is not None:
-                                finished_request = False
-                                if 'notify' in resp:
-                                    if Settings.COMPONENT_DEBUG.callbacks:
-                                        print('id {0}: notify callback'.format(resp_id))
-                                    callbacks.call_notify(resp['notify'])
-                                if 'error' in resp:
-                                    if Settings.COMPONENT_DEBUG.callbacks:
-                                        print('id {0}: error callback'.format(resp_id))
-                                    err = resp.pop("error")
-                                    callbacks.call_error(err, resp)
-                                    finished_request = True
-                                if 'result' in resp:
-                                    if Settings.COMPONENT_DEBUG.callbacks:
-                                        print('id {0}: result callback'.format(resp_id))
-                                    callbacks.call_response(resp['result'])
-                                    finished_request = True
-
-                                if finished_request:
-                                    del requests[resp_id]
-                            elif Logging.is_log_level(Logging.LOG_WARNING):
-                                print('HsDevClient.receiver: no callbacks for request {0}'.format(resp_id))
-                                pprint.pprint(resp)
+                            self.invoke_callbacks(resp, resp_id, requests)
                         elif Logging.is_log_level(Logging.LOG_ERROR):
                             print('HsDevClient.receiver: request w/o id')
                             pprint.pprint(resp)
@@ -268,6 +245,35 @@ class HsDevClient(object):
                         self.request_q.task_done()
             except queue.Empty:
                 pass
+
+    def invoke_callbacks(self, response, resp_id, requests):
+        callbacks = requests.get(resp_id)[0]
+        finished_request = False
+        if callbacks is not None:
+            # Unconditionally call the notify callback first:
+            if 'notify' in response:
+                if Settings.COMPONENT_DEBUG.callbacks:
+                    print('id {0}: notify callback'.format(resp_id))
+                callbacks.call_notify(response['notify'])
+
+            if 'result' in response:
+                if Settings.COMPONENT_DEBUG.callbacks:
+                    print('id {0}: result callback'.format(resp_id))
+                callbacks.call_response(response['result'])
+                finished_request = True
+            elif 'error' in response:
+                if Settings.COMPONENT_DEBUG.callbacks:
+                    print('id {0}: error callback'.format(resp_id))
+                err = response.pop("error")
+                callbacks.call_error(err, response)
+                finished_request = True
+
+            if finished_request:
+                del requests[resp_id]
+        elif Logging.is_log_level(Logging.LOG_WARNING):
+            print('HsDevClient.receiver: no callbacks for request {0}'.format(resp_id))
+            pprint.pprint(response)
+            del requests[resp_id]
 
     def call(self, command, opts, on_response, on_notify, on_error, wait, timeout):
         # log

@@ -158,8 +158,7 @@ def parse_cabal_package(pkg):
 
 
 def parse_corrections(corr):
-    return list(map(parse_correction, corr)) if corr is not None else corr
-
+    return [parse_correction(c) for c in corr] if corr else None
 
 def parse_correction(corr):
     return symbols.Correction(corr['source']['file']
@@ -187,16 +186,16 @@ def encode_correction(corr):
             'corrector': encode_corrector(corr.corrector),
             'message': corr.message},
         'region': {
-            'from': encode_position(corr.corrector.start.from_zero_based()),
-            'to': encode_position(corr.corrector.end.from_zero_based())}
+            'from': encode_position(corr.corrector.region.start.from_zero_based()),
+            'to': encode_position(corr.corrector.region.end.from_zero_based())}
         }
 
 
 def encode_corrector(corr):
     return {
         'region': {
-            'from': encode_position(corr.start),
-            'to': encode_position(corr.end)},
+            'from': encode_position(corr.region.start),
+            'to': encode_position(corr.region.end)},
         'contents': corr.contents}
 
 

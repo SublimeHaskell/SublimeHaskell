@@ -484,6 +484,7 @@ class HsDevBackend(Backend.HaskellBackend):
 
     def lint(self, files=None, contents=None, hlint=None, wait_complete=False, **backend_args):
         action = self.list_command if wait_complete else self.async_list_command
+        backend_args = self.convert_warnings(backend_args)
         return action('lint', {'files': self.files_and_contents(files, contents),
                                'hlint-opts': hlint or []},
                       **backend_args)
@@ -496,6 +497,7 @@ class HsDevBackend(Backend.HaskellBackend):
 
     def check_lint(self, files=None, contents=None, ghc=None, hlint=None, wait_complete=False, **backend_args):
         action = self.list_command if wait_complete else self.async_list_command
+        backend_args = self.convert_warnings(backend_args)
         return action('check-lint', {'files': self.files_and_contents(files, contents),
                                      'ghc-opts': ghc or [],
                                      'hlint-opts': hlint or []},
@@ -512,12 +514,13 @@ class HsDevBackend(Backend.HaskellBackend):
     def flags(self, _projectname, **backend_args):
         return self.command('flags', {}, **backend_args)
 
-    def autofix_show(self, messages, **backend_args):
-        return self.async_list_command('autofix show', {'messages': messages}, ResultParse.parse_corrections, **backend_args)
+    def autofix_show(self, messages, wait_complete=False, **backend_args):
+        action = self.list_command if wait_complete else self.async_list_command
+        return action('autofix show', {'messages': messages}, ResultParse.parse_corrections, **backend_args)
 
     def autofix_fix(self, messages, rest=None, pure=False, **backend_args):
-        return self.autofix_fix('autofix fix', {'messages': messages, 'rest': rest or [], 'pure': pure},
-                                ResultParse.parse_corrections, **backend_args)
+        return self.list_command('autofix fix', {'messages': messages, 'rest': rest or [], 'pure': pure},
+                                 ResultParse.parse_corrections, **backend_args)
 
     def ghc_eval(self, exprs, file=None, source=None, **backend_args):
         the_file = None
@@ -527,6 +530,33 @@ class HsDevBackend(Backend.HaskellBackend):
 
     def exit(self):
         return self.command('exit', {})
+
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+    # Utility functions:
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+    def convert_warnings(self, args):
+        if 'on_response' in args:
+            def chain_resp(on_resp_fn):
+                def convert_resp(resp):
+                    return on_resp_fn(self.do_convert_warnings(resp))
+
+                return convert_resp
+
+            orig_func = args['on_response']
+            args['on_response'] = chain_resp(orig_func)
+        else:
+            args['on_response'] = self.do_convert_warnings
+
+        return args
+
+    def do_convert_warnings(self, resp):
+        for msg in resp:
+            if msg.get('level', '') == 'warning':
+                msg['level'] = 'hint'
+
+        return resp
+
 
 class HsDevStartupReader(threading.Thread):
     '''Separate thread object that reads the local `hsdev` server's `stdout` looking for the server's startup

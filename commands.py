@@ -88,8 +88,7 @@ class SublimeHaskellBrowseDeclarations(CommandWin.BackendTextCommand):
 
     def run(self, _edit):
         self.status_msg.start()
-        BackendManager.active_backend().scope(self.current_file_name, wait=False, on_response=self.on_resp,
-                                              on_error=self.on_err)
+        BackendManager.active_backend().scope(self.current_file_name, on_response=self.on_resp, on_error=self.on_err)
 
     def on_resp(self, resp):
         self.decls = resp
@@ -149,8 +148,7 @@ class SublimeHaskellHayoo(CommandWin.BackendWindowCommand):
         self.search_str = search_str
         self.status_msg = Common.status_message_process("Hayoo '{0}'".format(search_str), priority=3)
         self.status_msg.start()
-        BackendManager.active_backend().hayoo(self.search_str, page=0, pages=5, on_response=self.on_resp,
-                                              on_error=self.on_err, wait=False)
+        BackendManager.active_backend().hayoo(self.search_str, page=0, pages=5, on_response=self.on_resp, on_error=self.on_err)
 
     def on_change(self, _ignored):
         pass
@@ -192,7 +190,7 @@ class SublimeHaskellSearch(CommandWin.BackendWindowCommand):
         self.search_str = search_str
         self.status_msg = Common.status_message_process("Search '{0}'".format(search_str), priority=3)
         self.status_msg.start()
-        BackendManager.active_backend().symbol(lookup=self.search_str, search_type='infix', wait=False,
+        BackendManager.active_backend().symbol(lookup=self.search_str, search_type='infix',
                                                on_response=self.on_symbol, on_error=self.on_err)
 
     def on_change(self, _ignored):
@@ -212,8 +210,7 @@ class SublimeHaskellSearch(CommandWin.BackendWindowCommand):
 
     def on_symbol(self, resp):
         self.decls.extend(resp)
-        BackendManager.active_backend().hayoo(self.search_str, page=0, pages=5, wait=False, on_response=self.on_resp,
-                                              on_error=self.on_err)
+        BackendManager.active_backend().hayoo(self.search_str, page=0, pages=5, on_response=self.on_resp, on_error=self.on_err)
 
     def on_resp(self, resp):
         self.status_msg.stop()
@@ -949,7 +946,7 @@ class AutoFixState(object):
         self.view = view
         self.view.settings().set('autofix', True)
         self.view.set_read_only(True)
-        self.corrections = corrections
+        self.corrections = corrections or []
         self.selected = selected
         self.undo_history = undo_history[:] if undo_history is not None else []
         self.redo_history = redo_history[:] if redo_history is not None else []
@@ -960,7 +957,7 @@ class AutoFixState(object):
             self.view.settings().erase('autofix')
             self.unmark()
             self.view = None
-            self.corrections.clear()
+            self.corrections = []
             self.undo_history.clear()
             self.redo_history.clear()
             self.selected = 0
@@ -986,7 +983,7 @@ class AutoFixState(object):
                             syntax='HaskellAutoFix')
 
     def keys(self):
-        return u'↑ ↓ ↵ ctrl+z ctrl+y esc'
+        return u'\u2191: Prev | \u2193: Next | \u21b5: Accept | ESC: Cancel'
 
     def message(self, cur):
         if cur.corrector.contents:
@@ -1058,17 +1055,14 @@ AUTOFIX_STATE = AutoFixState()
 class SublimeHaskellAutoFix(CommandWin.BackendWindowCommand):
     def __init__(self, window):
         super().__init__(window)
-        self.messages = []
         self.status_msg = None
 
     def run(self):
         if self.window.active_view().file_name():
             def on_resp(msgs):
-                self.messages = msgs
                 self.status_msg.stop()
-                if msgs is None:
-                    return
-                sublime.set_timeout(self.on_got_messages, 0)
+                if msgs is not None:
+                    sublime.set_timeout(lambda: self.on_got_messages(msgs), 0)
 
             def on_err(err, _details):
                 self.status_msg.fail()
@@ -1079,15 +1073,13 @@ class SublimeHaskellAutoFix(CommandWin.BackendWindowCommand):
             self.status_msg.start()
             BackendManager.active_backend().check_lint(files=[self.window.active_view().file_name()],
                                                        ghc=Settings.PLUGIN.ghc_opts,
-                                                       wait=False,
                                                        on_response=on_resp,
-                                                       on_error=on_err,
-                                                       timeout=0)
+                                                       on_error=on_err)
 
-    def on_got_messages(self):
-        corrections = list(filter(lambda corr: os.path.samefile(corr.file, self.window.active_view().file_name()),
-                                  BackendManager.active_backend().autofix_show(self.messages)))
-        if len(corrections) > 0:
+    def on_got_messages(self, msgs):
+        fixes = BackendManager.active_backend().autofix_show(msgs, wait_complete=True)
+        corrections = [corr for corr in fixes if os.path.samefile(corr.file, self.window.active_view().file_name())]
+        if corrections:
             AUTOFIX_STATE.set(self.window.active_view(), corrections)
             AUTOFIX_STATE.mark()
 
@@ -1101,23 +1093,35 @@ class SublimeHaskellAutoFixTextBase(CommandWin.SublimeHaskellTextCommand):
 
 
 class SublimeHaskellAutoFixWindowBase(CommandWin.SublimeHaskellWindowCommand):
+    def __init__(self, window):
+        super().__init__(window)
+
     def is_enabled(self):
         return AUTOFIX_STATE.is_active() and AUTOFIX_STATE.view == self.window.active_view()
 
 
 class SublimeHaskellAutoFixPrevious(SublimeHaskellAutoFixWindowBase):
+    def __init__(self, window):
+        super().__init__(window)
+
     def run(self):
         if AUTOFIX_STATE.selected > 0:
             AUTOFIX_STATE.set_selected(AUTOFIX_STATE.selected - 1)
 
 
 class SublimeHaskellAutoFixNext(SublimeHaskellAutoFixWindowBase):
+    def __init__(self, window):
+        super().__init__(window)
+
     def run(self):
         if AUTOFIX_STATE.selected + 1 < AUTOFIX_STATE.count():
             AUTOFIX_STATE.set_selected(AUTOFIX_STATE.selected + 1)
 
 
 class SublimeHaskellAutoFixAll(SublimeHaskellAutoFixWindowBase):
+    def __init__(self, window):
+        super().__init__(window)
+
     def run(self):
         AUTOFIX_STATE.unmark()
         self.window.active_view().run_command('sublime_haskell_auto_fix_fix_it', {'all': True})
@@ -1125,6 +1129,9 @@ class SublimeHaskellAutoFixAll(SublimeHaskellAutoFixWindowBase):
 
 
 class SublimeHaskellAutoFixFix(SublimeHaskellAutoFixWindowBase):
+    def __init__(self, window):
+        super().__init__(window)
+
     def run(self):
         AUTOFIX_STATE.unmark()
         self.window.active_view().run_command('sublime_haskell_auto_fix_fix_it')

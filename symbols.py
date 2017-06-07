@@ -76,7 +76,7 @@ class Region(object):
         return self.to_string()
 
     def to_string(self):
-        return 'symbols.Region({0})'.format(u'-'.join([str(self.start), str(self.end)]))
+        return u'-'.join([str(self.start), str(self.end)])
 
     def __eq__(self, other):
         return self.start == other.start and self.end == other.end
