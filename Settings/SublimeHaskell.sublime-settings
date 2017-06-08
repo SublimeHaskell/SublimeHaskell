@@ -109,22 +109,28 @@
     // The backend dictionary, whose structure is:
     //
     //  "name of backend": {
-    //    "default": "true|false",           // Only one should be true
+    //    "default": true|false,             // Only one of your backends should be true. SublimeHaskell will use the first
+    //                                       // default backend it finds if there is more than one default backend.
+    //                                       // (remember: this is a dictionary, so it's not necessarily the one you think
+    //                                       // it should be.)
     //    "backend": "hsdev|ghc-mod|none",   // Self explanatory
-    //   "options": {
-    //     // see below
+    //    "options": {
+    //      // see below
     //    }
     //  }
     //
+    // There are three backends: "hsdev", "ghc-mod" and "none".
+    //
     // Options for hsdev:
     //
-    //     port:        [default: 4567]      TCP port where SublimeHaskell will connect to hsdev
-    //     host:        [defualt: localhost] Host name SublimeHaskell will connect to hsdev
-    //     local:       [default: true]      Should SublimeHaskell create a local hsdev server process?
-    //     exec-with:   [default: ""]        Should SublimeHaskell use "stack" or "cabal" to when starting
-    //                                       the hsdev executable?
-    //     install-dir: [default ""]         Used in conjunction with "exec-with"; this is the directory where SublimeHaskell
-    //                                       can find  the hsdev executable.
+    //     port:        [default: "4567"]      TCP port where SublimeHaskell will connect to hsdev
+    //     host:        [defualt: "localhost"] Host name SublimeHaskell will connect to hsdev
+    //     local:       [default: true]        Should SublimeHaskell create a local hsdev server process? Specify false if you
+    //                                         want to connect to a remote hsdev server
+    //     exec-with:   [default: ""]          Should SublimeHaskell use "stack" or "cabal" to when starting
+    //                                         the hsdev executable?
+    //     install-dir: [default ""]           Used in conjunction with "exec-with"; this is the directory where SublimeHaskell
+    //                                         can find  the hsdev executable.
     //
     // There are no additional options for either the ghc-mod or none backends
 
