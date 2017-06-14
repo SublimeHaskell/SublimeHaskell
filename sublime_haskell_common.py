@@ -13,9 +13,6 @@ import sublime_plugin
 import SublimeHaskell.internals.locked_object as LockedObject
 import SublimeHaskell.internals.settings as Settings
 
-# Maximum seconds to wait for window to appear
-# This dirty hack is used in wait_for_window function
-MAX_WAIT_FOR_WINDOW = 10
 
 DEFAULT_PANEL_NAME = 'sublime_haskell_panel'
 # Panel for SublimeHaskell errors
@@ -172,24 +169,6 @@ def get_cwd(filename=None):
     """
     cwd = (get_cabal_project_dir_of_file(filename) or os.path.dirname(filename)) if filename else os.getcwd()
     return cwd
-
-
-def wait_for_window_callback(on_appear, seconds_to_wait):
-    window = sublime.active_window()
-    if window:
-        on_appear(window)
-        return
-    if seconds_to_wait == 0:
-        return
-    sublime.set_timeout(lambda: wait_for_window_callback(on_appear, seconds_to_wait - 1), 1000)
-
-
-def wait_for_window(on_appear, seconds_to_wait=MAX_WAIT_FOR_WINDOW):
-    """
-    Wait for window to appear on startup
-    It's dirty hack, but I have no idea how to make it better
-    """
-    sublime.set_timeout(lambda: wait_for_window_callback(on_appear, seconds_to_wait), 0)
 
 
 class SublimeHaskellOutputText(sublime_plugin.TextCommand):
