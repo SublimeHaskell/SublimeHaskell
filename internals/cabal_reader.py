@@ -75,7 +75,6 @@ class CabalFileReader(object):
             elif self.in_state(self.STATE_ELEMENTS):
                 if tok[0] == self.TOK_UNDENT:
                     print('state_elements undent')
-                    self.indent_stack.pop()
                     self.reduce(self.STATE_ELEMENTS, self.current_var())
                     self.reduce(self.STATE_FIELD_OR_SECTION, self.current_var())
                     self.reduce(self.STATE_ELEMENT, self.current_var())
@@ -91,7 +90,6 @@ class CabalFileReader(object):
                 elif tok[0] == self.TOK_UNDENT:
                     # End of an indented section
                     print('state_element undent')
-                    self.indent_stack.pop()
                     self.reduce(self.STATE_ELEMENT, self.current_var())
                     self.reduce(self.STATE_ELEMENTS, self.current_var())
                     self.reduce(self.STATE_FIELD_OR_SECTION, self.current_var())
@@ -108,7 +106,7 @@ class CabalFileReader(object):
                     self.reduce(self.STATE_FIELD_OR_SECTION, {fld_name: tok[1]})
                     self.reduce(self.STATE_ELEMENT, self.current_var())
                     tok = self.lex(file)
-                elif tok[0] in [self.TOK_EOL, self.TOK_NAME]:
+                elif tok[0] in [self.TOK_EOL, self.TOK_NAME, self.TOK_OTHER]:
                     # It's a section
                     section = self.current_var()
                     args = []
@@ -194,14 +192,14 @@ class CabalFileReader(object):
                 if indent < 0:
                     return (self.TOK_EOF, '')
                 elif self.indent_stack and indent < self.indent_stack[-1]:
+                    self.indent_stack.pop()
                     return (self.TOK_UNDENT, '')
-
-            if self.lexmode in [self.LEX_BEGIN_SECTION, self.LEX_IN_SECTION]:
-                # begin section makes us save the current indent level
-                if self.lexmode == self.LEX_BEGIN_SECTION:
+                elif self.lexmode == self.LEX_BEGIN_SECTION:
+                    # begin section makes us save the current indent level
                     self.indent_stack.append(indent)
                     self.lexmode = self.LEX_IN_SECTION
 
+            if self.lexmode == self.LEX_IN_SECTION:
                 retval = self.lex_section()
             elif self.lexmode == self.LEX_IN_FIELD_LAYOUT:
                 retval = self.lex_field_arg(file, self.lexmode)
@@ -209,7 +207,7 @@ class CabalFileReader(object):
             else:
                 retval = self.lex_error()
 
-        print('lex: ({0}, \'{1}\')'.format(self.TOKEN_NAMES.get(retval[0]), retval[1]))
+        # print('lex: ({0}, \'{1}\')'.format(self.TOKEN_NAMES.get(retval[0]), retval[1]))
         return retval
 
     def lex_section(self):
@@ -262,9 +260,17 @@ class CabalFileReader(object):
         if i < clen:
             ret_content.append(self.content[i:])
         indent, self.content = self.get_content(file, lexmode)
-        while self.content == '' or indent > self.indent_stack[-1]:
+        while indent >= 0 and (self.content == '' or indent > self.indent_stack[-1]):
             ret_content.append(self.content)
             indent, self.content = self.get_content(file, lexmode)
+
+        if indent >= 0:
+            while indent < self.indent_stack[-1]:
+                # Deal with a pending undent
+                self.indent_stack.pop()
+                self.token_stack.append((self.TOK_UNDENT, ''))
+        else:
+            self.token_stack.append((self.TOK_EOF, ''))
 
         return (self.TOK_FIELDARG, ret_content)
 
@@ -298,7 +304,7 @@ class CabalFileReader(object):
                 indent = -1
                 content = ''
 
-        print('indent: {0} content \'{1}\''.format(indent, content))
+        # print('indent: {0} content \'{1}\''.format(indent, content))
         return (indent, content)
 
     def diag_token_stack(self):
