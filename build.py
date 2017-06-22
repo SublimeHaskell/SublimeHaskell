@@ -236,7 +236,7 @@ def run_build(view, project_name, project_dir, config):
     tool_steps = config['steps'][build_tool_name]
 
     # Config override
-    override_config = Settings.get_project_setting(view, 'stack_config_file')
+    override_config = Settings.get_project_setting(view, 'active_stack_config')
 
     override_args = []
     if override_config:

@@ -1327,4 +1327,4 @@ class SublimeHaskellStackConfigSwitch(Common.SublimeHaskellWindowCommand):
         options = Settings.get_project_setting(self.view, 'stack_config_file_list')
         selected = options[idx]
 
-        Settings.set_project_setting(self.view, 'stack_config_file', selected)
+        Settings.set_project_setting(self.view, 'active_stack_config', selected)
