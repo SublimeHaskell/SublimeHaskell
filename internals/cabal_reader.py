@@ -2,13 +2,14 @@
 '''
 
 import os.path
-import pprint
+import platform
+# import pprint
 
-#import SublimeHaskell.internals.logging as Logging
-
-class CabalFileReader(object):
-    '''A cabal file parser that roughly mimics the Haskell Distribution.Parsec code.
+class IndentedFileReader(object):
+    '''An indented file parser that roughly mimics the Haskell Distribution.Parsec code used to parse both
+    Cabal project specifications and Cabal's configuration files..
     '''
+
     # Parser tokens:
     TOK_UNDENT = -3
     TOK_ERROR = -2
@@ -28,17 +29,6 @@ class CabalFileReader(object):
                    TOK_OTHER: 'OTHER',
                    TOK_FIELDARG: 'FIELDARG'}
 
-    # Parser states:
-    STATE_START = -1
-    STATE_ELEMENTS = 0
-    STATE_ELEMENT = 1
-    STATE_FIELD_OR_SECTION = 2
-
-    STATE_NAMES = {STATE_START: 'start state',
-                   STATE_ELEMENTS: 'elements',
-                   STATE_ELEMENT: 'element',
-                   STATE_FIELD_OR_SECTION: 'field or section'}
-
     # Lexing modes:
     LEX_BEGIN_SECTION = 1
     LEX_IN_SECTION = 2
@@ -48,123 +38,100 @@ class CabalFileReader(object):
                        LEX_IN_SECTION: 'in:section',
                        LEX_IN_FIELD_LAYOUT: 'in:field-layout'}
 
-    def __init__(self, project_dir, project_name):
+    def __init__(self, project_name, file_name):
         self.content = ''
         self.content_idx = 0
         self.inp_line = 0
         self.indent_stack = []
-        self.state_stack = [self.STATE_START]
-        self.var_stack = [{}]
         self.token_stack = []
         self.lexmode = self.LEX_BEGIN_SECTION
 
+        norm_fname = os.path.normcase(os.path.normpath(file_name))
         try:
-            with open(os.path.join(project_dir, project_name + ".cabal"), "r", encoding='utf-8') as f_cabal:
+            with open(norm_fname, 'r', encoding='utf-8') as f_cabal:
                 self.cabal_info = self.parse_indented_file(project_name, f_cabal)
         except OSError:
+            print('File not found: {0}'.format(norm_fname))
             self.cabal_info = {}
 
 
     def parse_indented_file(self, project_name, file):
-        keep_parsing = True
-        while keep_parsing:
-            self.diag_stacks()
-            if self.in_state(self.STATE_START):
-                tok = self.lex(file, lexmode=self.LEX_BEGIN_SECTION)
-                self.reduce(self.STATE_START, None)
-            elif self.in_state(self.STATE_ELEMENTS):
-                if tok[0] == self.TOK_UNDENT:
-                    print('state_elements undent')
-                    self.reduce(self.STATE_ELEMENTS, self.current_var())
-                    self.reduce(self.STATE_FIELD_OR_SECTION, self.current_var())
-                    self.reduce(self.STATE_ELEMENT, self.current_var())
-                    tok = self.lex(file)
-                elif tok[0] == self.TOK_EOF:
-                    keep_parsing = False
-                else:
-                    self.shift(self.STATE_ELEMENT, {})
-            elif self.in_state(self.STATE_ELEMENT):
-                if tok[0] == self.TOK_NAME:
-                    self.shift(self.STATE_FIELD_OR_SECTION, tok[1])
-                    tok = self.lex(file)
-                elif tok[0] == self.TOK_UNDENT:
-                    # End of an indented section
-                    print('state_element undent')
-                    self.reduce(self.STATE_ELEMENT, self.current_var())
-                    self.reduce(self.STATE_ELEMENTS, self.current_var())
-                    self.reduce(self.STATE_FIELD_OR_SECTION, self.current_var())
-                    tok = self.lex(file)
-                else:
-                    tok = (self.TOK_ERROR, '{0}:{1}: Expected a section or field name'.format(project_name, self.inp_line))
-            elif self.in_state(self.STATE_FIELD_OR_SECTION):
-                if tok[0] == self.TOK_COLON:
-                    # It's a field. Consume the EOL if it's there (and it'll be on the token stack)
-                    if self.token_stack and self.token_stack[0][0] == self.TOK_EOL:
-                        self.token_stack = self.token_stack[1:]
-                    tok = self.lex(file, lexmode=self.LEX_IN_FIELD_LAYOUT)
-                    fld_name = self.current_var()
-                    self.reduce(self.STATE_FIELD_OR_SECTION, {fld_name: tok[1]})
-                    self.reduce(self.STATE_ELEMENT, self.current_var())
-                    tok = self.lex(file)
-                elif tok[0] in [self.TOK_EOL, self.TOK_NAME, self.TOK_OTHER]:
-                    # It's a section
-                    section = self.current_var()
-                    args = []
-                    # tok = self.lex(file)
-                    while tok[0] not in [self.TOK_EOL, self.TOK_ERROR]:
-                        args.append(tok[1])
-                        tok = self.lex(file)
-                    if tok[0] != self.TOK_ERROR:
-                        self.update_current_var((section, args))
-                        self.shift(self.STATE_ELEMENTS, {})
-                        tok = self.lex(file, lexmode=self.LEX_BEGIN_SECTION)
-                else:
-                    tok = (self.TOK_ERROR,
-                           '{0}:{1}: Expected \':\'-separated field or section arguments'.format(project_name, self.inp_line))
-            elif self.in_state(self.TOK_UNDENT):
-                self.reduce(self.STATE_ELEMENT, self.current_var())
+        tok = self.lex(file, lexmode=self.LEX_BEGIN_SECTION)
+        element_dict = {}
 
-            print('token {0} {1}'.format(self.TOKEN_NAMES.get(tok[0]), tok[1]))
-            if tok[0] in [self.TOK_EOF, self.TOK_ERROR]:
-                keep_parsing = False
-                if tok[0] == self.TOK_ERROR:
-                    print(tok[1])
-
-    def in_state(self, parse_state):
-        return self.state_stack[-1] == parse_state
+        (tok, element_dict) = self.parse_elements(tok, file)
+        if tok[0] == self.TOK_ERROR:
+            print('parse_indented_file {0}: {1}'.format(project_name, tok[1]))
+            return {}
+        else:
+            # pprint.pprint(element_dict)
+            return element_dict
 
 
-    def current_var(self):
-        return self.var_stack[-1]
+    def parse_elements(self, tok, file):
+        elts = {}
+        while tok[0] not in [self.TOK_UNDENT, self.TOK_ERROR, self.TOK_EOF]:
+            (tok, elts) = self.parse_element(tok, file, elts)
 
-    def update_current_var(self, newval):
-        self.var_stack[-1] = newval
-        return newval
-
-    def shift(self, parse_state, state_var):
-        '''Shift to a new parse state.
-        '''
-        self.state_stack.append(parse_state)
-        self.var_stack.append(state_var)
+        return (tok, elts)
 
 
-    def reduce(self, parse_state, state_var):
-        '''Actions associated with successfully parsing something
-        '''
-        if not self.in_state(parse_state):
-            print('wrong state in reduce: {0} expected {1}'.format(self.STATE_NAMES.get(parse_state, '???'),
-                                                                   self.STATE_NAMES.get(self.state_stack[-1], '???')))
-        elif parse_state == self.STATE_START:
-            self.state_stack[-1] = self.STATE_ELEMENTS
-            self.var_stack[-1] = {}
-        elif parse_state == self.STATE_ELEMENTS:
-            self.state_stack.pop()
-        elif parse_state == self.STATE_ELEMENT:
-            self.state_stack.pop()
-        elif parse_state == self.STATE_FIELD_OR_SECTION:
-            self.state_stack.pop()
+    def parse_element(self, tok, file, element_dict):
+        if tok[0] == self.TOK_NAME:
+            name = tok[1].lower()
+            tok = self.lex(file)
+            retval = None
+
+            if tok[0] == self.TOK_COLON:
+                self.skip_eol()
+                tok = self.lex(file, lexmode=self.LEX_IN_FIELD_LAYOUT)
+                # print('tok LEX_IN_FIELD_LAYOUT: {0}'.format(tok))
+                field = element_dict.get(name, [])
+                if tok[0] not in [self.TOK_EOF, self.TOK_EOL, self.TOK_ERROR]:
+                    field += tok[1]
+                # print('updating {0} with {1}'.format(name, field))
+                element_dict.update({name: field})
+                retval = (self.lex(file), element_dict)
+            elif tok[0] in [self.TOK_EOL, self.TOK_NAME, self.TOK_OTHER]:
+                retval = self.parse_section(tok, file, name, element_dict)
+            elif tok[0] == self.TOK_UNDENT:
+                retval = (self.lex(file), element_dict)
+            else:
+                retval = ((self.TOK_ERROR, '\'{0}\' unexpected in input.'.format(tok[1])), element_dict)
+
+            # print('parse_element returning:')
+            # pprint.pprint(retval)
+            return retval
+        else:
+            return ((self.TOK_ERROR, 'Expected a name'), element_dict)
 
 
+    def parse_section(self, tok, file, name, element_dict):
+        args = []
+        while tok[0] not in [self.TOK_EOF, self.TOK_EOL, self.TOK_ERROR]:
+            args.append(tok[1])
+            tok = self.lex(file)
+
+        if tok[0] != self.TOK_ERROR:
+            (tok, element) = self.parse_elements(self.lex(file, lexmode=self.LEX_BEGIN_SECTION), file)
+
+            section = element_dict.get(name)
+            if section is None:
+                element_dict[name] = {}
+                section = element_dict[name]
+
+            # Ensure that the subsidiary dictionaries exist:
+            for arg in args:
+                if section.get(arg) is None:
+                    section[arg] = {}
+                section = section[arg]
+
+            section.update(element)
+
+            if tok[0] == self.TOK_UNDENT:
+                tok = self.lex(file)
+
+        return (tok, element_dict)
 
     # Lexical classes for characters
     CLASS_ALPHA = set([chr(c) for c in range(ord('A'), ord('Z')+1)] + [chr(c) for c in range(ord('a'), ord('z')+1)])
@@ -190,16 +157,19 @@ class CabalFileReader(object):
                 indent, self.content = self.get_content(file, self.lexmode)
                 self.content_idx = 0
                 if indent < 0:
-                    return (self.TOK_EOF, '')
-                elif self.indent_stack and indent < self.indent_stack[-1]:
-                    self.indent_stack.pop()
-                    return (self.TOK_UNDENT, '')
-                elif self.lexmode == self.LEX_BEGIN_SECTION:
-                    # begin section makes us save the current indent level
-                    self.indent_stack.append(indent)
-                    self.lexmode = self.LEX_IN_SECTION
+                    retval = (self.TOK_EOF, '')
+                else:
+                    while self.indent_stack and indent < self.indent_stack[-1]:
+                        self.indent_stack.pop()
+                        self.token_stack.append((self.TOK_UNDENT, ''))
 
-            if self.lexmode == self.LEX_IN_SECTION:
+                    if self.lexmode == self.LEX_BEGIN_SECTION:
+                        # Save the current indent level when beginning a new section
+                        self.indent_stack.append(indent)
+                        self.lexmode = self.LEX_IN_SECTION
+
+                    retval = self.lex(file)
+            elif self.lexmode == self.LEX_IN_SECTION:
                 retval = self.lex_section()
             elif self.lexmode == self.LEX_IN_FIELD_LAYOUT:
                 retval = self.lex_field_arg(file, self.lexmode)
@@ -207,8 +177,9 @@ class CabalFileReader(object):
             else:
                 retval = self.lex_error()
 
-        # print('lex: ({0}, \'{1}\')'.format(self.TOKEN_NAMES.get(retval[0]), retval[1]))
+        # self.diag_token(retval)
         return retval
+
 
     def lex_section(self):
         '''
@@ -246,10 +217,12 @@ class CabalFileReader(object):
             retval = self.lex_error()
 
         self.content_idx = i
-        if self.content_idx >= clen:
+        if i >= clen:
+            # Mark end of line for next lex()
             self.token_stack.append((self.TOK_EOL, ''))
 
         return retval
+
 
     def lex_field_arg(self, file, lexmode):
         i = self.content_idx
@@ -266,23 +239,29 @@ class CabalFileReader(object):
 
         if indent >= 0:
             while indent < self.indent_stack[-1]:
-                # Deal with a pending undent
+                # Deal with a undents
                 self.indent_stack.pop()
                 self.token_stack.append((self.TOK_UNDENT, ''))
         else:
             self.token_stack.append((self.TOK_EOF, ''))
 
+        # Trim empty lines from the front and the back...
+        while ret_content[0] == '':
+            ret_content = ret_content[1:]
+        while ret_content[-1] == '':
+            ret_content.pop()
+
         return (self.TOK_FIELDARG, ret_content)
+
+
+    def skip_eol(self):
+        while self.token_stack and self.token_stack[0][0] == self.TOK_EOL:
+            self.token_stack = self.token_stack[1:]
+
 
     def lex_error(self):
         return (self.TOK_ERROR, 'line {0}: Unexpected input \'{1}\''.format(self.inp_line, self.content[self.content_idx]))
 
-
-    def printable(self, char):
-        '''Returns True if the character `char` is printable (not a control character)
-        '''
-        char_val = ord(char)
-        return (char_val >= 0x20 and char_val <= 0x10ffff) and char_val != 0x7f
 
     def get_content(self, file, lexmode):
         got_content = False
@@ -311,6 +290,18 @@ class CabalFileReader(object):
         tok_name = self.TOKEN_NAMES.get(self.token_stack[0], self.token_stack[0]) if self.token_stack else '<empty>'
         print('token_stack[0] {0}'.format(tok_name))
 
-    def diag_stacks(self):
-        pretty_states = [self.STATE_NAMES.get(s, '<unknown>') for s in self.state_stack]
-        print('state stack:  {0}\nindent stacK: {1}'.format(pretty_states, self.indent_stack))
+    def diag_token(self, token):
+        print('token {0} \'{1}\''.format(self.TOKEN_NAMES.get(token[0]), token[1]))
+
+
+class CabalConfigReader(IndentedFileReader):
+    def __init__(self, cabal_config):
+        is_windows = platform.system() == "Windows"
+        user_prefix = "$HOME/.cabal" if not is_windows else r'%APPDATA%/cabal'
+        super().__init__('cabal-config', os.path.join(os.path.expandvars(os.path.expanduser(user_prefix)), cabal_config))
+
+
+class CabalProjectReader(IndentedFileReader):
+    def __init__(self, project_dir, project_name):
+        project_cabal = os.path.expandvars(os.path.expanduser(os.path.join(project_dir, project_name + '.cabal')))
+        super().__init__(project_name, project_cabal)

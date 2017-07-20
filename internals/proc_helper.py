@@ -17,6 +17,7 @@ import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.internals.which as Which
 import SublimeHaskell.internals.cabal_cfgrdr as CabalConfigRdr
+import SublimeHaskell.internals.cabal_reader as CabalReader
 
 class ProcHelper(object):
     """Command and tool process execution helper."""
@@ -194,24 +195,21 @@ def get_source_dir(filename):
     if not cabal_dir:
         # No cabal file -> Punt and assume the source directory for the file and project is the same as the file.
         return os.path.dirname(filename)
+    else:
+        proj_info = CabalReader.CabalProjectReader(cabal_dir, cabal_proj)
+        cabal_info = proj_info.cabal_info
+        dirs = ['.']
 
-    exit_code, out, _ = ProcHelper.run_process(['hsinspect', os.path.join(cabal_dir, cabal_proj + '.cabal')])
-    if exit_code == 0:
-        info = json.loads(out)
+        executables = cabal_info.get('executable', {})
+        dirs.extend([sdir.strip()
+                     for exe in executables
+                     for sdirs in executables[exe].get('hs-source-dirs', [])
+                     for sdir in sdirs.split(',')])
+        dirs.extend([sdir.strip()
+                     for sdirs in cabal_info.get('library', {}).get('hs-source-dirs', [])
+                     for sdir in sdirs.split(',')])
 
-        dirs = ["."]
-
-        if 'error' not in info and 'description' in info:
-            # collect all hs-source-dirs
-            descr = info['description']
-            if descr['library']:
-                dirs.extend(descr['library']['info']['source-dirs'])
-            for i in descr['executables']:
-                dirs.extend(i['info']['source-dirs'])
-            for test in descr['tests']:
-                dirs.extend(test['info']['source-dirs'])
-
-        paths = [os.path.abspath(os.path.join(cabal_dir, d)) for d in dirs]
+        paths = [os.path.abspath(os.path.join(cabal_dir, srcdirs)) for srcdirs in set(dirs)]
         paths.sort(key=lambda p: -len(p))
 
         for path in paths:
