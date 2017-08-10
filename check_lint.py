@@ -87,7 +87,7 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
                                                      m['level'].capitalize() + ': ' + m['note']['message'].replace('\n', '\n  '),
                                                      m['level']) for m in self.msgs]
 
-        self.corrections = corrections
+        self.corrections = corrections or []
         for corr in self.corrections:
             corr.message_region.to_zero_based()
         self.corrections_dict = dict(((os.path.normpath(c.file), c.message_region.start.line, c.message_region.start.column), c)
