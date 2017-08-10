@@ -27,25 +27,26 @@ GHC_LINT_REGEX = re.compile(FILE_LINE_COL_REGEX + r'(?P<msg>.*$)(?P<details>(\n(
                             re.MULTILINE)
 
 class GHCModBackend(Backend.HaskellBackend):
-    """This class encapsulates all of the functions that interact with the `hsdev` backend.
-    """
+    '''This class encapsulates all of the functions that interact with the `ghc-mod` backend.
+    '''
 
     def __init__(self, backend_mgr, **kwargs):
         super().__init__(backend_mgr)
         exec_with = kwargs.get('exec-with')
         install_dir = kwargs.get('install-dir')
 
-        if exec_with is not None and install_dir is None:
-            sublime.error_message('\n'.join(['\'exec_with\' requires an \'install_dir\'.',
-                                             '',
-                                             'Please check your \'backends\' configuration and retry.']))
-            raise RuntimeError('\'exec_with\' requires an \'install_dir\'.')
-        elif exec_with is not None and exec_with not in ['stack', 'cabal']:
-            sublime.error_message('\n'.join(['Invalid backend \'exec_with\': {0}'.format(exec_with),
-                                             '',
-                                             'Valid values are "cabal" or "stack".',
-                                             'Please check your \'backends\' configuration and retry.']))
-            raise RuntimeError('Invalid backend \'exec_with\': {0}'.format(exec_with))
+        if exec_with is not None:
+            if install_dir is None:
+                sublime.error_message('\n'.join(['\'exec_with\' requires an \'install_dir\'.',
+                                                 '',
+                                                 'Please check your \'backends\' configuration and retry.']))
+                raise RuntimeError('\'exec_with\' requires an \'install_dir\'.')
+            elif exec_with not in ['stack', 'cabal']:
+                sublime.error_message('\n'.join(['Invalid backend \'exec_with\': {0}'.format(exec_with),
+                                                 '',
+                                                 'Valid values are "cabal" or "stack".',
+                                                 'Please check your \'backends\' configuration and retry.']))
+                raise RuntimeError('Invalid backend \'exec_with\': {0}'.format(exec_with))
 
         self.exec_with = exec_with
         self.install_dir = install_dir
@@ -58,7 +59,7 @@ class GHCModBackend(Backend.HaskellBackend):
         return 'ghc-mod'
 
     @staticmethod
-    def is_available():
+    def is_available(**kwargs):
         return Which.which('ghc-mod', ProcHelper.ProcHelper.get_extended_path())
 
     def start_backend(self):
@@ -325,7 +326,7 @@ class GHCModBackend(Backend.HaskellBackend):
             else:
                 Logging.log('{0}: {1} does not have an active ghc-mod!'.format(type(self).__name__, backend_info[0]))
         else:
-            Logging.log('{0}: {1} does map to a project!'.format(type(self).__name__, filename))
+            Logging.log('{0}: {1} does not map to a project!'.format(type(self).__name__, filename))
 
         return None
 
@@ -503,6 +504,8 @@ class GHCModClient(object):
             self.action_lock = threading.Lock()
             self.stderr_drain = OutputCollector.DescriptorDrain(self.diag_prefix, self.ghcmod.process.stderr)
             self.stderr_drain.start()
+        else:
+            Logging.log('Did not start ghc-mod successfully.')
 
     def shutdown(self):
         if self.ghcmod is not None:

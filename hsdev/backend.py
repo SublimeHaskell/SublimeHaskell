@@ -39,7 +39,7 @@ class HsDevBackend(Backend.HaskellBackend):
     HSDEV_DEFAULT_HOST = 'localhost'
     HSDEV_MIN_VER = [0, 2, 0, 0]  # minimum hsdev version
     HSDEV_MAX_VER = [0, 2, 4, 0]  # maximum hsdev version
-    HSDEV_CALL_TIMEOUT = 300.0 # second timeout for synchronous requests
+    HSDEV_CALL_TIMEOUT = 300.0 # second timeout for synchronous requests (5 minutes should be enough, no?)
 
     def __init__(self, backend_mgr, local=True, port=HSDEV_DEFAULT_PORT, host=HSDEV_DEFAULT_HOST, **kwargs):
         super().__init__(backend_mgr)
@@ -68,7 +68,7 @@ class HsDevBackend(Backend.HaskellBackend):
         self.install_dir = Utils.normalize_path(install_dir) if install_dir is not None else None
         # Keep track of the hsdev version early. Needed to patch command line arguments later.
         hsdev_path = Which.which('hsdev', ProcHelper.ProcHelper.get_extended_path())
-        self.version = HsDevBackend.hsdev_version() if hsdev_path is not None else [0, 0, 0, 0]
+        self.version = HsDevBackend.hsdev_version(self.exec_with, self.install_dir) if hsdev_path is not None else [0, 0, 0, 0]
 
         self.drain_stdout = None
         self.drain_stderr = None
@@ -84,14 +84,18 @@ class HsDevBackend(Backend.HaskellBackend):
         return 'hsdev'
 
     @staticmethod
-    def is_available():
+    def is_available(**kwargs):
         # Yes, this is slightly redundant because eventually __init__ does the same thing for a class
         # instance.
-        hsdev_path = Which.which('hsdev', ProcHelper.ProcHelper.get_extended_path())
-        hsdev_ver = HsDevBackend.hsdev_version() if hsdev_path is not None else [0, 0, 0, 0]
-        Logging.log('hsdev version: {0}'.format('.'.join(map(str, hsdev_ver))), Logging.LOG_INFO)
-        return hsdev_path is not None and \
-               (hsdev_ver >= HsDevBackend.HSDEV_MIN_VER and hsdev_ver <= HsDevBackend.HSDEV_MAX_VER)
+        local = kwargs.get('local', True)
+        if local:
+            hsdev_ver = HsDevBackend.hsdev_version(kwargs.get('exec-with'), kwargs.get('install-dir'))
+            Logging.log('hsdev version: {0}'.format('.'.join(map(str, hsdev_ver))), Logging.LOG_INFO)
+            return hsdev_ver >= HsDevBackend.HSDEV_MIN_VER and hsdev_ver <= HsDevBackend.HSDEV_MAX_VER
+        else:
+            # Assume that a remote backend is actually available. Ultimately, we might not connect to it, but
+            # it is available to us as a backend.
+            return True
 
     def start_backend(self):
         retval = True
@@ -207,9 +211,18 @@ class HsDevBackend(Backend.HaskellBackend):
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
     @staticmethod
-    def hsdev_version():
-        retval = None
-        exit_code, out, _ = ProcHelper.ProcHelper.run_process(['hsdev', 'version'])
+    def hsdev_version(exec_with, install_dir):
+        retval = [0, 0, 0, 0]
+        cmd = HsDevBackend.concat_args([(exec_with is not None and exec_with == 'cabal', ['cabal', 'exec']),
+                                        (exec_with is not None and exec_with == 'stack', ['stack', 'exec']),
+                                        (True, ['hsdev']),
+                                        (exec_with is not None, ['--']),
+                                        (True, ['version'])])
+        proc_args = {}
+        if install_dir is not None:
+            proc_args['cwd'] = Utils.normalize_path(install_dir)
+
+        exit_code, out, _ = ProcHelper.ProcHelper.run_process(cmd, **proc_args)
 
         if exit_code == 0:
             hsver = re.match(r'(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)\.(?P<build>\d+)', out)
@@ -223,7 +236,8 @@ class HsDevBackend(Backend.HaskellBackend):
         return retval
 
 
-    def concat_args(self, args):
+    @staticmethod
+    def concat_args(args):
         def inner_concat(left, right):
             (left_pred, left_expr) = left
             (right_pred, right_expr) = right

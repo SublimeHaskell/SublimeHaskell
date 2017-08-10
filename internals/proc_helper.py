@@ -119,10 +119,11 @@ class ProcHelper(object):
         Which.reset_cache()
         ProcHelper.augmented_path = ProcHelper.make_augmented_path()
 
-    # Generate the augmented environment for subprocesses. This copies the
-    # current process environment and updates PATH with `add_to_PATH` extras.
     @staticmethod
     def make_augmented_path():
+        ''' Generate the augmented PATH for subprocesses: adds the appropriate cabal/stack local install directory
+        ($HOME/.local/bin for *nix, %APPDATA%/local/bin for Windows) and updates PATH with `add_to_PATH` extras.
+        '''
         std_places = []
         if Settings.PLUGIN.add_standard_dirs:
             std_places = ["$HOME/.local/bin" if not Utils.is_windows() else "%APPDATA%/local/bin"] + \
@@ -140,7 +141,7 @@ class ProcHelper(object):
     def get_extended_path():
         if ProcHelper.augmented_path is None:
             ProcHelper.augmented_path = ProcHelper.make_augmented_path()
-        return ProcHelper.augmented_path + os.pathsep + (os.environ.get('PATH') or '')
+        return ProcHelper.augmented_path + os.pathsep + (os.environ.get('PATH', ''))
 
     @staticmethod
     def run_process(command, input_string='', **popen_kwargs):

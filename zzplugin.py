@@ -101,17 +101,16 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
 
     def on_post_save(self, view):
         filename = view.file_name()
-        if filename is None or not Common.is_inspected_source(view):
-            return
+        if filename is not None and Common.is_inspected_source(view):
+            if Settings.COMPONENT_DEBUG.event_viewer:
+                print('{0} invoked.'.format(type(self).__name__ + ".on_post_save"))
 
-        if Settings.COMPONENT_DEBUG.event_viewer:
-            print('{0} invoked.'.format(type(self).__name__ + ".on_post_save"))
+            project_name = Common.locate_cabal_project_from_view(view)[1]
+            Utils.run_async('rescan source', self.rescan_source, project_name, filename)
 
-        Utils.run_async('rescan source', self.rescan_source, filename)
-
-        if Common.is_haskell_source(view):
-            self.type_cache.remove(filename)
-            self.trigger_build(view)
+            if Common.is_haskell_source(view):
+                self.type_cache.remove(filename)
+                self.trigger_build(view)
 
 
     def on_modified(self, view):

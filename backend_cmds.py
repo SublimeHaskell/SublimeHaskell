@@ -1,5 +1,6 @@
 import threading
 
+import sublime
 import sublime_plugin
 
 import SublimeHaskell.internals.backend_mgr as BackendManager
@@ -81,20 +82,33 @@ class SublimeHaskellChooseBackend(sublime_plugin.WindowCommand):
 
     def run(self):
         backend_mgr = BackendManager.BackendManager()
+
+        # Rescan for backends to ensure we have the most up-to-date list...
+        backend_mgr.possible_backends = backend_mgr.filter_possible(Settings.PLUGIN.backends)
         if len(backend_mgr.possible_backends) > 0:
-            self.backend_names = [name for name in backend_mgr.possible_backends]
-            self.backend_names.sort()
-            self.window.show_quick_panel(self.backend_names, self.change_backend)
+            print('plugin \'backends\' {0}'.format([name for name in Settings.PLUGIN.backends]))
+            print('Possible/usable \'backends\': {0}'.format([name for name in backend_mgr.possible_backends]))
+
+            if len(backend_mgr.possible_backends) > 1:
+                self.backend_names = [name for name in backend_mgr.possible_backends]
+                self.backend_names.sort()
+                self.window.show_quick_panel(self.backend_names, self.change_backend)
+            elif len(backend_mgr.possible_backends) == 1:
+                backend_name = list(backend_mgr.possible_backends)[0]
+                sublime.message_dialog('Only one backend, \'{0}\', available -- starting it.'.format(backend_name))
+                self.start_new_backend(backend_name)
+        else:
+            backend_mgr.no_backends_available()
 
     def change_backend(self, idx):
         if idx >= 0:
-            def start_new_backend():
-                backend_name = self.backend_names[idx]
-                with Common.status_message_process('Changing backend to \'{0}\''.format(backend_name), priority=2):
-                    BackendManager.BackendManager().change_current_backend(backend_name)
-                    cabal_project_status(self.window.active_view(), BackendManager.BackendManager())
+            Utils.run_async('change backend: startup', self.start_new_backend, self.backend_names[idx])
 
-            Utils.run_async('change backend: startup', start_new_backend)
+
+    def start_new_backend(self, backend_name):
+        with Common.status_message_process('Changing backend to \'{0}\''.format(backend_name), priority=2):
+            BackendManager.BackendManager().change_current_backend(backend_name)
+            cabal_project_status(self.window.active_view(), BackendManager.BackendManager())
 
 def cabal_project_status(view, backend_mgr):
     vsettings = view.settings()

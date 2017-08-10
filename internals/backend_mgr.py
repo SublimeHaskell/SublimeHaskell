@@ -137,32 +137,33 @@ class BackendManager(object, metaclass=Utils.Singleton):
 
         Updates the :py:attr:`possible_backends` and :py:attr:`current_backend_name` attributes.
         '''
-        usable_backends = self.available_backends()
-        if len(usable_backends) > 0:
+        self.possible_backends = self.filter_possible(Settings.PLUGIN.backends)
+        if len(self.possible_backends) > 0:
             # Take first available because DEFAULT_KNOWN_BACKENDS are listed in order of priority...
-            self.possible_backends = self.filter_possible(Settings.PLUGIN.backends, usable_backends)
 
-            print('Available backend types: {0}'.format([clazz.backend_name() for clazz in usable_backends]))
             print('plugin \'backends\' {0}'.format([name for name in Settings.PLUGIN.backends]))
             print('Possible/usable \'backends\': {0}'.format([name for name in self.possible_backends]))
 
             def_backend, n_defaults = self.get_default_backend(self.possible_backends)
             if n_defaults == 0:
-                sublime.message_dialog('No default backend found. Proceeding without a backend.')
+                sublime.message_dialog('\n'.join(['No default backend found. Using the \'none\' backend.']))
+                self.current_backend_name = Backend.NullHaskellBackend.backend_name()
             else:
                 if n_defaults > 1:
                     sublime.message_dialog('Multiple default backends detected. Using {0}.'.format(def_backend))
                 self.current_backend_name = def_backend
         else:
             # Yell at luser.
-            sublime.message_dialog('\n'.join(['No usable backends (hsdev, ghc-mod) found on PATH or',
-                                              'in the standard Haskell cabal and stack installation',
-                                              'locations.',
-                                              '',
-                                              'Please check or update your SublimeHaskell user settings,',
-                                              'or install hsdev or ghc-mod.',
-                                              '',
-                                              'Proceeding without a backend.']))
+            self.no_backends_available()
+
+
+    def no_backends_available(self):
+        sublime.message_dialog('\n'.join(['No usable backends (hsdev, ghc-mod) found on PATH or',
+                                          'in the standard Haskell cabal and stack installation',
+                                          'locations.',
+                                          '',
+                                          'Please check or update your SublimeHaskell user settings,',
+                                          'or install hsdev or ghc-mod.']))
 
 
     def updated_settings(self, key, _val):
@@ -196,19 +197,18 @@ class BackendManager(object, metaclass=Utils.Singleton):
                                     Logging.LOG_ERROR)
 
 
-    def available_backends(self):
-        '''Determine which backends are actually available. Whether a backend is available is backend-specific, usually the
-        backend class examines the PATH environment variable and looks for a specific executable.
-        '''
-        return [clazz for clazz in BackendManager.BACKEND_META.values() if clazz.is_available()]
-
-
-    def filter_possible(self, user_backends, avail_backends):
+    def filter_possible(self, user_backends):
         '''Filter down user-requested backends using the available backends.
         '''
-        backend_names = [b.backend_name() for b in avail_backends]
-        return dict([(name, user_backends[name]) for name in user_backends
-                     if user_backends[name].get('backend', '') in backend_names])
+        retval = {}
+        for ubname in user_backends:
+            ubackend = user_backends.get(ubname)
+            if ubackend is not None:
+                ubclazz = BackendManager.BACKEND_META.get(ubackend.get('backend'))
+                if ubclazz is not None and ubclazz.is_available(**ubackend.get('options', {})):
+                    retval[ubname] = ubackend
+
+        return retval
 
 
     def get_default_backend(self, user_backends):
@@ -222,6 +222,7 @@ class BackendManager(object, metaclass=Utils.Singleton):
                     retval = name
 
         return (retval, n_defaults)
+
 
     def set_backend(self, new_backend):
         BackendManager.ACTIVE_BACKEND = new_backend

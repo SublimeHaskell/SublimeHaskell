@@ -28,7 +28,7 @@ class HaskellBackend(object):
         raise NotImplementedError("HaskellBackend.backend_name needs an implementation.")
 
     @staticmethod
-    def is_availabile():
+    def is_available(**kwargs):
         '''Test if the backend is available. For most backends, this verifies that an executable exists and possibly that the
         version is supported (see the `hsdev` version of this method.)
 
@@ -286,7 +286,7 @@ class NullHaskellBackend(HaskellBackend):
         return "none"
 
     @staticmethod
-    def is_available():
+    def is_available(**kwargs):
         return True
 
     def start_backend(self):
