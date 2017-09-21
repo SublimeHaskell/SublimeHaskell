@@ -4,8 +4,10 @@ The `hsdev` backend.
 
 from functools import reduce
 import io
+import json
 import os
 import os.path
+import pprint
 import re
 import subprocess
 import threading
@@ -43,6 +45,7 @@ class HsDevBackend(Backend.HaskellBackend):
 
     def __init__(self, backend_mgr, local=True, port=HSDEV_DEFAULT_PORT, host=HSDEV_DEFAULT_HOST, **kwargs):
         super().__init__(backend_mgr)
+        Logging.log('{0}.__init__({1}, {2})'.format(type(self).__name__, host, port), Logging.LOG_INFO)
 
         # Sanity checking:
         exec_with = kwargs.get('exec-with')
@@ -67,8 +70,7 @@ class HsDevBackend(Backend.HaskellBackend):
         self.exec_with = exec_with
         self.install_dir = Utils.normalize_path(install_dir) if install_dir is not None else None
         # Keep track of the hsdev version early. Needed to patch command line arguments later.
-        hsdev_path = Which.which('hsdev', ProcHelper.ProcHelper.get_extended_path())
-        self.version = HsDevBackend.hsdev_version(self.exec_with, self.install_dir) if hsdev_path is not None else [0, 0, 0, 0]
+        self.version = HsDevBackend.hsdev_version(self.exec_with, self.install_dir)
 
         self.drain_stdout = None
         self.drain_stderr = None
@@ -100,16 +102,13 @@ class HsDevBackend(Backend.HaskellBackend):
     def start_backend(self):
         retval = True
         if self.is_local_hsdev:
-            Logging.log('Starting local \'hsdev\'server', Logging.LOG_INFO)
+            Logging.log('Starting local \'hsdev\' server', Logging.LOG_INFO)
 
-            use_log_level = self.version >= [0, 2, 3, 2]
+            use_log_level = (self.version >= [0, 2, 3, 2])
             log_config = Settings.PLUGIN.hsdev_log_config
             log_level = Settings.PLUGIN.hsdev_log_level
 
-            cmd = self.concat_args([(self.exec_with is not None and self.exec_with == 'cabal', ['cabal', 'exec']),
-                                    (self.exec_with is not None and self.exec_with == 'stack', ['stack', 'exec']),
-                                    (True, ["hsdev"]),
-                                    (self.exec_with is not None, ['--']),
+            cmd = self.concat_args([(True, ["hsdev"]),
                                     (True, ["run"]),
                                     (self.port, ["--port", str(self.port)]),
                                     (self.cache, ["--cache", self.cache]),
@@ -117,13 +116,7 @@ class HsDevBackend(Backend.HaskellBackend):
                                     (not use_log_level and log_config, ["--log-config", log_config]),
                                     (use_log_level, ["--log-level", log_level])])
 
-            Logging.log('hsdev command: {0}'.format(cmd), Logging.LOG_DEBUG)
-
-            proc_args = {}
-            if self.install_dir is not None:
-                proc_args['cwd'] = self.install_dir
-
-            hsdev_proc = ProcHelper.ProcHelper(cmd, **proc_args)
+            hsdev_proc = HsDevBackend.exec_with_wrapper(self.exec_with, self.install_dir, cmd)
             if hsdev_proc.process is not None:
                 # Use TextIOWrapper here because it combines decoding with newline handling,
                 # which means less to maintain.
@@ -213,25 +206,17 @@ class HsDevBackend(Backend.HaskellBackend):
     @staticmethod
     def hsdev_version(exec_with, install_dir):
         retval = [0, 0, 0, 0]
-        cmd = HsDevBackend.concat_args([(exec_with is not None and exec_with == 'cabal', ['cabal', 'exec']),
-                                        (exec_with is not None and exec_with == 'stack', ['stack', 'exec']),
-                                        (True, ['hsdev']),
-                                        (exec_with is not None, ['--']),
-                                        (True, ['version'])])
-        proc_args = {}
-        if install_dir is not None:
-            proc_args['cwd'] = Utils.normalize_path(install_dir)
-
-        exit_code, out, _ = ProcHelper.ProcHelper.run_process(cmd, **proc_args)
-
-        if exit_code == 0:
-            hsver = re.match(r'(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)\.(?P<build>\d+)', out)
-            if hsver:
-                major = int(hsver.group('major'))
-                minor = int(hsver.group('minor'))
-                revision = int(hsver.group('revision'))
-                build = int(hsver.group('build'))
-                retval = [major, minor, revision, build]
+        hsdev_proc = HsDevBackend.exec_with_wrapper(exec_with, install_dir, ['hsdev', 'version'])
+        if hsdev_proc.process is not None:
+            exit_code, out, _ = hsdev_proc.wait()
+            if exit_code == 0:
+                hsver = re.match(r'(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)\.(?P<build>\d+)', out)
+                if hsver:
+                    major = int(hsver.group('major'))
+                    minor = int(hsver.group('minor'))
+                    revision = int(hsver.group('revision'))
+                    build = int(hsver.group('build'))
+                    retval = [major, minor, revision, build]
 
         return retval
 
@@ -318,6 +303,35 @@ class HsDevBackend(Backend.HaskellBackend):
         return self.hsdev_command(name, opts, on_result, async=True, timeout=None, is_list=True,
                                   on_response=on_response, on_notify=on_notify, on_error=on_error,
                                   on_result_part=on_result_part, split_result=split_result)
+
+    @staticmethod
+    def exec_with_wrapper(exec_with, install_dir, cmd_list):
+        '''Wrapper function for inserting the execution wrapper, e.g., 'cabal exec' or 'stack exec'
+
+        :returns: Process object from ProcHelper.
+        '''
+
+        proc_args = {}
+        if exec_with is not None:
+            if exec_with == 'cabal':
+                cmd_list = ['cabal', 'exec'] + cmd_list
+                cmd_list.insert(3, '--')
+            elif exec_with == 'stack':
+                cmd_list = ['stack', 'exec'] + cmd_list
+                cmd_list.insert(3, '--')
+            else:
+                errmsg = 'HsDevBackend.exec_with_wrapper: Unknown execution prefix \'{0}\''.format(exec_with)
+                raise RuntimeError(errmsg)
+
+            if install_dir is not None:
+                proc_args['cwd'] = Utils.normalize_path(install_dir)
+        else:
+            cmd = Which.which(cmd_list[0], ProcHelper.ProcHelper.get_extended_path())
+            if cmd is not None:
+                cmd_list[0] = cmd
+
+        Logging.log('HsDevBackend.exec_with_wrapper: {0}'.format(cmd_list), Logging.LOG_DEBUG)
+        return ProcHelper.ProcHelper(cmd_list, **proc_args)
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # API implementation:
@@ -544,6 +558,33 @@ class HsDevBackend(Backend.HaskellBackend):
 
     def exit(self):
         return self.command('exit', {})
+
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+    # Advanced features:
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+    def query_import(self, symbol, filename):
+        if self.whois(symbol, filename):
+            return (False, ['Symbol {0} already in scope'.format(symbol)])
+        else:
+            candidates = self.lookup(symbol, filename)
+            return (True, candidates) if candidates else (False, ['Symbol {0} not found'.format(symbol)])
+
+    def contents_to_modules(self, contents):
+        imp_module = None
+        hsinspect_proc = HsDevBackend.exec_with_wrapper(self.exec_with, self.install_dir, ['hsinspect'])
+        if hsinspect_proc.process is not None:
+            exit_code, result, _ = hsinspect_proc.wait(input_str=contents)
+            if exit_code == 0:
+                pyresult = json.loads(result).get('result')
+                if pyresult is not None:
+                    if Logging.is_log_level(Logging.LOG_DEBUG):
+                        pprint.pprint(pyresult, width=127)
+                    modinfo = pyresult.get('module')
+                    if modinfo is not None:
+                        imp_module = ResultParse.parse_module(modinfo)
+
+        return imp_module
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # Utility functions:

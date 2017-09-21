@@ -136,11 +136,10 @@ def parse_module_declaration(mod_decl, parse_module_info=True):
 def parse_module(mod):
     if mod is None:
         return None
-    return symbols.Module(mod['name'], mod.get('exports'),
-                          [parse_import(i) for i in mod['imports']] if 'imports' in mod else [],
-                          dict((decl['name'], parse_declaration(decl)) for decl in mod['declarations']) \
-                            if 'declarations' in mod else {},
-                          parse_location(mod.get('location')))
+
+    the_imports = [parse_import(i) for i in mod['imports']] if 'imports' in mod else []
+    the_decls = dict((decl['name'], parse_declaration(decl)) for decl in mod['declarations']) if 'declarations' in mod else {}
+    return symbols.Module(mod['name'], mod.get('exports'), the_imports, the_decls, parse_location(mod.get('location')))
 
 
 def parse_modules(modules):

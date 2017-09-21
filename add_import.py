@@ -1,95 +1,66 @@
-import json
 import re
-
-import pprint
 
 import sublime
 
 import SublimeHaskell.internals.backend_mgr as BackendManager
-import SublimeHaskell.hsdev.result_parse as HsDevResultParse
-import SublimeHaskell.internals.logging as Logging
-import SublimeHaskell.internals.proc_helper as ProcHelper
-import SublimeHaskell.internals.utils as Utils
+import SublimeHaskell.internals.backend as Backend
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.cmdwin_types as CommandWin
 
 
 class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
-    """
-    Insert import for symbol
-    """
+    '''Insert import for symbol. Uses the advanced feature API in the backend.
+    '''
     def __init__(self, view):
         super().__init__(view)
-        self.full_name = None
-        self.current_file_name = None
         self.edit = None
         self.candidates = None
-        self.module_name = None
-        self.project_name = None
+        self.backend = Backend.NullHaskellBackend(BackendManager.BackendManager())
 
     def run(self, edit, **kwargs):
-        filename = kwargs.get('filename')
         decl = kwargs.get('decl')
-        module_name = kwargs.get('module_name')
+        self.backend = BackendManager.active_backend()
 
-        self.full_name = decl
-        self.current_file_name = filename
-        self.edit = edit
-        self.project_name = Common.locate_cabal_project_from_view(self.view)[1]
-
-        if module_name is not None:
-            self.add_import(module_name)
-            return
-
-        if not self.current_file_name:
-            self.current_file_name = self.view.file_name()
-
-        if not self.full_name:
+        full_name = decl
+        if full_name is None:
             qsymbol = Common.get_qualified_symbol_at_region(self.view, self.view.sel()[0])
-            self.full_name = qsymbol.qualified_name()
+            full_name = qsymbol.qualified_name()
 
-        if BackendManager.active_backend().whois(self.full_name, self.current_file_name):
-            Common.show_status_message('Symbol {0} already in scope'.format(self.full_name))
-        else:
-            self.candidates = BackendManager.active_backend().lookup(self.full_name, self.current_file_name)
+        current_file_name = self.view.file_name()
+        self.edit = edit
 
-            if not self.candidates:
-                Common.show_status_message('Symbol {0} not found'.format(self.full_name))
-            elif len(self.candidates) == 1:
+        # Phase 1: Get the candidate import modules: the backend's query_import returns the (flag, list) tuple.
+        # If successful (flag == True), then invoke add_import to add the import to the module's existing
+        # modules.
+        (status, self.candidates) = self.backend.query_import(full_name, current_file_name)
+        if status:
+            if len(self.candidates) == 1:
                 self.add_import(self.candidates[0].module.name)
             else:
                 self.view.window().show_quick_panel([[c.module.name] for c in self.candidates], self.on_done)
+        else:
+            if len(self.candidates) == 1:
+                Common.show_status_message(self.candidates[0])
+            else:
+                sublime.message_dialog('\n'.join(self.candidates))
+
+    def on_done(self, idx):
+        if idx >= 0:
+            self.add_import(self.candidates[idx].module.name)
 
     def add_import(self, module_name):
-        self.module_name = module_name
         contents = self.view.substr(sublime.Region(0, self.view.size()))
+
         # Truncate contents to the module declaration and the imports list, if present.
         imports_list = list(re.finditer('^import.*$', contents, re.MULTILINE))
         if len(imports_list) > 0:
-            imports_list = imports_list[-1].end()
-            contents = contents[0:imports_list]
+            contents = contents[0:imports_list[-1].end()]
 
-        ProcHelper.ProcHelper.invoke_tool(['hsinspect'], 'hsinspect', contents, self.on_inspected, check_enabled=False)
-
-    def on_inspected(self, result):
-        imp_module = None
-
-        if self.view.is_dirty():
-            # Use the buffer's contents
-            pyresult = json.loads(result).get('result')
-            if pyresult is not None:
-                if Logging.is_log_level(Logging.LOG_DEBUG):
-                    pprint.pprint(pyresult, width=80)
-                modinfo = pyresult.get('module')
-                if modinfo is not None:
-                    imp_module = HsDevResultParse.parse_module(modinfo)
-        else:
-            # Otherwise, use the actual file
-            imp_module = Utils.head_of(BackendManager.active_backend().module(self.project_name, file=self.current_file_name))
-
+        # Phase 2: Ask the backend to turn the contents into a list of Module objects:
+        imp_module = self.backend.contents_to_modules(contents)
         if imp_module is not None:
             imports = sorted(imp_module.imports, key=lambda i: i.position.line)
-            after = [i for i in imports if i.module > self.module_name]
+            after = [imp for imp in imports if imp.module > module_name]
 
             insert_line = 0
             insert_gap = False
@@ -115,18 +86,12 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
                     # Punt! Insert at the end of the file
                     insert_line = self.view.rowcol(self.view.size())[0]
 
-            insert_text = 'import {0}\n'.format(self.module_name) + ('\n' if insert_gap else '')
+            insert_text = 'import {0}\n'.format(module_name) + ('\n' if insert_gap else '')
 
             point = self.view.text_point(insert_line, 0)
             self.view.insert(self.edit, point, insert_text)
 
-            Common.show_status_message('Import {0} added'.format(self.module_name), True)
-
-    def on_done(self, idx):
-        if idx >= 0:
-            self.view.run_command('sublime_haskell_insert_import_for_symbol',
-                                  {'filename': self.current_file_name,
-                                   'module_name': self.candidates[idx].module.name})
+            Common.show_status_message('Import {0} added'.format(module_name), True)
 
     def is_visible(self):
         return Common.is_haskell_source(self.view) and super().is_visible()

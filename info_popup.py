@@ -1,9 +1,9 @@
-import html
+import urllib.parse
+
 import webbrowser
 from xml.etree import ElementTree
 
 import sublime
-import sublime_plugin
 
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.utils as Utils
@@ -171,7 +171,7 @@ class SublimeHaskellHoverPopup(object):
                     typed_expr.substr(self.view),
                     symbols.format_type(UnicodeOpers.use_unicode_operators(' :: {0}'.format(typed_expr.typename)))))
             if decl:
-                popup_msg = [u'<a href="import:{0}">Add import</a>'.format(html.escape(decl.name))] \
+                popup_msg = [u'<a href="import:{0}">Add import</a>'.format(urllib.parse.quote_plus(decl.name))] \
                             if suggest_import else []
                 popup_parts.append(decl.popup(popup_msg))
 
@@ -218,7 +218,7 @@ class SublimeHaskellHoverPopup(object):
                                      'end': err_rgn.end()}
                         sublime.set_timeout(lambda: self.view.run_command('sublime_haskell_replace_text', repl_text), 0)
             elif url[0:7] == "import:":
-                decl_name = html.unescape(url[7:])
+                decl_name = urllib.parse.unquote(url[7:])
                 self.view.run_command('sublime_haskell_insert_import_for_symbol',
                                       {'filename': self.view.file_name(),
                                        'decl': decl_name})

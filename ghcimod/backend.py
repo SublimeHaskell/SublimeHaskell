@@ -59,7 +59,7 @@ class GHCModBackend(Backend.HaskellBackend):
         return 'ghc-mod'
 
     @staticmethod
-    def is_available(**kwargs):
+    def is_available(**_kwargs):
         return Which.which('ghc-mod', ProcHelper.ProcHelper.get_extended_path())
 
     def start_backend(self):
@@ -304,6 +304,16 @@ class GHCModBackend(Backend.HaskellBackend):
 
     def exit(self):
         return True
+
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+    # Advanced features:
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+    def query_import(self, _symbol, _filename):
+        return (False, ['ghc-mod does not support query_import used by \'Add Import\''])
+
+    def contents_to_modules(self, contents):
+        return None
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # Utility functions:

@@ -28,7 +28,7 @@ class HaskellBackend(object):
         raise NotImplementedError("HaskellBackend.backend_name needs an implementation.")
 
     @staticmethod
-    def is_available(**kwargs):
+    def is_available(**_kwargs):
         '''Test if the backend is available. For most backends, this verifies that an executable exists and possibly that the
         version is supported (see the `hsdev` version of this method.)
 
@@ -252,15 +252,28 @@ class HaskellBackend(object):
         raise NotImplementedError("HaskellBackend.exit needs an implementation.")
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+    # Advanced features:
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+    def query_import(self, symbol, filename):
+        '''Query possible import modules for symbol :py:var:`name` in the file named :py:var:`filename`.
+
+        :rtype: (Boolean, List(String)) tuple
+        :returns: If the first tuple element is True, the list of strings will be the module names from which
+            :py:var:`name` can be imported. If False, the list of strings is an error message or diagnostic.
+        '''
+        raise NotImplementedError("HaskellBackend.add_import needs an implementation")
+
+    def contents_to_modules(self, contents):
+        raise NotImplementedError('HaskellBackend.contents_to_modules needs an implementation')
+
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # Async dispatch functions:
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
     def dispatch_callbacks(self, resp, **kwargs):
         on_response = kwargs.pop('on_response', None)
-        if on_response is not None:
-            return on_response(resp)
-        else:
-            return resp
+        return on_response(resp) if on_response is not None else resp
 
 
 class NullHaskellBackend(HaskellBackend):
@@ -417,3 +430,19 @@ class NullHaskellBackend(HaskellBackend):
 
     def exit(self):
         return True
+
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+    # Advanced features:
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+    def query_import(self, symbol, filename):
+        '''Query possible import modules for symbol :py:var:`name` in the file named :py:var:`filename`.
+
+        :rtype: (Boolean, List(String)) tuple
+        :returns: If the first tuple element is True, the list of strings will be the module names from which
+            :py:var:`name` can be imported. If False, the list of strings is an error message or diagnostic.
+        '''
+        return (False, ['NullBackend doe not support query_import used by \'Add Import\''])
+
+    def contents_to_modules(self, contents):
+        return None
