@@ -57,7 +57,7 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
             contents = contents[0:imports_list[-1].end()]
 
         # Phase 2: Ask the backend to turn the contents into a list of Module objects:
-        imp_module = self.backend.contents_to_modules(contents)
+        imp_module = self.backend.contents_to_module(contents)
         if imp_module is not None:
             imports = sorted(imp_module.imports, key=lambda i: i.position.line)
             after = [imp for imp in imports if imp.module > module_name]

@@ -147,10 +147,10 @@
         "caption": "SublimeHaskell: Insert import for symbol",
         "command": "sublime_haskell_insert_import_for_symbol"
     },
-    // {
-    //     "caption": "SublimeHaskell: Clear imports",
-    //     "command": "sublime_haskell_clear_imports"
-    // },
+    {
+        "caption": "SublimeHaskell: Clean imports",
+        "command": "sublime_haskell_clean_imports"
+    },
     {
         "caption": "SublimeHaskell: Reinspect all",
         "command": "sublime_haskell_reinspect_all"

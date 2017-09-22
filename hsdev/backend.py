@@ -570,7 +570,7 @@ class HsDevBackend(Backend.HaskellBackend):
             candidates = self.lookup(symbol, filename)
             return (True, candidates) if candidates else (False, ['Symbol {0} not found'.format(symbol)])
 
-    def contents_to_modules(self, contents):
+    def contents_to_module(self, contents):
         imp_module = None
         hsinspect_proc = HsDevBackend.exec_with_wrapper(self.exec_with, self.install_dir, ['hsinspect'])
         if hsinspect_proc.process is not None:
@@ -585,6 +585,18 @@ class HsDevBackend(Backend.HaskellBackend):
                         imp_module = ResultParse.parse_module(modinfo)
 
         return imp_module
+
+    def clean_imports(self, filename):
+        cmd = ['hsclearimports', filename, '--max-import-list', '64']
+        hsclean_proc = HsDevBackend.exec_with_wrapper(self.exec_with, self.install_dir, cmd)
+        if hsclean_proc.process is not None:
+            exit_code, result, err = hsclean_proc.wait()
+            if exit_code == 0:
+                return (True, result.splitlines())
+            else:
+                return (False, err)
+        else:
+            return (False, ['\'hscleanimports\' utility not found.'])
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # Utility functions:

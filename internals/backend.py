@@ -264,8 +264,22 @@ class HaskellBackend(object):
         '''
         raise NotImplementedError("HaskellBackend.add_import needs an implementation")
 
-    def contents_to_modules(self, contents):
-        raise NotImplementedError('HaskellBackend.contents_to_modules needs an implementation')
+    def contents_to_module(self, contents):
+        '''Convert Haskell source to a :py:class:`Module` object. This method is currently used to
+        extract the imports when adding a missing import.
+
+        :rtype: :py:class:`Module`
+        :returns: A :py:class:`Module` object representing the Haskell source.
+        '''
+        raise NotImplementedError('HaskellBackend.contents_to_module needs an implementation')
+
+    def clean_imports(self, filename):
+        '''Clean the import list.
+
+        :rtype: (Boolean, [string])
+        :returns: If the backend supports this functionality, (True, [new imports]), otherwise (False, [error messages])
+        '''
+        raise NotImplementedError('HaskellBackend.clean_imports needs an implementation')
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # Async dispatch functions:
@@ -444,5 +458,8 @@ class NullHaskellBackend(HaskellBackend):
         '''
         return (False, ['NullBackend doe not support query_import used by \'Add Import\''])
 
-    def contents_to_modules(self, contents):
+    def contents_to_module(self, contents):
         return None
+
+    def clean_imports(self, filename):
+        return (False, ['NullBackend does not support the clean_imports functionality'])

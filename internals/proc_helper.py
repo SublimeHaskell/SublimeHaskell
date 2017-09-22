@@ -149,43 +149,6 @@ class ProcHelper(object):
         with ProcHelper(command, **popen_kwargs) as proc:
             return proc.wait(input_string)
 
-    @staticmethod
-    def invoke_tool(command, tool_name, inp='', on_result=None, filename=None, on_line=None, check_enabled=True,
-                    **popen_kwargs):
-        if check_enabled and not Settings.PLUGIN.__getattribute__(Utils.tool_enabled(tool_name)):
-            return None
-
-        source_dir = get_source_dir(filename)
-
-        def mk_result(result):
-            return on_result(result) if on_result else result
-
-        try:
-            with ProcHelper(command, cwd=source_dir, **popen_kwargs) as proc:
-                exit_code, stdout, stderr = proc.wait(inp)
-                if exit_code != 0:
-                    raise Exception('{0} exited with exit code {1} and stderr: {2}'.format(tool_name, exit_code, stderr))
-
-                if on_line:
-                    for line in io.StringIO(stdout):
-                        on_line(mk_result(line))
-                else:
-                    return mk_result(stdout)
-
-        except OSError as os_exc:
-            if os_exc.errno == errno.ENOENT:
-                errmsg = "SublimeHaskell: {0} was not found!\n'{1}' is set to False".format(tool_name,
-                                                                                            Utils.tool_enabled(tool_name))
-                Common.output_error_async(sublime.active_window(), errmsg)
-                Settings.PLUGIN.__setattr__(Utils.tool_enabled(tool_name), False)
-            else:
-                Logging.log('{0} fails with {1}, command: {2}'.format(tool_name, os_exc, command), Logging.LOG_ERROR)
-
-            return None
-
-        return None
-
-
 def get_source_dir(filename):
     '''Get root of hs-source-dirs for filename in project.
     '''

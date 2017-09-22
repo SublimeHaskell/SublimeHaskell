@@ -580,48 +580,41 @@ class SublimeHaskellContinuousSymbolInfo(sublime_plugin.EventListener):
             view.run_command('sublime_haskell_symbol_info', {'no_browse': True})
 
 
-class SublimeHaskellClearImports(CommandWin.BackendTextCommand):
+class SublimeHaskellCleanImports(CommandWin.BackendTextCommand):
     def __init__(self, view):
         super().__init__(view)
-        self.current_file_name = None
-        self.edit = None
 
     def run(self, edit, **kwargs):
-        self.current_file_name = kwargs.get('filename')
-        self.edit = edit
-
-        if not self.current_file_name:
-            self.current_file_name = self.view.file_name()
-
+        current_file_name = kwargs.get('filename', self.view.file_name())
         project_name = Common.locate_cabal_project_from_view(self.view)[1]
-        imp_module = Utils.head_of(BackendManager.active_backend().module(project_name, file=self.current_file_name))
-        if not imp_module:
-            Logging.log("module not scanned")
-            return
+        backend = BackendManager.active_backend()
 
-        imports = sorted(imp_module.imports, key=lambda i: i.position.line)
+        imp_module = Utils.head_of(backend.module(project_name, file=current_file_name))
+        if imp_module:
+            imports = sorted(imp_module.imports, key=lambda i: i.position.line)
 
-        cmd = ['hsclearimports', self.current_file_name, '--max-import-list', '32']
-        exit_code, cleared, err = ProcHelper.ProcHelper.run_process(cmd)
-        if exit_code != 0:
-            Logging.log('hsclearimports error: {0}'.format(err), Logging.LOG_ERROR)
-            return
-
-        new_imports = cleared.splitlines()
-
-        if len(imports) != len(new_imports):
-            Logging.log('different number of imports: {0} and {1}'.format(len(imports), len(new_imports)), Logging.LOG_ERROR)
-            return
-
-        Logging.log('replacing imports for {0}'.format(self.current_file_name), Logging.LOG_TRACE)
-        erased = 0
-        for imp, new_imp in zip(imports, new_imports):
-            point = self.view.text_point(imp.position.line - 1 - erased, 0)
-            if new_imp.endswith('()'):
-                self.view.erase(edit, self.view.full_line(point))
-                erased = erased + 1
+            supported, result = backend.clean_imports(current_file_name)
+            print(result)
+            if supported:
+                if len(imports) == len(result):
+                    Logging.log('replacing imports for {0}'.format(current_file_name), Logging.LOG_TRACE)
+                    erased = 0
+                    for imp, new_imp in zip(imports, result):
+                        point = self.view.text_point(imp.position.line - 1 - erased, 0)
+                        if new_imp.endswith('()'):
+                            self.view.erase(edit, self.view.full_line(point))
+                            erased = erased + 1
+                        else:
+                            self.view.replace(edit, self.view.line(point), new_imp)
+                else:
+                    Common.show_status_message('different number of imports: {0} and {1}'.format(len(imports), len(result)))
             else:
-                self.view.replace(edit, self.view.line(point), new_imp)
+                if len(result) == 1:
+                    Common.show_status_message(result[0])
+                else:
+                    sublime.message_dialog('\n'.join(result))
+        else:
+            Common.show_status_message('Clean Imports failed: module not scanned')
 
 
 class SublimeHaskellBrowseModule(CommandWin.BackendWindowCommand):

@@ -312,8 +312,11 @@ class GHCModBackend(Backend.HaskellBackend):
     def query_import(self, _symbol, _filename):
         return (False, ['ghc-mod does not support query_import used by \'Add Import\''])
 
-    def contents_to_modules(self, contents):
+    def contents_to_module(self, contents):
         return None
+
+    def clean_imports(self, filename):
+        return (False, ['NullBackend does not support the clean_imports functionality'])
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # Utility functions:
