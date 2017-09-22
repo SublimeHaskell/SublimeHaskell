@@ -50,15 +50,15 @@ class FlyCheckLint(threading.Thread):
         self.event = threading.Event()
 
     def fly(self, view):
-        with self.view as view:
-            view['view'] = view
-            view['mtime'] = time.time()
+        with self.view as self_view:
+            self_view['view'] = view
+            self_view['mtime'] = time.time()
         self.event.set()
 
     def nofly(self):
-        with self.view as view:
-            view['view'] = None
-            view['mtime'] = None
+        with self.view as self_view:
+            self_view['view'] = None
+            self_view['mtime'] = None
         self.event.set()
 
     def run(self):
@@ -67,9 +67,9 @@ class FlyCheckLint(threading.Thread):
             mtime_ = None
             delay = Settings.PLUGIN.lint_check_fly_idle
 
-            with self.view as view:
-                view_ = view['view']
-                mtime_ = view['mtime']
+            with self.view as self_view:
+                view_ = self_view['view']
+                mtime_ = self_view['mtime']
 
             if not view_:  # Wait for signal
                 self.event.wait()
@@ -81,9 +81,9 @@ class FlyCheckLint(threading.Thread):
                 time.sleep(delay)
                 continue
             else:
-                with self.view as view:
-                    view['view'] = None
-                    view['mtime'] = None
+                with self.view as self_view:
+                    self_view['view'] = None
+                    self_view['mtime'] = None
 
                 fly_view = view_
                 fly_window = fly_view.window()
