@@ -313,7 +313,7 @@ class NullHaskellBackend(HaskellBackend):
         return "none"
 
     @staticmethod
-    def is_available(**kwargs):
+    def is_available(**_kwargs):
         return True
 
     def start_backend(self):

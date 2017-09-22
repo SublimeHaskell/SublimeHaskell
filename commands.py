@@ -13,7 +13,6 @@ import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.hsdev.result_parse as HsDevResultParse
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.output_collector as OutputCollector
-import SublimeHaskell.internals.proc_helper as ProcHelper
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.sublime_haskell_common as Common

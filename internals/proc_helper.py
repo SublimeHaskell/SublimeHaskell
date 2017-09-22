@@ -3,13 +3,9 @@
 # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
 import errno
-import io
-import json
 import subprocess
 import os
 import os.path
-
-import sublime
 
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.logging as Logging
