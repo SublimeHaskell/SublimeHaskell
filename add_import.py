@@ -13,44 +13,45 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
     '''
     def __init__(self, view):
         super().__init__(view)
-        self.edit = None
         self.candidates = None
-        self.cand_idx = 0
         self.backend = Backend.NullHaskellBackend(BackendManager.BackendManager())
 
     def run(self, edit, **kwargs):
-        decl = kwargs.get('decl')
+        kw_module = kwargs.get('module')
         self.backend = BackendManager.active_backend()
 
-        full_name = decl
-        if full_name is None:
-            qsymbol = Common.get_qualified_symbol_at_region(self.view, self.view.sel()[0])
-            full_name = qsymbol.qualified_name()
+        if not kw_module:
+            kw_decl = kwargs.get('decl')
+            if kw_decl is None:
+                qsymbol = Common.get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+                kw_decl = qsymbol.qualified_name()
 
-        current_file_name = self.view.file_name()
-        self.edit = edit
+            current_file_name = self.view.file_name()
 
-        # Phase 1: Get the candidate import modules: the backend's query_import returns the (flag, list) tuple.
-        # If successful (flag == True), then invoke add_import to add the import to the module's existing
-        # modules.
-        (status, self.candidates) = self.backend.query_import(full_name, current_file_name)
-        if status:
-            if len(self.candidates) == 1:
-                self.add_import(self.candidates[0].module.name)
+            # Phase 1: Get the candidate import modules: the backend's query_import returns the (flag, list) tuple.
+            # If successful (flag == True), then invoke add_import to add the import to the module's existing
+            # modules.
+            (status, self.candidates) = self.backend.query_import(kw_decl, current_file_name)
+            if status:
+                if len(self.candidates) == 1:
+                    self.add_import(edit, self.candidates[0].module.name)
+                else:
+                    self.view.window().show_quick_panel([[c.module.name] for c in self.candidates], self.on_done)
             else:
-                self.view.window().show_quick_panel([[c.module.name] for c in self.candidates], self.on_done)
-                if self.cand_idx >= 0:
-                    self.add_import(self.candidates[self.cand_idx].module.name)
+                if len(self.candidates) == 1:
+                    Common.show_status_message(self.candidates[0])
+                else:
+                    sublime.message_dialog('\n'.join(self.candidates))
         else:
-            if len(self.candidates) == 1:
-                Common.show_status_message(self.candidates[0])
-            else:
-                sublime.message_dialog('\n'.join(self.candidates))
+            self.add_import(edit, kw_module)
 
     def on_done(self, idx):
-        self.cand_idx = idx
+        if idx >= 0:
+            # By this point, the `run` method has exited, so the `edit` is no longer valid. Reinvoke the command
+            # with the module name so that a fresh `edit` is created.
+            self.view.run_command('sublime_haskell_insert_import_for_symbol', {'module': self.candidates[idx].module.name})
 
-    def add_import(self, module_name):
+    def add_import(self, edit, module_name):
         contents = self.view.substr(sublime.Region(0, self.view.size()))
 
         # Truncate contents to the module declaration and the imports list, if present.
@@ -91,7 +92,7 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
             insert_text = 'import {0}\n'.format(module_name) + ('\n' if insert_gap else '')
 
             point = self.view.text_point(insert_line, 0)
-            self.view.insert(self.edit, point, insert_text)
+            self.view.insert(edit, point, insert_text)
 
             Common.show_status_message('Import {0} added'.format(module_name), True)
 
