@@ -15,6 +15,7 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
         super().__init__(view)
         self.edit = None
         self.candidates = None
+        self.cand_idx = 0
         self.backend = Backend.NullHaskellBackend(BackendManager.BackendManager())
 
     def run(self, edit, **kwargs):
@@ -38,6 +39,8 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
                 self.add_import(self.candidates[0].module.name)
             else:
                 self.view.window().show_quick_panel([[c.module.name] for c in self.candidates], self.on_done)
+                if self.cand_idx >= 0:
+                    self.add_import(self.candidates[self.cand_idx].module.name)
         else:
             if len(self.candidates) == 1:
                 Common.show_status_message(self.candidates[0])
@@ -45,8 +48,7 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
                 sublime.message_dialog('\n'.join(self.candidates))
 
     def on_done(self, idx):
-        if idx >= 0:
-            self.add_import(self.candidates[idx].module.name)
+        self.cand_idx = idx
 
     def add_import(self, module_name):
         contents = self.view.substr(sublime.Region(0, self.view.size()))

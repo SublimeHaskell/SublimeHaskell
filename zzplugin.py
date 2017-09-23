@@ -1,4 +1,3 @@
-
 import os
 import re
 import threading
@@ -76,6 +75,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         self.assoc_to_project(view, filename)
         project_name = Common.locate_cabal_project_from_view(view)[1]
         self.rescan_source(project_name, filename)
+        view.settings().set('translate_tabs_to_spaces', True)
 
     def on_load(self, view):
         filename = view.file_name()
@@ -93,6 +93,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             if Settings.COMPONENT_DEBUG.event_viewer:
                 print('{0} is_haskell_source {1}.'.format(type(self).__name__ + ".on_load", filename))
 
+            view.settings().set('translate_tabs_to_spaces', True)
             if Settings.PLUGIN.use_improved_syntax:
                 name = os.path.basename(filename.lower())
                 if name.endswith(".hs") or name.endswith(".hsc"):
