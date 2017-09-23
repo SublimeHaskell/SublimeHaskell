@@ -36,7 +36,13 @@ class SublimeHaskellFilterCommand(CommandWin.SublimeHaskellTextCommand):
                         _, out, err = proc.wait(sel_str)
                         # stylish-haskell does not have a non-zero exit code if it errors out! (Surprise!)
                         # Not sure about hindent, but this seems like a safe enough test.
-                        if err is None or len(err) == 0:
+                        #
+                        # Also test if the contents actually changed so break the save-indent-save-indent-... loop if
+                        # the user enabled prettify_on_save.
+                        #
+                        # Yes, I like the explicitness of the 'err' test. It might be slower and less compact that
+                        # 'if err and ...', but it does tell one what's going on.
+                        if (err is None or len(err) == 0) and out not in [selection, sel_str]:
                             self.view.replace(edit, selection, out)
                         else:
                             indent_err = ' '.join(self.indenter)
@@ -66,8 +72,8 @@ class SublimeHaskellFilterCommand(CommandWin.SublimeHaskellTextCommand):
 
 class SublimeHaskellStylish(SublimeHaskellFilterCommand):
     def __init__(self, view):
-        super().__init__(view, indenter=["stylish-haskell"])
+        super().__init__(view, indenter=['stylish-haskell'])
 
 class SublimeHaskellHindent(SublimeHaskellFilterCommand):
     def __init__(self, view):
-        super().__init__(view, indenter=["hindent"])
+        super().__init__(view, indenter=['hindent'])

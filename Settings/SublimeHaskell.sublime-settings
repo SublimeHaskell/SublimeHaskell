@@ -208,6 +208,11 @@
     // Additional ghc options for repl
     "ghci_opts": [],
 
+    // Run a code indenter/prettyfier after save.
+    "prettify_on_save": false,
+    // The prettifier to use when indenting/prettifying on save. Valid options are "stylish-haskell" or "hindent"
+    "prettify_executable": "stylish-haskell",
+
     // ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
     // Logging verbosity
     // ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=

@@ -113,6 +113,12 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
                 self.type_cache.remove(filename)
                 self.trigger_build(view)
 
+                if Settings.PLUGIN.prettify_on_save:
+                    if Settings.PLUGIN.prettify_executable == 'stylish-haskell':
+                        view.run_command('sublime_haskell_stylish')
+                    elif Settings.PLUGIN.prettify_executable == 'hindent':
+                        view.run_command('sublime_haskell_hindent')
+
 
     def on_modified(self, view):
         filename = view.file_name()

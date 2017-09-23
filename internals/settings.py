@@ -68,6 +68,8 @@ class SettingsContainer(object):
         'lint_check_fly': ('lint_check_fly', False),
         'lint_check_fly_idle': ('lint_check_fly_idle', 5),
         'log': ('log', 1),
+        'prettify_on_save': ('prettify_on_save', False),
+        'prettify_executable': ('prettify_executable', 'stylish-haskell'),
         'show_error_window': ('show_error_window', True),
         'show_output_window': ('show_output_window', True),
         'unicode_symbol_info': ('unicode_symbol_info', True),
@@ -99,6 +101,8 @@ class SettingsContainer(object):
         self.lint_check_fly = None
         self.lint_check_fly_idle = None
         self.log = None
+        self.prettify_on_save = None
+        self.prettify_executable = None
         self.show_error_window = None
         self.show_output_window = None
         self.unicode_symbol_info = None
@@ -134,7 +138,7 @@ class SettingsContainer(object):
                             'hsdev_host', 'hsdev_local_process', 'hsdev_port']:
             if settings.get(old_setting) is not None:
                 old_stuff.append(old_setting)
-        if len(old_stuff) > 0:
+        if old_stuff:
             msg = ['Old SublimeHaskell backend settings found:',
                    '']
             msg = msg + old_stuff
