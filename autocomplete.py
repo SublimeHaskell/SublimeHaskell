@@ -4,8 +4,6 @@
 
 import re
 
-import sublime
-
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.internals.logging as Logging
@@ -216,7 +214,9 @@ class AutoCompleter(object):
                 else:
                     completions = cache_.files.get(current_file_name, cache_.global_completions())
 
-        return completions + self.keyword_completions(qsymbol.name)
+        completions += self.keyword_completions(qsymbol.name)
+        sort_completions(completions)
+        return completions
 
     def completions_for_module(self, project_name, module, filename):
         """

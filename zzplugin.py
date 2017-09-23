@@ -304,15 +304,15 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
 
 
     def fly(self, view):
-        with self.fly_view as view:
-            view['view'] = view
-            view['mtime'] = time.time()
+        with self.fly_view as self_view:
+            self_view['view'] = view
+            self_view['mtime'] = time.time()
         self.fly_event.set()
 
     def nofly(self):
-        with self.fly_view as view:
-            view['view'] = None
-            view['mtime'] = None
+        with self.fly_view as self_view:
+            self_view['view'] = None
+            self_view['mtime'] = None
         self.fly_event.set()
 
     def fly_check(self):
