@@ -196,7 +196,10 @@ def get_project_setting(view, key, default=None):
     return view.window().project_data().get(key, default)
 
 def set_project_setting(view, key, value):
-    view.window().project_data().set(key, value)
+    project_data = view.window().project_data()
+    project_data[key] = value
+
+    return view.window().set_project_data(project_data)
 
 
 class ComponentDebug(object):
