@@ -541,7 +541,8 @@ def is_cabal_source(view=None):
 
 
 def is_haskell_source(view=None):
-    return is_with_syntax(view, syntax="Haskell.tmLanguage")
+    return (is_with_syntax(view, syntax="Haskell.sublime-syntax")
+        or is_with_syntax(view, syntax="Haskell.tmLanguage"))
 
 
 def is_inspected_source(view=None):
