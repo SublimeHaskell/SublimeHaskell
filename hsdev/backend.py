@@ -40,7 +40,7 @@ class HsDevBackend(Backend.HaskellBackend):
     HSDEV_DEFAULT_PORT = 4567
     HSDEV_DEFAULT_HOST = 'localhost'
     HSDEV_MIN_VER = [0, 2, 0, 0]  # minimum hsdev version
-    HSDEV_MAX_VER = [0, 2, 4, 0]  # maximum hsdev version
+    HSDEV_MAX_VER = [0, 3, 0, 0]  # maximum hsdev version
     HSDEV_CALL_TIMEOUT = 300.0 # second timeout for synchronous requests (5 minutes should be enough, no?)
 
     def __init__(self, backend_mgr, local=True, port=HSDEV_DEFAULT_PORT, host=HSDEV_DEFAULT_HOST, **kwargs):
@@ -93,7 +93,7 @@ class HsDevBackend(Backend.HaskellBackend):
         if local:
             hsdev_ver = HsDevBackend.hsdev_version(kwargs.get('exec-with'), kwargs.get('install-dir'))
             Logging.log('hsdev version: {0}'.format('.'.join(map(str, hsdev_ver))), Logging.LOG_INFO)
-            return hsdev_ver >= HsDevBackend.HSDEV_MIN_VER and hsdev_ver <= HsDevBackend.HSDEV_MAX_VER
+            return hsdev_ver >= HsDevBackend.HSDEV_MIN_VER and hsdev_ver < HsDevBackend.HSDEV_MAX_VER
         else:
             # Assume that a remote backend is actually available. Ultimately, we might not connect to it, but
             # it is available to us as a backend.
