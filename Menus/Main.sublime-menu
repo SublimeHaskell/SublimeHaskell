@@ -16,33 +16,23 @@
                         "children":
                         [
                             {
-                                "command": "open_file", "args":
+                                "caption": "Settings",
+                                "command": "edit_settings",
+                                "args":
                                 {
-                                    "file": "${packages}/SublimeHaskell/Settings/SublimeHaskell.sublime-settings"
-                                },
-                                "caption": "Settings – Default"
-                            },
-                            {
-                                "command": "open_file", "args":
-                                {
-                                    "file": "${packages}/User/SublimeHaskell.sublime-settings"
-                                },
-                                "caption": "Settings – User"
+                                    "base_file": "${packages}/SublimeHaskell/Settings/SublimeHaskell.sublime-settings",
+                                    "default": "{\n\t$0\n}\n"
+                                }
                             },
                             { "caption": "-" },
                             {
-                                "command": "open_file", "args":
+                                "caption": "Key Bindings",
+                                "command": "edit_settings",
+                                "args":
                                 {
-                                    "file": "${packages}/SublimeHaskell/Keymaps/Default.sublime-keymap"
-                                },
-                                "caption": "Key Bindings – Default"
-                            },
-                            {
-                                "command": "open_file", "args":
-                                {
-                                    "file": "${packages}/User/Default.sublime-keymap"
-                                },
-                                "caption": "Key Bindings – User"
+                                    "base_file": "${packages}/SublimeHaskell/Keymaps/Default.sublime-keymap",
+                                    "default": "{\n\t$0\n}\n"
+                                }
                             }
                         ]
                     }
