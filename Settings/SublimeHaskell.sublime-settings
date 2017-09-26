@@ -163,7 +163,7 @@
               "local": true,
               "port": 4567,
               "exec-with": "cabal",
-              "install-dir": "$HOME/play/haskell/hsdev"
+              //"install-dir": "$HOME/play/haskell/hsdev"
             }
         },
         "Stack-exec local hsdev": {
@@ -173,7 +173,7 @@
               "local": true,
               "port": 4567,
               "exec-with": "stack",
-              "install-dir": "$HOME/play/haskell/hsdev"
+              //"install-dir": "$HOME/play/haskell/hsdev"
             }
         },
         "No backend": {
