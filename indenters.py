@@ -42,8 +42,9 @@ class SublimeHaskellFilterCommand(CommandWin.SublimeHaskellTextCommand):
                         #
                         # Yes, I like the explicitness of the 'err' test. It might be slower and less compact that
                         # 'if err and ...', but it does tell one what's going on.
-                        if (err is None or len(err) == 0) and out not in [selection, sel_str]:
-                            self.view.replace(edit, selection, out)
+                        if err is None or len(err) == 0:
+                            if out not in [selection, sel_str]:
+                                self.view.replace(edit, selection, out)
                         else:
                             indent_err = ' '.join(self.indenter)
                             stderr_out = '\n'.join(["{0} failed, stderr contents:".format(indent_err), "-" * 40, ""]) + err
