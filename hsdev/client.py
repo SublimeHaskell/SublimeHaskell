@@ -247,31 +247,39 @@ class HsDevClient(object):
                 pass
 
     def invoke_callbacks(self, response, resp_id, requests):
-        callbacks = requests.get(resp_id)[0]
-        finished_request = False
+        reason = None
+        callbacks = requests.get(resp_id)
         if callbacks is not None:
-            # Unconditionally call the notify callback first:
-            if 'notify' in response:
-                if Settings.COMPONENT_DEBUG.callbacks:
-                    print('id {0}: notify callback'.format(resp_id))
-                callbacks.call_notify(response['notify'])
+            callbacks = callbacks[0]
+            finished_request = False
+            if callbacks is not None:
+                # Unconditionally call the notify callback first:
+                if 'notify' in response:
+                    if Settings.COMPONENT_DEBUG.callbacks:
+                        print('id {0}: notify callback'.format(resp_id))
+                    callbacks.call_notify(response['notify'])
 
-            if 'result' in response:
-                if Settings.COMPONENT_DEBUG.callbacks:
-                    print('id {0}: result callback'.format(resp_id))
-                callbacks.call_response(response['result'])
-                finished_request = True
-            elif 'error' in response:
-                if Settings.COMPONENT_DEBUG.callbacks:
-                    print('id {0}: error callback'.format(resp_id))
-                err = response.pop("error")
-                callbacks.call_error(err, response)
-                finished_request = True
+                if 'result' in response:
+                    if Settings.COMPONENT_DEBUG.callbacks:
+                        print('id {0}: result callback'.format(resp_id))
+                    callbacks.call_response(response['result'])
+                    finished_request = True
+                elif 'error' in response:
+                    if Settings.COMPONENT_DEBUG.callbacks:
+                        print('id {0}: error callback'.format(resp_id))
+                    err = response.pop("error")
+                    callbacks.call_error(err, response)
+                    finished_request = True
 
-            if finished_request:
-                del requests[resp_id]
+                if finished_request:
+                    del requests[resp_id]
+            elif Logging.is_log_level(Logging.LOG_WARNING):
+                reason = 'HsDevClient.receiver: No callbacks found for request {0}.'.format(resp_id)
         elif Logging.is_log_level(Logging.LOG_WARNING):
-            print('HsDevClient.receiver: no callbacks for request {0}'.format(resp_id))
+            reason = 'HsDevClient.receiver: callbacks expected for request {0}, none found.'.format(resp_id)
+
+        if reason:
+            print(reason)
             pprint.pprint(response)
             del requests[resp_id]
 
