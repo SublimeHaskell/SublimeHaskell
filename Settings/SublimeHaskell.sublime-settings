@@ -162,8 +162,12 @@
             "options": {
               "local": true,
               "port": 4567,
-              "exec-with": "cabal",
-              //"install-dir": "$HOME/play/haskell/hsdev"
+              "exec-with": "cabal"
+              // ^^^^^^^^^^^^^^^^^ Remember to insert a comma (",") after this line once you set install-dir
+              // to hsdev's installation directory.
+              //
+              // Force a diagnostic message because this has to be set in conjunction with exec-with:
+              // "install-dir": "$HOME/totally/invalid/directory"
             }
         },
         "Stack-exec local hsdev": {
@@ -172,8 +176,12 @@
             "options": {
               "local": true,
               "port": 4567,
-              "exec-with": "stack",
-              //"install-dir": "$HOME/play/haskell/hsdev"
+              "exec-with": "stack"
+              // ^^^^^^^^^^^^^^^^^ Remember to insert a comma (",") after this line once you set install-dir
+              // to hsdev's installation directory.
+              //
+              // Force a diagnostic message because this has to be set in conjunction with exec-with:
+              // "install-dir": "$HOME/totally/invalid/directory"
             }
         },
         "No backend": {
