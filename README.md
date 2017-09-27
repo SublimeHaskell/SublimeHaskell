@@ -25,7 +25,6 @@ You will need to install the GHC Haskell compiler, the `cabal` build tool and a 
   * [hsdev](http://hackage.haskell.org/package/hsdev) cabal package (`cabal install hsdev`) for inspection, enhanced completion, goto, symbol info etc.
   * Deprecated backends
     * [ghc-mod](http://hackage.haskell.org/package/ghc-mod) (for import and LANGUAGE completions and type inference, `cabal install ghc-mod`, not used if `hsdev` enabled, `ghc-mod` is used by `hsdev` as a library)
-    * [hdevtools](https://github.com/bitc/hdevtools) (or [fork for windows](https://github.com/mvoidex/hdevtools)) (for type inference, `cabal install hdevtools`, not used if `hsdev` enabled)
 
 ### Install SublimeHaskell
 
