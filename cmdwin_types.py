@@ -37,8 +37,8 @@ class SublimeHaskellTextCommand(sublime_plugin.TextCommand):
         return Common.is_enabled_haskell_command(self.view, False)
 
 class BackendWindowCommand(SublimeHaskellWindowCommand):
-    def __init__(self, view):
-        super().__init__(view)
+    def __init__(self, win):
+        super().__init__(win)
 
     def is_enabled(self):
         live = BackendMgr.is_live_backend()

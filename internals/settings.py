@@ -151,6 +151,15 @@ class SettingsContainer(object):
                          '',
                          '(Preferences > Package Settings > SublimeHaskell)']
             sublime.message_dialog('\n'.join(msg))
+        if settings.get('add_to_path'):
+            msg = ['\'add_to_path\' setting detected. You probably meant \'add_to_PATH\'.']
+            sublime.message_dialog('\n'.join(msg))
+        if settings.get('prettify_executable') not in ['stylish-haskell', 'hindent']:
+            msg = ['\'{0}\' is not a recognized Haskell indenter/prettifier. Recognized prettifiers are:',
+                   '',
+                   'stylish-haskell',
+                   'hindent']
+            sublime.message_dialog('\n'.join(msg))
 
     def update_setting(self, key):
         settings = get_settings()

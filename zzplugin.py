@@ -106,9 +106,6 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             if Settings.COMPONENT_DEBUG.event_viewer:
                 print('{0} invoked.'.format(type(self).__name__ + ".on_post_save"))
 
-            project_name = Common.locate_cabal_project_from_view(view)[1]
-            Utils.run_async('rescan source', self.rescan_source, project_name, filename)
-
             if Common.is_haskell_source(view):
                 self.type_cache.remove(filename)
                 self.trigger_build(view)
@@ -118,6 +115,11 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
                         view.run_command('sublime_haskell_stylish')
                     elif Settings.PLUGIN.prettify_executable == 'hindent':
                         view.run_command('sublime_haskell_hindent')
+
+            # Ensure that the source scan happens after trigger_build -- the inspector is active, so the SublimeHaskell
+            # commands that we try to execute end up being disabled.
+            project_name = Common.locate_cabal_project_from_view(view)[1]
+            Utils.run_async('rescan source', self.rescan_source, project_name, filename)
 
 
     def on_modified(self, view):
@@ -275,13 +277,13 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         if Settings.PLUGIN.enable_auto_build and cabal_project_dir is not None:
             view.window().run_command('sublime_haskell_build_auto')
         elif Settings.PLUGIN.enable_auto_check and Settings.PLUGIN.enable_auto_lint:
-            view.window().run_command('sublime_haskell_check_and_lint')
-            view.window().run_command('sublime_haskell_get_types')
+            view.run_command('sublime_haskell_check_and_lint')
+            view.run_command('sublime_haskell_get_types')
         elif Settings.PLUGIN.enable_auto_check:
-            view.window().run_command('sublime_haskell_check')
-            view.window().run_command('sublime_haskell_get_types')
+            view.run_command('sublime_haskell_check')
+            view.run_command('sublime_haskell_get_types')
         elif Settings.PLUGIN.enable_auto_lint:
-            view.window().run_command('sublime_haskell_lint')
+            view.run_command('sublime_haskell_lint')
 
 
     def update_completions_async(self, project_name, files=None, drop_all=False):
@@ -352,11 +354,11 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
 
                 fly_window = view_.window()
                 if auto_check_enabled and auto_lint_enabled:
-                    sublime.set_timeout(lambda: fly_window.run_command('sublime_haskell_check_and_lint', {'fly': True}), 0)
+                    sublime.set_timeout(lambda: view.run_command('sublime_haskell_check_and_lint', {'fly': True}), 0)
                 elif auto_check_enabled:
-                    sublime.set_timeout(lambda: fly_window.run_command('sublime_haskell_check', {'fly': True}), 0)
+                    sublime.set_timeout(lambda: view_.run_command('sublime_haskell_check', {'fly': True}), 0)
                 elif auto_lint_enabled:
-                    sublime.set_timeout(lambda: fly_window.run_command('sublime_haskell_lint', {'fly': True}), 0)
+                    sublime.set_timeout(lambda: view.run_command('sublime_haskell_lint', {'fly': True}), 0)
 
     def scan_contents(self, view):
         current_file_name = view.file_name()

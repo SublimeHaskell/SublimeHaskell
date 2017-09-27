@@ -1,5 +1,6 @@
 import json
 import os.path
+import pprint
 import shlex
 import threading
 import webbrowser
@@ -86,8 +87,9 @@ class SublimeHaskellBrowseDeclarations(CommandWin.BackendWindowCommand):
 
     def run(self):
         self.decls = BackendManager.active_backend().scope(self.current_file_name, on_error=self.on_err)
-        brief_decls = [[Utils.escape_quick_string(decl.brief(use_unicode=True)),
-                        Utils.escape_quick_string(decl.docs.splitlines()[0] if decl.docs else '')] for decl in self.decls]
+        brief_decls = [[decl.brief(use_unicode=True),
+                        decl.docs.splitlines()[0] if decl.docs else ''] for decl in self.decls]
+        pprint.pprint(brief_decls)
         self.window.show_quick_panel(brief_decls, self.on_done)
 
     def on_err(self, err, _details):
@@ -111,8 +113,8 @@ class SublimeHaskellFindDeclarations(CommandWin.BackendWindowCommand):
         if not self.decls:
             Common.show_status_message("Nothing found for: {0}".format(sym))
         else:
-            module_decls = [[Utils.escape_quick_string(decl.module.name + ': ' + decl.brief(use_unicode=False)),
-                             Utils.escape_quick_string(decl.defined_module().location)] for decl in self.decls]
+            module_decls = [[decl.module.name + ': ' + decl.brief(use_unicode=False),
+                             decl.defined_module().location] for decl in self.decls]
             self.window.show_quick_panel(module_decls, self.on_select)
 
     def on_change(self, _sym):
@@ -163,8 +165,8 @@ class SublimeHaskellHayoo(CommandWin.BackendWindowCommand):
         if not self.decls:
             Common.show_status_message("Hayoo '{0}': not found".format(self.search_str))
             return
-        brief_decls = [[Utils.escape_quick_string(decl.module.name + ': ' + decl.brief(use_unicode=False)),
-                        Utils.escape_quick_string(decl.defined_module().location)] for decl in self.decls]
+        brief_decls = [[decl.module.name + ': ' + decl.brief(use_unicode=False),
+                        decl.defined_module().location] for decl in self.decls]
         self.window.show_quick_panel(brief_decls, self.on_select)
 
 
@@ -210,8 +212,8 @@ class SublimeHaskellSearch(CommandWin.BackendWindowCommand):
         if not self.decls:
             Common.show_status_message("Search '{0}' not found".format(self.search_str))
         else:
-            hayoo_results = [[Utils.escape_quick_string(decl.module.name + ': ' + decl.brief(use_unicode=False)),
-                              Utils.escape_quick_string(decl.defined_module().location)] for decl in self.decls]
+            hayoo_results = [[decl.module.name + ': ' + decl.brief(use_unicode=False),
+                              decl.defined_module().location] for decl in self.decls]
             self.window.show_quick_panel(hayoo_results, self.on_select)
 
 
@@ -288,8 +290,8 @@ class SublimeHaskellGoToModule(CommandWin.BackendWindowCommand):
 
     def run(self):
         self.modules = BackendManager.active_backend().list_modules(source=True)
-        mod_strings = [[Utils.escape_quick_string(m.name if m.name != 'Main' else 'Main in {0}'.format(m.location.to_string())),
-                        Utils.escape_quick_string(m.location.to_string())] for m in self.modules]
+        mod_strings = [[m.name if m.name != 'Main' else 'Main in {0}'.format(m.location.to_string()),
+                        m.location.to_string()] for m in self.modules]
         self.window.show_quick_panel(mod_strings, self.on_done, 0, 0, self.on_highlighted)
 
     def on_done(self, idx):
@@ -363,8 +365,7 @@ class SublimeHaskellGoToHackageModule(CommandWin.BackendTextCommand):
                 webbrowser.open('http://hackage.haskell.org/package/{0}/docs/{1}.html'.format(pkg_id, pkg_name))
             else:
                 self.candidates = modules[:]
-                mod_strings = [[Utils.escape_quick_string(m.name),
-                                Utils.escape_quick_string(m.location.package.package_id())] for m in self.candidates]
+                mod_strings = [[m.name, m.location.package.package_id()] for m in self.candidates]
                 self.view.window().show_quick_panel(mod_strings, self.on_done)
 
     def on_done(self, idx):
@@ -510,8 +511,7 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
         elif len(self.candidates) == 1:
             self.show_symbol_info(self.candidates[0])
         elif not no_browse:
-            results = [[Utils.escape_quick_string(c.qualified_name()),
-                        Utils.escape_quick_string(c.defined_module().location.to_string())] for c in self.candidates]
+            results = [[c.qualified_name(), c.defined_module().location.to_string()] for c in self.candidates]
             self.view.window().show_quick_panel(results, self.on_done)
 
     def on_done(self, idx):
@@ -520,7 +520,7 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
 
     def on_import_selected(self, idx):
         if idx == 0:  # Yes, select imported module
-            results = [Utils.escape_quick_string('{0}.{1}'.format(i[0], i[1])) for i in self.candidates]
+            results = ['{0}.{1}'.format(i[0], i[1]) for i in self.candidates]
             sublime.set_timeout(lambda: self.view.window().show_quick_panel(results, self.on_candidate_selected), 0)
 
     def on_candidate_selected(self, idx):
@@ -657,12 +657,12 @@ class SublimeHaskellBrowseModule(CommandWin.BackendTextCommand):
 
         if the_module:
             self.candidates = sorted(list(the_module.declarations.values()), key=lambda d: d.brief())
-            results = [[Utils.escape_quick_string(decl.brief(use_unicode=False)),
-                        Utils.escape_quick_string(decl.docs.splitlines()[0] if decl.docs else '')] for decl in self.candidates]
+            results = [[decl.brief(use_unicode=False),
+                        decl.docs.splitlines()[0] if decl.docs else ''] for decl in self.candidates]
             self.view.window().show_quick_panel(results, self.on_symbol_selected)
         else:
             self.candidates.sort(key=lambda c: c[1][0])
-            self.view.window().show_quick_panel([Utils.escape_quick_string(c[1]) for c in self.candidates], self.on_done)
+            self.view.window().show_quick_panel([c[1] for c in self.candidates], self.on_done)
 
     def on_done(self, idx):
         if idx >= 0:
@@ -767,7 +767,7 @@ class SublimeHaskellGoToDeclaration(CommandWin.BackendTextCommand):
                     self.select_candidates = [([c.brief(use_unicode=False), c.get_source_location()], True) for c in candidates]
                     self.select_candidates += [([m.name, m.location.filename], False) for m in module_candidates]
 
-                    just_names = [Utils.escape_quick_string(c[0]) for c in self.select_candidates]
+                    just_names = [c[0] for c in self.select_candidates]
                     self.view.window().show_quick_panel(just_names, self.on_done, 0, 0, self.on_highlighted)
 
     def on_done(self, idx):

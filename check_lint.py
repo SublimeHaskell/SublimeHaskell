@@ -42,9 +42,11 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
         self.status_msg = None
 
     def run(self, edit):
+        print('SublimeHaskellHsDevChain.run??')
         raise NotImplementedError("SublimeHaskellDevChain.run needs an implementation.")
 
     def run_chain(self, cmds, msg, fly_mode=False):
+        print('run_chain')
         self.filename = self.view.file_name()
         if self.filename:
             self.msgs = []
@@ -114,7 +116,7 @@ class SublimeHaskellCheck(SublimeHaskellHsDevChain):
     def __init__(self, view):
         super().__init__(view)
 
-    def run(self, edit, **kwargs):
+    def run(self, _edit, **kwargs):
         Utils.run_async('SublimeHaskellCheck', self.run_chain, [hsdev_check()], 'Checking', fly_mode=kwargs.get('fly', False))
 
 
@@ -122,7 +124,7 @@ class SublimeHaskellLint(SublimeHaskellHsDevChain):
     def __init__(self, view):
         super().__init__(view)
 
-    def run(self, edit, **kwargs):
+    def run(self, _edit, **kwargs):
         Utils.run_async('SublimeHaskellLint', self.run_chain, [hsdev_lint()], 'Linting', fly_mode=kwargs.get('fly', False))
 
 
@@ -130,6 +132,6 @@ class SublimeHaskellCheckAndLint(SublimeHaskellHsDevChain):
     def __init__(self, view):
         super().__init__(view)
 
-    def run(self, edit, **kwargs):
+    def run(self, _edit, **kwargs):
         Utils.run_async('SublimeHaskellCheckAndLint', self.run_chain, [hsdev_check(), hsdev_lint()], 'Checking and Linting',
                         fly_mode=kwargs.get('fly', False))

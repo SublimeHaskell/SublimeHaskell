@@ -266,7 +266,6 @@ class HsDevBackend(Backend.HaskellBackend):
 
         else:
             def process_response(resp):
-                print('HsDevBackend.hsdev_command')
                 on_response(on_result(resp))
 
             resp = self.client.call(name,

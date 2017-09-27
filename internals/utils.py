@@ -33,13 +33,6 @@ def normalize_path(dpath):
 def is_windows():
     return platform.system() == "Windows"
 
-TRANSLATE_SPECIALS = str.maketrans({'&': '\\&',
-                                    '>': '\\>',
-                                    '<': '\\<'})
-
-def escape_quick_string(inp_str):
-    return inp_str.translate(TRANSLATE_SPECIALS)
-
 class Singleton(type):
     '''Singleton meta-class. This ensures that only one instance of an object is every alive at any given time during
     program execution. Principally used in backends and backend management, where only one NullHaskellBackend and
