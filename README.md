@@ -1,5 +1,4 @@
-README
-======
+# README
 
 [![Package Control](https://packagecontrol.herokuapp.com/downloads/SublimeHaskell.svg?style=flat-square)](https://packagecontrol.io/packages/SublimeHaskell) [![Join the chat at https://gitter.im/SublimeHaskell/SublimeHaskell](https://badges.gitter.im/SublimeHaskell/SublimeHaskell.svg)](https://gitter.im/SublimeHaskell/SublimeHaskell?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) [![PayPal][paypal-donate-image]][paypal-donate-link] [![Flattr this git repo][flattr-donate-image]][flattr-donate-link]
 
