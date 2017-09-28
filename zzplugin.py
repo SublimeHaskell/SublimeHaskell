@@ -119,7 +119,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             # Ensure that the source scan happens after trigger_build -- the inspector is active, so the SublimeHaskell
             # commands that we try to execute end up being disabled.
             project_name = Common.locate_cabal_project_from_view(view)[1]
-            Utils.run_async('rescan source', self.rescan_source, project_name, filename)
+            Utils.run_async('rescan source {0}/{1}'.format(project_name, filename), self.rescan_source, project_name, filename)
 
 
     def on_modified(self, view):
@@ -291,10 +291,10 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             Utils.run_async('drop all completions', self.autocompleter.drop_completions_async)
         else:
             for file in files or []:
-                Utils.run_async('drop completions', self.autocompleter.drop_completions_async, file)
+                Utils.run_async('{0}: drop completions'.format(file), self.autocompleter.drop_completions_async, file)
 
         for file in files or []:
-            Utils.run_async('init completions', self.autocompleter.get_completions_async, project_name, file)
+            Utils.run_async('{0}: init completions'.format(file), self.autocompleter.get_completions_async, project_name, file)
 
 
     def is_scanned_source(self, view):

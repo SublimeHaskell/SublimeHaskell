@@ -328,11 +328,10 @@ class SublimeHaskellGetTypes(CommandWin.SublimeHaskellTextCommand):
     def __init__(self, view):
         super().__init__(view)
 
-    def run(self, edit, **kwargs):
+    def run(self, _edit, **kwargs):
         filename = kwargs.get('filename', self.view.file_name())
-        project_name = Common.locate_cabal_project_from_view(self.view)[1]
-
         if not SourceHaskellTypeCache().has(filename):
+            project_name = Common.locate_cabal_project_from_view(self.view)[1]
             get_type_view(self.view, project_name)
 
 

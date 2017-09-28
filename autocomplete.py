@@ -123,12 +123,12 @@ class AutoCompleter(object):
         if file_name is None:
             return log_result(comps)
         else:
-            Logging.log('preparing completions for {0}'.format(file_name), Logging.LOG_DEBUG)
+            Logging.log('preparing completions for {0}/{1}'.format(project_name, file_name), Logging.LOG_DEBUG)
+            comps = make_completions(BackendManager.active_backend().complete('', file_name))
+
             current_module = Utils.head_of(BackendManager.active_backend().module(project_name, file_name))
-
+            Logging.log('current_module {0}'.format(current_module))
             if current_module:
-                comps = make_completions(BackendManager.active_backend().complete('', file_name))
-
                 # Get import names
                 #
                 # Note, that if module imported with 'as', then it can be used only with its synonym
@@ -166,7 +166,7 @@ class AutoCompleter(object):
         if not current_file_name:
             return []
 
-        Logging.log('AutoCompleter.get_completons.', Logging.LOG_DEBUG)
+        Logging.log('AutoCompleter.get_completions.', Logging.LOG_DEBUG)
 
         self.current_filename = current_file_name
         project_name = Common.locate_cabal_project_from_view(view)[1]
@@ -210,9 +210,9 @@ class AutoCompleter(object):
         else:
             with self.cache as cache_:
                 if wide:
-                    completions = cache_.global_completions()
+                    completions += cache_.global_completions()
                 else:
-                    completions = cache_.files.get(current_file_name, cache_.global_completions())
+                    completions += cache_.files.get(current_file_name, cache_.global_completions())
 
         completions += self.keyword_completions(qsymbol.name)
         sort_completions(completions)

@@ -46,7 +46,6 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
         raise NotImplementedError("SublimeHaskellDevChain.run needs an implementation.")
 
     def run_chain(self, cmds, msg, fly_mode=False):
-        print('run_chain')
         self.filename = self.view.file_name()
         if self.filename:
             self.msgs = []
