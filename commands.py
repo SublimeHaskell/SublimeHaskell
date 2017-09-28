@@ -1,6 +1,6 @@
 import json
 import os.path
-import pprint
+# import pprint
 import shlex
 import threading
 import webbrowser
@@ -89,7 +89,7 @@ class SublimeHaskellBrowseDeclarations(CommandWin.BackendWindowCommand):
         self.decls = BackendManager.active_backend().scope(self.current_file_name, on_error=self.on_err)
         brief_decls = [[decl.brief(use_unicode=True),
                         decl.docs.splitlines()[0] if decl.docs else ''] for decl in self.decls]
-        pprint.pprint(brief_decls)
+        # pprint.pprint(brief_decls)
         self.window.show_quick_panel(brief_decls, self.on_done)
 
     def on_err(self, err, _details):

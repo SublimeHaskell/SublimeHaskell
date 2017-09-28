@@ -43,19 +43,25 @@ class HsDevConnection(object):
                 # Note: We could have read a lot from the socket, which could have resulted in multiple request responses
                 # being read (this can happen when the 'scan' command sends status updates):
                 pre, sep, post = partial.partition('\n')
-                if len(sep) > 0:
+                if sep:
                     req_resp = pre
                     partial = post
+                    # print('got resp from partial.')
                 else:
                     req_resp = partial
                     complete_req = False
                     while not complete_req:
-                        streaminp = self.socket.recv(10240).decode('utf-8')
+                        # Complete paranoia here with newlines.
+                        streaminp = self.socket.recv(8192).decode('utf-8').replace('\r\n', '\n').replace('\r', '\n')
                         pre, sep, post = streaminp.partition('\n')
-                        req_resp = req_resp + pre
-                        if len(sep) > 0:
+                        req_resp += pre
+                        if sep:
                             complete_req = True
                             partial = post
+                            # print('got complete resp, partial length is {0}'.format(len(partial)))
+                        else:
+                            # print('incomplete request, reading more.')
+                            pass
 
                 if self.rcvr_queue is not None:
                     # Catch the case here where the socket gets closed, but close() has already assigned rcvr_queue
@@ -81,8 +87,8 @@ class HsDevConnection(object):
                 self.stop_event.set()
 
     def send_request(self, request):
-        msg = json.dumps(request, separators=(',', ':')) + '\n'
         if self.send_queue is not None:
+            msg = json.dumps(request, separators=(',', ':')) + '\n'
             self.send_queue.put(msg.encode('utf-8'))
 
     def close(self):
