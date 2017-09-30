@@ -86,7 +86,7 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
         output_messages = [ParseOutput.OutputMessage(m['source']['file'],
                                                      HsResultParse.parse_region(m['region']).to_zero_based(),
                                                      m['level'].capitalize() + ': ' + m['note']['message'].replace('\n', '\n  '),
-                                                     m['level']) for m in self.msgs]
+                                                     m['level']) for m in self.msgs if 'file' in m['source']]
 
         self.corrections = corrections or []
         for corr in self.corrections:
