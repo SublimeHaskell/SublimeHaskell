@@ -136,10 +136,10 @@ def mark_messages_in_views(errors):
         for view in win.views():
             view_filename = view.file_name()
             # Unsaved files have no file name
-            if view_filename is None:
-                continue
-            errors_in_view = list(filter(lambda x: os.path.samefile(view_filename, x.filename), errors))
-            mark_messages_in_view(errors_in_view, view)
+            if view_filename is not None:
+                mark_messages_in_view([err for err in errors \
+                                       if os.path.exists(err.filename) and os.path.samefile(view_filename, err.filename)],
+                                      view)
     end_time = time.clock()
     Logging.log('total time to mark {0} diagnostics: {1} seconds'.format(len(errors), end_time - begin_time),
                 Logging.LOG_DEBUG)

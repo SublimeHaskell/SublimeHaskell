@@ -8,9 +8,10 @@ import SublimeHaskell.cmdwin_types as CommandWin
 import SublimeHaskell.hsdev.result_parse as HsResultParse
 import SublimeHaskell.internals.backend_mgr as BackendMgr
 import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.parseoutput as ParseOutput
 import SublimeHaskell.sublime_haskell_common as Common
-import SublimeHaskell.internals.utils as Utils
+import SublimeHaskell.symbols as Symbols
 
 
 def file_as_file_list(file):
@@ -83,22 +84,20 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
             BackendMgr.active_backend().autofix_show(self.msgs, on_response=self.on_autofix, wait_complete=False)
 
     def on_autofix(self, corrections):
-        output_messages = []
-        for msg in self.msgs:
-            src_file = msg.get('source', {}).get('file', '<no file/command line>')
-            diag_region = HsResultParse.parse_region(msg.get('region'))
-            if diag_region is not None:
-                diag_region.to_zero_based()
-            diag_level = msg.get('level', '(unknown)')
-            diag_msg = diag_level.capitalize() + ': ' + msg.get('note', {}).get('message', '').replace('\n', '\n  ')
+        # Oh, this looks pretty ugly. But, list comprehensions are supposedly faster than loops. And since this is
+        # is supporting Haskell, why not use the functional approach? :-)
+        output_messages = [ParseOutput.OutputMessage(msg.get('source', {}).get('file', '<no file/command line/OPTIONS_GHC>'),
+                                                     HsResultParse.parse_region(msg.get('region')).to_zero_based() \
+                                                       if msg.get('region') is not None else Symbols.Region(0),
+                                                     msg.get('level', '(unknown)').capitalize() + ': ' + \
+                                                       msg.get('note', {}).get('message', '').replace('\n', '\n  '),
+                                                     msg.get('level', '(unknown)'))
+                           for msg in self.msgs]
 
-            output_messages.append(ParseOutput.OutputMessage(src_file, diag_region, diag_msg, diag_level))
-
-        self.corrections = corrections or []
-        for corr in self.corrections:
-            corr.message_region.to_zero_based()
+        # Hack alert: Region and Position.to_zero_based() return the original object (self) after updating it. 'and' returns the
+        # right hand side, which is never None or a false value.
         self.corrections_dict = dict(((os.path.normpath(c.file), c.message_region.start.line, c.message_region.start.column), c)
-                                     for c in self.corrections)
+                                     for c in [corr.message_region.to_zero_based() and corr for corr in corrections or []])
 
         for omsg in output_messages:
             okey = (os.path.normpath(omsg.filename), omsg.region.start.line, omsg.region.start.column)
