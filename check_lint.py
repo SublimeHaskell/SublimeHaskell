@@ -83,10 +83,16 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
             BackendMgr.active_backend().autofix_show(self.msgs, on_response=self.on_autofix, wait_complete=False)
 
     def on_autofix(self, corrections):
-        output_messages = [ParseOutput.OutputMessage(m['source']['file'],
-                                                     HsResultParse.parse_region(m['region']).to_zero_based(),
-                                                     m['level'].capitalize() + ': ' + m['note']['message'].replace('\n', '\n  '),
-                                                     m['level']) for m in self.msgs]
+        output_messages = []
+        for msg in self.msgs:
+            src_file = msg.get('source', {}).get('file', '<no file/command line>')
+            diag_region = HsResultParse.parse_region(msg.get('region'))
+            if diag_region is not None:
+                diag_region.to_zero_based()
+            diag_level = msg.get('level', '(unknown)')
+            diag_msg = diag_level.capitalize() + ': ' + msg.get('note', {}).get('message', '').replace('\n', '\n  ')
+
+            output_messages.append(ParseOutput.OutputMessage(src_file, diag_region, diag_msg, diag_level))
 
         self.corrections = corrections or []
         for corr in self.corrections:

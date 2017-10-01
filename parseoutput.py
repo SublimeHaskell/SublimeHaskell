@@ -43,11 +43,14 @@ class OutputMessage(object):
         # must match RESULT_FILE_REGEX
         # TODO: Columns must be recalculated, such that one tab is of tab_size length
         # We can do this for opened views, but how to do this for files, that are not open?
-        return u'  {0}: line {1}, column {2}:\n    {3}'.format(
-            self.filename,
-            self.region.start.line + 1,
-            self.region.start.column + 1,
-            self.message)
+        if self.region is not None:
+            retval = u'  {0}: line {1}, column {2}:\n    {3}'.format(self.filename, self.region.start.line + 1,
+                                                                     self.region.start.column + 1, self.message)
+        else:
+            retval = u'  {0}:\n    {1}'.format(self.filename, self.message)
+
+        return retval
+
 
     def __str__(self):
         return self.__unicode__()
