@@ -1,5 +1,8 @@
--- SYNTAX TEST "syntax_test_haskell.hs"
+-- SYNTAX TEST "Packages/SublimeHaskell/Syntaxes/Haskell-SublimeHaskell.sublime-syntax"
 {-# LANGUAGE GADTs #-}
+//^ comment.pragma.haskell
+//  ^^^^^^^^ pragma.name.haskell
+//                 ^^^ comment.pragma.haskell
 
 module Arrays (
   -- Export list comment (PASS)
