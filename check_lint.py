@@ -89,9 +89,9 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
         output_messages = [ParseOutput.OutputMessage(msg.get('source', {}).get('file', '<no file/command line/OPTIONS_GHC>'),
                                                      HsResultParse.parse_region(msg.get('region')).to_zero_based() \
                                                        if msg.get('region') is not None else Symbols.Region(0),
-                                                     msg.get('level', '(unknown)').capitalize() + ': ' + \
+                                                     msg.get('level', 'uncategorized').capitalize() + ': ' + \
                                                        msg.get('note', {}).get('message', '').replace('\n', '\n  '),
-                                                     msg.get('level', '(unknown)'))
+                                                     msg.get('level', 'uncategorized'))
                            for msg in self.msgs]
 
         # Hack alert: Region and Position.to_zero_based() return the original object (self) after updating it. 'and' returns the

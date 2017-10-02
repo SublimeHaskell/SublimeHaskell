@@ -114,7 +114,8 @@ class Inspector(object):
         for window in sublime.windows():
             dirty_files = []
             with self.dirty_files:
-                dirty_files.extend(list(filter(lambda f: f and f.endswith('.hs'), [v.file_name() for v in window.views()])))
+                dirty_files.extend([f for f in [v.file_name() for v in window.views()] if f and f.endswith('.hs')])
+                Logging.log("dirty files: : {0}".format(dirty_files), Logging.LOG_DEBUG)
                 self.dirty_files.set(dirty_files)
 
             dirty_paths = []

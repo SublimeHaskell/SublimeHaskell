@@ -110,12 +110,13 @@ class SublimeHaskellFindDeclarations(CommandWin.BackendWindowCommand):
 
     def on_done(self, sym):
         self.decls = BackendManager.active_backend().symbol(lookup=sym, search_type='regex')
-        if not self.decls:
-            Common.show_status_message("Nothing found for: {0}".format(sym))
-        else:
-            module_decls = [[decl.module.name + ': ' + decl.brief(use_unicode=False),
-                             decl.defined_module().location] for decl in self.decls]
+        self.decls.sort(key=lambda d: d.module.name)
+        if self.decls:
+            module_decls = [['{0}: {1}'.format(decl.module.name, decl.brief(use_unicode=True)),
+                             str(decl.defined_module().location)] for decl in self.decls]
             self.window.show_quick_panel(module_decls, self.on_select)
+        else:
+            Common.show_status_message("Nothing found for: {0}".format(sym))
 
     def on_change(self, _sym):
         pass
@@ -262,12 +263,8 @@ class SublimeHaskellGoTo(CommandWin.BackendWindowCommand):
         return list(sorted(decls, key=lambda d: (d.position.line, d.position.column)))
 
     def closest_idx(self, decls):
-        fdecls = list(filter(
-            lambda d: d[1].defined_module().location.filename == self.current_filename,
-            enumerate(decls)))
-        if not fdecls:
-            return -1
-        return min(fdecls, key=lambda d: abs(d[1].position.line - self.line))[0]
+        fdecls = [decl for decl in enumerate(decls) if decl[1].defined_module().location.filename == self.current_filename]
+        return min(fdecls, key=lambda d: abs(d[1].position.line - self.line))[0] if fdecls else -1
 
     def on_done(self, idx):
         if idx >= 0:
@@ -725,13 +722,11 @@ class SublimeHaskellGoToDeclaration(CommandWin.BackendTextCommand):
             whois_name = qsymbol.qualified_name()
             full_name = qsymbol.full_name()
             current_file_name = self.view.file_name()
-            # current_project = Common.get_cabal_project_dir_of_file(current_file_name)
 
             candidates = []
             module_candidates = []
             if not qsymbol.is_module():
-                candidates = list(filter(lambda d: d.by_source(), backend.whois(whois_name, current_file_name)))
-
+                candidates = [decl for decl in backend.whois(whois_name, current_file_name) if decl.by_source()]
                 if candidates:
                     if candidates[0].has_source_location():
                         self.view.window().open_file(candidates[0].get_source_location(), sublime.ENCODED_POSITION)
@@ -740,8 +735,8 @@ class SublimeHaskellGoToDeclaration(CommandWin.BackendTextCommand):
                         candidates = []
                         for cand in cands:
                             for i in cand.imported:
-                                candidates = [s for s in backend.symbol(lookup=cand.name, search_type='exact', source=True)
-                                              if s.module.name == i.module]
+                                candidates = [sym for sym in backend.symbol(lookup=cand.name, search_type='exact', source=True)
+                                              if sym.module.name == i.module]
                                 if candidates and candidates[0].has_source_location():
                                     self.view.window().open_file(candidates[0].get_source_location(), sublime.ENCODED_POSITION)
                     return

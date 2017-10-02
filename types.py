@@ -360,7 +360,8 @@ class SublimeHaskellShowAllTypes(CommandWin.SublimeHaskellTextCommand):
             Common.show_status_message("Can't infer type", False)
             return
 
-        types = sorted(filter(lambda t: t.region(self.view).contains(self.view.sel()[0]), types),
+        view_sel = self.view.sel()[0]
+        types = sorted(filter(lambda t: t.region(self.view).contains(view_sel), types),
                        key=lambda t: t.region(self.view).size())
         self.output_view = Common.output_panel(self.view.window(), '',
                                                panel_name=TYPES_PANEL_NAME,

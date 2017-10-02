@@ -482,13 +482,12 @@ class StatusMessagesManager(threading.Thread):
     def update(self):
         # Update priority list
         with StatusMessagesManager.priorities as prios:
-            prios[:] = list(filter(lambda p: p[0].is_active(), prios))
-            # Ended processes goes first, then by priority, and then by time of message addition
+            prios = [prio for prio in prios if prio[0].is_active()]
+            # Ended processes go first, then by priority, and then by time of message addition
             prios.sort(key=lambda x: (x[0].is_process, -x[0].priority, x[1]))
         with StatusMessagesManager.messages as msgs:
-            ums = dict(filter(lambda m: m[1].is_active(), msgs.items()))
             msgs.clear()
-            msgs.update(ums)
+            msgs.update(dict([item for item in msgs.items() if item[1].is_active()]))
 
 STATUS_MSG_MANAGER = StatusMessagesManager()
 STATUS_MSG_MANAGER.start()

@@ -94,10 +94,13 @@ def set_global_error_messages(messages):
 
 def format_output_messages(messages):
     """Formats list of messages"""
-    summary = {'error': 0, 'warning': 0, 'hint': 0}
+    summary = {'error': 0, 'warning': 0, 'hint': 0, 'uncategorized': 0}
     for msg in messages:
         summary[msg.level] = summary[msg.level] + 1
-    summary_line = 'Errors: {0}, Warnings: {1}, Hints: {2}'.format(summary['error'], summary['warning'], summary['hint'])
+    summary_line = 'Errors: {0}, Warnings: {1}, Hints: {2}, Uncategorized {3}'.format(summary['error'],
+                                                                                      summary['warning'],
+                                                                                      summary['hint'],
+                                                                                      summary['uncategorized'])
 
     def messages_level(name, level):
         if not summary[level]:
@@ -109,8 +112,9 @@ def format_output_messages(messages):
     errors = messages_level('Errors', 'error')
     warnings = messages_level('Warnings', 'warning')
     hints = messages_level('Hints', 'hint')
+    uncategorized = messages_level('Uncategorized', 'uncategorized')
 
-    return '\n\n'.join(filter(lambda s: s, [summary_line, errors, warnings, hints]))
+    return '\n\n'.join(filter(lambda s: s, [summary_line, errors, warnings, hints, uncategorized]))
 
 
 def show_output_result_text(view, msg, text, exit_code, base_dir):
@@ -149,19 +153,20 @@ MESSAGE_LEVELS = {
     'hint': {
         'style': 'sublimehaskell.mark.hint',
         'icon': {'normal': 'haskell-hint.png',
-                 'fix': 'haskell-hint-fix.png'
-                }
+                 'fix': 'haskell-hint-fix.png'}
     },
     'warning': {'style': 'sublimehaskell.mark.warning',
                 'icon': {'normal': 'haskell-warning.png',
-                         'fix': 'haskell-warning-fix.png'
-                        }
+                         'fix': 'haskell-warning-fix.png'}
                },
     'error': {'style': 'sublimehaskell.mark.error',
               'icon': {'normal': 'haskell-error.png',
-                       'fix': 'haskell-error-fix.png'
-                      }
-             }
+                       'fix': 'haskell-error-fix.png'}
+             },
+    'uncategorized': {'style': 'sublimehaskell.mark.warning',
+                      'icon': {'normal': 'haskell-warning.png',
+                               'fix': 'haskell-warning-fix.png'}
+                     }
 }
 
 

@@ -8,7 +8,7 @@ import SublimeHaskell.cmdwin_types as CommandWin
 import SublimeHaskell.internals.proc_helper as ProcHelper
 
 class SublimeHaskellFilterCommand(CommandWin.SublimeHaskellTextCommand):
-    """Utility class to run filter-like commands, for example, 'stylish-haskell' and 'hindent'. Error/diagnostic
+    """Utility class to run prettyfier commands, for example, 'stylish-haskell' and 'hindent'. Error/diagnostic
     output is sent to the Haskell Run Output window."""
     OUTPUT_PANEL_NAME = 'haskell_run_output'
 
