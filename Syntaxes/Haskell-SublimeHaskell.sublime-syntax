@@ -1,32 +1,44 @@
 %YAML 1.2
 ---
-# http://www.sublimetext.com/docs/3/syntax.html
-name: Haskell (SublimeHaskell)
-file_extensions:
-  - hs
-  - hsc
+# Enhanced SublimeHaskell syntax highlighting.
+#
+# Based on the SublimeText Haskell syntax highlighting spec.
+# Ref: http://www.sublimetext.com/docs/3/syntax.html
+
+name: Haskell
+file_extensions: [hs, hsc]
 scope: source.haskell
+
+variables:
+  # GHC pragmas: https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#pragmas
+  ghc_pragmas: '(LANGUAGE|OPTIONS_GHC|IN(CLUDE|LINE|COHERENT|LINABLE)|WARNING|DEPRECATED|MINIMAL|UNPACK|NOUNPACK|SOURCE|OVERLAP(PING|PABLE|S)|NOINLINE|CONLIKE|LINE|RULES|SPECIALI[SZ]E)'
+  ctor_id: '(?<!'')\b[A-Z][\w'']*'
+  var_id: '[a-z_][\w'']*'
 
 contexts:
   main:
     - match: "(`)[a-zA-Z_']*?(`)"
-      comment: "In case this regex seems unusual for an infix operator, note that Haskell allows any ordinary function application (elem 4 [1..10]) to be rewritten as an infix expression (4 `elem` [1..10])."
+      comment: "In case this regex seems unusual for an infix operator, note that Haskell allows any ordinary
+         function application (elem 4 [1..10]) to be rewritten as an infix expression (4 `elem` [1..10])."
       scope: keyword.operator.function.infix.haskell
       captures:
         1: punctuation.definition.entity.haskell
         2: punctuation.definition.entity.haskell
+    - match: --(?!\s|-).
+      comment: Double-dash can also be a prefix for an operator and not a comment leader.
+      scope: keyword.operator.function.infix.haskell
     - match: \(\)
-      scope: constant.language.unit.haskell
+      scope: constant.language.unit.haskell entity.name.constructor.haskell
     - match: '\[\]'
       scope: constant.language.empty-list.haskell
     - match: \b(module)\b
       captures:
-        1: keyword.other.haskell
+        1: keyword.module.haskell keyword.other.haskell
       push:
         - meta_scope: meta.declaration.module.haskell
         - match: (where)
           captures:
-            1: keyword.other.haskell
+            1: keyword.module.haskell keyword.other.haskell
           pop: true
         - include: module_name
         - include: module_exports
@@ -78,7 +90,21 @@ contexts:
           pop: true
         - match: '\b[A-Z][a-zA-Z_'']*'
           scope: entity.other.inherited-class.haskell
-    - match: \b(deriving|where|data|type|case|of|let|in|newtype|default)\b
+    - match: ^\s*(newtype)\s+
+      captures:
+        1: keyword.declaration.data.haskell
+      push:
+        - meta_scope: meta.newtype_declaration.haskell
+        - match: (=)
+          pop: true
+    - match: ^\s*(data)\s+
+      captures:
+        1: keyword.declaration.data.haskell
+      push:
+        - meta_scope: meta.data_declaration.haskell
+        - match: (=|where)
+          pop: true
+    - match: \b(deriving|where|data|type|case|of|let|in|default)\b
       scope: keyword.other.haskell
     - match: '\binfix[lr]?\b'
       scope: keyword.operator.haskell
@@ -159,20 +185,22 @@ contexts:
         4: constant.character.escape.hexadecimal.haskell
         5: constant.character.escape.control.haskell
         6: punctuation.definition.string.end.haskell
-    - match: '^\s*([a-z_][a-zA-Z0-9_'']*|\([|!%$+\-.,=</>]+\))\s*(::|∷)'
+    - match: '^\s*(,\s*)?(({{var_id}})|\([|!%$+-.,=<\/>]+\))\s*(::|∷)'
       captures:
-        1: entity.name.function.haskell
-        2: keyword.other.double-colon.haskell
+        2: entity.name.function.haskell
+        4: keyword.other.double-colon.haskell
       push:
         - meta_scope: meta.function.type-declaration.haskell
+        # Termination condition
         - match: |-
             (?x)
-                ^(data|newtype|type|class|deriving)\s  # When a top level declaration starts
+                ^(data|newtype|type|class|deriving)\s    # When a top level declaration starts
               | ^[^=]*(=)[\sa-zA-Z0-9_\(]                # A function declaration
           captures:
             1: keyword.other.haskell
             2: keyword.operator.haskell
           pop: true
+        - include: comments
         - include: type_signature
     - match: '\b[A-Z]\w*\b'
       scope: constant.other.haskell
@@ -236,9 +264,12 @@ contexts:
         - match: '#-\}'
           scope: punctuation.pragma.haskell comment.pragma.haskell
           pop: true
-        - match: \b(LANGUAGE|OPTIONS_GHC|INCLUDE|WARNING|DEPRECATED|MINIMAL|UNPACK|NOUNPACK|SOURCE|OVERLAPPING|OVERLAPPABLE|OVERLAPS|INCOHERENT|INLINE|NOINLINE|INLINABLE|CONLIKE|LINE|RULES|SPECIALIZE|SPECIALISE)\b
-          # https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#pragmas
-          scope: keyword.preprocessor.haskell pragma.name.haskell
+        - match: \b{{ghc_pragmas}}\b
+          scope: keyword.preprocessor.haskell
+        - match: '\b([A-Z][a-z]*)+\b'
+          scope: keyword.other.preprocessor.haskell pragma.support.language.haskell
+        - match: '\b-\w+\b'
+          scope: keyword.other.preprocessor.haskell pragma.support.flag.haskell
   type_signature:
     - include: pragma
     - match: "(->|→)"
@@ -250,5 +281,5 @@ contexts:
     - match: '\b[A-Z][a-zA-Z0-9_'']*\b'
       scope: storage.type.haskell
     - match: \(\)
-      scope: support.constant.unit.haskell
+      scope: entity.name.constructor.haskell support.constant.unit.haskell 
     - include: comments

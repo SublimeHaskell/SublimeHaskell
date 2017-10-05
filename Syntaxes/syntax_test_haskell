@@ -1,8 +1,13 @@
 -- SYNTAX TEST "Packages/SublimeHaskell/Syntaxes/Haskell-SublimeHaskell.sublime-syntax"
 {-# LANGUAGE GADTs #-}
-//^ comment.pragma.haskell
-//  ^^^^^^^^ pragma.name.haskell
-//                 ^^^ comment.pragma.haskell
+--  ^^^^^^^^ keyword.preprocessor.haskell
+--           ^^^^^ keyword.other.preprocessor.haskell
+-- <-comment.pragma.haskell
+
+{- This is an interior comment.
+ -- with a double dash comment embedded. {- and a comment within a comment
+ -}-}
+-- <- comment.block.haskell
 
 module Arrays (
   -- Export list comment (PASS)
@@ -11,8 +16,10 @@ module Arrays (
 
 import Data.List (sort, nub) -- import comment (PASS)
 
--- Normal comment (PASS)
---Normal comment missing space (PASS)
+-- Normal comment
+-- <- comment.line.double-dash.haskell
+--Normal comment missing space
+-- <- comment.line.double-dash.haskell
 
 data Type = Type Int deriving
   (Eq, Show) -- deriving on next line (PASS)
@@ -20,11 +27,16 @@ data Type = Type Int deriving
 a = "asdf"
 b = 2
 
+ioFunc :: IO ()
+
 newtype Fribbles x = Fribbles x
 
 class Myclass a
   -- Class before where comment (PASS)
-  where
+  where MyClass :: {
+    _f1 :: Int
+  , _f2 :: String
+  }
 
 myFunction1
   :: Int -- Type signature on next line (PASS)
@@ -64,7 +76,9 @@ myimport -- function containing "import" (PASS)
 {-# INLINE foo #-}
 foo :: Int -> Int
 foo x = x
--} -- should be a comment (PASS)
+     -} -- should be a comment
+--    ^ comment.block.haskell
+--                           ^ comment.line.double-dash.haskell
 
 c = 1
 
@@ -99,7 +113,7 @@ data D where{A :: Int -> D; B :: D } -- A should be highlighted (PASS)
 data MyCTor = MyCtor
 
 
--- The following things shouldn't be comments but operators (PASS):
+-- The following things shouldn't be comments but operators:
 _ --! _ = undefined
 _ --# _ = undefined
 _ --$ _ = undefined
@@ -121,10 +135,14 @@ _ --~ _ = undefined
 _ --: _ = undefined
 _ --⋆ _ = undefined
 
--- The following should be comments (PASS):
+-- The following should be comments:
+-- <- comment.line.double-dash.haskell
 -- a
+-- <- comment.line.double-dash.haskell
 --- a
+-- <- comment.line.double-dash.haskell
 ---- a
+-- <- comment.line.double-dash.haskell
 --_ _ = undefined
 --" _ = undefined
 --' _ = undefined

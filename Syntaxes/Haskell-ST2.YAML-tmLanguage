@@ -1,6 +1,6 @@
 ---
 # [PackageDev] target_format: plist, ext: tmLanguage
-name: Haskell
+name: Haskell (ST2)
 scopeName: source.haskell
 fileTypes: [hs, hsc]
 uuid: 5C034675-1F6D-497E-8073-369D37E2FD7D
