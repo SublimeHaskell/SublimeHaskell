@@ -3,6 +3,8 @@
 --  ^^^^^^^^ keyword.preprocessor.haskell
 --           ^^^^^ keyword.other.preprocessor.haskell
 -- <-comment.pragma.haskell
+{-# OPTIONS_GHC -O2 #-}
+-- <-comment.pragma.haskell
 
 {- This is an interior comment.
  -- with a double dash comment embedded. {- and a comment within a comment
@@ -10,7 +12,8 @@
 -- <- comment.block.haskell
 
 module Arrays (
-  -- Export list comment (PASS)
+  -- Export list comment, because we like them
+  -- <- comment.line.double-dash.haskell
   Type(..)
 ) where
 
@@ -20,6 +23,55 @@ import Data.List (sort, nub) -- import comment (PASS)
 -- <- comment.line.double-dash.haskell
 --Normal comment missing space
 -- <- comment.line.double-dash.haskell
+
+{- Various data type definitions -}
+data SimpleThing = Foo | Bar Int | Baz | Quux
+-- ^ keyword.declaration.data.haskell
+--   ^^^^^^^^^^^ constant.other.haskell entity.name.class.haskell
+--               ^ keyword.operator.haskell
+--                 ^^^ entity.name.function entity.name.constructor.haskell
+--                     ^ keyword.operator.haskell
+--                           ^^^ storage.type.haskell support.type.haskell
+
+data MyMaybe x = MyMaybe | MyJust x
+-- ^ keyword.declaration.data.haskell
+--   ^^^^^^^ meta.data_declaration.haskell constant.other.haskell entity.name.class.haskell
+--           ^ meta.data_declaration.haskell variable.generic.haskell
+--               ^^^^^^^ meta.data_declaration.haskell entity.name.function entity.name.constructor.haskell
+--                       ^ keyword.operator.haskell
+--                         ^^^^^^ entity.name.function entity.name.constructor.haskell
+--                                ^ variable.generic.haskell
+
+data LongDataType = Foo_a | Bar_a |
+-- ^ keyword.declaration.data.haskell
+--   ^^^^^^^^^^^^ meta.data_declaration.haskell constant.other.haskell entity.name.class.haskell
+--                ^ meta.data_declaration.haskell keyword.operator.haskell
+--                  ^^^^^ meta.data_declaration.haskell entity.name.function entity.name.constructor.haskell
+--                        ^ keyword.operator.haskell
+--                          ^^^^^ entity.name.function entity.name.constructor.haskell
+--                                ^ keyword.operator.haskell
+  Quux | Llama x y z
+-- ^^^ constant.other.haskell entity.name.class.haskell
+--     ^ keyword.operator.haskell
+--       ^^^^^ entity.name.function entity.name.constructor.haskell
+--             ^ variable.generic.haskell
+--               ^ variable.generic.haskell
+--                 ^ variable.generic.haskell
+
+data TediouslyEnumerated = Foo_d
+-- ^ keyword.declaration.data.haskell
+--   ^^^^^^^^^^^^^^^^^^^ meta.data_declaration.haskell constant.other.haskell entity.name.class.haskell
+--                       ^ meta.data_declaration.haskell keyword.operator.haskell
+--                         ^^^^^ meta.data_declaration.haskell entity.name.function entity.name.constructor.haskell
+    | Bar_d
+--  ^ keyword.operator.haskell
+--    ^^^^^ entity.name.function entity.name.constructor.haskell
+    | Quux_d a b c
+--  ^ keyword.operator.haskell
+--    ^^^^^^ entity.name.function entity.name.constructor.haskell
+--           ^ variable.generic.haskell
+--             ^ variable.generic.haskell
+--               ^ variable.generic.haskell
 
 data Type = Type Int deriving
   (Eq, Show) -- deriving on next line (PASS)
@@ -32,19 +84,23 @@ ioFunc :: IO ()
 newtype Fribbles x = Fribbles x
 
 class Myclass a
-  -- Class before where comment (PASS)
+  -- Class before where comment
+  -- <- comment.line.double-dash.haskell
   where MyClass :: {
     _f1 :: Int
   , _f2 :: String
   }
 
 myFunction1
-  :: Int -- Type signature on next line (PASS)
+  :: Int -- Type signature on next line
   -> String
 myFunction1 = undefined
 
-myFunction2 :: Int -> String -- Type signature (PASS)
+myFunction2 :: Int -> String -- Type signature
 myFunction2 = undefined
+
+myFunction2' :: Int → String
+myFunction2' = undefined
 
 myFunction2a :: Fribbles a -> ()
 myFunction2a a = undefined
@@ -115,25 +171,46 @@ data MyCTor = MyCtor
 
 -- The following things shouldn't be comments but operators:
 _ --! _ = undefined
+--  ^ keyword.operator.function.infix.haskell
 _ --# _ = undefined
+--  ^ keyword.operator.function.infix.haskell
 _ --$ _ = undefined
+--  ^ keyword.operator.function.infix.haskell
 _ --% _ = undefined
+--  ^ keyword.operator.function.infix.haskell
 _ --& _ = undefined
+--  ^ keyword.operator.function.infix.haskell
 _ --* _ = undefined
+--  ^ keyword.operator.function.infix.haskell
 _ --+ _ = undefined
+--  ^ keyword.operator.function.infix.haskell
 _ --. _ = undefined
+--  ^ keyword.operator.function.infix.haskell
 _ --/ _ = undefined
+--  ^ keyword.operator.function.infix.haskell
 _ --< _ = undefined
+--  ^ keyword.operator.function.infix.haskell
 _ --= _ = undefined
+--  ^ keyword.operator.function.infix.haskell
 _ --> _ = undefined
+--  ^ keyword.operator.function.infix.haskell
 _ --? _ = undefined
+--  ^ keyword.operator.function.infix.haskell
 _ --@ _ = undefined
+--  ^ keyword.operator.function.infix.haskell
 _ --\ _ = undefined
+--  ^ keyword.operator.function.infix.haskell
 _ --^ _ = undefined
+--  ^ keyword.operator.function.infix.haskell
 _ --| _ = undefined
+--  ^ keyword.operator.function.infix.haskell
 _ --~ _ = undefined
+--  ^ keyword.operator.function.infix.haskell
 _ --: _ = undefined
+--  ^ keyword.operator.function.infix.haskell
 _ --⋆ _ = undefined
+--  ^ keyword.operator.function.infix.haskell
+
 
 -- The following should be comments:
 -- <- comment.line.double-dash.haskell
@@ -164,3 +241,37 @@ guarded_func x
   = False
   | otherwise
   = False
+
+
+data LongDataType' = Foo_b | Bar_b |
+-- ^ meta.data_declaration.haskell keyword.declaration.data.haskell
+--   ^^^^^^^^^^^^^ meta.data_declaration.haskell constant.other.haskell entity.name.class.haskell
+--                 ^ meta.data_declaration.haskell keyword.operator.haskell
+--                   ^^^^^ meta.data_declaration.haskell entity.name.function entity.name.constructor.haskell
+--                         ^ keyword.operator.haskell
+--                           ^^^^^ entity.name.function entity.name.constructor.haskell
+--                                 ^ keyword.operator.haskell
+  Quux_b l m  n | Lemma_b
+-- ^^^^^ constant.other.haskell entity.name.class.haskell
+--       ^ variable.generic.haskell
+--         ^ variable.generic.haskell
+--            ^ variable.generic.haskell
+--              ^ keyword.operator.haskell
+--                ^^^^^^^ entity.name.function entity.name.constructor.haskell
+
+data LongDataType'' = Foo_c | Bar_c |
+-- ^ meta.data_declaration.haskell keyword.declaration.data.haskell
+--   ^^^^^^^^^^^^^^ meta.data_declaration.haskell constant.other.haskell entity.name.class.haskell
+--                  ^ meta.data_declaration.haskell keyword.operator.haskell
+--                    ^^^^^ meta.data_declaration.haskell entity.name.function entity.name.constructor.haskell
+--                          ^ keyword.operator.haskell
+--                            ^^^^^ entity.name.function entity.name.constructor.haskell
+--                                  ^ keyword.operator.haskell
+  Quux_c String | Lemma_c derived | Kragon
+-- ^^^^^ constant.other.haskell entity.name.class.haskell
+--       ^^^^^^ storage.type.haskell support.type.haskell
+--              ^ keyword.operator.haskell
+--                ^^^^^^^ entity.name.function entity.name.constructor.haskell
+--                        ^^^^^^^ variable.generic.haskell
+--                                ^ keyword.operator.haskell
+--                                  ^^^^^^ entity.name.function entity.name.constructor.haskell

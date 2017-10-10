@@ -1,0 +1,250 @@
+name: Hasky (Dark)
+settings:
+- settings: {activeGuide: '#9d550fb0', background: '#2b2a27', bracketContentsForeground: '#BF472F',
+    bracketContentsOptions: underline, bracketsForeground: '#5FBFBF', bracketsOptions: underline,
+    caret: '#f8f8f0', findHighlight: '#ffe792', findHighlightForeground: '#000000',
+    foreground: '#ede0ce', invisibles: '#3b3a32', lineHighlight: '#403c37', selection: '#BF472F',
+    selectionBorder: '#222218', selectionForeground: '#ffffff', tagsOptions: stippled_underline}
+- name: Mark error
+  scope: sublimehaskell.mark.error
+  settings: {foreground: '#d80027'}
+- name: Mark warning
+  scope: sublimehaskell.mark.warning
+  settings: {foreground: '#ffda44'}
+- name: Mark hint
+  scope: sublimehaskell.mark.hint
+  settings: {foreground: '#91dc5a'}
+- name: Comment
+  scope: comment
+  settings: {foreground: '#7f7f7f'}
+- name: Punctuation comment
+  scope: punctuation.comment
+  settings: {foreground: '#7f7f7f'}
+- name: Pragma
+  scope: pragma
+  settings: {foreground: '#BF2F5F'}
+- name: Punctuation pragma
+  scope: punctuation.pragma
+  settings: {foreground: '#BF2F5F'}
+- name: Pragma name
+  scope: pragma.name
+  settings: {foreground: '#BF2F5F'}
+- name: Pragma support flag
+  scope: pragma.support.flag
+  settings: {foreground: '#AC5EBC'}
+- name: Pragma support language
+  scope: pragma.support.language
+  settings: {foreground: '#AC5EBC'}
+- name: Punctuation pragma preprocessor
+  scope: punctuation.pragma.preprocessor
+  settings: {foreground: '#BF2F2F'}
+- name: Pragma preprocessor
+  scope: pragma.preprocessor
+  settings: {foreground: '#BF2F2F'}
+- name: Keyword module
+  scope: keyword.module
+  settings: {foreground: '#BF772F'}
+- name: Keyword import
+  scope: keyword.import
+  settings: {foreground: '#BF772F'}
+- name: Entity name type
+  scope: entity.name.type
+  settings: {foreground: '#2FBFBF'}
+- name: Entity name class
+  scope: entity.name.class
+  settings: {foreground: '#2FBFBF'}
+- name: Entity name data
+  scope: entity.name.data, storage.data
+  settings: {foreground: '#2FBFBF'}
+- name: Entity name constructor
+  scope: entity.name.constructor, punctuation.record
+  settings: {foreground: '#5EBC7D'}
+- name: Entity name function
+  scope: entity.name.function
+  settings: {foreground: '#8DBC2F'}
+- name: Entity name module
+  scope: entity.name.module, storage.module
+  settings: {foreground: '#BFA72F'}
+- name: Constant numeric
+  scope: constant.numeric
+  settings: {foreground: '#BF2F8F'}
+- name: String quoted double
+  scope: string.quoted.double
+  settings: {foreground: '#BF5FBF'}
+- name: String quoted single
+  scope: string.quoted.single
+  settings: {foreground: '#BF5FBF'}
+- name: Keyword declaration data
+  scope: keyword.declaration.data
+  settings: {foreground: '#BF472F'}
+- name: Keyword declaration class
+  scope: keyword.declaration.class
+  settings: {foreground: '#BF472F'}
+- name: Keyword declaration instance
+  scope: keyword.declaration.instance
+  settings: {foreground: '#BF472F'}
+- name: Keyword declaration foreign
+  scope: keyword.declaration.foreign
+  settings: {foreground: '#BF2F5F'}
+- name: Keyword declaration fixity
+  scope: keyword.declaration.fixity
+  settings: {foreground: '#BF2F5F'}
+- name: Keyword operator
+  scope: keyword.operator
+  settings: {foreground: '#87B42D'}
+- name: Punctuation list
+  scope: punctuation.list
+  settings: {foreground: '#87B42D'}
+- name: Keyword other
+  scope: keyword.other
+  settings: {foreground: '#BF472F'}
+- name: Punctuation quasi-quoter
+  scope: punctuation.quasi-quoter
+  settings: {foreground: '#87B42D'}
+- name: String quoted quasi
+  scope: string.quoted.quasi
+  settings: {foreground: '#87B42D'}
+- name: Variable generic
+  scope: variable.generic
+  settings: {foreground: '#5F7FBF'}
+- name: Library function
+  scope: support.function
+  settings: {fontStyle: '', foreground: '#BCBC5E'}
+- name: String
+  scope: string
+  settings: {foreground: '#BFBF2F'}
+- name: Built-in constant
+  scope: constant.language
+  settings: {foreground: '#BF472F'}
+- name: User-defined constant
+  scope: constant.character, constant.other
+  settings: {foreground: '#BF472F'}
+- name: Variable
+  scope: variable
+  settings: {fontStyle: ''}
+- name: Keyword
+  scope: keyword
+  settings: {foreground: '#BF472F'}
+- name: Storage
+  scope: storage
+  settings: {fontStyle: '', foreground: '#BF472F'}
+- name: Storage type
+  scope: storage.type
+  settings: {fontStyle: '', foreground: '#5FBFBF'}
+- name: Inherited class
+  scope: entity.other.inherited-class
+  settings: {fontStyle: italic underline, foreground: '#BF472F'}
+- name: Function argument
+  scope: variable.parameter
+  settings: {fontStyle: italic, foreground: ''}
+- name: Tag name
+  scope: entity.name.tag
+  settings: {fontStyle: '', foreground: '#5FBFBF'}
+- name: Tag attribute
+  scope: entity.other.attribute-name
+  settings: {fontStyle: '', foreground: '#BF472F'}
+- name: Library constant
+  scope: support.constant
+  settings: {fontStyle: '', foreground: '#5F9FBF'}
+- name: Library class/type
+  scope: support.type, support.class
+  settings: {fontStyle: italic, foreground: '#5F9FBF'}
+- name: Library variable
+  scope: support.other.variable
+  settings: {fontStyle: ''}
+- name: Invalid
+  scope: invalid
+  settings: {background: '#7F1E1E', fontStyle: '', foreground: '#2FBCBC'}
+- name: Invalid deprecated
+  scope: invalid.deprecated
+  settings: {background: '#7F1E1E', foreground: '#2FBCBC'}
+- name: JSON String
+  scope: meta.structure.dictionary.json string.quoted.double.json
+  settings: {foreground: '#A7BF2F'}
+- name: diff.header
+  scope: meta.diff, meta.diff.header
+  settings: {foreground: '#75715E'}
+- name: diff.deleted
+  scope: markup.deleted
+  settings: {foreground: '#00A8C6'}
+- name: diff.inserted
+  scope: markup.inserted
+  settings: {foreground: '#A6E22E'}
+- name: diff.changed
+  scope: markup.changed
+  settings: {foreground: '#E6DB74'}
+- scope: constant.numeric.line-number.find-in-files - match
+  settings: {foreground: '#8FBE00A0'}
+- scope: entity.name.filename.find-in-files
+  settings: {foreground: '#E6DB74'}
+- scope: meta.property-value, support.constant.property-value, constant.other.color
+  settings: {foreground: '#A7BF2F'}
+- scope: meta.structure.dictionary.json string.quoted.double.json
+  settings: {foreground: '#BF472F'}
+- scope: meta.structure.dictionary.value.json string.quoted.double.json
+  settings: {foreground: '#A7BF2F'}
+- name: Function argument
+  scope: meta.property-name support.type.property-name
+  settings: {fontStyle: normal}
+- name: Function argument
+  scope: meta.property-value punctuation.separator.key-value
+  settings: {foreground: '#ede0ce'}
+- name: Function argument
+  scope: keyword.other.use, keyword.other.function.use, keyword.other.namespace, keyword.other.new,
+    keyword.other.special-method, keyword.other.unit, keyword.other.use-as
+  settings: {foreground: '#5FBFBF'}
+- name: Function argument
+  scope: meta.use support.class.builtin, meta.other.inherited-class support.class.builtin
+  settings: {fontStyle: normal, foreground: '#ede0ce'}
+- name: Function argument
+  scope: variable.other
+  settings: {fontStyle: normal, foreground: ''}
+- name: Coffeescript Function argument
+  scope: variable.parameter.function.coffee
+  settings: {fontStyle: italic, foreground: '#A7BF2F'}
+- name: Markdown Titles
+  scope: entity.name.section.markdown
+  settings: {foreground: '#BF472F'}
+- name: Markdown Title Hash
+  scope: punctuation.definition.heading.markdown
+  settings: {foreground: '#26A6A6'}
+- name: Markdown Raw
+  scope: markup.raw.inline.markdown
+  settings: {foreground: '#A7BF2F'}
+- name: Markdown bold stars
+  scope: punctuation.definition.bold.markdown, punctuation.definition.italic.markdown
+  settings: {foreground: '#26A6A6'}
+- name: Markdown link title braces
+  scope: punctuation.definition.string.begin.markdown, punctuation.definition.string.end.markdown
+  settings: {foreground: '#26A6A6'}
+- name: Markdown link braces
+  scope: punctuation.definition.metadata.markdown
+  settings: {foreground: '#26A6A6'}
+- name: Markdown link
+  scope: markup.underline.link.markdown, markup.underline.link.image.markdown, meta.image.inline.markdown
+  settings: {fontStyle: italic, foreground: '#5FBFBF'}
+- name: Markdown bold/italic
+  scope: markup.bold.markdown, markup.italic.markdown
+  settings: {foreground: '#5FBFBF'}
+- name: Markdown bold/italic
+  scope: markup.italic.markdown
+  settings: {fontStyle: italic}
+- name: Markdown bold/italic
+  scope: markup.bold.markdown
+  settings: {fontStyle: bold}
+- name: Markdown pre
+  scope: markup.raw.block.markdown
+  settings: {foreground: '#00a8c6'}
+- name: GitGutter deleted
+  scope: markup.deleted.git_gutter
+  settings: {foreground: '#e61f44'}
+- name: GitGutter inserted
+  scope: markup.inserted.git_gutter
+  settings: {foreground: '#a7da1e'}
+- name: GitGutter changed
+  scope: markup.changed.git_gutter
+  settings: {foreground: '#f7b83d'}
+- name: CSS Class
+  scope: entity.other.attribute-name.class.css
+  settings: {foreground: '#A7BF2F'}
+uuid: 9390e510-7f08-11e4-b4a9-0800200c9a66
