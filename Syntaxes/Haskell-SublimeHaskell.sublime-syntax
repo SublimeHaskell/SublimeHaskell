@@ -12,12 +12,15 @@ scope: source.haskell
 variables:
   # GHC pragmas: https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#pragmas
   ghc_pragmas: '(LANGUAGE|OPTIONS_GHC|IN(CLUDE|LINE|COHERENT|LINABLE)|WARNING|DEPRECATED|MINIMAL|UNPACK|NOUNPACK|SOURCE|OVERLAP(PING|PABLE|S)|NOINLINE|CONLIKE|LINE|RULES|SPECIALI[SZ]E)'
-  tycon_id: '(?<!'')[A-Z][\w'']*'
-  var_id: '[a-z_][\w'']*'
+  # Haskell keywords, i.e., invalid variable names
+  haskell_kw: '\b(deriving|where|data|type|case|of|let|in|newtype|import|module|if|then|else)\b'
+  tycon_id: '(?<!'')\b[A-Z][\w'']*'
+  var_id: '(?!{{haskell_kw}})\b[a-z_][\w'']*'
   unicode_misc: '[\u2605\u2606]'
   oper_id: '([!"#$%&''()*+,\-.\/\[\]:<=>@?\{\}^_\|~\\]|{{unicode_misc}})+'
   unit_oper: '\(\)'
   possible_tycon_arg: '(\s+({{tycon_id}}|{{var_id}}))'
+  eol: '$\n?'
 
 contexts:
   main:
@@ -92,17 +95,6 @@ contexts:
         - include: module_exports
         - include: comments
 
-    ## deriving clause
-    - match: (deriving)\s*\(
-      captures:
-        1: keyword.other.haskell
-      push:
-        - meta_scope: meta.deriving.haskell
-        - match: \)
-          pop: true
-        - match: '\b[A-Z][a-zA-Z_'']*'
-          scope: entity.other.inherited-class.haskell
-
     ## newtype definition
     - match: ^\s*(newtype)\s+
       captures:
@@ -113,9 +105,10 @@ contexts:
           pop: true
 
     - include: data_decl
+    - include: solitary_deriving
 
     ## Keywords:
-    - match: \b(deriving|where|data|type|case|of|let|in|default)\b
+    - match: \b(where|data|type|case|of|let|in|default)\b
       scope: keyword.other.haskell
     - match: '\binfix[lr]?\b'
       scope: keyword.operator.haskell
@@ -265,7 +258,7 @@ contexts:
       scope: punctuation.comment.haskell
       push:
         - meta_scope: comment.block.haskell
-        - match: '\{-#'
+        - match: '\{-'
           push:
             - match: '-\}'
               pop: true
@@ -280,7 +273,7 @@ contexts:
       scope: punctuation.definition.comment.haskell
       push:
         - meta_scope: comment.line.double-dash.haskell
-        - match: $\n?
+        - match: '{{eol}}'
           pop: true
     - include: block_comment
 
@@ -340,7 +333,6 @@ contexts:
       scope: storage.type.haskell
     - match: '{{unit_oper}}'
       scope: entity.name.constructor.haskell support.constant.unit.haskell
-    - include: comments
 
   data_decl:
     ## data type definition
@@ -354,38 +346,77 @@ contexts:
         - match: (=)\s*({{tycon_id}})
           captures:
             1: keyword.operator.haskell
-            2: entity.name.function entity.name.constructor.haskell
-          ## Push context for ordinary type constructors, terminate the context when we hit the end of the line
-          set: tycon_args
-        - match: (where)
+            2: entity.name.constructor.haskell
+        ## Push context for ordinary type constructors, terminate the context when we hit the end of the line
+        - match: '{{eol}}'
           pop: true
+        - match: (\bderiving\b)
           captures:
-            1: keyword.declaration.data.haskell
-    - match: '^\s+({{tycon_id}})(?={{possible_tycon_arg}}*\s*\|)'
-      captures:
-        1: constant.other.haskell entity.name.class.haskell
-      push:
+            1: keyword.other.haskell
+          push:
+            - meta_scope: meta.data_deriving.haskell
+            - include: deriving_clause
         - include: tycon_args
-    - match: '^\s+(\|)\s*({{tycon_id}})(?={{possible_tycon_arg}}*)'
+        - include: comments
+
+    ## For data constructors that continue on following line:
+    ##
+    ## | Foo ...
+    ##
+    ## Foo ... | ...
+    ##
+    ## | Foo ... |
+    - match: '^\s+((\|)\s*)?({{tycon_id}})(?={{possible_tycon_arg}}*(\s*(\|))?)'
       captures:
-        1: keyword.operator.haskell
-        2: entity.name.function entity.name.constructor.haskell
+        2: keyword.operator.haskell
+        3: entity.name.function entity.name.constructor.haskell
+        5: keyword.operator.haskell
       push:
+        - match: '{{eol}}'
+          pop: true
         - include: tycon_args
+        - include: comments
+    - include: comments
+
+  solitary_deriving:
+    ## A 'deriving' clause on its own line.
+    - match: '^\s+(deriving)'
+      captures:
+        1: keyword.other.haskell
+      push:
+        - meta_scope: meta.data_deriving.haskell
+        - include: deriving_clause
     - include: comments
 
   tycon_args:
     - match: '({{tycon_id}})'
-      scope: storage.type.haskell support.type.haskell
+      captures:
+        1: storage.type.haskell support.type.haskell
     - match: '({{var_id}})'
-      scope: variable.generic.haskell
-    - match: '(\|)\s*({{tycon_id}})'
+      captures:
+        1: variable.generic.haskell
+    - match: '(\|)\s*({{tycon_id}})?'
       captures:
         1: keyword.operator.haskell
         2: entity.name.function entity.name.constructor.haskell
-    - match: '(\|)\s*$'
-      captures:
-        1: keyword.operator.haskell
-    - match: '$'
+    - include: comments
+
+  deriving_clause:
+    # 'deriving' clauses: a single type constructor or a parenthesized list of type constructors.
+    - match: '{{tycon_id}}'
+      scope: storage.type.haskell support.type.haskell
+      pop: true
+    - match: '\('
+      scope: keyword.operator.haskell
+      push:
+        - match: '(\))'
+          captures:
+            1: keyword.operator.haskell
+          pop: true
+        - match: '{{tycon_id}}'
+          scope: storage.type.haskell support.type.haskell
+        - match: ','
+          scope: punctuation.separator.comma.haskell
+        - include: comments
       pop: true
     - include: comments

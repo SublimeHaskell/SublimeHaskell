@@ -29,7 +29,7 @@ data SimpleThing = Foo | Bar Int | Baz | Quux
 -- ^ keyword.declaration.data.haskell
 --   ^^^^^^^^^^^ constant.other.haskell entity.name.class.haskell
 --               ^ keyword.operator.haskell
---                 ^^^ entity.name.function entity.name.constructor.haskell
+--                 ^^^ meta.data_declaration.haskell entity.name.constructor.haskell
 --                     ^ keyword.operator.haskell
 --                           ^^^ storage.type.haskell support.type.haskell
 
@@ -37,7 +37,7 @@ data MyMaybe x = MyMaybe | MyJust x
 -- ^ keyword.declaration.data.haskell
 --   ^^^^^^^ meta.data_declaration.haskell constant.other.haskell entity.name.class.haskell
 --           ^ meta.data_declaration.haskell variable.generic.haskell
---               ^^^^^^^ meta.data_declaration.haskell entity.name.function entity.name.constructor.haskell
+--               ^^^^^^^ meta.data_declaration.haskell entity.name.constructor.haskell
 --                       ^ keyword.operator.haskell
 --                         ^^^^^^ entity.name.function entity.name.constructor.haskell
 --                                ^ variable.generic.haskell
@@ -46,12 +46,12 @@ data LongDataType = Foo_a | Bar_a |
 -- ^ keyword.declaration.data.haskell
 --   ^^^^^^^^^^^^ meta.data_declaration.haskell constant.other.haskell entity.name.class.haskell
 --                ^ meta.data_declaration.haskell keyword.operator.haskell
---                  ^^^^^ meta.data_declaration.haskell entity.name.function entity.name.constructor.haskell
+--                  ^^^^^ meta.data_declaration.haskell entity.name.constructor.haskell
 --                        ^ keyword.operator.haskell
 --                          ^^^^^ entity.name.function entity.name.constructor.haskell
 --                                ^ keyword.operator.haskell
   Quux | Llama x y z
--- ^^^ constant.other.haskell entity.name.class.haskell
+-- ^^^ entity.name.function entity.name.constructor.haskell
 --     ^ keyword.operator.haskell
 --       ^^^^^ entity.name.function entity.name.constructor.haskell
 --             ^ variable.generic.haskell
@@ -62,7 +62,7 @@ data TediouslyEnumerated = Foo_d
 -- ^ keyword.declaration.data.haskell
 --   ^^^^^^^^^^^^^^^^^^^ meta.data_declaration.haskell constant.other.haskell entity.name.class.haskell
 --                       ^ meta.data_declaration.haskell keyword.operator.haskell
---                         ^^^^^ meta.data_declaration.haskell entity.name.function entity.name.constructor.haskell
+--                         ^^^^^ meta.data_declaration.haskell entity.name.constructor.haskell
     | Bar_d
 --  ^ keyword.operator.haskell
 --    ^^^^^ entity.name.function entity.name.constructor.haskell
@@ -73,8 +73,55 @@ data TediouslyEnumerated = Foo_d
 --             ^ variable.generic.haskell
 --               ^ variable.generic.haskell
 
+data DerivedType = DerivedType Int deriving Show
+-- ^ meta.data_declaration.haskell keyword.declaration.data.haskell
+--   ^^^^^^^^^^^ meta.data_declaration.haskell constant.other.haskell entity.name.class.haskell
+--               ^ meta.data_declaration.haskell keyword.operator.haskell
+--                 ^^^^^^^^^^^ meta.data_declaration.haskell entity.name.constructor.haskell
+--                             ^^^ storage.type.haskell support.type.haskell
+--                                 ^^^^^^^^ meta.data_deriving.haskell keyword.other.haskell
+--                                          ^^^^ meta.data_deriving.haskell storage.type.haskell support.type.haskell
+
+
+data DerivedType' = DerivedType Int deriving
+-- ^ meta.data_declaration.haskell keyword.declaration.data.haskell
+--   ^^^^^^^^^^^^ meta.data_declaration.haskell constant.other.haskell entity.name.class.haskell
+--                ^ meta.data_declaration.haskell keyword.operator.haskell
+--                  ^^^^^^^^^^^ meta.data_declaration.haskell entity.name.constructor.haskell
+--                              ^^^ storage.type.haskell support.type.haskell
+--                                  ^^^^^^^^ meta.data_deriving.haskell keyword.other.haskell
+-- <- meta.data_declaration.haskell keyword.declaration.data.haskell
+  Show
+-- ^^^ meta.data_deriving.haskell storage.type.haskell support.type.haskell
+
+data DerivedType'' = DerivedType Int
+-- ^ meta.data_declaration.haskell keyword.declaration.data.haskell
+--   ^^^^^^^^^^^^ meta.data_declaration.haskell constant.other.haskell entity.name.class.haskell
+--                 ^ meta.data_declaration.haskell keyword.operator.haskell
+--                   ^^^^^^^^^^^ meta.data_declaration.haskell entity.name.constructor.haskell
+--                               ^^^ storage.type.haskell support.type.haskell
+  deriving Show
+-- ^^^^^^^ meta.data_deriving.haskell keyword.other.haskell
+--         ^^^^ meta.data_deriving.haskell storage.type.haskell support.type.haskell
+-- <- meta.data_deriving.haskell
+
 data Type = Type Int deriving
-  (Eq, Show) -- deriving on next line (PASS)
+-- ^ meta.data_declaration.haskell keyword.declaration.data.haskell
+--   ^^^^ meta.data_declaration.haskell constant.other.haskell entity.name.class.haskell
+--        ^ meta.data_declaration.haskell keyword.operator.haskell
+--          ^^^^ meta.data_declaration.haskell entity.name.constructor.haskell
+--               ^^^ storage.type.haskell support.type.haskell
+--                   ^^^^^^^^ meta.data_deriving.haskell keyword.other.haskell
+    (Eq, Show) -- deriving on following line
+--  ^ meta.data_deriving.haskell keyword.operator.haskell
+--   ^^ storage.type.haskell support.type.haskell
+--     ^ meta.data_deriving.haskell meta.deriving.haskell punctuation.separator.comma.haskell
+--       ^^^^ meta.data_deriving.haskell meta.deriving.haskell storage.type.haskell support.type.haskell
+--           ^ meta.data_deriving.haskell meta.deriving.haskell keyword.operator.haskell
+--             ^^ meta.data_deriving.haskell comment.line.double-dash.haskell punctuation.definition.comment.haskell
+
+data Type' foo = Type foo deriving (Eq, Show)
+
 
 a = "asdf"
 b = 2
@@ -252,7 +299,7 @@ data LongDataType' = Foo_b | Bar_b |
 --                           ^^^^^ entity.name.function entity.name.constructor.haskell
 --                                 ^ keyword.operator.haskell
   Quux_b l m  n | Lemma_b
--- ^^^^^ constant.other.haskell entity.name.class.haskell
+-- ^^^^^ entity.name.function entity.name.constructor.haskell
 --       ^ variable.generic.haskell
 --         ^ variable.generic.haskell
 --            ^ variable.generic.haskell
@@ -268,7 +315,7 @@ data LongDataType'' = Foo_c | Bar_c |
 --                            ^^^^^ entity.name.function entity.name.constructor.haskell
 --                                  ^ keyword.operator.haskell
   Quux_c String | Lemma_c derived | Kragon
--- ^^^^^ constant.other.haskell entity.name.class.haskell
+-- ^^^^^ entity.name.function entity.name.constructor.haskell
 --       ^^^^^^ storage.type.haskell support.type.haskell
 --              ^ keyword.operator.haskell
 --                ^^^^^^^ entity.name.function entity.name.constructor.haskell
