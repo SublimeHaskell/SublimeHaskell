@@ -222,6 +222,12 @@ def get_type_view(view, project_name, selection=None):
     return get_type(view, project_name, filename, module_name, line, column)
 
 
+def refresh_view_types(view):
+    if not SourceHaskellTypeCache().has(view.file_name()):
+        project_name, _ = Common.locate_cabal_project_from_view(view)
+        get_type_view(view, project_name)
+
+
 class SublimeHaskellShowType(CommandWin.SublimeHaskellTextCommand):
     def __init__(self, view):
         super().__init__(view)
@@ -322,17 +328,6 @@ class SublimeHaskellShowTypes(SublimeHaskellShowType):
                                           self.output_view.size() - 1))
         self.output_view.add_regions('types', regions, 'comment', '', sublime.DRAW_OUTLINED)
         Common.show_panel(self.view.window(), panel_name=TYPES_PANEL_NAME)
-
-
-class SublimeHaskellGetTypes(CommandWin.SublimeHaskellTextCommand):
-    def __init__(self, view):
-        super().__init__(view)
-
-    def run(self, _edit, **kwargs):
-        filename = kwargs.get('filename', self.view.file_name())
-        if not SourceHaskellTypeCache().has(filename):
-            project_name = Common.locate_cabal_project_from_view(self.view)[1]
-            get_type_view(self.view, project_name)
 
 
 class SublimeHaskellShowAllTypes(CommandWin.SublimeHaskellTextCommand):

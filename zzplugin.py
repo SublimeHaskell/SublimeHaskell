@@ -8,6 +8,7 @@ import sublime_plugin
 
 import SublimeHaskell.autocomplete as Autocomplete
 import SublimeHaskell.backend_cmds as BackendCmds
+import SublimeHaskell.check_lint as CheckAndLint
 import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.internals.locked_object as LockedObject
 import SublimeHaskell.internals.logging as Logging
@@ -268,22 +269,20 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
 
 
     def trigger_build(self, view):
-        cabal_project_dir, _ = Common.locate_cabal_project_from_view(view)
-
         # don't flycheck
         self.nofly()
 
         # auto build enabled and file within a cabal project
-        if Settings.PLUGIN.enable_auto_build and cabal_project_dir is not None:
+        if Settings.PLUGIN.enable_auto_build:
             view.window().run_command('sublime_haskell_build_auto')
         elif Settings.PLUGIN.enable_auto_check and Settings.PLUGIN.enable_auto_lint:
-            view.run_command('sublime_haskell_check_and_lint')
-            view.run_command('sublime_haskell_get_types')
+            CheckAndLint.exec_check_and_lint_process(view)
+            Types.refresh_view_types(view)
         elif Settings.PLUGIN.enable_auto_check:
-            view.run_command('sublime_haskell_check')
-            view.run_command('sublime_haskell_get_types')
+            CheckAndLint.exec_check_process(view)
+            Types.refresh_view_types(view)
         elif Settings.PLUGIN.enable_auto_lint:
-            view.run_command('sublime_haskell_lint')
+            CheckAndLint.exec_lint_process(view)
 
 
     def update_completions_async(self, project_name, files=None, drop_all=False):
