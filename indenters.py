@@ -6,14 +6,19 @@ import sublime
 
 import SublimeHaskell.cmdwin_types as CommandWin
 import SublimeHaskell.internals.proc_helper as ProcHelper
+import SublimeHaskell.internals.settings as Settings
 
 class SublimeHaskellFilterCommand(CommandWin.SublimeHaskellTextCommand):
-    """Utility class to run prettyfier commands, for example, 'stylish-haskell' and 'hindent'. Error/diagnostic
-    output is sent to the Haskell Run Output window."""
+    '''Utility class to run prettyfier commands, for example, 'stylish-haskell' and 'hindent'. Error/diagnostic
+    output is sent to the Haskell Run Output window.'''
     OUTPUT_PANEL_NAME = 'haskell_run_output'
 
-    def __init__(self, view, indenter=None):
+    def __init__(self, view, indenter=None, indenter_options=None):
         super().__init__(view)
+        if indenter:
+            if not isinstance(indenter, list):
+                indenter = list(indenter)
+            indenter.extend(indenter_options or [])
         self.indenter = indenter
 
     def run(self, edit):
@@ -73,8 +78,8 @@ class SublimeHaskellFilterCommand(CommandWin.SublimeHaskellTextCommand):
 
 class SublimeHaskellStylish(SublimeHaskellFilterCommand):
     def __init__(self, view):
-        super().__init__(view, indenter=['stylish-haskell'])
+        super().__init__(view, indenter=['stylish-haskell'], indenter_options=Settings.PLUGIN.stylish_options)
 
 class SublimeHaskellHindent(SublimeHaskellFilterCommand):
     def __init__(self, view):
-        super().__init__(view, indenter=['hindent'])
+        super().__init__(view, indenter=['hindent'], indenter_options=Settings.PLUGIN.hindent_options)

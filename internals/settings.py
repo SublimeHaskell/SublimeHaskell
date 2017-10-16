@@ -61,6 +61,7 @@ class SettingsContainer(object):
         'ghc_opts': ('ghc_opts', []),
         'ghci_opts': ('ghci_opts', []),
         'haskell_build_tool': ('haskell_build_tool', 'stack'),
+        'hindent_options': ('hindent_options', []),
         'hsdev_log_config': ('hsdev_log_config', 'use silent'),
         'hsdev_log_level': ('hsdev_log_level', 'warning'),
         'inhibit_completions': ('inhibit_completions', False),
@@ -72,6 +73,7 @@ class SettingsContainer(object):
         'prettify_executable': ('prettify_executable', 'stylish-haskell'),
         'show_error_window': ('show_error_window', True),
         'show_output_window': ('show_output_window', True),
+        'stylish_options': ('stylish_options', []),
         'unicode_symbol_info': ('unicode_symbol_info', True),
         'use_improved_syntax': ('use_improved_syntax', True)
     }
@@ -94,6 +96,7 @@ class SettingsContainer(object):
         self.ghc_opts = None
         self.ghci_opts = None
         self.haskell_build_tool = None
+        self.hindent_options = []
         self.hsdev_log_config = None
         self.hsdev_log_level = None
         self.inhibit_completions = None
@@ -105,6 +108,7 @@ class SettingsContainer(object):
         self.prettify_executable = None
         self.show_error_window = None
         self.show_output_window = None
+        self.stylish_options = []
         self.unicode_symbol_info = None
         self.use_improved_syntax = None
 

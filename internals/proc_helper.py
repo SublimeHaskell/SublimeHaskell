@@ -31,7 +31,7 @@ class ProcHelper(object):
         ## Why? Because someone could (like me) change os.environ via the ST console and those changes
         ## would never make it here. Use case: settting $http_proxy so that stack can fetch packages.
         proc_env = dict(os.environ)
-        proc_env['PATH'] = ProcHelper.augmented_path + os.pathsep + (proc_env.get('PATH') or '')
+        proc_env['PATH'] = ProcHelper.augmented_path + os.pathsep + proc_env.get('PATH', '')
 
         self.process = None
         self.process_err = None
@@ -43,10 +43,8 @@ class ProcHelper(object):
 
         # Allow caller to specify something different for stdout or stderr -- provide
         # the default here if unspecified.
-        if popen_kwargs.get('stdout') is None:
-            popen_kwargs['stdout'] = subprocess.PIPE
-        if popen_kwargs.get('stderr') is None:
-            popen_kwargs['stderr'] = subprocess.PIPE
+        popen_kwargs['stdout'] = popen_kwargs.get('stdout', subprocess.PIPE)
+        popen_kwargs['stderr'] = popen_kwargs.get('stderr', subprocess.PIPE)
 
         try:
             normcmd = Which.which(command, proc_env['PATH'])

@@ -220,6 +220,16 @@
     "prettify_on_save": false,
     // The prettifier to use when indenting/prettifying on save. Valid options are "stylish-haskell" or "hindent"
     "prettify_executable": "stylish-haskell",
+    // Option list for hindent
+    //
+    // NOTE: This is not a string. Having Python parse an option string will be suboptimal. Use a list of options
+    // instead, e.g., ['--foo', '--bar', '--baz']
+    "hindent_options": [],
+    // Option list for stylish-haskell
+    //
+    // NOTE: This is not a string. Having Python parse an option string will be suboptimal. Use a list of options
+    // instead, e.g., ['--foo', '--bar', '--baz']
+    "stylish_options": [],
 
     // ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
     // Logging verbosity
