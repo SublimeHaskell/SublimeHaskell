@@ -67,15 +67,11 @@ def parse_location(srclocation):
 
 
 def parse_import(imp):
-    if not imp:
-        return None
-    return symbols.Import(imp['name'], imp['qualified'], imp.get('as'), parse_position(imp.get('pos')))
+    return symbols.Import(imp['name'], imp['qualified'], imp.get('as'), parse_position(imp.get('pos'))) if imp else None
 
 
 def parse_module_id(mod):
-    if mod is None:
-        return None
-    return symbols.Module(mod['name'], [], [], {}, parse_location(mod.get('location')))
+    return symbols.Module(mod['name'], [], [], {}, parse_location(mod.get('location'))) if mod else None
 
 
 def parse_declaration(decl):
@@ -95,6 +91,7 @@ def parse_declaration(decl):
 
     retval = None
     if what == 'function':
+        ## Most common path
         retval = symbols.Function(name, the_decl.get('type'), docs, imported, defined, pos)
     else:
         decl_ctx = decl_info.get('ctx')

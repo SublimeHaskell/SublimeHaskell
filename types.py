@@ -3,6 +3,7 @@
 """Haskell type display and query support"""
 
 from functools import total_ordering
+## import pprint
 import re
 
 import sublime
@@ -193,6 +194,7 @@ def get_type(view, project_name, filename, module_name, line, column):
             return FilePosition(int(rgn['line']) - 1, int(rgn['column']) - 1)
 
         def to_region_type(resp):
+            ## print('resp {0}'.format(pprint.pformat(resp)))
             rgn = resp['region']
             return RegionType(resp['note']['type'], to_file_pos(rgn['from']), to_file_pos(rgn['to']))
 

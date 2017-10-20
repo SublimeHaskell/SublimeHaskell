@@ -226,6 +226,7 @@ class ComponentDebug(object):
         self.socket_pool = False
         self.callbacks = False
         self.event_viewer = False
+        self.completions = False
 
     def load(self, backend_settings):
         self.all_messages = 'all_messages' in backend_settings
@@ -234,6 +235,7 @@ class ComponentDebug(object):
         self.socket_pool = 'socket_pool' in backend_settings
         self.callbacks = 'callbacks' in backend_settings
         self.event_viewer = 'event_viewer' in backend_settings
+        self.completions = 'completions' in backend_settings
 
 
 PLUGIN = SettingsContainer()

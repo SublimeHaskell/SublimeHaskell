@@ -257,5 +257,8 @@
     // "send_messages": Emit all sent messages
     // "recv_messages": Emit all received messages
     // "socket_pool": Keep track of the socket pool avail/used sizes.
+    // "callbacks": Show interesting information about 'hsdev' callbacks
+    // "event_viewer": Event handling dignostics and debug
+    // "completions": Completion generator diagnostics and debug
     "component_debug": []
 }

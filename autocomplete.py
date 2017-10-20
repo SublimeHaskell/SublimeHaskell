@@ -29,16 +29,12 @@ def sort_completions(comps):
 
 
 def sorted_completions(comps):
-    retval = list(set(comps))  # unique
-    retval.sort()
-    return retval
+    return sorted(set(comps))  # unique
 
 
 def make_completions(suggestions):
     # return sorted_completions([s.suggest() for s in suggestions or []])
-    retval = [s.suggest() for s in suggestions or []]
-    retval.sort()
-    return retval
+    return sorted([s.suggest() for s in suggestions or []])
 
 
 def make_locations(comps):
@@ -96,7 +92,7 @@ class AutoCompleter(object):
     def keyword_completions(self, query):
         return [(k + '\tkeyword', k) for k in self.keywords if k.startswith(query)] if isinstance(query, ''.__class__) else []
 
-    def get_completions_async(self, project_name, file_name):
+    def generate_completions_cache(self, project_name, file_name):
         def log_result(result):
             retval = result or []
             Logging.log('completions: {0}'.format(len(retval)), Logging.LOG_TRACE)
@@ -120,10 +116,8 @@ class AutoCompleter(object):
 
         import_names = []
 
-        if file_name is None:
-            return log_result(comps)
-        else:
-            Logging.log('preparing completions for {0}/{1}'.format(project_name, file_name), Logging.LOG_DEBUG)
+        if file_name:
+            Logging.log('preparing completions for {0} ({1})'.format(project_name, file_name), Logging.LOG_DEBUG)
             comps = make_completions(BackendManager.active_backend().complete('', file_name))
 
             current_module = Utils.head_of(BackendManager.active_backend().module(project_name, file_name))
@@ -141,9 +135,11 @@ class AutoCompleter(object):
                 comps.extend(import_names)
                 sort_completions(comps)
 
-        with self.cache as cache_:
-            cache_.files[file_name] = comps
-            return log_result(cache_.files[file_name])
+            with self.cache as cache_:
+                cache_.files[file_name] = comps
+                return log_result(cache_.files[file_name])
+        else:
+            return log_result(comps)
 
     def drop_completions_async(self, file_name=None):
         Logging.log('drop prepared completions', Logging.LOG_DEBUG)

@@ -148,7 +148,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
                 self.assoc_to_project(view, filename)
                 project_name = Common.locate_cabal_project_from_view(view)[1]
                 if Common.is_haskell_source(view):
-                    self.autocompleter.get_completions_async(project_name, filename)
+                    self.autocompleter.generate_completions_cache(project_name, filename)
 
         Utils.run_async('on_activated', activated_worker)
 
@@ -199,7 +199,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
 
     def on_query_completions(self, view, prefix, locations):
         # Defer starting the backend until as late as possible...
-        if Settings.COMPONENT_DEBUG.event_viewer:
+        if Settings.COMPONENT_DEBUG.event_viewer or Settings.COMPONENT_DEBUG.completions:
             print('{0} invoked (prefix: {1}).'.format(type(self).__name__ + '.on_query_completions', prefix))
 
         if not Common.is_haskell_source(view):
@@ -237,7 +237,8 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
                     completion_flags = 0
 
             end_time = time.clock()
-            Logging.log('time to get completions: {0} seconds'.format(end_time - begin_time), Logging.LOG_INFO)
+            if Settings.COMPONENT_DEBUG.event_viewer or Settings.COMPONENT_DEBUG.completions:
+                print('time to get completions: {0} seconds'.format(end_time - begin_time))
 
         # Don't put completions with special characters (?, !, ==, etc.)
         # into completion because that wipes all default Sublime completions:
@@ -293,7 +294,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
                 Utils.run_async('{0}: drop completions'.format(file), self.autocompleter.drop_completions_async, file)
 
         for file in files or []:
-            Utils.run_async('{0}: init completions'.format(file), self.autocompleter.get_completions_async, project_name, file)
+            Utils.run_async('{0}: init completions'.format(file), self.autocompleter.generate_completions_cache, project_name, file)
 
 
     def is_scanned_source(self, view):
@@ -365,6 +366,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         status_msg.start()
 
         def scan_resp(_resp):
+            Logging.log('scan_contents:scan_resp invoked.', Logging.LOG_INFO)
             status_msg.stop()
             self.update_completions_async([current_file_name])
 
