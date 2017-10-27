@@ -212,9 +212,9 @@ class GHCModBackend(Backend.HaskellBackend):
     ## Regular expressions used by the completions "logic"
     MODNAME_RE = r'^module\s+([A-Z]\w+)'
     MODNAME_MATCH = re.compile(MODNAME_RE)
-    IMPORT_MATCH = re.compile(r'(?P<isqual>qualified\s+)?(?P<import>[A-Z]\w+(\.[A-Z]\w+)*)(?!\s*\()(\s+as\s+(?P<qual>[A-Z][A-Za-z0-9\'_]*))')
+    IMPORT_MATCH = re.compile(r'(?P<isqual>qualified\s+)?(?P<import>[A-Z]\w+(\.[A-Z]\w+)*)(?!\s*\()(.*\sas\s+(?P<qual>[A-Z][A-Za-z0-9\'_]*))')
 
-    def complete(self, lookup, file, wide=False, **backend_args):
+    def complete(self, sym, file, wide=False, **backend_args):
         completions = []
 
         ## Have to do this the "old fashioned" way by looking at the actual file buffer, scraping for the module name,
@@ -235,12 +235,13 @@ class GHCModBackend(Backend.HaskellBackend):
                 if modname:
                     mod_dict[modname] = (False, '')
 
-            for imp_region in view.find_all(r'^import\s+(qualified\s+).*$'):
-                imp_text = view.substr(imp_region)
+            for imp_region in view.find_all(r'^import\s+(qualified\s+)'):
+                imp_text = Common.get_line_contents(view, imp_region)
                 ##print('imp_text \'{0}\''.format(imp_text))
                 imp = self.IMPORT_MATCH.search(imp_text)
-                if imp and imp.group('import'):
-                    mod_dict[imp.group('import')] = (imp.group('isqual') is not None, imp.group('qual'))
+                import_name = imp.group('import')
+                if imp and import_name and import_name not in mod_dict:
+                    mod_dict[import_name] = (imp.group('isqual') is not None, imp.group('qual'))
 
             ## Adapted from the ghc-mod ghc-comp.el source: These modules are automagically 'preloaded' along with
             ## any other modules imported by the primary source module. Note that if the user already imports one of
@@ -257,7 +258,8 @@ class GHCModBackend(Backend.HaskellBackend):
                 print('completion_modules:\n{0}\nunique-ified\n{1}'.format(pprint.pformat(completion_modules),
                                                                            pprint.pformat(list(set(completion_modules)))))
 
-            completions = sum([self.collect_completions(backend, mod, lookup) for mod in list(set(completion_modules))], [])
+            completions = sum([self.collect_completions(backend, mod, sym.qualified_name())
+                               for mod in list(set(completion_modules))], [])
 
         return self.dispatch_callbacks(filter(None, completions), None, **backend_args)
 

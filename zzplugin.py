@@ -199,8 +199,8 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
 
     def on_query_completions(self, view, prefix, locations):
         # Defer starting the backend until as late as possible...
-        if Settings.COMPONENT_DEBUG.event_viewer or Settings.COMPONENT_DEBUG.completions:
-            print('{0} invoked (prefix: {1}).'.format(type(self).__name__ + '.on_query_completions', prefix))
+        ## if Settings.COMPONENT_DEBUG.event_viewer or Settings.COMPONENT_DEBUG.completions:
+        ##    print('{0} invoked (prefix: {1}).'.format(type(self).__name__ + '.on_query_completions', prefix))
 
         if not Common.is_haskell_source(view):
             return []

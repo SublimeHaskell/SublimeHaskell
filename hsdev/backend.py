@@ -25,6 +25,7 @@ import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.which as Which
 import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.symbols as symbol
 
 
 def result_identity(resp):
@@ -497,8 +498,13 @@ class HsDevBackend(Backend.HaskellBackend):
                                   'file': file
                                  }, ResultParse.parse_declarations, **backend_args)
 
-    def complete(self, lookup, file, wide=False, **backend_args):
-        return self.list_command('complete', {'prefix': lookup, 'wide': wide, 'file': file},
+    def complete(self, sym, file, wide=False, **backend_args):
+        if sym.name is None:
+            qname = sym.module + '.'
+        else:
+            qname = sym.qualified_name()
+        print('hsdev complete: qualified_name {0}'.format(qname))
+        return self.list_command('complete', {'prefix': qname, 'wide': wide, 'file': file},
                                  ResultParse.parse_declarations, **backend_args)
 
     def hayoo(self, query, page=None, pages=None, **backend_args):

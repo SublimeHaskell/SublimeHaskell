@@ -4,6 +4,9 @@
 
 # [SublimeLinter pylint-disable:"W0613"]
 
+import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.symbols as symbol
+
 # import pprint
 
 class HaskellBackend(object):
@@ -183,7 +186,9 @@ class HaskellBackend(object):
     def scope(self, file, lookup='', search_type='prefix', global_scope=False, **backend_args):
         raise NotImplementedError("HaskellBackend.scope needs an implementation.")
 
-    def complete(self, lookup, file, wide=False, **backend_args):
+    def complete(self, sym, file, wide=False, **backend_args):
+        '''Generate completions for a qualified symbol (:py:class:`QualifiedSymbol`)
+        '''
         raise NotImplementedError("HaskellBackend.complete needs an implementation.")
 
     def hayoo(self, query, page=None, pages=None, **backend_args):
@@ -416,7 +421,7 @@ class NullHaskellBackend(HaskellBackend):
     def scope(self, file, lookup='', search_type='prefix', global_scope=False, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
-    def complete(self, lookup, file, wide=False, **backend_args):
+    def complete(self, _sym, _file, wide=False, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def hayoo(self, query, page=None, pages=None, **backend_args):

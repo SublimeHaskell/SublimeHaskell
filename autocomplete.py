@@ -95,7 +95,8 @@ class AutoCompleter(object):
     def generate_completions_cache(self, project_name, file_name):
         def log_result(result):
             retval = result or []
-            Logging.log('completions: {0}'.format(len(retval)), Logging.LOG_TRACE)
+            if Settings.COMPONENT_DEBUG.completions:
+                print('completions: {0}'.format(len(retval)))
             return retval
 
         comps = []
@@ -103,25 +104,32 @@ class AutoCompleter(object):
         update_sources = False
         with self.cache as cache_:
             if file_name in cache_.files:
-                return log_result(cache_.files.get(file_name, []))
+                del cache_.files[file_name]
             else:
                 update_cabal = not cache_.cabal
                 update_sources = not cache_.sources
+
+        ## Not sure what these were supposed to do -- the actual methods are no-ops.
         if update_cabal:
             self.update_cabal_completions()
         if update_sources:
             self.update_sources_completions()
+
         with self.cache as cache_:
             comps = cache_.global_completions()
 
         import_names = []
 
         if file_name:
-            Logging.log('preparing completions for {0} ({1})'.format(project_name, file_name), Logging.LOG_DEBUG)
-            comps = make_completions(BackendManager.active_backend().complete('', file_name))
+            if Settings.COMPONENT_DEBUG.completions:
+                print('preparing completions for {0} ({1})'.format(project_name, file_name))
 
+            comps = make_completions(BackendManager.active_backend().complete(Common.QualifiedSymbol(''), file_name))
             current_module = Utils.head_of(BackendManager.active_backend().module(project_name, file_name))
-            Logging.log('current_module {0}'.format(current_module))
+
+            if Settings.COMPONENT_DEBUG.completions:
+                print('current_module {0}'.format(current_module))
+
             if current_module:
                 # Get import names
                 #
@@ -162,52 +170,58 @@ class AutoCompleter(object):
         if not current_file_name:
             return []
 
-        Logging.log('AutoCompleter.get_completions.', Logging.LOG_DEBUG)
+        if Settings.COMPONENT_DEBUG.completions:
+            print('AutoCompleter.get_completions.')
 
         self.current_filename = current_file_name
-        project_name = Common.locate_cabal_project_from_view(view)[1]
+        _, project_name = Common.locate_cabal_project_from_view(view)
 
         line_contents = Common.get_line_contents(view, locations[0])
         qsymbol = Common.get_qualified_symbol(line_contents)
         qualified_prefix = qsymbol.qualified_name()
 
-        Logging.log('qsymbol {0}'.format(qsymbol), Logging.LOG_DEBUG)
-        Logging.log('current_file_name {0} qualified_prefix {1}'.format(current_file_name, qualified_prefix), Logging.LOG_DEBUG)
+        if Settings.COMPONENT_DEBUG.completions:
+            print('qsymbol {0}'.format(qsymbol))
+            print('current_file_name {0} qualified_prefix {1}'.format(current_file_name, qualified_prefix))
 
         view_settings = view.settings()
         wide = view_settings.get('subhask_wide_completion')
+        backend = BackendManager.active_backend()
 
         suggestions = []
         completions = []
         if qsymbol.module:
             if qsymbol.is_import_list:
-                current_module = Utils.head_of(BackendManager.active_backend().module(project_name, current_file_name))
+                current_module = Utils.head_of(backend.module(project_name, current_file_name))
                 if current_module and current_module.location.project:
                     # Search for declarations of qsymbol.module within current project
-                    q_module = Utils.head_of(BackendManager.active_backend().scope_modules(project_name, current_file_name,
-                                                                                           lookup=qsymbol.module,
-                                                                                           search_type='exact'))
+                    q_module = Utils.head_of(backend.scope_modules(project_name, current_file_name, lookup=qsymbol.module,
+                                                                   search_type='exact'))
                     if q_module is not None:
                         if q_module.by_source():
-                            proj_module = BackendManager.active_backend().resolve(file=q_module.location.filename, exports=True)
+                            proj_module = backend.resolve(file=q_module.location.filename, exports=True)
                             if proj_module:
                                 suggestions = proj_module.declarations.values()
                         elif q_module.by_cabal():
-                            cabal_module = Utils.head_of(BackendManager.active_backend().module(project_name,
-                                                                                                lookup=q_module.name,
-                                                                                                search_type='exact',
-                                                                                                package=q_module.location.package.name))
+                            cabal_module = Utils.head_of(backend.module(project_name, lookup=q_module.name, search_type='exact',
+                                                                        package=q_module.location.package.name))
                             if cabal_module:
                                 suggestions = cabal_module.declarations.values()
             else:
-                suggestions = BackendManager.active_backend().complete(qualified_prefix, current_file_name, wide=wide)
+                if Settings.COMPONENT_DEBUG.completions:
+                    print('completions: querying module-specific completions')
+                suggestions = backend.complete(qsymbol, current_file_name, wide=wide)
 
             completions = make_completions(suggestions)
         else:
             with self.cache as cache_:
                 if wide:
+                    if Settings.COMPONENT_DEBUG.completions:
+                        print('completions: returning global completions')
                     completions += cache_.global_completions()
                 else:
+                    if Settings.COMPONENT_DEBUG.completions:
+                        print('completions: returning file-specific completions')
                     completions += cache_.files.get(current_file_name, cache_.global_completions())
 
         completions += self.keyword_completions(qsymbol.name)
