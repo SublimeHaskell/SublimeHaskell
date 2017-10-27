@@ -133,12 +133,13 @@ class SublimeHaskellBuilderCommand(CommandWin.SublimeHaskellWindowCommand):
     # filter_project accepts name of project and project-info as it appears in AutoCompletion object
     #   and returns whether this project must appear in selection list
     def select_project(self, on_selected, filter_project):
-        projs = [(name, info) for (name, info) in self.get_projects().items() if not filter_project or filter_project(name, info)]
+        projs = [(name, info) for (name, info) in self.get_projects().items()
+                 if not filter_project or filter_project(name, info)]
 
         def run_selected(psel):
             on_selected(psel[0], psel[1]['path'])
 
-        if len(projs) == 0:
+        if not projs:
             Common.show_status_message("No active projects found.", is_ok=False, priority=5)
         elif len(projs) == 1:
             # There's only one project, build it
@@ -254,7 +255,7 @@ class SublimeHaskellBuilderCommand(CommandWin.SublimeHaskellWindowCommand):
             if exit_code != 0:
                 break
 
-        if len(collected_out) > 0 or exit_code == 0:
+        if collected_out or exit_code == 0:
             # We're going to show the errors in the output panel...
             Common.hide_panel(view.window(), panel_name=BUILD_LOG_PANEL_NAME)
 
@@ -295,7 +296,7 @@ def stack_dist_path(project_dir):
     exit_code, out, _err = ProcHelper.ProcHelper.run_process(['stack', 'path'], cwd=project_dir)
     if exit_code == 0:
         distdirs = [d for d in out.splitlines() if d.startswith('dist-dir: ')]
-        if len(distdirs) > 0:
+        if distdirs:
             dist_dir = distdirs[0][10:]
             return os.path.join(project_dir, dist_dir)
 
@@ -357,10 +358,7 @@ class SublimeHaskellBuildAutoCommand(SublimeHaskellBuilderCommand):
 
 
 def project_dist_path(project_dir):
-    if is_stack_project(project_dir):
-        return stack_dist_path(project_dir)
-    else:
-        return os.path.join(project_dir, 'dist')
+    return stack_dist_path(project_dir) if is_stack_project(project_dir) else os.path.join(project_dir, 'dist')
 
 
 class SublimeHaskellRunCommand(SublimeHaskellBuilderCommand):
@@ -382,17 +380,17 @@ class SublimeHaskellRunCommand(SublimeHaskellBuilderCommand):
                         }))
 
         # Nothing to run
-        if len(projs) == 0:
+        if not projs:
+            _, cabal_project_name = Common.locate_cabal_project_from_view(self.window.active_view())
+
+            # Show current project first
+            projs.sort(key=lambda s: (not s[0].startswith(cabal_project_name), s[0]))
+
+            self.executables = list(map(lambda m: m[1], projs))
+            self.window.show_quick_panel(list(map(lambda m: m[0], projs)), self.on_done)
+        else:
             Common.sublime_status_message('Nothing to run')
-            return
 
-        _, cabal_project_name = Common.locate_cabal_project_from_view(self.window.active_view())
-
-        # Show current project first
-        projs.sort(key=lambda s: (not s[0].startswith(cabal_project_name), s[0]))
-
-        self.executables = list(map(lambda m: m[1], projs))
-        self.window.show_quick_panel(list(map(lambda m: m[0], projs)), self.on_done)
 
     def on_done(self, idx):
         if idx == -1:
