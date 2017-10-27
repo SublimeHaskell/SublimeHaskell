@@ -31,7 +31,10 @@ def normalize_path(dpath):
     return os.path.normpath(os.path.expandvars(os.path.expanduser(dpath)))
 
 def is_windows():
-    return platform.system() == "Windows"
+    return platform.system() == 'Windows'
+
+def is_macosx():
+    return platform.system() == 'Darwin'
 
 class Singleton(type):
     '''Singleton meta-class. This ensures that only one instance of an object is every alive at any given time during

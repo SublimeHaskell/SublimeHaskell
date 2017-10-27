@@ -3,6 +3,7 @@
 # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
 import errno
+import platform
 import subprocess
 import os
 import os.path
@@ -120,9 +121,11 @@ class ProcHelper(object):
         '''
         std_places = []
         if Settings.PLUGIN.add_standard_dirs:
-            std_places = ["$HOME/.local/bin" if not Utils.is_windows() else "%APPDATA%/local/bin"] + \
-                         CabalConfigRdr.cabal_config()
-            std_places = list(filter(os.path.isdir, map(Utils.normalize_path, std_places)))
+            std_places.append("$HOME/.local/bin" if not Utils.is_windows() else "%APPDATA%/local/bin")
+            if Utils.is_macosx():
+                std_places.append('$HOME/Library/Haskell/bin')
+            std_places += CabalConfigRdr.cabal_config()
+            std_places = [dir for dir in [Utils.normalize_path(path) for path in std_places] if os.path.isdir(dir)]
 
         add_to_path = list(filter(os.path.isdir, map(Utils.normalize_path, Settings.PLUGIN.add_to_path)))
 
