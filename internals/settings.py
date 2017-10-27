@@ -162,8 +162,10 @@ class SettingsContainer(object):
             msg = ['\'{0}\' is not a recognized Haskell indenter/prettifier. Recognized prettifiers are:',
                    '',
                    'stylish-haskell',
-                   'hindent']
-            sublime.message_dialog('\n'.join(msg))
+                   'hindent',
+                   '',
+                   'Please check the \'prettify_executable\' setting.']
+            sublime.message_dialog('\n'.join(msg).format(settings.get('prettify_executable')))
 
     def update_setting(self, key):
         settings = get_settings()
