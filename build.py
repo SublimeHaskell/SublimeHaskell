@@ -223,6 +223,8 @@ class SublimeHaskellBuilderCommand(CommandWin.SublimeHaskellWindowCommand):
 
         # Run them
         msg = '{0} {1} with {2}'.format(action_title, project_name, tool_title)
+        Logging.log(msg, Logging.LOG_DEBUG)
+        Logging.log('commands:\n{0}'.format(commands), Logging.LOG_DEBUG)
         Common.show_status_message_process(msg, priority=3)
         Utils.run_async('run_chain_build_thread', self.wait_for_chain_to_complete, view, project_dir, msg, commands,
                         on_done=done_callback)

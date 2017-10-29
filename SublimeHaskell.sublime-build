@@ -19,6 +19,10 @@
         {
             "name": "Install",
             "task": "install"
+        },
+        {
+            "name": "Test",
+            "task": "test"
         }
     ]
 }
