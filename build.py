@@ -192,7 +192,7 @@ class SublimeHaskellBuilderCommand(CommandWin.SublimeHaskellWindowCommand):
         self.PROJECTS_BEING_BUILT.add(project_name)
 
         build_tool_name = Settings.PLUGIN.haskell_build_tool
-        if build_tool_name == 'stack' and not is_stack_project(project_dir):  # rollback to cabal
+        if build_tool_name == 'stack' and not self.is_stack_project(project_dir):  # rollback to cabal
             build_tool_name = 'cabal'
 
         tool = BUILD_TOOL[build_tool_name]
@@ -288,19 +288,25 @@ class SublimeHaskellBuilderCommand(CommandWin.SublimeHaskellWindowCommand):
         sublime.set_timeout(lambda: ParseOutput.mark_messages_in_views(parsed_messages), 0)
 
 
-def is_stack_project(project_dir):
-    """Search for stack.yaml in parent directories"""
-    return Common.find_file_in_parent_dir(project_dir, "stack.yaml") is not None
+    def project_dist_path(self, project_dir):
+        return self.stack_dist_path(project_dir) \
+            if self.is_stack_project(project_dir) \
+            else os.path.join(project_dir, 'dist')
 
 
-# Get stack dist path
-def stack_dist_path(project_dir):
-    exit_code, out, _err = ProcHelper.ProcHelper.run_process(['stack', 'path'], cwd=project_dir)
-    if exit_code == 0:
-        distdirs = [d for d in out.splitlines() if d.startswith('dist-dir: ')]
-        if distdirs:
-            dist_dir = distdirs[0][10:]
-            return os.path.join(project_dir, dist_dir)
+    def is_stack_project(self, project_dir):
+        """Search for stack.yaml in parent directories"""
+        return Common.find_file_in_parent_dir(project_dir, "stack.yaml") is not None
+
+
+    # Get stack dist path
+    def stack_dist_path(self, project_dir):
+        exit_code, out, _err = ProcHelper.ProcHelper.run_process(['stack', 'path'], cwd=project_dir)
+        if exit_code == 0:
+            distdirs = [d for d in out.splitlines() if d.startswith('dist-dir: ')]
+            if distdirs:
+                dist_dir = distdirs[0][10:]
+                return os.path.join(project_dir, dist_dir)
 
 
 # Default build system (cabal or cabal-dev)
@@ -359,10 +365,6 @@ class SublimeHaskellBuildAutoCommand(SublimeHaskellBuilderCommand):
             self.run_build(self.window.active_view(), current_project_name, current_project_dir, config)
 
 
-def project_dist_path(project_dir):
-    return stack_dist_path(project_dir) if is_stack_project(project_dir) else os.path.join(project_dir, 'dist')
-
-
 class SublimeHaskellRunCommand(SublimeHaskellBuilderCommand):
     def __init__(self, view):
         super().__init__(view)
@@ -377,7 +379,7 @@ class SublimeHaskellRunCommand(SublimeHaskellBuilderCommand):
                 for exes in info['description']['executables']:
                     projs.append((proj + ": " + exes['name'], {
                         'dir': info['path'],
-                        'dist': project_dist_path(info['path']),
+                        'dist': self.project_dist_path(info['path']),
                         'name': exes['name']
                         }))
 
