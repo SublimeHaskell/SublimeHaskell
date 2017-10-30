@@ -50,7 +50,7 @@ class HsDevConnection(object):
                 else:
                     req_resp = partial
                     complete_req = False
-                    while not complete_req:
+                    while not complete_req and self.socket is not None:
                         # Complete paranoia here with newlines.
                         streaminp = self.socket.recv(8192).decode('utf-8').replace('\r\n', '\n').replace('\r', '\n')
                         pre, sep, post = streaminp.partition('\n')
@@ -63,7 +63,7 @@ class HsDevConnection(object):
                             # print('incomplete request, reading more.')
                             pass
 
-                if self.rcvr_queue is not None:
+                if self.rcvr_queue is not None and complete_req:
                     # Catch the case here where the socket gets closed, but close() has already assigned rcvr_queue
                     # to None.
                     self.rcvr_queue.put(json.loads(req_resp))

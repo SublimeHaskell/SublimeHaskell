@@ -256,7 +256,7 @@ def get_line_contents(view, location):
     """
     Returns contents of line at the given location.
     """
-    return view.substr(sublime.Region(view.line(location).a, location))
+    return view.substr(view.line(location))
 
 
 def get_line_contents_at_region(view, region):

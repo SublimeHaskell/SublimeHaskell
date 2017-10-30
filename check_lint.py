@@ -124,12 +124,24 @@ class SublimeHaskellCheck(SublimeHaskellHsDevChain):
         Utils.run_async('SublimeHaskellCheck', self.run_chain, [hsdev_check()], 'Checking', fly_mode=kwargs.get('fly', False))
 
 
+def exec_check_process(view):
+    '''Utility function to unconditionally execute `SublimeHaskellCheck.run()` without worrying about the command's status.
+    '''
+    return SublimeHaskellCheck(view).run(None)
+
+
 class SublimeHaskellLint(SublimeHaskellHsDevChain):
     def __init__(self, view):
         super().__init__(view)
 
     def run(self, _edit, **kwargs):
         Utils.run_async('SublimeHaskellLint', self.run_chain, [hsdev_lint()], 'Linting', fly_mode=kwargs.get('fly', False))
+
+
+def exec_lint_process(view):
+    '''Utility function to unconditionally execute `SublimeHaskellLint.run()` without worrying about the command's status.
+    '''
+    return SublimeHaskellLint(view).run(None)
 
 
 class SublimeHaskellCheckAndLint(SublimeHaskellHsDevChain):
@@ -139,3 +151,9 @@ class SublimeHaskellCheckAndLint(SublimeHaskellHsDevChain):
     def run(self, _edit, **kwargs):
         Utils.run_async('SublimeHaskellCheckAndLint', self.run_chain, [hsdev_check(), hsdev_lint()], 'Checking and Linting',
                         fly_mode=kwargs.get('fly', False))
+
+
+def exec_check_and_lint_process(view):
+    '''Utility function to unconditionally execute 'SublimeHaskellCHeckAndLint.run()' without worrying about the command's status.
+    '''
+    return SublimeHaskellCheckAndLint(view).run(None)

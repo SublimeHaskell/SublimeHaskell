@@ -8,6 +8,7 @@ import sublime_plugin
 
 import SublimeHaskell.autocomplete as Autocomplete
 import SublimeHaskell.backend_cmds as BackendCmds
+import SublimeHaskell.check_lint as CheckAndLint
 import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.internals.locked_object as LockedObject
 import SublimeHaskell.internals.logging as Logging
@@ -147,7 +148,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
                 self.assoc_to_project(view, filename)
                 project_name = Common.locate_cabal_project_from_view(view)[1]
                 if Common.is_haskell_source(view):
-                    self.autocompleter.get_completions_async(project_name, filename)
+                    self.autocompleter.generate_completions_cache(project_name, filename)
 
         Utils.run_async('on_activated', activated_worker)
 
@@ -198,8 +199,8 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
 
     def on_query_completions(self, view, prefix, locations):
         # Defer starting the backend until as late as possible...
-        if Settings.COMPONENT_DEBUG.event_viewer:
-            print('{0} invoked (prefix: {1}).'.format(type(self).__name__ + '.on_query_completions', prefix))
+        ## if Settings.COMPONENT_DEBUG.event_viewer or Settings.COMPONENT_DEBUG.completions:
+        ##    print('{0} invoked (prefix: {1}).'.format(type(self).__name__ + '.on_query_completions', prefix))
 
         if not Common.is_haskell_source(view):
             return []
@@ -212,7 +213,11 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             filename = view.file_name()
             line_contents = Common.get_line_contents(view, locations[0])
             project_name = Common.locate_cabal_project_from_view(view)[1]
-            completion_flags = sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS
+            completion_flags = 0
+            if not Settings.PLUGIN.add_word_completions:
+                completion_flags = completion_flags | sublime.INHIBIT_WORD_COMPLETIONS
+            if not Settings.PLUGIN.add_default_completions:
+                completion_flags = completion_flags | sublime.INHIBIT_EXPLICIT_COMPLETIONS
 
             curselector = view.scope_name(locations[0])
             if self.LANGUAGE_RE.search(line_contents):
@@ -232,11 +237,11 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             else:
                 # Add current file's completions:
                 completions = self.autocompleter.get_completions(view, locations)
-                if not Settings.PLUGIN.inhibit_completions:
-                    completion_flags = 0
 
             end_time = time.clock()
-            Logging.log('time to get completions: {0} seconds'.format(end_time - begin_time), Logging.LOG_INFO)
+            if Settings.COMPONENT_DEBUG.event_viewer or Settings.COMPONENT_DEBUG.completions:
+                print('time to get completions: {0} seconds'.format(end_time - begin_time))
+                print('completion flag: {0}'.format(completion_flags))
 
         # Don't put completions with special characters (?, !, ==, etc.)
         # into completion because that wipes all default Sublime completions:
@@ -247,7 +252,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         #     return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         # return comp
 
-        return (completions, completion_flags)  # if completions else []
+        return (completions, completion_flags) # if completions else None
 
 
     def on_hover(self, view, point, hover_zone):
@@ -268,22 +273,20 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
 
 
     def trigger_build(self, view):
-        cabal_project_dir, _ = Common.locate_cabal_project_from_view(view)
-
         # don't flycheck
         self.nofly()
 
         # auto build enabled and file within a cabal project
-        if Settings.PLUGIN.enable_auto_build and cabal_project_dir is not None:
+        if Settings.PLUGIN.enable_auto_build:
             view.window().run_command('sublime_haskell_build_auto')
         elif Settings.PLUGIN.enable_auto_check and Settings.PLUGIN.enable_auto_lint:
-            view.run_command('sublime_haskell_check_and_lint')
-            view.run_command('sublime_haskell_get_types')
+            CheckAndLint.exec_check_and_lint_process(view)
+            Types.refresh_view_types(view)
         elif Settings.PLUGIN.enable_auto_check:
-            view.run_command('sublime_haskell_check')
-            view.run_command('sublime_haskell_get_types')
+            CheckAndLint.exec_check_process(view)
+            Types.refresh_view_types(view)
         elif Settings.PLUGIN.enable_auto_lint:
-            view.run_command('sublime_haskell_lint')
+            CheckAndLint.exec_lint_process(view)
 
 
     def update_completions_async(self, project_name, files=None, drop_all=False):
@@ -294,7 +297,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
                 Utils.run_async('{0}: drop completions'.format(file), self.autocompleter.drop_completions_async, file)
 
         for file in files or []:
-            Utils.run_async('{0}: init completions'.format(file), self.autocompleter.get_completions_async, project_name, file)
+            Utils.run_async('{0}: init completions'.format(file), self.autocompleter.generate_completions_cache, project_name, file)
 
 
     def is_scanned_source(self, view):
@@ -366,6 +369,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         status_msg.start()
 
         def scan_resp(_resp):
+            Logging.log('scan_contents:scan_resp invoked.', Logging.LOG_INFO)
             status_msg.stop()
             self.update_completions_async([current_file_name])
 

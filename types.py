@@ -3,6 +3,7 @@
 """Haskell type display and query support"""
 
 from functools import total_ordering
+## import pprint
 import re
 
 import sublime
@@ -193,6 +194,7 @@ def get_type(view, project_name, filename, module_name, line, column):
             return FilePosition(int(rgn['line']) - 1, int(rgn['column']) - 1)
 
         def to_region_type(resp):
+            ## print('resp {0}'.format(pprint.pformat(resp)))
             rgn = resp['region']
             return RegionType(resp['note']['type'], to_file_pos(rgn['from']), to_file_pos(rgn['to']))
 
@@ -220,6 +222,12 @@ def get_type_view(view, project_name, selection=None):
     module_name = Utils.head_of(BackendManager.active_backend().module(project_name, file=filename))
 
     return get_type(view, project_name, filename, module_name, line, column)
+
+
+def refresh_view_types(view):
+    if not SourceHaskellTypeCache().has(view.file_name()):
+        project_name, _ = Common.locate_cabal_project_from_view(view)
+        get_type_view(view, project_name)
 
 
 class SublimeHaskellShowType(CommandWin.SublimeHaskellTextCommand):
@@ -322,17 +330,6 @@ class SublimeHaskellShowTypes(SublimeHaskellShowType):
                                           self.output_view.size() - 1))
         self.output_view.add_regions('types', regions, 'comment', '', sublime.DRAW_OUTLINED)
         Common.show_panel(self.view.window(), panel_name=TYPES_PANEL_NAME)
-
-
-class SublimeHaskellGetTypes(CommandWin.SublimeHaskellTextCommand):
-    def __init__(self, view):
-        super().__init__(view)
-
-    def run(self, _edit, **kwargs):
-        filename = kwargs.get('filename', self.view.file_name())
-        if not SourceHaskellTypeCache().has(filename):
-            project_name = Common.locate_cabal_project_from_view(self.view)[1]
-            get_type_view(self.view, project_name)
 
 
 class SublimeHaskellShowAllTypes(CommandWin.SublimeHaskellTextCommand):

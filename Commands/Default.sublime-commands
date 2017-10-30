@@ -81,7 +81,7 @@
     {
         "caption": "SublimeHaskell: Test",
         "command": "sublime_haskell_build",
-        "args": { "task": "install" }
+        "args": { "task": "test" }
     },
     {
         "caption": "SublimeHaskell: Run",
