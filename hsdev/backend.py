@@ -499,11 +499,7 @@ class HsDevBackend(Backend.HaskellBackend):
                                  }, ResultParse.parse_declarations, **backend_args)
 
     def complete(self, sym, file, wide=False, **backend_args):
-        if sym.name is None:
-            qname = sym.module + '.'
-        else:
-            qname = sym.qualified_name()
-        print('hsdev complete: qualified_name {0}'.format(qname))
+        qname = sym.qualified_name() if sym.name is not None else sym.module + '.'
         return self.list_command('complete', {'prefix': qname, 'wide': wide, 'file': file},
                                  ResultParse.parse_declarations, **backend_args)
 

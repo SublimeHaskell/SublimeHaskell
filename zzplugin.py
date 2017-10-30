@@ -213,7 +213,11 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             filename = view.file_name()
             line_contents = Common.get_line_contents(view, locations[0])
             project_name = Common.locate_cabal_project_from_view(view)[1]
-            completion_flags = sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS
+            completion_flags = 0
+            if not Settings.PLUGIN.add_word_completions:
+                completion_flags = completion_flags | sublime.INHIBIT_WORD_COMPLETIONS
+            if not Settings.PLUGIN.add_default_completions:
+                completion_flags = completion_flags | sublime.INHIBIT_EXPLICIT_COMPLETIONS
 
             curselector = view.scope_name(locations[0])
             if self.LANGUAGE_RE.search(line_contents):
@@ -233,12 +237,11 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             else:
                 # Add current file's completions:
                 completions = self.autocompleter.get_completions(view, locations)
-                if not Settings.PLUGIN.inhibit_completions:
-                    completion_flags = 0
 
             end_time = time.clock()
             if Settings.COMPONENT_DEBUG.event_viewer or Settings.COMPONENT_DEBUG.completions:
                 print('time to get completions: {0} seconds'.format(end_time - begin_time))
+                print('completion flag: {0}'.format(completion_flags))
 
         # Don't put completions with special characters (?, !, ==, etc.)
         # into completion because that wipes all default Sublime completions:
@@ -249,7 +252,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         #     return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         # return comp
 
-        return (completions, completion_flags)  # if completions else []
+        return (completions, completion_flags) # if completions else None
 
 
     def on_hover(self, view, point, hover_zone):

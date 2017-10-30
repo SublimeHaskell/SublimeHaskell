@@ -93,8 +93,14 @@
     //   [add_to_PATH directories] + [standard_dirs] + [PATH]
     "add_to_PATH": [],
 
-    // Inhibit default Sublime word completions
-    "inhibit_completions": false,
+
+    // Add word completions to the completions list. This consists of any word
+    // in the current document that is longer than 3 characters.
+    "add_word_completions": false,
+
+    // Add default completions from the Haskell.sublime-completions file. You can
+    // probably leave this setting false, unless you're using the "none" backend.
+    "add_default_completions": false,
 
     // Auto autocompletion popup on '.' in import list
     "auto_completion_popup": false,

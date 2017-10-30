@@ -45,8 +45,10 @@ class SettingsContainer(object):
     # Note: Must keep this consistent with the instance attributes in __init__()
     # and with the SublimeHaskell.sublime-settings file's contents.
     attr_dict = {
+        'add_default_completions': ('add_default_completions', False),
         'add_standard_dirs': ('add_standard_dirs', True),
         'add_to_PATH': ('add_to_path', []),
+        'add_word_completions': ('add_word_completions', False),
         'auto_build_mode': ('auto_build_mode', 'normal-then-warnings'),
         'auto_complete_imports': ('auto_complete_imports', True),
         'auto_complete_language_pragmas': ('auto_complete_language_pragmas', True),
@@ -64,7 +66,6 @@ class SettingsContainer(object):
         'hindent_options': ('hindent_options', []),
         'hsdev_log_config': ('hsdev_log_config', 'use silent'),
         'hsdev_log_level': ('hsdev_log_level', 'warning'),
-        'inhibit_completions': ('inhibit_completions', False),
         'inspect_modules': ('inspect_modules', True),
         'lint_check_fly': ('lint_check_fly', False),
         'lint_check_fly_idle': ('lint_check_fly_idle', 5),
@@ -80,8 +81,10 @@ class SettingsContainer(object):
 
     def __init__(self):
         # Instantiate the attributes (rationale: style and pylint error checking)
+        self.add_default_completions = False
         self.add_standard_dirs = None
         self.add_to_path = []
+        self.add_word_completions = False
         self.auto_build_mode = None
         self.auto_complete_imports = None
         self.auto_complete_language_pragmas = None
@@ -99,7 +102,6 @@ class SettingsContainer(object):
         self.hindent_options = []
         self.hsdev_log_config = None
         self.hsdev_log_level = None
-        self.inhibit_completions = None
         self.inspect_modules = None
         self.lint_check_fly = None
         self.lint_check_fly_idle = None
@@ -164,8 +166,15 @@ class SettingsContainer(object):
                    'stylish-haskell',
                    'hindent',
                    '',
-                   'Please check the \'prettify_executable\' setting.']
+                   'Please check your \'prettify_executable\' setting.']
             sublime.message_dialog('\n'.join(msg).format(settings.get('prettify_executable')))
+        if settings.get('inhibit_completions'):
+            msg = ['The \'inhibit_completions\' setting has been replaced by '
+                   '\'add_word_completions\' and \'add_default_completions\'',
+                   '',
+                   'Please customize your settings with these two flags, '
+                   'delete the \'inhibit_completions\' setting.']
+            sublime.message_dialog('\n'.join(msg))
 
     def update_setting(self, key):
         settings = get_settings()
@@ -179,17 +188,17 @@ class SettingsContainer(object):
                     COMPONENT_DEBUG.load(newval)
                 else:
                     setattr(self, attr, newval)
-                with self.changes as changes:
-                    for change_fn in changes.get(key, []):
+                with self.changes as changes_:
+                    for change_fn in changes_.get(key, []):
                         change_fn(key, newval)
 
     @access_sync('wlock')
     def add_change_callback(self, key, change_fn):
-        with self.changes as changes:
-            if key not in changes:
-                changes[key] = []
+        with self.changes as changes_:
+            if key not in changes_:
+                changes_[key] = []
 
-            changes[key].append(change_fn)
+            changes_[key].append(change_fn)
 
 
 def install_updater(settings, setting_obj, key):
@@ -232,12 +241,12 @@ class ComponentDebug(object):
 
     def load(self, backend_settings):
         self.all_messages = 'all_messages' in backend_settings
-        self.send_messages = 'send_messages' in backend_settings
-        self.recv_messages = 'recv_messages' in backend_settings
-        self.socket_pool = 'socket_pool' in backend_settings
         self.callbacks = 'callbacks' in backend_settings
-        self.event_viewer = 'event_viewer' in backend_settings
         self.completions = 'completions' in backend_settings
+        self.event_viewer = 'event_viewer' in backend_settings
+        self.recv_messages = 'recv_messages' in backend_settings
+        self.send_messages = 'send_messages' in backend_settings
+        self.socket_pool = 'socket_pool' in backend_settings
 
 
 PLUGIN = SettingsContainer()
