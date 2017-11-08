@@ -190,6 +190,20 @@
               // "install-dir": "$HOME/totally/invalid/directory"
             }
         },
+        "Cabal new-build local hsdev": {
+            "default": false,
+            "backend": "hsdev",
+            "options": {
+              "local": true,
+              "port": 4567,
+              "exec-with": "cabal-new"
+              // ^^^^^^^^^^^^^^^^^ Remember to insert a comma (",") after this line once you set install-dir
+              // to hsdev's installation directory.
+              //
+              // Force a diagnostic message because this has to be set in conjunction with exec-with:
+              // "install-dir": "$HOME/totally/invalid/directory"
+            }
+        },
         "No backend": {
             "default": false,
             "backend": "none"

@@ -25,7 +25,6 @@ import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.which as Which
 import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.sublime_haskell_common as Common
-import SublimeHaskell.symbols as symbol
 
 
 def result_identity(resp):
@@ -56,10 +55,10 @@ class HsDevBackend(Backend.HaskellBackend):
                                              '',
                                              'Please check your \'backends\' configuration and retry.']))
             raise RuntimeError('\'exec_with\' requires an \'install_dir\'.')
-        elif exec_with is not None and exec_with not in ['stack', 'cabal']:
+        elif exec_with is not None and exec_with not in ['stack', 'cabal', 'cabal-new']:
             sublime.error_message('\n'.join(['Invalid backend \'exec_with\': {0}'.format(exec_with),
                                              '',
-                                             'Valid values are "cabal" or "stack".',
+                                             'Valid values are "cabal", "cabal-new" or "stack".',
                                              'Please check your \'backends\' configuration and retry.']))
             raise RuntimeError('Invalid backend \'exec_with\': {0}'.format(exec_with))
 
@@ -194,11 +193,15 @@ class HsDevBackend(Backend.HaskellBackend):
     # File/project tracking functions:
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
-    def add_project_file(self, filename, project, project_dir):
-        super().add_project_file(filename, project, project_dir)
+    ## Pylint deems these two methods unncessary since all they do is call the superclass. However, I'm
+    ## leaving them here just in case something more interesting has to be done in addition to calling
+    ## the superclass.
 
-    def remove_project_file(self, filename):
-        super().remove_project_file(filename)
+    # def add_project_file(self, filename, project, project_dir):
+    #     super().add_project_file(filename, project, project_dir)
+
+    # def remove_project_file(self, filename):
+    #     super().remove_project_file(filename)
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # Utility functions used to implement the API:
@@ -211,13 +214,16 @@ class HsDevBackend(Backend.HaskellBackend):
         if hsdev_proc.process is not None:
             exit_code, out, _ = hsdev_proc.wait()
             if exit_code == 0:
-                hsver = re.match(r'(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)\.(?P<build>\d+)', out)
-                if hsver:
-                    major = int(hsver.group('major'))
-                    minor = int(hsver.group('minor'))
-                    revision = int(hsver.group('revision'))
-                    build = int(hsver.group('build'))
-                    retval = [major, minor, revision, build]
+                ## 'cabal new-run' can spit out multiple lines of status before executing the task:
+                for line in out.splitlines():
+                    hsver = re.match(r'(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)\.(?P<build>\d+)', line)
+                    if hsver:
+                        major = int(hsver.group('major'))
+                        minor = int(hsver.group('minor'))
+                        revision = int(hsver.group('revision'))
+                        build = int(hsver.group('build'))
+                        retval = [major, minor, revision, build]
+                        break
 
         return retval
 
@@ -314,15 +320,18 @@ class HsDevBackend(Backend.HaskellBackend):
 
         proc_args = {}
         if exec_with is not None:
+            wrapper = []
             if exec_with == 'cabal':
-                cmd_list = ['cabal', 'exec'] + cmd_list
-                cmd_list.insert(3, '--')
+                wrapper = ['cabal', 'exec', cmd_list[0], '--']
+            elif exec_with == 'cabal-new':
+                wrapper = ['cabal', 'new-run', 'exe:' + cmd_list[0], '--']
             elif exec_with == 'stack':
-                cmd_list = ['stack', 'exec'] + cmd_list
-                cmd_list.insert(3, '--')
+                wrapper = ['stack', 'exec', cmd_list[0], '--']
             else:
                 errmsg = 'HsDevBackend.exec_with_wrapper: Unknown execution prefix \'{0}\''.format(exec_with)
                 raise RuntimeError(errmsg)
+
+            cmd_list = wrapper + cmd_list[1:]
 
             if install_dir is not None:
                 proc_args['cwd'] = Utils.normalize_path(install_dir)
