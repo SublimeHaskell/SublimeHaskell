@@ -7,6 +7,7 @@
 # (lock controlled) dictionary.
 # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
+import os.path
 import threading
 
 import sublime
@@ -34,6 +35,7 @@ def access_sync(lock_name):
     return decorator
 
 KEY_COMPONENT_DEBUG_DEBUG = 'component_debug'
+SUBHASK_PROJECT_KEY = 'SublimeHaskell'
 
 class SettingsContainer(object):
     """Container object for default and user preference settings."""
@@ -157,17 +159,27 @@ class SettingsContainer(object):
                          '',
                          '(Preferences > Package Settings > SublimeHaskell)']
             sublime.message_dialog('\n'.join(msg))
+
         if settings.get('add_to_path'):
             msg = ['\'add_to_path\' setting detected. You probably meant \'add_to_PATH\'.']
             sublime.message_dialog('\n'.join(msg))
-        if settings.get('prettify_executable') not in ['stylish-haskell', 'hindent']:
-            msg = ['\'{0}\' is not a recognized Haskell indenter/prettifier. Recognized prettifiers are:',
-                   '',
-                   'stylish-haskell',
-                   'hindent',
-                   '',
-                   'Please check your \'prettify_executable\' setting.']
-            sublime.message_dialog('\n'.join(msg).format(settings.get('prettify_executable')))
+
+        if self.prettify_executable:
+            if not os.path.exists(self.prettify_executable) and \
+               self.prettify_executable not in ['stylish-haskell', 'hindent']:
+                msg = ['\'{0}\' is not a recognized Haskell indenter/prettifier. Recognized prettifiers are:',
+                       '',
+                       'stylish-haskell',
+                       'hindent',
+                       '',
+                       'Please check your \'prettify_executable\' setting.']
+                sublime.message_dialog('\n'.join(msg).format(self.prettify_executable))
+        elif self.prettify_on_save:
+            msg = ['The \'prettify_executable\' setting is missing from the plugin\'s  settings.',
+                   'This affects prettify-on-save functionality, which is now set to false.']
+            self.prettify_on_save = False
+            sublime.message_dialog('\n'.join(msg))
+
         if settings.get('inhibit_completions'):
             msg = ['The \'inhibit_completions\' setting has been replaced by '
                    '\'add_word_completions\' and \'add_default_completions\'',
@@ -217,12 +229,15 @@ def save_settings():
     sublime.save_settings("SublimeHaskell.sublime-settings")
 
 def get_project_setting(view, key, default=None):
-    project_data = view.window().project_data() or {}
-    return project_data.get(key, default)
+    subhask_data = (view.window().project_data() or {}).get(SUBHASK_PROJECT_KEY, {})
+    return subhask_data.get(key, default)
 
 def set_project_setting(view, key, value):
     project_data = view.window().project_data()
-    project_data[key] = value
+    if SUBHASK_PROJECT_KEY not in project_data:
+        project_data[SUBHASK_PROJECT_KEY] = {}
+
+    project_data[SUBHASK_PROJECT_KEY][key] = value
 
     return view.window().set_project_data(project_data)
 
