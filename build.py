@@ -3,6 +3,9 @@
 
 import os
 import os.path
+import pprint
+import shlex
+import threading
 
 import sublime
 
@@ -21,104 +24,147 @@ import SublimeHaskell.sublime_haskell_common as Common
 OUTPUT_PANEL_NAME = "haskell_run_output"
 BUILD_LOG_PANEL_NAME = 'sublime_haskell_build_log_panel'
 
-BUILD_TOOL = {
-    'cabal': {'command': 'cabal', 'name': 'cabal'},
-    'cabal-new-build': {'command': 'cabal', 'name': 'cabal (new build)'},
-    'stack': {'command': 'stack', 'name': 'stack'}
-}
 
+def cabal_new_clean(project_dir):
+    '''Internal command that does the "cabal new-"-style 'clean' command (until it is actually implemented.)
+    '''
+    cabal_project_local = Utils.normalize_path(os.path.join(project_dir, 'cabal.project.local'))
 
-def same_steps(steps):
-    return {
-        'cabal': steps,
-        'cabal-new-build': steps,
-        'stack': steps
-    }
+    diag_feedback = []
 
-BUILD_TOOL_CONFIG = {
-    'clean': {
-        'message': 'Cleaning',
-        'steps': same_steps([['clean']])
-    },
-    'configure': {
-        'message': 'Configuring',
-        'steps': {
-            'cabal':           [['configure', '--enable-tests']],
-            'cabal-new-build': [['new-configure', '--enable-tests']],
-            'stack':           []
-        }
-    },
-    'build': {
-        'message': 'Building',
-        'steps': {
-            'cabal':           [['build']],
-            'cabal-new-build': [['new-build']],
-            'stack':           [['build']]
-        }
-    },
-    'typecheck': {
-        'message': 'Checking',
-        'steps': {
-            'cabal':           [['build', '--ghc-options=-c']],
-            'cabal-new-build': [['new-build', '--ghc-options=-c']],
-            'stack':           [['build', '--ghc-options=-c']]
-        }
-    },
-    # Commands with warnings:
-    # Run fast, incremental build first. Then build everything with -Wall and -fno-code
-    # If the incremental build fails, the second step is not executed.
-    'build_then_warnings': {
-        'message': 'Building',
-        'steps': {
-            'cabal':           [['build'], ['build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
-            'cabal-new-build': [['new-build'], ['new-build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
-            'stack':           [['build']]
-        }
-    },
-    'typecheck_then_warnings': {
-        'message': 'Checking',
-        'steps': {
-            'cabal':           [['build', '--ghc-options=-c'], ['build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
-            'cabal-new-build': [['new-build', '--ghc-options=-c'],
-                                ['new-build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
-            'stack':           [['build']]
-        }
-    },
+    for subd in ['dist-newstyle', 'dist']:
+        subdir = Utils.normalize_path(os.path.join(project_dir, subd))
+        if os.path.exists(subdir):
+            if os.path.isdir(subdir):
+                for dirpath, _dirnames, filenames in os.walk(subdir, topdown=False):
+                    try:
+                        for fname in filenames:
+                            os.remove(os.path.join(dirpath, fname))
+                        os.rmdir(dirpath)
+                    except OSError as ex:
+                        diag_feedback.append(str(ex))
+                        print(ex)
+            else:
+                os.remove(subdir)
+    if os.path.exists(cabal_project_local):
+        os.remove(cabal_project_local)
 
-    'rebuild': {
-        'message': 'Rebuilding',
-        'steps': {
-            'cabal':           [['clean'], ['configure', '--enable-tests'], ['build']],
-            'cabal-new-build': [['clean'], ['new-configure', '--enable-tests'], ['new-build']],
-            'stack':           [['clean'], ['build']]
-        }
-    },
-    'install': {
-        'message': 'Installing',
-        'steps': {
-            'cabal':           [['install', '--enable-tests']],
-            'cabal-new-build': [['install', '--enable-tests']],
-            'stack':           [['install']]
-        }
-    },
-    'test': {
-        'message': 'Testing',
-        'steps': same_steps([['test']])
-    }
-}
+    return (0 if not diag_feedback else 1, '\n'.join(diag_feedback))
 
 
 # Base command
 class SublimeHaskellBuilderCommand(CommandWin.SublimeHaskellWindowCommand):
-    # Contains names of projects currently being built.
-    # To be updated only from the UI thread.
+
     PROJECTS_BEING_BUILT = set()
+    '''Projects that are currently being built, used to ensure that the same project isn't being
+    built multiple times.
+
+    NOTE: Should only be updated via the UI thread. Since this is the base class for most project-build
+    commands, that's almost automagic.
+    '''
+
+
+    BUILD_TOOL = {
+        'cabal':           {'command': 'cabal', 'name': 'cabal'},
+        'cabal-new-build': {'command': 'cabal', 'name': 'cabal (Nix-local/new build)'},
+        'stack':           {'command': 'stack', 'name': 'stack'}
+    }
+    '''Command and information associated with the various build tools.
+    '''
+
+
+    BUILD_TOOL_CONFIG = {
+        'clean': {
+            'message': 'Cleaning',
+            'steps': {
+                'cabal':           [['clean']],
+                'cabal-new-build': [cabal_new_clean],
+                'stack':           [['clean']]
+            }
+        },
+        'configure': {
+            'message': 'Configuring',
+            'steps': {
+                'cabal':           [['configure', '--enable-tests']],
+                'cabal-new-build': [['new-configure', '--enable-tests']],
+                'stack':           []
+            }
+        },
+        'build': {
+            'message': 'Building',
+            'steps': {
+                'cabal':           [['build']],
+                'cabal-new-build': [['new-build']],
+                'stack':           [['build']]
+            }
+        },
+        'typecheck': {
+            'message': 'Checking',
+            'steps': {
+                'cabal':           [['build', '--ghc-options=-c']],
+                'cabal-new-build': [['new-build', '--ghc-options=-c']],
+                'stack':           [['build', '--ghc-options=-c']]
+            }
+        },
+        # Commands with warnings:
+        # Run fast, incremental build first. Then build everything with -Wall and -fno-code
+        # If the incremental build fails, the second step is not executed.
+        'build_then_warnings': {
+            'message': 'Building',
+            'steps': {
+                'cabal':           [['build'], ['build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
+                'cabal-new-build': [['new-build'], ['new-build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
+                'stack':           [['build']]
+            }
+        },
+        'typecheck_then_warnings': {
+            'message': 'Checking',
+            'steps': {
+                'cabal':           [['build', '--ghc-options=-c'],
+                                    ['build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
+                'cabal-new-build': [['new-build', '--ghc-options=-c'],
+                                    ['new-build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
+                'stack':           [['build']]
+            }
+        },
+
+        'rebuild': {
+            'message': 'Rebuilding',
+            'steps': {
+                'cabal':           [['clean'],
+                                    ['configure', '--enable-tests'],
+                                    ['build']],
+                'cabal-new-build': [cabal_new_clean,
+                                    ['new-configure', '--enable-tests'],
+                                    ['new-build']],
+                'stack':           [['clean'],
+                                    ['build']]
+            }
+        },
+        'install': {
+            'message': 'Installing',
+            'steps': {
+                'cabal':           [['install', '--enable-tests']],
+                'cabal-new-build': [],
+                'stack':           [['install']]
+            }
+        },
+        'test': {
+            'message': 'Testing',
+            'steps': {
+                'cabal':           [['test']],
+                'cabal-new-build': [['new-test']],
+                'stack':           [['test']]
+            }
+        }
+    }
+
 
     def __init__(self, window):
         super().__init__(window)
 
     def build(self, command, filter_project=None):
-        self.select_project(lambda n, d: self.run_build(self.window.active_view(), n, d, BUILD_TOOL_CONFIG[command]),
+        self.select_project(lambda n, d: self.run_build(self.window.active_view(), n, d, self.BUILD_TOOL_CONFIG[command]),
                             filter_project)
 
     def is_enabled(self):
@@ -191,11 +237,15 @@ class SublimeHaskellBuilderCommand(CommandWin.SublimeHaskellWindowCommand):
         # Set project as building
         self.PROJECTS_BEING_BUILT.add(project_name)
 
-        build_tool_name = Settings.PLUGIN.haskell_build_tool
+        Logging.log('project build tool: {0}'.format(Settings.get_project_setting(view, 'haskell_build_tool')),
+                    Logging.LOG_DEBUG)
+        Logging.log('settings build tool: {0}'.format(Settings.PLUGIN.haskell_build_tool), Logging.LOG_DEBUG)
+
+        build_tool_name = Settings.get_project_setting(view, 'haskell_build_tool', Settings.PLUGIN.haskell_build_tool)
         if build_tool_name == 'stack' and not self.is_stack_project(project_dir):  # rollback to cabal
             build_tool_name = 'cabal'
 
-        tool = BUILD_TOOL[build_tool_name]
+        tool = self.BUILD_TOOL[build_tool_name]
 
         # Title of tool: Cabal, Stack
         tool_title = tool['name']
@@ -213,7 +263,7 @@ class SublimeHaskellBuilderCommand(CommandWin.SublimeHaskellWindowCommand):
         if override_config:
             override_args = ['--stack-yaml', override_config]
         # Assemble command lines to run (possibly multiple steps)
-        commands = [[tool_name] + step + override_args for step in tool_steps]
+        commands = [[tool_name] + override_args + step if isinstance(step, list) else step for step in tool_steps]
 
         Logging.log('running build commands: {0}'.format(commands), Logging.LOG_TRACE)
 
@@ -226,7 +276,7 @@ class SublimeHaskellBuilderCommand(CommandWin.SublimeHaskellWindowCommand):
         Logging.log(msg, Logging.LOG_DEBUG)
         Logging.log('commands:\n{0}'.format(commands), Logging.LOG_DEBUG)
         Common.show_status_message_process(msg, priority=3)
-        Utils.run_async('run_chain_build_thread', self.wait_for_chain_to_complete, view, project_dir, msg, commands,
+        Utils.run_async('wait_for_chain_to_complete', self.wait_for_chain_to_complete, view, project_dir, msg, commands,
                         on_done=done_callback)
 
 
@@ -239,20 +289,26 @@ class SublimeHaskellBuilderCommand(CommandWin.SublimeHaskellWindowCommand):
 
         # run and wait commands, fail on first fail
         # exit_code has scope outside of the loop
-        # stdout = ''
         collected_out = []
         exit_code = 0
         output_log = Common.output_panel(view.window(), '',
                                          panel_name=BUILD_LOG_PANEL_NAME,
                                          panel_display=Settings.PLUGIN.show_output_window)
         for cmd in cmds:
-            Common.output_text(output_log, ' '.join(cmd) + '...\n')
+            if isinstance(cmd, list):
+                Common.output_text(output_log, ' '.join(cmd) + '...\n')
 
-            # Don't tie stderr to stdout, since we're interested in the error messages
-            out = OutputCollector.OutputCollector(output_log, cmd, cwd=cabal_project_dir)
-            exit_code, cmd_out = out.wait()
+                # Don't tie stderr to stdout, since we're interested in the error messages
+                out = OutputCollector.OutputCollector(output_log, cmd, cwd=cabal_project_dir)
+                exit_code, cmd_out = out.wait()
+            elif callable(cmd):
+                Common.output_text(output_log, 'Function/method {0}\n'.format(cmd.__name__))
+                exit_code, cmd_out = cmd(cabal_project_dir)
+            else:
+                # Clearly something not a list or callable:
+                pass
+
             collected_out.append(cmd_out)
-
             # Bail if the command failed...
             if exit_code != 0:
                 break
@@ -347,7 +403,7 @@ class SublimeHaskellBuildAutoCommand(SublimeHaskellBuilderCommand):
             if not build_command:
                 Common.output_error(self.window, "SublimeHaskell: invalid auto_build_mode '%s'" % build_mode)
 
-            config = BUILD_TOOL_CONFIG[build_command]
+            config = self.BUILD_TOOL_CONFIG[build_command]
 
             # TODO: Auto run tests
 
@@ -366,9 +422,11 @@ class SublimeHaskellBuildAutoCommand(SublimeHaskellBuilderCommand):
 
 
 class SublimeHaskellRunCommand(SublimeHaskellBuilderCommand):
-    def __init__(self, view):
-        super().__init__(view)
+    def __init__(self, window):
+        super().__init__(window)
         self.executables = []
+        self.exec_name = ''
+        self.exec_base_dir = ''
 
     def run(self):
         self.executables = []
@@ -377,56 +435,67 @@ class SublimeHaskellRunCommand(SublimeHaskellBuilderCommand):
         for proj, info in projects.items():
             if 'description' in info:
                 for exes in info['description']['executables']:
-                    projs.append((proj + ": " + exes['name'], {
-                        'dir': info['path'],
-                        'dist': self.project_dist_path(info['path']),
-                        'name': exes['name']
-                        }))
+                    projs.append((proj + ': ' + exes['name'], {'dir': info['path'], 'name': exes['name']}))
+        print('SublimeHaskellRunCommand: projects {0}'.format(projects))
 
-        # Nothing to run
         if not projs:
+            Common.sublime_status_message('No project or nothing to run')
+        elif len(projs) == 1:
+            # One project
+            proj_info = projs[0][1]
+            self.exec_name = proj_info['name']
+            self.exec_base_dir = proj_info['dir']
+            self.prompt_prog_args()
+        else:
+            # Multiple choices
             _, cabal_project_name = Common.locate_cabal_project_from_view(self.window.active_view())
 
             # Show current project first
-            projs.sort(key=lambda s: (not s[0].startswith(cabal_project_name), s[0]))
+            projs.sort(key=lambda s: (not s[0].startswith(cabal_project_name + ': '), s[0]))
 
-            self.executables = list(map(lambda m: m[1], projs))
-            self.window.show_quick_panel(list(map(lambda m: m[0], projs)), self.on_done)
-        else:
-            Common.sublime_status_message('Nothing to run')
+            self.executables = [p[1] for p in projs]
+            self.window.show_quick_panel([p[0] for p in projs], self.on_project_selected)
 
+    def prompt_prog_args(self):
+        args = ''
+        view = self.window.active_view()
+        if view:
+            run_args = (view.settings() or {}).get('subhask_run_args', {})
+            args = run_args.get(self.exec_name, '')
 
-    def on_done(self, idx):
-        if idx == -1:
-            return
-        selected = self.executables[idx]
-        name = selected['name']
-        base_dir = selected['dir']
-        bin_file = os.path.join(selected['dist'], 'build', name, name)
+        self.window.show_input_panel('Program arguments (shlex)', args, self.on_program_args, None, None)
+
+    def on_project_selected(self, idx):
+        if idx > -1:
+            selected = self.executables[idx]
+            self.exec_name = selected['name']
+            self.exec_base_dir = selected['dir']
+            self.prompt_prog_args()
+
+    def on_program_args(self, args):
+        view = self.window.active_view()
+        view_settings = view.settings()
+        run_args = (view_settings or {}).get('subhask_run_args', {})
+        run_args[self.exec_name] = args
+        view_settings.set('subhask_run_args', run_args)
+        project_builder = Settings.get_project_setting(view, 'haskell_build_tool', Settings.PLUGIN.haskell_build_tool)
+        cmd_list = ProcHelper.exec_wrapper_cmd(project_builder, [self.exec_name] + shlex.split(args))
 
         hide_output(self.window)
+        outview = Common.output_panel(self.window, panel_name=OUTPUT_PANEL_NAME)
 
-        # Run in thread
-        Utils.run_async(type(self).__name__, self.run_binary, name, bin_file, base_dir)
+        pretty_cmdargs = 'Running \'{0}\' in {1}'.format(' '.join(cmd_list), self.exec_base_dir)
+        outview.run_command('insert', {'characters': '{0}\n{1}\n'.format(pretty_cmdargs, '-' * len(pretty_cmdargs))})
+        self.ExecRunner(outview, cmd_list, self.exec_base_dir).start()
 
 
-    def run_binary(self, name, bin_file, base_dir):
-        def write_output(window, text, base_dir):
-            "Write text to Sublime's output panel."
-            output_view = Common.output_panel(window, text, panel_name=OUTPUT_PANEL_NAME, panel_display=True)
-            output_view.settings().set("result_base_dir", base_dir)
+    class ExecRunner(threading.Thread):
+        def __init__(self, panel, cmdargs, install_dir):
+            super().__init__()
+            self.the_proc = OutputCollector.OutputCollector(panel, cmdargs, tie_stderr=True, cwd=install_dir)
 
-        with Common.status_message_process('Running {0}'.format(name), priority=5) as smsg:
-            exit_code, out, err = ProcHelper.ProcHelper.run_process([bin_file], cwd=base_dir)
-            window = sublime.active_window()
-            if not window:
-                return
-            if exit_code == 0:
-                smsg.ok()
-                sublime.set_timeout(lambda: write_output(window, out, base_dir), 0)
-            else:
-                smsg.fail()
-                sublime.set_timeout(lambda: write_output(window, err, base_dir), 0)
+        def run(self):
+            self.the_proc.wait()
 
 
 def hide_output(window):

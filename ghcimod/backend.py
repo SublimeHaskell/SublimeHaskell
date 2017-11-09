@@ -46,10 +46,10 @@ class GHCModBackend(Backend.HaskellBackend):
                                                  '',
                                                  'Please check your \'backends\' configuration and retry.']))
                 raise RuntimeError('\'exec_with\' requires an \'install_dir\'.')
-            elif exec_with not in ['stack', 'cabal', 'cabal-new']:
+            elif exec_with not in ['stack', 'cabal', 'cabal-new-build']:
                 sublime.error_message('\n'.join(['Invalid backend \'exec_with\': {0}'.format(exec_with),
                                                  '',
-                                                 'Valid values are "cabal", "cabal-new" or "stack".',
+                                                 'Valid values are "cabal", "cabal-new-build" or "stack".',
                                                  'Please check your \'backends\' configuration and retry.']))
                 raise RuntimeError('Invalid backend \'exec_with\': {0}'.format(exec_with))
 

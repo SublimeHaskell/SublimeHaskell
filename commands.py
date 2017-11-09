@@ -1203,41 +1203,6 @@ class SublimeHaskellReplaceRegions(sublime_plugin.TextCommand):
         self.view.erase_regions('sublime_haskell_replace_regions')
 
 
-class SublimeHaskellStackExec(sublime_plugin.TextCommand):
-    """Execute a command via `stack exec`, displaying the stdout and stderr live in the SublimeHaskell output window.
-    This utility command understands basic shell argument lexing, which allows quotes arounds arguments (especially needed
-    when using path names containing spaces.)"""
-
-    def __init__(self, view):
-        super().__init__(view)
-
-    OUTPUT_PANEL_NAME = 'haskell_run_output'
-
-    class SExecRunner(threading.Thread):
-        def __init__(self, panel, cmdargs):
-            super().__init__()
-            self.sexec_proc = OutputCollector.OutputCollector(panel, cmdargs)
-
-        def run(self):
-            self.sexec_proc.wait()
-
-    def run(self, _edit):
-        win = self.view.window()
-        win.show_input_panel('stack exec', '', self.stack_exec, None, None)
-
-    def stack_exec(self, arg):
-        args = shlex.split(arg)
-        if any(map(lambda arg: arg.startswith('-'), args)) and '--' not in args:
-            args.insert(0, '--')
-        cmdargs = ['stack', 'exec'] + args
-        window = self.view.window()
-        runv = Common.output_panel(window, panel_name=SublimeHaskellStackExec.OUTPUT_PANEL_NAME)
-        pretty_cmdargs = 'Running \'{0}\''.format(' '.join(cmdargs))
-        runv.run_command('insert', {'characters': '{0}\n{1}\n'.format(pretty_cmdargs, '-' * len(pretty_cmdargs))})
-
-        SublimeHaskellStackExec.SExecRunner(runv, cmdargs).start()
-
-
 class SublimeHaskellStackConfigSwitch(CommandWin.SublimeHaskellWindowCommand):
     def __init__(self, window):
         super().__init__(window)

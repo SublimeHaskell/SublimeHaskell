@@ -22,7 +22,6 @@ import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.output_collector as OutputCollector
 import SublimeHaskell.internals.proc_helper as ProcHelper
 import SublimeHaskell.internals.settings as Settings
-import SublimeHaskell.internals.which as Which
 import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.sublime_haskell_common as Common
 
@@ -55,10 +54,10 @@ class HsDevBackend(Backend.HaskellBackend):
                                              '',
                                              'Please check your \'backends\' configuration and retry.']))
             raise RuntimeError('\'exec_with\' requires an \'install_dir\'.')
-        elif exec_with is not None and exec_with not in ['stack', 'cabal', 'cabal-new']:
+        elif exec_with is not None and exec_with not in ['stack', 'cabal', 'cabal-new-build']:
             sublime.error_message('\n'.join(['Invalid backend \'exec_with\': {0}'.format(exec_with),
                                              '',
-                                             'Valid values are "cabal", "cabal-new" or "stack".',
+                                             'Valid values are "cabal", "cabal-new-build" or "stack".',
                                              'Please check your \'backends\' configuration and retry.']))
             raise RuntimeError('Invalid backend \'exec_with\': {0}'.format(exec_with))
 
@@ -116,7 +115,7 @@ class HsDevBackend(Backend.HaskellBackend):
                                     (not use_log_level and log_config, ["--log-config", log_config]),
                                     (use_log_level, ["--log-level", log_level])])
 
-            hsdev_proc = HsDevBackend.exec_with_wrapper(self.exec_with, self.install_dir, cmd)
+            hsdev_proc = ProcHelper.exec_with_wrapper(self.exec_with, self.install_dir, cmd)
             if hsdev_proc.process is not None:
                 # Use TextIOWrapper here because it combines decoding with newline handling,
                 # which means less to maintain.
@@ -210,7 +209,7 @@ class HsDevBackend(Backend.HaskellBackend):
     @staticmethod
     def hsdev_version(exec_with, install_dir):
         retval = [0, 0, 0, 0]
-        hsdev_proc = HsDevBackend.exec_with_wrapper(exec_with, install_dir, ['hsdev', 'version'])
+        hsdev_proc = ProcHelper.exec_with_wrapper(exec_with, install_dir, ['hsdev', 'version'])
         if hsdev_proc.process is not None:
             exit_code, out, _ = hsdev_proc.wait()
             if exit_code == 0:
@@ -310,38 +309,6 @@ class HsDevBackend(Backend.HaskellBackend):
         return self.hsdev_command(name, opts, on_result, async=True, timeout=None, is_list=True,
                                   on_response=on_response, on_notify=on_notify, on_error=on_error,
                                   on_result_part=on_result_part, split_result=split_result)
-
-    @staticmethod
-    def exec_with_wrapper(exec_with, install_dir, cmd_list):
-        '''Wrapper function for inserting the execution wrapper, e.g., 'cabal exec' or 'stack exec'
-
-        :returns: Process object from ProcHelper.
-        '''
-
-        proc_args = {}
-        if exec_with is not None:
-            wrapper = []
-            if exec_with == 'cabal':
-                wrapper = ['cabal', 'exec', cmd_list[0], '--']
-            elif exec_with == 'cabal-new':
-                wrapper = ['cabal', 'new-run', 'exe:' + cmd_list[0], '--']
-            elif exec_with == 'stack':
-                wrapper = ['stack', 'exec', cmd_list[0], '--']
-            else:
-                errmsg = 'HsDevBackend.exec_with_wrapper: Unknown execution prefix \'{0}\''.format(exec_with)
-                raise RuntimeError(errmsg)
-
-            cmd_list = wrapper + cmd_list[1:]
-
-            if install_dir is not None:
-                proc_args['cwd'] = Utils.normalize_path(install_dir)
-        else:
-            cmd = Which.which(cmd_list[0], ProcHelper.ProcHelper.get_extended_path())
-            if cmd is not None:
-                cmd_list[0] = cmd
-
-        Logging.log('HsDevBackend.exec_with_wrapper: {0}'.format(cmd_list), Logging.LOG_DEBUG)
-        return ProcHelper.ProcHelper(cmd_list, **proc_args)
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # API implementation:
@@ -577,13 +544,13 @@ class HsDevBackend(Backend.HaskellBackend):
     def query_import(self, symbol, filename):
         if self.whois(symbol, filename):
             return (False, ['Symbol {0} already in scope'.format(symbol)])
-        else:
-            candidates = self.lookup(symbol, filename)
-            return (True, candidates) if candidates else (False, ['Symbol {0} not found'.format(symbol)])
+
+        candidates = self.lookup(symbol, filename)
+        return (True, candidates) if candidates else (False, ['Symbol {0} not found'.format(symbol)])
 
     def contents_to_module(self, contents):
         imp_module = None
-        hsinspect_proc = HsDevBackend.exec_with_wrapper(self.exec_with, self.install_dir, ['hsinspect'])
+        hsinspect_proc = ProcHelper.exec_with_wrapper(self.exec_with, self.install_dir, ['hsinspect'])
         if hsinspect_proc.process is not None:
             exit_code, result, _ = hsinspect_proc.wait(input_str=contents)
             if exit_code == 0:
@@ -599,15 +566,15 @@ class HsDevBackend(Backend.HaskellBackend):
 
     def clean_imports(self, filename):
         cmd = ['hsclearimports', filename, '--max-import-list', '64']
-        hsclean_proc = HsDevBackend.exec_with_wrapper(self.exec_with, self.install_dir, cmd)
+        hsclean_proc = ProcHelper.exec_with_wrapper(self.exec_with, self.install_dir, cmd)
         if hsclean_proc.process is not None:
             exit_code, result, err = hsclean_proc.wait()
             if exit_code == 0:
                 return (True, result.splitlines())
-            else:
-                return (False, err)
-        else:
-            return (False, ['\'hscleanimports\' utility not found.'])
+
+            return (False, err)
+
+        return (False, ['\'hscleanimports\' utility not found.'])
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # Utility functions:

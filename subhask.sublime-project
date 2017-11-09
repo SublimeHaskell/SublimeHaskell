@@ -12,7 +12,8 @@
       "pylint" : {
 	    "paths": [ "${sublime}",
                  "${project}",
-                 "${project}/.."
+                 "${project}/..",
+                 "/Applications/Sublime Text.app/Contents/MacOS/"
                ]
       }
     }
