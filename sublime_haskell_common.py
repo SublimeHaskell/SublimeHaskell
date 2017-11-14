@@ -49,9 +49,9 @@ def is_enabled_haskell_command(view, must_be_project):
 
         if not must_be_project:
             return True
-        else:
-            cabal_project_dir = get_cabal_project_dir_of_view(view)
-            return cabal_project_dir is not None
+
+        cabal_project_dir = get_cabal_project_dir_of_view(view)
+        return cabal_project_dir is not None
 
 
 def get_haskell_command_window_view_file_project(view=None):

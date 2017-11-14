@@ -14,8 +14,9 @@
     // "cabal-new-build": Use the new cabal build system
     // "stack" Use stack to build projects
     //
-    // Ideally, you should put your default preference in your User preferences. Someday, SublimeHaskell
-    // will pick this up on a per-project basis.
+    // Ideally, you should put your default preference in your User preferences.
+    //
+    // May be set on a per-project basis in SublimeHaskell project settings.
     "haskell_build_tool": "stack",
 
     // Enable auto run tests on save, has effect only if auto build enabled (enable_auto_build)
@@ -281,4 +282,23 @@
     // "event_viewer": Event handling dignostics and debug
     // "completions": Completion generator diagnostics and debug
     "component_debug": []
+
+    // SublimeHaskell per-project settings (or "things you can put in your .sublime-project file")
+    //
+    // haskell_build_tool
+    // active_stack_config
+    //
+    // Example:
+    // {
+    //   "folders":
+    //   [
+    //     {
+    //       "path": "."
+    //     }
+    //   ],
+    //   "SublimeHaskell": {
+    //     // SublimeHaskell project settings here:
+    //     "haskell_build_tool": "cabal-new-build"
+    //   }
+    // }
 }

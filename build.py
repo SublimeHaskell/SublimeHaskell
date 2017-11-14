@@ -28,12 +28,8 @@ BUILD_LOG_PANEL_NAME = 'sublime_haskell_build_log_panel'
 def cabal_new_clean(project_dir):
     '''Internal command that does the "cabal new-"-style 'clean' command (until it is actually implemented.)
     '''
-    cabal_project_local = Utils.normalize_path(os.path.join(project_dir, 'cabal.project.local'))
-
-    diag_feedback = []
-
-    for subd in ['dist-newstyle', 'dist']:
-        subdir = Utils.normalize_path(os.path.join(project_dir, subd))
+    def remove_subdir_recursively(subdir):
+        subdir = Utils.normalize_path(os.path.join(project_dir, subdir))
         if os.path.exists(subdir):
             if os.path.isdir(subdir):
                 for dirpath, _dirnames, filenames in os.walk(subdir, topdown=False):
@@ -46,14 +42,22 @@ def cabal_new_clean(project_dir):
                         print(ex)
             else:
                 os.remove(subdir)
+
+    cabal_project_local = Utils.normalize_path(os.path.join(project_dir, 'cabal.project.local'))
+
+    diag_feedback = []
+
+    for subd in ['dist-newstyle', 'dist']:
+        remove_subdir_recursively(subd)
     if os.path.exists(cabal_project_local):
         os.remove(cabal_project_local)
 
     return (0 if not diag_feedback else 1, '\n'.join(diag_feedback))
 
 
-# Base command
-class SublimeHaskellBuilderCommand(CommandWin.SublimeHaskellWindowCommand):
+class SublimeHaskellBuildCommand(CommandWin.SublimeHaskellWindowCommand):
+    '''Base class for the builder commands (build, configure, test, install, ...).
+    '''
 
     PROJECTS_BEING_BUILT = set()
     '''Projects that are currently being built, used to ensure that the same project isn't being
@@ -112,8 +116,10 @@ class SublimeHaskellBuilderCommand(CommandWin.SublimeHaskellWindowCommand):
         'build_then_warnings': {
             'message': 'Building',
             'steps': {
-                'cabal':           [['build'], ['build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
-                'cabal-new-build': [['new-build'], ['new-build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
+                'cabal':           [['build'],
+                                    ['build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
+                'cabal-new-build': [['new-build'],
+                                    ['new-build', '-v0', '--ghc-options=-fforce-recomp -fno-code']],
                 'stack':           [['build']]
             }
         },
@@ -156,12 +162,32 @@ class SublimeHaskellBuilderCommand(CommandWin.SublimeHaskellWindowCommand):
                 'cabal-new-build': [['new-test']],
                 'stack':           [['test']]
             }
+        },
+        'freeze': {
+            'message': 'Dependency freeze',
+            'steps': {
+                'cabal':           [['freeze']],
+                'cabal-new-build': [['new-freeze']]
+            }
+        },
+        'bench': {
+            'message': 'Execute benchmarks',
+            'steps': {
+                'cabal':            [['bench']],
+                'cabal-new-build':  [['new-bench']],
+                'stack':            [['bench']]
+            }
         }
     }
 
 
-    def __init__(self, window):
-        super().__init__(window)
+    ## Pylinter complains that this is a useless super delegation. Uncomment when instance attributes are added.
+    # def __init__(self, window):
+    #     super().__init__(window)
+
+    def run(self, **args):
+        task = args.get('task', 'build')
+        self.build(task)
 
     def build(self, command, filter_project=None):
         self.select_project(lambda n, d: self.run_build(self.window.active_view(), n, d, self.BUILD_TOOL_CONFIG[command]),
@@ -174,11 +200,11 @@ class SublimeHaskellBuilderCommand(CommandWin.SublimeHaskellWindowCommand):
         return Common.is_enabled_haskell_command(None, False)
 
 
-    # Select project from list
-    # on_selected accepts name of project and directory of project
-    # filter_project accepts name of project and project-info as it appears in AutoCompletion object
-    #   and returns whether this project must appear in selection list
     def select_project(self, on_selected, filter_project):
+        '''Select a project from a generated project list. Execution flow continues into the :py:function:`on_selected`
+        function with the project's name and the project's base directory. The :py:function:`filter_project` filters
+        projects before they are shown (see :py:method:`get_projects`.)
+        '''
         projs = [(name, info) for (name, info) in self.get_projects().items()
                  if not filter_project or filter_project(name, info)]
 
@@ -212,11 +238,8 @@ class SublimeHaskellBuilderCommand(CommandWin.SublimeHaskellWindowCommand):
         view_files = [v.file_name() for v in sublime.active_window().views()
                       if (Common.is_haskell_source(v) or Common.is_cabal_source(v)) and v.file_name()]
 
-        def npath(path):
-            return os.path.normcase(os.path.normpath(path))
-
         def childof(path, prefix):
-            return npath(path).startswith(npath(prefix))
+            return Utils.normalize_path(path).startswith(Utils.normalize_path(prefix))
 
         def relevant_project(proj):
             return any([childof(proj['path'], f) for f in folders]) or any([childof(src, proj['path']) for src in view_files])
@@ -272,9 +295,8 @@ class SublimeHaskellBuilderCommand(CommandWin.SublimeHaskellWindowCommand):
             self.PROJECTS_BEING_BUILT.remove(project_name)
 
         # Run them
-        msg = '{0} {1} with {2}'.format(action_title, project_name, tool_title)
+        msg = '{0} {1} with {2}\ncommands:\n{3}'.format(action_title, project_name, tool_title, commands)
         Logging.log(msg, Logging.LOG_DEBUG)
-        Logging.log('commands:\n{0}'.format(commands), Logging.LOG_DEBUG)
         Common.show_status_message_process(msg, priority=3)
         Utils.run_async('wait_for_chain_to_complete', self.wait_for_chain_to_complete, view, project_dir, msg, commands,
                         on_done=done_callback)
@@ -365,40 +387,36 @@ class SublimeHaskellBuilderCommand(CommandWin.SublimeHaskellWindowCommand):
                 return os.path.join(project_dir, dist_dir)
 
 
-# Default build system (cabal or cabal-dev)
+class SublimeHaskellBuildCabalOnlyCommand(SublimeHaskellBuildCommand):
+    '''SublimeHaskell commands that are only valid if the project builder is cabal or 'cabal new-build'.
+    '''
+    def is_enabled(self):
+        project_builder = Settings.get_project_setting(self.window.active_view(), 'haskell_build_tool',
+                                                       Settings.PLUGIN.haskell_build_tool)
+        return super().is_enabled() and project_builder and project_builder in ['cabal', 'cabal-new-build']
 
-class SublimeHaskellBuildCommand(SublimeHaskellBuilderCommand):
-    def run(self, task='build'):
-        self.build(task)
-
-
-class SublimeHaskellTypecheckCommand(SublimeHaskellBuilderCommand):
-    def run(self):
-        self.build('typecheck_then_warnings')
-
-
-# class SublimeHaskellTestCommand(SublimeHaskellBuilderCommand):
-#     def run(self):
-#         def has_tests(_, info):
-#             return len(info['description']['tests']) > 0
-
-#         self.build('test', filter_project=has_tests)
+    def is_visible(self):
+        project_builder = Settings.get_project_setting(self.window.active_view(), 'haskell_build_tool',
+                                                       Settings.PLUGIN.haskell_build_tool)
+        return super().is_visible and project_builder and project_builder in ['cabal', 'cabal-new-build']
 
 
 # Auto build current project
-class SublimeHaskellBuildAutoCommand(SublimeHaskellBuilderCommand):
-    def run(self):
+class SublimeHaskellBuildAutoCommand(SublimeHaskellBuildCommand):
+    MODE_BUILD_COMMAND = {
+        'normal': 'build',
+        'normal-then-warnings': 'build_then_warnings',
+        'typecheck': 'typecheck',
+        'typecheck-then-warnings': 'typecheck_then_warnings',
+    }
+
+    def run(self, _args=None):
         current_project_dir, current_project_name = Common.locate_cabal_project_from_view(self.window.active_view())
         if current_project_name and current_project_dir:
             build_mode = Settings.PLUGIN.auto_build_mode
             # run_tests = Settings.PLUGIN.auto_run_tests
 
-            build_command = {
-                'normal': 'build',
-                'normal-then-warnings': 'build_then_warnings',
-                'typecheck': 'typecheck',
-                'typecheck-then-warnings': 'typecheck_then_warnings',
-            }.get(build_mode)
+            build_command = self.MODE_BUILD_COMMAND.get(build_mode)
 
             if not build_command:
                 Common.output_error(self.window, "SublimeHaskell: invalid auto_build_mode '%s'" % build_mode)
@@ -421,14 +439,14 @@ class SublimeHaskellBuildAutoCommand(SublimeHaskellBuilderCommand):
             self.run_build(self.window.active_view(), current_project_name, current_project_dir, config)
 
 
-class SublimeHaskellRunCommand(SublimeHaskellBuilderCommand):
+class SublimeHaskellRunCommand(SublimeHaskellBuildCommand):
     def __init__(self, window):
         super().__init__(window)
         self.executables = []
         self.exec_name = ''
         self.exec_base_dir = ''
 
-    def run(self):
+    def run(self, _args=None):
         self.executables = []
         projs = []
         projects = self.get_projects()
