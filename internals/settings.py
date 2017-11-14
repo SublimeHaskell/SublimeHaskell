@@ -55,7 +55,6 @@ class SettingsContainer(object):
         'auto_complete_imports': ('auto_complete_imports', True),
         'auto_complete_language_pragmas': ('auto_complete_language_pragmas', True),
         'auto_completion_popup': ('auto_completion_popup', False),
-        'auto_run_tests': ('auto_run_tests', True),
         'backends': ('backends', {}),
         KEY_COMPONENT_DEBUG_DEBUG: ('component_debug', []),
         'enable_auto_build': ('enable_auto_build', False),
@@ -91,7 +90,6 @@ class SettingsContainer(object):
         self.auto_complete_imports = None
         self.auto_complete_language_pragmas = None
         self.auto_completion_popup = None
-        self.auto_run_tests = None
         self.backends = {}
         self.component_debug = []
         self.enable_auto_build = None
@@ -163,6 +161,11 @@ class SettingsContainer(object):
         if settings.get('add_to_path'):
             msg = ['\'add_to_path\' setting detected. You probably meant \'add_to_PATH\'.']
             sublime.message_dialog('\n'.join(msg))
+
+        if settings.get('auto_run_tests'):
+            msg = ['\'auto_run_tests\' setting deprecated. See the new options in the ',
+                   '\'auto_build_mode\' preference']
+           sublime.message_dialog(''.join(msg))
 
         if self.prettify_executable:
             if not os.path.exists(self.prettify_executable) and \

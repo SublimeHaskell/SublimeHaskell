@@ -19,9 +19,6 @@
     // May be set on a per-project basis in SublimeHaskell project settings.
     "haskell_build_tool": "stack",
 
-    // Enable auto run tests on save, has effect only if auto build enabled (enable_auto_build)
-    "auto_run_tests": true,
-
     // Enable auto check on save
     "enable_auto_check": true,
 
@@ -31,27 +28,36 @@
     // How to build the cabal project in order to obtain error messages.
     // This option exists because `cabal build` is slow and cannot re-print
     // warnings of already compiled modules.
+    //
     // (Also see https://github.com/haskell/cabal/issues/1179, cabal 1.16).
     //
     // Possible values:
-    // - "normal"
-    //   Uses a full `cabal build`, generating object files and binaries.
-    //   If this takes too long for you, look at the other options.
-    // - "normal-then-warnings"
-    //   Like "normal", but afterwards also collects project-wide warnings with
-    //   `cabal build --ghc-options="-fforce-recomp -Wall -fno-code"`
-    //   (this recompiles everything, but skips code generation for speed).
-    // - "typecheck"
-    //   Performs a type check of the whole project, trying to not do any more
-    //   than that in order to give faster feedback (that "normal").
-    //   Currently uses `cabal build --ghc-options="-c"` to skip linking.
-    // - "typecheck-then-warnings"
-    //   Like "typecheck", but afterwards collects warnings like
-    //   "normal-then-warnings".
+    //
+    // - "normal": A normal build using the haskell_build_tool builder. This is
+    //   a full build of the project.
+    //
+    // - "normal-then-warnings": A normal build that also collects project-wide
+    //   warnings. This runs the builder tool twice.
+    //
+    // - "normal-then-test": A normal build that runs tests after a successful
+    //   build.
+    //
+    // - "normal-then-bench": A normal build that runs benchmarks after a
+    //   successful build.
+    //
+    // - "typecheck": Performs a type check of the whole project, trying to not
+    //   do any more than necesssary to give faster feedback. Consider turning
+    //   auto-build off and enable auto-check instead.
+    //
+    // - "typecheck-then-warnings": Like "typecheck", but afterwards collects
+    //    warnings like "normal-then-warnings".
     //
     // Please note that it is currently impossible to properly use a `-fno-code`
     // build on a cabal project that links a shared library; it errors too early.
     // (https://github.com/haskell/cabal/issues/1176, cabal 1.16).
+    //
+    // This can be a project-specific setting (see per-project settings at the end
+    // of this document.)
     "auto_build_mode": "normal-then-warnings",
 
     // Use the improved/alternate Haskell syntax?
@@ -285,8 +291,9 @@
 
     // SublimeHaskell per-project settings (or "things you can put in your .sublime-project file")
     //
-    // haskell_build_tool
-    // active_stack_config
+    // - active_stack_config
+    // - auto_build_mode
+    // - haskell_build_tool
     //
     // Example:
     // {

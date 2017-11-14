@@ -406,35 +406,44 @@ class SublimeHaskellBuildAutoCommand(SublimeHaskellBuildCommand):
     MODE_BUILD_COMMAND = {
         'normal': 'build',
         'normal-then-warnings': 'build_then_warnings',
+        'normal-then-tests': 'build',
+        'normal-then-bench': 'build',
         'typecheck': 'typecheck',
         'typecheck-then-warnings': 'typecheck_then_warnings',
     }
 
-    def run(self, _args=None):
+    def run(self, **_args):
         current_project_dir, current_project_name = Common.locate_cabal_project_from_view(self.window.active_view())
         if current_project_name and current_project_dir:
-            build_mode = Settings.PLUGIN.auto_build_mode
-            # run_tests = Settings.PLUGIN.auto_run_tests
+            build_mode = Settings.get_project_setting(self.window.active_view(), 'auto_build_mode',
+                                                      Settings.PLUGIN.auto_build_mode)
 
             build_command = self.MODE_BUILD_COMMAND.get(build_mode)
 
-            if not build_command:
+            if not build_command or build_command not in self.MODE_BUILD_COMMAND:
                 Common.output_error(self.window, "SublimeHaskell: invalid auto_build_mode '%s'" % build_mode)
 
-            config = self.BUILD_TOOL_CONFIG[build_command]
+            # Duplicate the dictionary corresponding to the build command. We might modify it later.
+            config = dict(self.BUILD_TOOL_CONFIG[build_command])
+            addl_config = None
 
-            # TODO: Auto run tests
+            if build_mode.endswith('-then-tests'):
+                has_tests = False
+                projects = self.get_projects()
 
-            # if run_tests:
-            #     has_tests = False
+                if current_project_name in projects and 'description' in projects[current_project_name]:
+                    has_tests = projects[current_project_name]['description'].get('tests') is not None
 
-            #     projects = get_projects()
+                if has_tests:
+                    addl_config = 'test'
+            elif build_mode.endswith('-then-bench'):
+                addl_config = 'bench'
 
-            #     if current_project_name in projects and 'description' in projects[current_project_name]:
-            #         has_tests = len(projects[current_project_name]['description']['tests']) > 0
+            if addl_config is not None:
+                for tool, steps in self.BUILD_TOOL_CONFIG[addl_config]['steps'].items():
+                    config['steps'][tool].extend(steps)
 
-            #     if has_tests:
-            #         config['steps'].extend(cabal_config['test']['steps'])
+            Logging.log('auto build: final config:\n{0}'.format(pprint.pformat(config)))
 
             self.run_build(self.window.active_view(), current_project_name, current_project_dir, config)
 
