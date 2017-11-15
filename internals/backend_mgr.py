@@ -138,7 +138,7 @@ class BackendManager(object, metaclass=Utils.Singleton):
         Updates the :py:attr:`possible_backends` and :py:attr:`current_backend_name` attributes.
         '''
         self.possible_backends = self.filter_possible(Settings.PLUGIN.backends)
-        if len(self.possible_backends) > 0:
+        if self.possible_backends:
             # Take first available because DEFAULT_KNOWN_BACKENDS are listed in order of priority...
 
             print('plugin \'backends\' {0}'.format([name for name in Settings.PLUGIN.backends]))
@@ -379,8 +379,8 @@ class BackendManager(object, metaclass=Utils.Singleton):
         backend = BackendManager.ACTIVE_BACKEND
         if backend is not None and BackendManager().current_state(BackendManager.ACTIVE):
             return backend
-        else:
-            return Backend.NullHaskellBackend(BackendManager())
+
+        return Backend.NullHaskellBackend(BackendManager())
 
 
     @staticmethod

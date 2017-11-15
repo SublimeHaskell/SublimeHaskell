@@ -16,12 +16,12 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
         self.candidates = None
         self.backend = Backend.NullHaskellBackend(BackendManager.BackendManager())
 
-    def run(self, edit, **kwargs):
-        kw_module = kwargs.get('module')
+    def run(self, edit, **args):
+        kw_module = args.get('module')
         self.backend = BackendManager.active_backend()
 
         if not kw_module:
-            kw_decl = kwargs.get('decl')
+            kw_decl = args.get('decl')
             if kw_decl is None:
                 qsymbol = Common.get_qualified_symbol_at_region(self.view, self.view.sel()[0])
                 kw_decl = qsymbol.qualified_name()
@@ -56,7 +56,7 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
 
         # Truncate contents to the module declaration and the imports list, if present.
         imports_list = list(re.finditer('^import.*$', contents, re.MULTILINE))
-        if len(imports_list) > 0:
+        if imports_list:
             contents = contents[0:imports_list[-1].end()]
 
         # Phase 2: Ask the backend to turn the contents into a list of Module objects:
@@ -68,13 +68,13 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
             insert_line = 0
             insert_gap = False
 
-            if len(after) > 0:
+            if after:
                 # Insert before after[0]
                 insert_line = after[0].position.line - 1
-            elif len(imports) > 0:
+            elif imports:
                 # Insert after all imports
                 insert_line = imports[-1].position.line
-            elif len(imp_module.declarations) > 0:
+            elif imp_module.declarations:
                 # Insert before first declaration
                 insert_line = min([d.position.line for d in imp_module.declarations.values()]) - 1
                 insert_gap = True

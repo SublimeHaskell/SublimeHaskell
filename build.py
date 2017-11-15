@@ -455,7 +455,7 @@ class SublimeHaskellRunCommand(SublimeHaskellBuildCommand):
         self.exec_name = ''
         self.exec_base_dir = ''
 
-    def run(self, _args=None):
+    def run(self, **_args):
         self.executables = []
         projs = []
         projects = self.get_projects()

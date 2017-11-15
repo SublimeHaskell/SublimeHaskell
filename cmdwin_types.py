@@ -8,14 +8,14 @@ import sublime_plugin
 
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.internals.backend_mgr as BackendMgr
-# import SublimeHaskell.internals.logging as Logging
 
 
 class SublimeHaskellWindowCommand(sublime_plugin.WindowCommand):
     '''Enable window commands if the source is Haskell source.
     '''
-    def __init__(self, view):
-        super().__init__(view)
+    ## Uncomment if instance attributes added.
+    # def __init__(self, view):
+    #     super().__init__(view)
 
     def is_enabled(self):
         return Common.is_enabled_haskell_command(None, False)
@@ -27,8 +27,9 @@ class SublimeHaskellWindowCommand(sublime_plugin.WindowCommand):
 class SublimeHaskellTextCommand(sublime_plugin.TextCommand):
     '''Enable text commands if the source is Haskell source.
     '''
-    def __init__(self, view):
-        super().__init__(view)
+    ## Uncomment if instance attributes added.
+    # def __init__(self, view):
+    #     super().__init__(view)
 
     def is_enabled(self):
         return Common.is_enabled_haskell_command(self.view, False)
@@ -37,8 +38,9 @@ class SublimeHaskellTextCommand(sublime_plugin.TextCommand):
         return Common.is_enabled_haskell_command(self.view, False)
 
 class BackendWindowCommand(SublimeHaskellWindowCommand):
-    def __init__(self, win):
-        super().__init__(win)
+    ## Uncomment if instance attributes added.
+    # def __init__(self, win):
+    #     super().__init__(win)
 
     def is_enabled(self):
         live = BackendMgr.is_live_backend()
@@ -59,8 +61,10 @@ class BackendWindowCommand(SublimeHaskellWindowCommand):
 class BackendTextCommand(SublimeHaskellTextCommand):
     '''Enable text commands only if the backend is alive and the source in the view is Haskell source.
     '''
-    def __init__(self, view):
-        super().__init__(view)
+
+    ## Uncomment if instance attributes added.
+    # def __init__(self, view):
+    #     super().__init__(view)
 
     def is_enabled(self):
         live = BackendMgr.is_live_backend()

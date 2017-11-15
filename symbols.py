@@ -104,7 +104,7 @@ class Region(object):
     def update(self):
         if self.saved():
             rgns = self.view.get_regions(self.region_key)
-            if len(rgns):
+            if rgns:
                 rgn = Region.from_region(self.view, rgns[0], self.region_key)
                 self.start = rgn.start
                 self.end = rgn.end
@@ -499,8 +499,8 @@ class Declaration(Symbol):
         info = u'<span class="function">{0}</span>'.format(html.escape(self.name, quote=False))
         if self.has_source_location():
             return u'<a href="{0}">{1}</a>'.format(html.escape(self.get_source_location()), info)
-        else:
-            return info
+
+        return info
 
     @unicode_operators
     def popup(self, comments=None):

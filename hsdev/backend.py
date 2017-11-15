@@ -93,10 +93,10 @@ class HsDevBackend(Backend.HaskellBackend):
             hsdev_ver = HsDevBackend.hsdev_version(kwargs.get('exec-with'), kwargs.get('install-dir'))
             Logging.log('hsdev version: {0}'.format('.'.join(map(str, hsdev_ver))), Logging.LOG_INFO)
             return hsdev_ver >= HsDevBackend.HSDEV_MIN_VER and hsdev_ver < HsDevBackend.HSDEV_MAX_VER
-        else:
-            # Assume that a remote backend is actually available. Ultimately, we might not connect to it, but
-            # it is available to us as a backend.
-            return True
+
+        # Assume that a remote backend is actually available. Ultimately, we might not connect to it, but
+        # it is available to us as a backend.
+        return True
 
     def start_backend(self):
         retval = True
@@ -242,7 +242,7 @@ class HsDevBackend(Backend.HaskellBackend):
         return  retval
 
 
-    def hsdev_command(self, name, opts, on_result, async=False, timeout=HSDEV_CALL_TIMEOUT, is_list=False,
+    def hsdev_command(self, name, opts, on_result, async_cmd=False, timeout=HSDEV_CALL_TIMEOUT, is_list=False,
                       on_response=None, on_notify=None, on_error=None, on_result_part=None, split_result=None):
         if split_result is None:
             split_res = on_result_part is not None
@@ -265,48 +265,47 @@ class HsDevBackend(Backend.HaskellBackend):
                                     on_response=on_response,
                                     on_notify=hsdev_command_notify,
                                     on_error=on_error,
-                                    wait=not async,
+                                    wait=not async_cmd,
                                     timeout=timeout)
 
-            return result if not async else resp
+            return result if not async_cmd else resp
 
-        else:
-            def process_response(resp):
-                on_response(on_result(resp))
+        def process_response(resp):
+            on_response(on_result(resp))
 
-            resp = self.client.call(name,
-                                    opts,
-                                    on_response=process_response if on_response else None,
-                                    on_notify=on_notify,
-                                    on_error=on_error,
-                                    wait=not async,
-                                    timeout=timeout)
+        resp = self.client.call(name,
+                                opts,
+                                on_response=process_response if on_response else None,
+                                on_notify=on_notify,
+                                on_error=on_error,
+                                wait=not async_cmd,
+                                timeout=timeout)
 
-            return on_result(resp) if not async else resp
+        return on_result(resp) if not async_cmd else resp
 
     def command(self, name, opts, on_result=result_identity, timeout=HSDEV_CALL_TIMEOUT, on_response=None,
                 on_notify=None, on_error=None, on_result_part=None, split_result=None):
-        return self.hsdev_command(name, opts, on_result, async=False, timeout=timeout, is_list=False,
+        return self.hsdev_command(name, opts, on_result, async_cmd=False, timeout=timeout, is_list=False,
                                   on_response=on_response, on_notify=on_notify, on_error=on_error,
                                   on_result_part=on_result_part, split_result=split_result)
 
 
     def async_command(self, name, opts, on_result=result_identity, on_response=None, on_notify=None,
                       on_error=None, on_result_part=None, split_result=None):
-        return self.hsdev_command(name, opts, on_result, async=True, timeout=None, is_list=False,
+        return self.hsdev_command(name, opts, on_result, async_cmd=True, timeout=None, is_list=False,
                                   on_response=on_response, on_notify=on_notify, on_error=on_error,
                                   on_result_part=on_result_part, split_result=split_result)
 
 
     def list_command(self, name, opts, on_result=result_identity, timeout=HSDEV_CALL_TIMEOUT, on_response=None,
                      on_notify=None, on_error=None, on_result_part=None, split_result=None):
-        return self.hsdev_command(name, opts, on_result, async=False, timeout=timeout, is_list=True,
+        return self.hsdev_command(name, opts, on_result, async_cmd=False, timeout=timeout, is_list=True,
                                   on_response=on_response, on_notify=on_notify, on_error=on_error,
                                   on_result_part=on_result_part, split_result=split_result)
 
     def async_list_command(self, name, opts, on_result=result_identity, on_response=None,
                            on_notify=None, on_error=None, on_result_part=None, split_result=None):
-        return self.hsdev_command(name, opts, on_result, async=True, timeout=None, is_list=True,
+        return self.hsdev_command(name, opts, on_result, async_cmd=True, timeout=None, is_list=True,
                                   on_response=on_response, on_notify=on_notify, on_error=on_error,
                                   on_result_part=on_result_part, split_result=split_result)
 
@@ -321,7 +320,8 @@ class HsDevBackend(Backend.HaskellBackend):
         return self.command('ping', {}, lambda r: r and ('message' in r) and (r['message'] == 'pong'))
 
     def scan(self, cabal=False, sandboxes=None, projects=None, files=None, paths=None, ghc=None, contents=None,
-             docs=False, infer=False, wait_complete=False, **backend_args):
+             docs=False, infer=False, **backend_args):
+        wait_complete = backend_args.get('wait_complete', False)
         action = self.command if wait_complete else self.async_command
         return action('scan', {'projects': projects or [],
                                'cabal': cabal,
@@ -520,7 +520,8 @@ class HsDevBackend(Backend.HaskellBackend):
     def flags(self, _projectname, **backend_args):
         return self.command('flags', {}, **backend_args)
 
-    def autofix_show(self, messages, wait_complete=False, **backend_args):
+    def autofix_show(self, messages, **backend_args):
+        wait_complete = backend_args.get('wait_complete', False)
         action = self.list_command if wait_complete else self.async_list_command
         return action('autofix show', {'messages': messages}, ResultParse.parse_corrections, **backend_args)
 
@@ -541,12 +542,12 @@ class HsDevBackend(Backend.HaskellBackend):
     # Advanced features:
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
-    def query_import(self, symbol, filename):
-        if self.whois(symbol, filename):
-            return (False, ['Symbol {0} already in scope'.format(symbol)])
+    def query_import(self, symname, filename):
+        if self.whois(symname, filename):
+            return (False, ['Symbol {0} already in scope'.format(symname)])
 
-        candidates = self.lookup(symbol, filename)
-        return (True, candidates) if candidates else (False, ['Symbol {0} not found'.format(symbol)])
+        candidates = self.lookup(symname, filename)
+        return (True, candidates) if candidates else (False, ['Symbol {0} not found'.format(symname)])
 
     def contents_to_module(self, contents):
         imp_module = None

@@ -111,8 +111,8 @@ def locate_cabal_project(filename):
         project_path, cabal_file = os.path.split(cabal_file_path)
         project_name = os.path.splitext(cabal_file)[0]
         return project_path, project_name
-    else:
-        return None, None
+
+    return None, None
 
 
 def get_cabal_project_dir_of_view(view):
@@ -192,8 +192,9 @@ class SublimeHaskellReplaceText(sublime_plugin.TextCommand):
     """
     Helper command to replace region
     """
-    def __init__(self, view):
-        super().__init__(view)
+    ## Uncomment if instance variables are needed.
+    # def __init__(self, view):
+    #     super().__init__(view)
 
     def run(self, edit, **kwargs):
         text = kwargs.get('text')
@@ -283,7 +284,7 @@ def get_qualified_name(name):
     """
     'bla bla bla Data.List.fo' -> ('Data.List', 'Data.List.fo')
     """
-    if len(name) == 0:
+    if not name:
         return ('', '')
     quals = name.split()[-1].split('.')
     filtered = list(map(lambda s: list(filter(lambda c: c.isalpha() or c.isdigit() or c == '_', s)), quals))
@@ -324,7 +325,7 @@ def get_qualified_symbol(line):
     """
     def normalize_name(re_result):
         name = next(i for i in [re_result.group('identifier'), re_result.group('operator')] if i is not None)
-        return name if len(name) > 0 else None
+        return name if name else None
 
     res = IMPORT_SYMBOL_RE.search(line)
     if res:
@@ -382,8 +383,8 @@ class StatusMessage(object):
     def is_active(self):
         if self.is_process:
             return self.timeout >= 0
-        else:
-            return self.duration >= 0
+
+        return self.duration >= 0
 
     def tick(self, interval):
         if self.is_process:
@@ -454,10 +455,10 @@ class StatusMessagesManager(threading.Thread):
         with StatusMessagesManager.priorities as prios:
             if not prios:
                 return False
-            else:
-                cur_msg, _ = prios[0]
-                sublime_status_message(cur_msg.message(self.ticks))
-                return True
+
+            cur_msg, _ = prios[0]
+            sublime_status_message(cur_msg.message(self.ticks))
+            return True
 
     def tick(self):
         self.ticks = self.ticks + 1

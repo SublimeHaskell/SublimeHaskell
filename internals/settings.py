@@ -1,11 +1,3 @@
-# -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
-# SublimeHaskell settings management
-#
-# This is a hack so that Sublime's Settings work outside of the main thread.
-# You cannot use the Settings class' methods outside of the main thread, so
-# SublimeHaskell has to keep its own copy of pertinent settings in its own
-# (lock controlled) dictionary.
-# -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
 import os.path
 import threading
@@ -165,7 +157,7 @@ class SettingsContainer(object):
         if settings.get('auto_run_tests'):
             msg = ['\'auto_run_tests\' setting deprecated. See the new options in the ',
                    '\'auto_build_mode\' preference']
-           sublime.message_dialog(''.join(msg))
+            sublime.message_dialog(''.join(msg))
 
         if self.prettify_executable:
             if not os.path.exists(self.prettify_executable) and \

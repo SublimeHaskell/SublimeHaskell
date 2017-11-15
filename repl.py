@@ -3,12 +3,10 @@
 import os
 import re
 
-import sublime
 import sublime_plugin
 
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.cmdwin_types as CommandWin
-import SublimeHaskell.autocomplete as autocomplete
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.backend_mgr as BackendManager
@@ -124,7 +122,7 @@ def repl_args(**kwargs):
 
 
 class SublimeHaskellReplGhci(CommandWin.SublimeHaskellWindowCommand):
-    def run(self):
+    def run(self, **_kwargs):
         opts = Settings.PLUGIN.ghci_opts or []
         self.window.run_command("repl_open", repl_args(cmd=["ghci"] + opts, loaded=None, caption="ghci"))
 
@@ -133,7 +131,7 @@ class SublimeHaskellReplGhci(CommandWin.SublimeHaskellWindowCommand):
 
 
 class SublimeHaskellReplGhciCurrentFile(CommandWin.SublimeHaskellWindowCommand):
-    def run(self):
+    def run(self, **_kwargs):
         view = self.window.active_view()
         if not view:
             Common.show_status_message("No file active", False)
@@ -155,7 +153,7 @@ class SublimeHaskellReplCabal(CommandWin.SublimeHaskellWindowCommand):
         self.project_name = None
         self.project_dir = None
         self.names = []
-    def run(self):
+    def run(self, **_kwargs):
         self.view = self.window.active_view()
         if not self.view:
             Common.show_status_message("No file active", False)
@@ -195,7 +193,7 @@ class SublimeHaskellReplCabal(CommandWin.SublimeHaskellWindowCommand):
 
 
 class SublimeHaskellReplLoad(CommandWin.SublimeHaskellWindowCommand):
-    def run(self):
+    def run(self, **_kwargs):
         view = self.window.active_view()
         if not view:
             Common.show_status_message("No file active", False)

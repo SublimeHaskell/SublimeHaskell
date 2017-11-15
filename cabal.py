@@ -10,7 +10,7 @@ class SublimeHaskellCabalList(CommandWin.SublimeHaskellWindowCommand):
         super().__init__(view)
         self.packages = []
 
-    def run(self):
+    def run(self, **_args):
         self.window.show_input_panel("Cabal list", "", self.on_done, self.on_change, self.on_cancel)
 
     def on_done(self, inp):

@@ -200,10 +200,11 @@ def goto_error(view, error):
 
 
 class SublimeHaskellNextError(CommandWin.SublimeHaskellTextCommand):
-    def __init__(self, view):
-        super().__init__(view)
+    ## Uncomment if instance variables are needed.
+    # def __init__(self, view):
+    #     super().__init__(view)
 
-    def run(self, _edit):
+    def run(self, _edit, **_kwargs):
         errs = errors_for_view(self.view)
         if not errs:
             Common.show_status_message('No errors or warnings!', priority=5)
@@ -226,10 +227,11 @@ class SublimeHaskellNextError(CommandWin.SublimeHaskellTextCommand):
 
 
 class SublimeHaskellPreviousError(CommandWin.SublimeHaskellTextCommand):
-    def __init__(self, view):
-        super().__init__(view)
+    ## Uncomment if instance variables are needed.
+    # def __init__(self, view):
+    #     super().__init__(view)
 
-    def run(self, _edit):
+    def run(self, _edit, **_kwargs):
         errs = errors_for_view(self.view)
         if not errs:
             Common.show_status_message("No errors or warnings!", priority=5)
@@ -247,8 +249,8 @@ class SublimeHaskellPreviousError(CommandWin.SublimeHaskellTextCommand):
 def region_key(name, is_fix=False):
     if is_fix:
         return 'output-{0}s-fix'.format(name)
-    else:
-        return 'output-{0}s'.format(name)
+
+    return 'output-{0}s'.format(name)
 
 
 def get_icon(png):
@@ -360,12 +362,12 @@ def trim_region(view, region):
     # If the region is entirely whitespace, give up and return it unchanged.
     if text.isspace():
         return region
-    else:
-        text_trimmed_on_left = text.lstrip()
-        text_trimmed = text_trimmed_on_left.rstrip()
-        rgn_begin += len(text) - len(text_trimmed_on_left)
-        rgn_end -= len(text_trimmed_on_left) - len(text_trimmed)
-        return sublime.Region(rgn_begin, rgn_end)
+
+    text_trimmed_on_left = text.lstrip()
+    text_trimmed = text_trimmed_on_left.rstrip()
+    rgn_begin += len(text) - len(text_trimmed_on_left)
+    rgn_end -= len(text_trimmed_on_left) - len(text_trimmed)
+    return sublime.Region(rgn_begin, rgn_end)
 
 DATA_REGEX = re.compile(r'(?P<what>(newtype|type|data))\s+((?P<ctx>(.*))=>\s+)?(?P<name>\S+)\s+' + \
                         r'(?P<args>(\w+\s+)*)=(\s*(?P<def>.*)\s+-- Defined)?',

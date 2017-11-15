@@ -77,7 +77,7 @@ class Inspector(object):
             projects = []
             files = []
 
-            if len(files_to_reinspect) > 0:
+            if files_to_reinspect:
                 projects = []
                 files = []
                 for finspect in files_to_reinspect:

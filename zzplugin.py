@@ -197,7 +197,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
     LANGUAGE_RE = re.compile(r'{-#\s+LANGUAGE.*')
     OPTIONS_GHC_RE = re.compile(r'{-#\s+OPTIONS_GHC.*')
 
-    def on_query_completions(self, view, prefix, locations):
+    def on_query_completions(self, view, _prefix, locations):
         # Defer starting the backend until as late as possible...
         ## if Settings.COMPONENT_DEBUG.event_viewer or Settings.COMPONENT_DEBUG.completions:
         ##    print('{0} invoked (prefix: {1}).'.format(type(self).__name__ + '.on_query_completions', prefix))
@@ -297,7 +297,8 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
                 Utils.run_async('{0}: drop completions'.format(file), self.autocompleter.drop_completions_async, file)
 
         for file in files or []:
-            Utils.run_async('{0}: init completions'.format(file), self.autocompleter.generate_completions_cache, project_name, file)
+            Utils.run_async('{0}: init completions'.format(file), self.autocompleter.generate_completions_cache,
+                            project_name, file)
 
 
     def is_scanned_source(self, view):
@@ -310,9 +311,9 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         file_shown_in_view = Common.get_haskell_command_window_view_file_project(view)[2]
         if file_shown_in_view is None:
             return False
-        else:
-            src_module = Utils.head_of(BackendManager.active_backend().module(file=file_shown_in_view))
-            return src_module is not None and src_module.location.project is not None
+
+        src_module = Utils.head_of(BackendManager.active_backend().module(file=file_shown_in_view))
+        return src_module is not None and src_module.location.project is not None
 
 
     def fly(self, view):
@@ -355,7 +356,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
                 auto_lint_enabled = Settings.PLUGIN.enable_auto_lint
                 sublime.set_timeout(lambda: self.scan_contents(view_), 0)
 
-                fly_window = view_.window()
+                ## (unused?) fly_window = view_.window()
                 if auto_check_enabled and auto_lint_enabled:
                     sublime.set_timeout(lambda: view.run_command('sublime_haskell_check_and_lint', {'fly': True}), 0)
                 elif auto_check_enabled:

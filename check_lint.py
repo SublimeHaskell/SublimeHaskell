@@ -42,7 +42,7 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
         self.contents = {}
         self.status_msg = None
 
-    def run(self, edit):
+    def run(self, edit, **_args):
         print('SublimeHaskellHsDevChain.run??')
         raise NotImplementedError("SublimeHaskellDevChain.run needs an implementation.")
 
@@ -108,7 +108,7 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
         output_text = ParseOutput.format_output_messages(output_messages)
         if Settings.PLUGIN.show_error_window:
             cabal_proj_dir = Common.get_cabal_project_dir_of_file(self.filename) or os.path.dirname(self.filename)
-            panel_display = not self.fly_mode and len(output_messages) > 0
+            panel_display = not self.fly_mode and output_messages
             sublime.set_timeout(lambda: ParseOutput.write_output(self.view, output_text, cabal_proj_dir, panel_display), 0)
         sublime.set_timeout(lambda: ParseOutput.mark_messages_in_views(output_messages), 0)
 
@@ -117,8 +117,9 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
 
 
 class SublimeHaskellCheck(SublimeHaskellHsDevChain):
-    def __init__(self, view):
-        super().__init__(view)
+    ## Uncomment if instance variables are needed.
+    # def __init__(self, view):
+    #     super().__init__(view)
 
     def run(self, _edit, **kwargs):
         Utils.run_async('SublimeHaskellCheck', self.run_chain, [hsdev_check()], 'Checking', fly_mode=kwargs.get('fly', False))
@@ -131,8 +132,9 @@ def exec_check_process(view):
 
 
 class SublimeHaskellLint(SublimeHaskellHsDevChain):
-    def __init__(self, view):
-        super().__init__(view)
+    ## Uncomment if instance variables are needed.
+    # def __init__(self, view):
+    #     super().__init__(view)
 
     def run(self, _edit, **kwargs):
         Utils.run_async('SublimeHaskellLint', self.run_chain, [hsdev_lint()], 'Linting', fly_mode=kwargs.get('fly', False))
@@ -145,8 +147,9 @@ def exec_lint_process(view):
 
 
 class SublimeHaskellCheckAndLint(SublimeHaskellHsDevChain):
-    def __init__(self, view):
-        super().__init__(view)
+    ## Uncomment if instance variables are needed.
+    # def __init__(self, view):
+    #     super().__init__(view)
 
     def run(self, _edit, **kwargs):
         Utils.run_async('SublimeHaskellCheckAndLint', self.run_chain, [hsdev_check(), hsdev_lint()], 'Checking and Linting',
@@ -154,6 +157,7 @@ class SublimeHaskellCheckAndLint(SublimeHaskellHsDevChain):
 
 
 def exec_check_and_lint_process(view):
-    '''Utility function to unconditionally execute 'SublimeHaskellCHeckAndLint.run()' without worrying about the command's status.
+    '''Utility function to unconditionally execute 'SublimeHaskellCHeckAndLint.run()' without worrying
+    about the command's status.
     '''
     return SublimeHaskellCheckAndLint(view).run(None)

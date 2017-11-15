@@ -21,7 +21,7 @@ class SublimeHaskellFilterCommand(CommandWin.SublimeHaskellTextCommand):
             indenter.extend(indenter_options or [])
         self.indenter = indenter
 
-    def run(self, edit):
+    def run(self, edit, **_kwargs):
         try:
             window = self.view.window()
             window.run_command('hide_panel', {'panel': 'output.' + SublimeHaskellFilterCommand.OUTPUT_PANEL_NAME})
@@ -44,10 +44,7 @@ class SublimeHaskellFilterCommand(CommandWin.SublimeHaskellTextCommand):
                         #
                         # Also test if the contents actually changed so break the save-indent-save-indent-... loop if
                         # the user enabled prettify_on_save.
-                        #
-                        # Yes, I like the explicitness of the 'err' test. It might be slower and less compact that
-                        # 'if err and ...', but it does tell one what's going on.
-                        if err is None or len(err) == 0:
+                        if not err:
                             if out not in [selection, sel_str]:
                                 self.view.replace(edit, selection, out)
                         else:

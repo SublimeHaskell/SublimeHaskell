@@ -3,7 +3,6 @@
 # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
 import errno
-import platform
 import subprocess
 import os
 import os.path
@@ -70,10 +69,10 @@ class ProcHelper(object):
                                , 'Process exit code: {0}'.format(exit_code)
                                , ''
                                , "output:"
-                               , stdout if stdout and len(stdout) > 0 else "--no output--"
+                               , stdout if stdout else "--no output--"
                                , ''
                                , 'error:'
-                               , stderr if stderr and len(stderr) > 0 else "--no error output--"])
+                               , stderr if stderr else "--no error output--"])
                 self.process = None
             else:
                 self.process = None
@@ -104,8 +103,8 @@ class ProcHelper(object):
             # Ensure that we reap the file descriptors.
             self.cleanup()
             return (exit_code, Utils.decode_bytes(stdout), Utils.decode_bytes(stderr))
-        else:
-            return (-1, '', self.process_err or "?? unknown error -- no process.")
+
+        return (-1, '', self.process_err or "?? unknown error -- no process.")
 
     # Update the augmented environment when `add_to_PATH` or `add_standard_dirs` change.
     @staticmethod
