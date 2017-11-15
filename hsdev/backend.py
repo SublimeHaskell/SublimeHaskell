@@ -320,8 +320,7 @@ class HsDevBackend(Backend.HaskellBackend):
         return self.command('ping', {}, lambda r: r and ('message' in r) and (r['message'] == 'pong'))
 
     def scan(self, cabal=False, sandboxes=None, projects=None, files=None, paths=None, ghc=None, contents=None,
-             docs=False, infer=False, **backend_args):
-        wait_complete = backend_args.get('wait_complete', False)
+             docs=False, infer=False, wait_complete=False, **backend_args):
         action = self.command if wait_complete else self.async_command
         return action('scan', {'projects': projects or [],
                                'cabal': cabal,
