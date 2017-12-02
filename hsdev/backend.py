@@ -519,7 +519,7 @@ class HsDevBackend(Backend.HaskellBackend):
     def flags(self, _projectname, **backend_args):
         return self.command('flags', {}, **backend_args)
 
-    def autofix_show(self, messages, wait_complete=False, **backend_args):
+    def autofix_show(self, messages, wait_complete, **backend_args):
         action = self.list_command if wait_complete else self.async_list_command
         return action('autofix show', {'messages': messages}, ResultParse.parse_corrections, **backend_args)
 

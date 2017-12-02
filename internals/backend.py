@@ -239,7 +239,13 @@ class HaskellBackend(object):
     def flags(self, project_name, **backend_args):
         raise NotImplementedError("HaskellBackend.flags needs an implementation.")
 
-    def autofix_show(self, messages, **backend_args):
+    def autofix_show(self, messages, wait_complete, **backend_args):
+        '''Show autofixes for errors, when possible. Can be used synchrnously or asynchronously.
+
+        :param list(str) messages: A list of error messages
+        :param bool wait_complete: If True, wait to receive a response from the backend.
+        :return: The JSON autofix response from the backend, if :py:param:`wait_complete` is True, or None.
+        '''
         raise NotImplementedError("HaskellBackend.autofix_show needs an implementation.")
 
     def autofix_fix(self, messages, rest=None, pure=False, **backend_args):
@@ -446,7 +452,7 @@ class NullHaskellBackend(HaskellBackend):
     def flags(self, _projectname, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
-    def autofix_show(self, messages, **backend_args):
+    def autofix_show(self, messages, wait_complete, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def autofix_fix(self, messages, rest=None, pure=False, **backend_args):

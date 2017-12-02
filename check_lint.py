@@ -81,7 +81,7 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
                        on_response=go_chain_resp, on_error=go_chain_err, **kwargs)
         else:
             self.status_msg.stop()
-            BackendMgr.active_backend().autofix_show(self.msgs, on_response=self.on_autofix, wait_complete=False)
+            BackendMgr.active_backend().autofix_show(self.msgs, False, on_response=self.on_autofix)
 
     def on_autofix(self, corrections):
         # Oh, this looks pretty ugly. But, list comprehensions are supposedly faster than loops. And since this is
