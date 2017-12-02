@@ -3,13 +3,14 @@
 import os
 import re
 
+import sublime
 import sublime_plugin
 
-import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.cmdwin_types as CommandWin
+import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.settings as Settings
-import SublimeHaskell.internals.backend_mgr as BackendManager
+import SublimeHaskell.sublime_haskell_common as Common
 
 HAS_SUBLIME_REPL = True
 
@@ -20,72 +21,57 @@ except ImportError:
     HAS_SUBLIME_REPL = False
 
 
-COMMAND_RE = re.compile(r'^.*:[a-z]*$')
-IMPORT_RE = re.compile(r'^.*\bimport\s+(qualified\s+)?(?P<module>[\w\d\.]*)$')
+COMMAND_RE = re.compile(r'.*:(\w+)(\s+(\w+))?')
+IMPORT_RE = re.compile(r'.*\bimport\s+(qualified\s+)?(?P<module>[\w\d\.]*)$')
 
 
-def find_sublime_haskell_repl():
-    known_repls = list(sublimerepl.manager.find_repl('sublime_haskell_repl')) if HAS_SUBLIME_REPL else []
-    return known_repls
-
-
-def run_repl_command(repl, repl_cmd):
-    repl.write("{0}\n".format(repl_cmd))
-    repl.repl.write("{0}\n".format(repl_cmd))
-
-
-def show_scope(repl):
-    run_repl_command(repl, ":show modules")
-    run_repl_command(repl, ":show imports")
-
-
-class Repl(object):
-    def __init__(self, view, path=None, project_name=None):
-        self.view = view
-        self.path = path
-        if not path:
-            path = os.path.dirname(view.file_name())
-        self.project_name = project_name
-
-    def is_project(self):
-        return self.project_name is not None
-
-
-# external_id => view
-class Repls(object):
-    def __init__(self):
-        self.repls = {}
-
-    def set_repl_view(self, repl_req, view, **kwargs):
-        self.repls[repl_req] = Repl(view, **kwargs)
-
-    def get_repl_view(self, repl_req):
-        return self.repls.get(repl_req)
-
-KNOWN_REPLS = Repls()
+# Not used. Keep it around just in case it becomes useful in the future.
+#
+# def run_repl_command(repl, repl_cmd):
+#     repl.write("{0}\n".format(repl_cmd))
+#     repl.repl.write("{0}\n".format(repl_cmd))
 
 
 class SublimeHaskellAutocompleteRepl(sublime_plugin.EventListener):
-    def __init__(self):
-        pass
+    # Uncomment if attributes are added. Otherwise, it's a useless superclass call.
+    #
+    # def __init__(self):
+    #     super().__init__()
 
-    def repl_commands_completions(self):
-        cmds = ["abandon", "add", "back", "break", "browse", "cd", "cmd", "complete", "continue", "ctags", "def", "delete",
-                "edit", "etags", "force", "forward", "help", "history", "info", "issafe", "kind", "list", "load", "main",
-                "module", "print", "quit", "r", "reload", "run", "script", "set", "seti", "show", "showi", "sprint", "step",
-                "steplocal", "stepmodule", "trace", "type", "undef", "unset"]
-        return [(":{0}".format(cmd), ":{0}".format(cmd)) for cmd in cmds]
+    GHCI_CMDS = [(":{0}\tghci".format(cmd), ":{0}".format(cmd)) for cmd in [
+        '!', '?', 'abandon', 'add', 'back', 'break', 'browse!', 'browse', 'cd', 'cmd', 'complete', 'continue',
+        'ctags!', 'ctags', 'def', 'delete', 'edit', 'etags', 'force', 'forward', 'help', 'history', 'info!',
+        'info', 'issafe', 'kind!', 'kind', 'list', 'load!', 'load', 'main', 'module', 'print', 'quit',
+        'reload!', 'reload', 'run', 'show', 'showi', 'script', 'sprint', 'step', 'steplocal', 'stepmodule',
+        'trace', 'type', 'undef']]
 
-    # def on_query_completions(self, view, _prefix, locations):
-    #     if not HAS_SUBLIME_REPL or not Common.is_haskell_repl(view):
-    #         return []
+    GHCI_SHOW_ARG = [('{0}'.format(show), '{0}'.format(show)) for show in [
+        'args', 'bindings', 'breaks', 'context', 'editor', 'imports', 'language', 'linker', 'modules', 'packages',
+        'paths', 'prog', 'prompt', 'stop']]
 
-    #     repl = sublimerepl.manager.repl_view(view)
+    GHCI_SHOWI_ARG = [('{0}'.format(show), '{0}'.format(show)) for show in [
+        'language']]
 
-    #     line_contents = Common.get_line_contents(view, locations[0])
-    #     command = COMMAND_RE.match(line_contents)
-    #     if command:
-    #         return self.repl_commands_completions()
+    def on_query_completions(self, view, _prefix, locations):
+        if not HAS_SUBLIME_REPL or not Common.is_haskell_repl(view):
+            return []
+
+        repl = sublimerepl.manager.repl_view(view)
+        extra_flags = sublime.INHIBIT_WORD_COMPLETIONS|sublime.INHIBIT_EXPLICIT_COMPLETIONS
+
+        line_contents = Common.get_line_contents(view, locations[0])
+        command = COMMAND_RE.match(line_contents)
+        if command:
+            cmd, arg = command.group(1, 3)
+            if cmd == 'show':
+                return (self.GHCI_SHOW_ARG, extra_flags)
+            elif cmd == 'showi':
+                return (self.GHCI_SHOWI_ARG, extra_flags)
+            elif cmd and not arg:
+                return (self.GHCI_CMDS, extra_flags)
+
+            # Have a command and an argument, but we don't know what to do with the argument...
+            return []
 
     #     imp = IMPORT_RE.match(line_contents)
     #     if imp:
@@ -105,23 +91,38 @@ class SublimeHaskellAutocompleteRepl(sublime_plugin.EventListener):
 
 
 def repl_args(**kwargs):
-    def_args = {"type": "sublime_haskell",
-                "encoding": "utf8",
-                "cmd": ["ghci"],
-                "cwd": "$file_path",
-                "external_id": "sublime_haskell_repl",
+    ret_args = {'type': 'sublime_haskell',
+                'encoding': 'utf8',
+                'cmd': ['ghci'],
+                'cwd': '$file_path',
+                'external_id': 'sublime_haskell_repl',
                 "syntax": "Packages/SublimeHaskell/Syntaxes/HaskellRepl.tmLanguage"}
-
-    # Drop this options until https://github.com/wuub/SublimeREPL/pull/395 is merged
-    kwargs.pop('loaded')
-    kwargs.pop('caption')
-
-    ret_args = def_args.copy()
     ret_args.update(kwargs)
+    ## SublimeREPL does not like/support these arguments
+    ret_args.pop('caption', None)
+    ret_args.pop('loaded', None)
     return ret_args
 
 
+def repl_wrapper_cmd(exec_with, args):
+    wrapper = []
+    if exec_with == 'cabal':
+        wrapper = ['cabal', 'repl']
+    elif exec_with == 'cabal-new-build':
+        wrapper = ['cabal', 'new-repl']
+    elif exec_with == 'stack':
+        wrapper = ['stack', 'repl']
+    else:
+        errmsg = 'repl_wrapper_cmd: Unknown execution prefix \'{0}\''.format(exec_with)
+        raise RuntimeError(errmsg)
+
+    return wrapper + args
+
+
 class SublimeHaskellReplGhci(CommandWin.SublimeHaskellWindowCommand):
+    # def __init__(self, window):
+    #     super().__init__(window)
+
     def run(self, **_kwargs):
         opts = Settings.PLUGIN.ghci_opts or []
         self.window.run_command("repl_open", repl_args(cmd=["ghci"] + opts, loaded=None, caption="ghci"))
@@ -140,7 +141,6 @@ class SublimeHaskellReplGhciCurrentFile(CommandWin.SublimeHaskellWindowCommand):
             self.window.run_command("repl_open", repl_args(cmd=["ghci", "$file"] + opts,
                                                            loaded=view.file_name(),
                                                            caption="ghci: {0}".format(os.path.basename(view.file_name()))))
-            KNOWN_REPLS.set_repl_view(sublimerepl.repl_external_id(view.file_name()), view)
 
     def is_enabled(self):
         return HAS_SUBLIME_REPL and CommandWin.SublimeHaskellWindowCommand.is_enabled(self)
@@ -152,41 +152,87 @@ class SublimeHaskellReplCabal(CommandWin.SublimeHaskellWindowCommand):
         self.view = None
         self.project_name = None
         self.project_dir = None
-        self.names = []
+        self.targets = []
+        self.args = {}
+
     def run(self, **_kwargs):
         self.view = self.window.active_view()
-        if not self.view:
-            Common.show_status_message("No file active", False)
-        else:
+        if self.view:
+            self.targets = []
+            self.args = {}
+
             project_dir, project_name = Common.locate_cabal_project_from_view(self.view)
-            if not project_dir:
-                Common.show_status_message("Not in project", False)
-            ## FIXME:
-            proj_info = BackendManager.active_backend().project(project_name)
-            self.project_name = project_name
-            self.project_dir = project_dir
-            self.names = ['lib:{0}'.format(project_name)]
-            if proj_info:
-                self.names.extend(['exe:{0}'.format(executable['name'])
-                                   for executable in proj_info['description']['executables']])
-                self.names.extend(['test:{0}'.format(test['name'])
-                                   for test in proj_info['description']['tests']])
-            if len(self.names) > 1:
-                self.window.show_quick_panel(self.names, self.on_done)
+            Logging.log('repl: project_dir {0} project_name {1}'.format(project_dir, project_name), Logging.LOG_DEBUG)
+            if project_dir:
+                proj_info = BackendManager.active_backend().project(project_name)
+                self.project_name = project_name
+                self.project_dir = project_dir
+
+                if proj_info:
+                    descrip = proj_info.get('description', {})
+                    if descrip.get('library'):
+                        target = '{0} library'.format(project_name)
+                        self.targets.append(target)
+                        self.args[target] = (project_name, 'lib', '')
+
+                    for exe in descrip.get('executables', []):
+                        target = '{0} ({1} executable)'.format(exe['name'], project_name)
+                        self.targets.append(target)
+                        self.args[target] = (project_name, 'exe', exe['name'])
+
+                    for test in descrip.get('tests', []):
+                        target = '{0} ({1} test)'.format(test['name'], project_name)
+                        self.targets.append(target)
+                        self.args[target] = (project_name, 'test', test['name'])
+
+                len_targets = len(self.targets)
+                if len_targets > 1:
+                    self.window.show_quick_panel(self.targets, self.on_done)
+                elif len_targets == 1:
+                    self.on_done(0)
+                else:
+                    Common.show_status_message('No target found for REPL.')
             else:
-                self.on_done(0)
+                Common.show_status_message("Not in project", False)
+        else:
+            Common.show_status_message("No file active", False)
 
     def on_done(self, idx):
         if idx >= 0:
-            capt = "cabal repl: {0}/{1}".format(self.project_name, self.names[idx])
-            self.window.run_command("repl_open", repl_args(cmd=["cabal", "repl", self.names[idx]],
-                                                           cwd=self.project_dir,
-                                                           loaded=self.project_dir,
-                                                           caption=capt))
-            KNOWN_REPLS.set_repl_view(sublimerepl.repl_external_id(self.project_dir),
-                                      self.view,
-                                      path=self.project_dir,
-                                      project_name=self.project_name)
+            view = self.window.active_view()
+
+            project_builder = Settings.get_project_setting(view, 'haskell_build_tool', Settings.PLUGIN.haskell_build_tool)
+            (pkg, comp, target) = self.args[self.targets[idx]]
+            if project_builder in ['cabal', 'cabal-new-build']:
+                repl_target = ':'.join([comp, target])
+            elif project_builder in ['stack']:
+                repl_target = ':'.join([pkg, comp, target] if comp != 'lib' else [pkg, comp])
+
+            external_id = 'Haskell {0} repl {1}'.format(project_builder, repl_target)
+            repl_views = list(sublimerepl.manager.find_repl(external_id))
+            if not repl_views:
+                repl_cmd_args = []
+                ghci_opts = Settings.get_project_setting(view, 'ghci_opts', Settings.PLUGIN.ghci_opts)
+                if ghci_opts:
+                    repl_cmd_args += ['--ghci-options=' + ghci_opts]
+                else:
+                    ghc_opts = Settings.get_project_setting(view, 'ghc_opts', Settings.PLUGIN.ghc_opts)
+                    if ghc_opts:
+                        repl_cmd_args += ['--ghc-options' + ghc_opts]
+
+                repl_cmd_args.append(repl_target)
+                repl_cmd_args = repl_wrapper_cmd(project_builder, repl_cmd_args)
+                Logging.log('repl cmd args: {0}'.format(repl_cmd_args), Logging.LOG_DEBUG)
+
+                self.window.run_command("repl_open", repl_args(cmd=repl_cmd_args,
+                                                               cwd=self.project_dir,
+                                                               loaded=self.project_dir,
+                                                               external_id=external_id))
+            else:
+                # Hey, already running!
+                for repl in repl_views:
+                    win = repl.view.window()
+                    win.focus_view(repl.view)
 
     def is_enabled(self):
         return HAS_SUBLIME_REPL and Common.is_enabled_haskell_command(None, True)

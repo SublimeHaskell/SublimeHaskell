@@ -515,21 +515,21 @@ def show_status_message_process(msg, is_ok=None, timeout=300, priority=0):
 
 
 def is_with_syntax(view, syntax):
-    if syntax is not None:
-        window, view = get_haskell_command_window_view_file_project(view)[0:2]
-        if window and view:
-            syntax_file_for_view = view.settings().get('syntax')
-            if syntax_file_for_view and syntax_file_for_view.lower().endswith(syntax.lower()):
-                return True
+    window, view = get_haskell_command_window_view_file_project(view)[0:2]
+    if window and view:
+        _, synfile = os.path.split(view.settings().get('syntax'))
+        return synfile and synfile.lower() == syntax.lower()
 
     return False
 
 def is_cabal_source(view):
-    return is_with_syntax(view, syntax="Cabal.tmLanguage")
+    return is_with_syntax(view, "Cabal.tmLanguage")
 
 
 def is_haskell_source(view):
-    return is_with_syntax(view, syntax="Haskell.tmLanguage") or is_with_syntax(view, syntax="Haskell.sublime-syntax")
+    return any([is_with_syntax(view, syn) for syn in ["Haskell.tmLanguage",
+                                                      "Haskell.sublime-syntax",
+                                                      'Haskell-SublimeHaskell.tmLanguage']])
 
 
 def is_inspected_source(view=None):
@@ -537,11 +537,12 @@ def is_inspected_source(view=None):
 
 
 def is_haskell_repl(view=None):
-    return is_with_syntax(view, syntax="HaskellRepl.tmLanguage")
+    return any(is_with_syntax(view, syn) for syn in ['HaskellRepl.tmLanguage',
+                                                     'HaskellRepl.sublime-syntax'])
 
 
 def is_haskell_symbol_info(view=None):
-    return is_with_syntax(view, syntax="HaskellSymbolInfo.tmLanguage")
+    return is_with_syntax(view, "HaskellSymbolInfo.tmLanguage")
 
 
 class StatusMessageContext(object):

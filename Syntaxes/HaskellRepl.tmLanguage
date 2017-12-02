@@ -245,11 +245,12 @@
 						</dict>
 					</dict>
 					<key>match</key>
-					<string>(---*(?!([!#\$%&amp;\*\+\./&lt;=&gt;\?@\\\^\|\-~:]|[^[^\p{S}\p{P}]_"'\(\),;\[\]`\{}]))).*$\n?</string> 
-					<!-- ^ See https://www.haskell.org/onlinereport/haskell2010/haskellch10.html -->
-					<!-- The difficulty is to forbid things that create valid operators. -->
-					<!-- OK, now the explanation: -->
-					<!-- First, we match "dashes": -- plus any number of further dashes. -->
+					<string>(---*(?!([!#\$%&amp;\*\+\./&lt;=&gt;\?@\\\^\|\-~:]|[^[^\p{S}\p{P}]_"'\(\),;\[\]`\{}]))).*$\n?</string>
+					<!-- ^ See https://www.haskell.org/onlinereport/haskell2010/haskellch10.html
+					  The difficulty is to forbid things that create valid operators.
+
+					  OK, now the explanation:
+					  First, we match "dashes": - - plus any number of further dashes. -->
 					<!-- We now have to match "any⟨symbol⟩": match any characters that's not "symbol". -->
 					<!--   symbol → ascSymbol | uniSymbol⟨special | _ | " | '⟩ -->
 					<!-- we forbid those two with a negative lookahead: -->
@@ -548,7 +549,7 @@
 					<string>(?x)
 					(')
 					(?:
-						[\ -&(-\[\]-~"]								# Basic Char
+						[\ -&amp;(-\[\]-~"]								# Basic Char
 					  | (\\(?:NUL|SOH|STX|ETX|EOT|ENQ|ACK|BEL|BS|HT|LF|VT|FF|CR|SO|SI|DLE
 							|DC1|DC2|DC3|DC4|NAK|SYN|ETB|CAN|EM|SUB|ESC|FS|GS|RS
 							|US|SP|DEL|[abfnrtv\\\"'\&amp;]))		# Escapes
@@ -687,7 +688,7 @@
 			Therefore we are just trying to much something: name, open bracket etc.
 			And we match other stuff within patterns
 			-->
-			<!-- <string>^(\s*)(?!--)(?=([\w\s,']*|\(.*\)|\[.*\])\s+((::)|∷))</string> -->
+			<!-- <string>^(\s*)(?!- -)(?=([\w\s,']*|\(.*\)|\[.*\])\s+((::)|∷))</string> -->
 			<string>^(\s*)(?!--)(?:(\(\W\)|[\w']+)|[\(\[])(?=[\w',\s\[\]\(\)]*((?:::)|∷))</string>
 			<key>beginCaptures</key>
 			<dict>
@@ -1569,7 +1570,7 @@
 		</dict>
 	</dict>
 	<key>scopeName</key>
-	<string>source.haskell</string>
+	<string>source.haskell-repl</string>
 	<key>uuid</key>
 	<string>5C034675-1F6D-497E-8073-369D37E2FD7D</string>
 </dict>

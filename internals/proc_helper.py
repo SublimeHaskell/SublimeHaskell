@@ -171,6 +171,8 @@ def exec_with_wrapper(exec_with, install_dir, cmd_list):
         cmd_list = exec_wrapper_cmd(exec_with, cmd_list)
         if install_dir is not None:
             proc_args['cwd'] = Utils.normalize_path(install_dir)
+        else:
+            raise RuntimeError('ProcHelper.exec_with_wrapper: invalid install_dir (None)')
     else:
         cmd = Which.which(cmd_list[0], ProcHelper.get_extended_path())
         if cmd is not None:
