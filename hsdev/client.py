@@ -177,9 +177,10 @@ class HsDevClient(object):
                 # IPv6. Makes this code friendlier to IPv4 and IPv6 hybrid systems.
                 return socket.create_connection((host, port))
 
-            except IOError:
+            except (socket.gaierror, IOError):
                 # Captures all of the socket exceptions:
-                Logging.log('[pool {0}]: Failed to connect to hsdev server:'.format(idx), Logging.LOG_WARNING)
+                msg = '[pool {0}]: Failed to connect to hsdev {1}:{2}:'.format(idx, host, port)
+                Logging.log(msg, Logging.LOG_ERROR)
                 print(traceback.format_exc())
                 time.sleep(self.CONNECT_DELAY)
 

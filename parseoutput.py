@@ -121,14 +121,11 @@ def show_output_result_text(view, msg, text, exit_code, base_dir):
     """Shows text (formatted messages) in output with build result"""
 
     success = exit_code == 0
-
     success_message = 'SUCCEEDED' if success else 'FAILED'
-    output = u'Build {0}\n\n{1}'.format(success_message, text.strip())
 
-    Common.show_status_message_process(msg, success)
     # Show panel if there is any text to show (without the part that we add)
     if text and Settings.PLUGIN.show_error_window:
-        sublime.set_timeout(lambda: write_output(view, output, base_dir), 0)
+        sublime.set_timeout(lambda: write_output(view, u'Build {0}\n\n{1}'.format(success_message, text.strip()), base_dir), 0)
 
 
 def mark_messages_in_views(errors):
@@ -207,7 +204,7 @@ class SublimeHaskellNextError(CommandWin.SublimeHaskellTextCommand):
     def run(self, _edit, **_kwargs):
         errs = errors_for_view(self.view)
         if not errs:
-            Common.show_status_message('No errors or warnings!', priority=5)
+            Common.sublime_status_message('No errors or warnings!')
         else:
             view_pt = self.view.sel()[0]
             # Bump just past the view's point, just in case we're sitting on top of the current
@@ -234,7 +231,7 @@ class SublimeHaskellPreviousError(CommandWin.SublimeHaskellTextCommand):
     def run(self, _edit, **_kwargs):
         errs = errors_for_view(self.view)
         if not errs:
-            Common.show_status_message("No errors or warnings!", priority=5)
+            Common.sublime_status_message("No errors or warnings!")
         else:
             cur_point = symbols.Region.from_region(self.view, self.view.sel()[0])
             prev_err = next(filter(lambda e: e.region < cur_point, reversed(errs)), None)

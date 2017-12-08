@@ -92,7 +92,7 @@ class SublimeHaskellBrowseDeclarations(CommandWin.BackendWindowCommand):
         self.window.show_quick_panel(brief_decls, self.on_done)
 
     def on_err(self, err, _details):
-        Common.show_status_message('Browse declarations: {0}'.format(err))
+        Common.sublime_status_message('Browse declarations: {0}'.format(err))
 
     def on_done(self, idx):
         if idx >= 0:
@@ -115,7 +115,7 @@ class SublimeHaskellFindDeclarations(CommandWin.BackendWindowCommand):
                              str(decl.defined_module().location)] for decl in self.decls]
             self.window.show_quick_panel(module_decls, self.on_select)
         else:
-            Common.show_status_message("Nothing found for: {0}".format(sym))
+            Common.sublime_status_message("Nothing found for: {0}".format(sym))
 
     def on_change(self, _sym):
         pass
@@ -155,15 +155,14 @@ class SublimeHaskellHayoo(CommandWin.BackendWindowCommand):
             show_declaration_info(self.window.active_view(), self.decls[idx])
 
     def on_err(self, err, _details):
-        self.status_msg.fail()
-        self.status_msg.stop()
-        Common.show_status_message("Hayoo '{0}': {1}".format(self.search_str, err))
+        self.status_msg.result_fail()
+        Common.sublime_status_message("Hayoo '{0}': {1}".format(self.search_str, err))
 
     def on_resp(self, resp):
-        self.status_msg.stop()
+        self.status_msg.result_ok()
         self.decls = resp
         if not self.decls:
-            Common.show_status_message("Hayoo '{0}': not found".format(self.search_str))
+            Common.sublime_status_message("Hayoo '{0}': not found".format(self.search_str))
             return
         brief_decls = [[decl.module.name + ': ' + decl.brief(use_unicode=False),
                         decl.defined_module().location] for decl in self.decls]
@@ -198,19 +197,18 @@ class SublimeHaskellSearch(CommandWin.BackendWindowCommand):
             show_declaration_info(self.window.active_view(), self.decls[idx])
 
     def on_err(self, err, _details):
-        self.status_msg.fail()
-        self.status_msg.stop()
-        Common.show_status_message("Search '{0}': {1}".format(self.search_str, err))
+        self.status_msg.result_fail()
+        Common.sublime_status_message("Search '{0}': {1}".format(self.search_str, err))
 
     def on_symbol(self, resp):
         self.decls.extend(resp)
         BackendManager.active_backend().hayoo(self.search_str, page=0, pages=5, on_response=self.on_resp, on_error=self.on_err)
 
     def on_resp(self, resp):
-        self.status_msg.stop()
+        self.status_msg.result_ok()
         self.decls.extend(resp)
         if not self.decls:
-            Common.show_status_message("Search '{0}' not found".format(self.search_str))
+            Common.sublime_status_message("Search '{0}' not found".format(self.search_str))
         else:
             hayoo_results = [[decl.module.name + ': ' + decl.brief(use_unicode=False),
                               decl.defined_module().location] for decl in self.decls]
@@ -236,7 +234,7 @@ class SublimeHaskellGoTo(CommandWin.BackendWindowCommand):
             modules = BackendManager.active_backend().module(project_name, file=self.current_filename)
             current_project = Utils.head_of(modules).location.project
             if not current_project:
-                Common.show_status_message('File {0} is not in project'.format(self.current_filename), False)
+                Common.sublime_status_message('File {0} is not in project'.format(self.current_filename))
                 return
 
             decls = self.sorted_decls_name(BackendManager.active_backend().symbol(project=current_project))
@@ -350,12 +348,12 @@ class SublimeHaskellGoToHackageModule(CommandWin.BackendTextCommand):
                             BackendManager.active_backend().lookup(qsymbol.full_name(), file=scope) or \
                             BackendManager.active_backend().symbol(lookup=qsymbol.full_name(), search_type='exact')
                     if not decls:
-                        Common.show_status_message('Module for symbol {0} not found'.format(qsymbol.full_name()))
+                        Common.sublime_status_message('Module for symbol {0} not found'.format(qsymbol.full_name()))
                         return
                     modules = [decl.defined_module() for decl in decls]
 
             if not modules:
-                Common.show_status_message('Module {0} not found'.format(qsymbol.module))
+                Common.sublime_status_message('Module {0} not found'.format(qsymbol.module))
             elif len(modules) == 1:
                 pkg_id = modules[0].location.package.package_id()
                 pkg_name = modules[0].name.replace('.', '-')
@@ -426,21 +424,19 @@ class SublimeHaskellInferDocs(CommandWin.BackendTextCommand):
             self.status_msg.start()
 
             def on_resp_(_resp):
-                self.status_msg.stop()
+                self.status_msg.result_ok()
 
             def on_err_(_err, _details):
-                self.status_msg.fail()
-                self.status_msg.stop()
+                self.status_msg.result_fail()
 
             BackendManager.active_backend().infer(files=[self.current_file_name], on_response=on_resp_, on_error=on_err_)
 
         def on_resp(_resp):
-            self.status_msg.stop()
+            self.status_msg.result_ok()
             run_infer()
 
         def on_err(_err, _details):
-            self.status_msg.fail()
-            self.status_msg.stop()
+            self.status_msg.result_fail()
             run_infer()
 
         BackendManager.active_backend().docs(files=[self.current_file_name], on_response=on_resp, on_error=on_err)
@@ -489,7 +485,7 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
                 return
 
             if not module_word and not ident:
-                Common.show_status_message('No symbol selected', False)
+                Common.sublime_status_message('No symbol selected')
                 return
 
             self.whois_name = qsymbol.qualified_name()
@@ -504,7 +500,7 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
                 self.candidates = BackendManager.active_backend().symbol(lookup=self.full_name, search_type='exact')
 
         if not self.candidates:
-            Common.show_status_message('Symbol {0} not found'.format(self.full_name))
+            Common.sublime_status_message('Symbol {0} not found'.format(self.full_name))
         elif len(self.candidates) == 1:
             self.show_symbol_info(self.candidates[0])
         elif not no_browse:
@@ -528,7 +524,7 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
             if info:
                 self.show_symbol_info(info[0])
             else:
-                Common.show_status_message("Can't get info for {0}.{1}".format(module_name, ident_name), False)
+                Common.sublime_status_message("Can't get info for {0}.{1}".format(module_name, ident_name),)
 
     def show_symbol_info(self, decl):
         show_declaration_info_panel(self.view, decl)
@@ -561,7 +557,7 @@ class SublimeHaskellToggleSymbolInfoCommand(CommandWin.BackendWindowCommand):
     def run(self, **_kwargs):
         global TOGGLE_SYMBOL_INFO
         TOGGLE_SYMBOL_INFO = not TOGGLE_SYMBOL_INFO
-        Common.show_status_message('continuous symbol info: {0}'.format('on' if TOGGLE_SYMBOL_INFO else 'off'))
+        Common.sublime_status_message('continuous symbol info: {0}'.format('on' if TOGGLE_SYMBOL_INFO else 'off'))
 
 
 class SublimeHaskellContinuousSymbolInfo(sublime_plugin.EventListener):
@@ -598,14 +594,14 @@ class SublimeHaskellCleanImports(CommandWin.BackendTextCommand):
                         else:
                             self.view.replace(edit, self.view.line(point), new_imp)
                 else:
-                    Common.show_status_message('different number of imports: {0} and {1}'.format(len(imports), len(result)))
+                    Common.sublime_status_message('different number of imports: {0} and {1}'.format(len(imports), len(result)))
             else:
                 if len(result) == 1:
-                    Common.show_status_message(result[0])
+                    Common.sublime_status_message(result[0])
                 else:
                     sublime.message_dialog('\n'.join(result))
         else:
-            Common.show_status_message('Clean Imports failed: module not scanned')
+            Common.sublime_status_message('Clean Imports failed: module not scanned')
 
 
 class SublimeHaskellBrowseModule(CommandWin.BackendTextCommand):
@@ -632,12 +628,12 @@ class SublimeHaskellBrowseModule(CommandWin.BackendTextCommand):
         if filename:
             the_module = Utils.head_of(BackendManager.active_backend().module(project_name, file=filename))
             if not the_module:
-                Common.show_status_message('Module {0} not found'.format(filename))
+                Common.sublime_status_message('Module {0} not found'.format(filename))
                 return
         elif module_name:
             cand_mods = self.candidate_modules(project_name, module_name, scope, symdb)
             if not cand_mods:
-                Common.show_status_message('Module {0} not found'.format(module_name))
+                Common.sublime_status_message('Module {0} not found'.format(module_name))
                 return
             elif len(cand_mods) == 1:
                 the_module = self.get_module_info(project_name, cand_mods[0], module_name)
@@ -717,7 +713,7 @@ class SublimeHaskellGoToDeclaration(CommandWin.BackendTextCommand):
             if loc:
                 self.view.window().open_file(loc, sublime.ENCODED_POSITION)
             else:
-                Common.show_status_message('Source location of {0} not found'.format(qsymbol.name), False)
+                Common.sublime_status_message('Source location of {0} not found'.format(qsymbol.name))
         else:
             backend = BackendManager.active_backend()
             whois_name = qsymbol.qualified_name()
@@ -747,7 +743,7 @@ class SublimeHaskellGoToDeclaration(CommandWin.BackendTextCommand):
                 module_candidates = [m for m in backend.list_modules(source=True, module=full_name) if m.name == full_name]
 
             if not candidates and not module_candidates:
-                Common.show_status_message('Declaration {0} not found'.format(qsymbol.name), False)
+                Common.sublime_status_message('Declaration {0} not found'.format(qsymbol.name))
             else:
                 candidates_len = len(candidates) if candidates is not None else 0
                 module_candidates_len = len(module_candidates) if module_candidates is not None else 0
@@ -1042,14 +1038,13 @@ class SublimeHaskellAutoFix(CommandWin.BackendWindowCommand):
     def run(self, **_kwargs):
         if self.window.active_view().file_name():
             def on_resp(msgs):
-                self.status_msg.stop()
+                self.status_msg.result_ok()
                 if msgs is not None:
                     sublime.set_timeout(lambda: self.on_got_messages(msgs), 0)
 
             def on_err(err, _details):
-                self.status_msg.fail()
-                self.status_msg.stop()
-                Common.show_status_message('Check & Lint: {0}'.format(err), False)
+                self.status_msg.result_fail()
+                Common.sublime_status_message('Check & Lint: {0}'.format(err))
 
             self.status_msg = Common.status_message_process('Autofix: ' + self.window.active_view().file_name(), priority=3)
             self.status_msg.start()

@@ -371,12 +371,11 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
 
         def scan_resp(_resp):
             Logging.log('scan_contents:scan_resp invoked.', Logging.LOG_INFO)
-            status_msg.stop()
+            status_msg.result_ok()
             self.update_completions_async([current_file_name])
 
         def scan_err(_err, _details):
-            status_msg.fail()
-            status_msg.stop()
+            status_msg.result_fail()
 
         scan_contents = {current_file_name: view.substr(sublime.Region(0, view.size()))}
         BackendManager.active_backend().scan(contents=scan_contents, on_response=scan_resp, on_error=scan_err)

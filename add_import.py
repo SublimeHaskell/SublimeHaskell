@@ -39,7 +39,7 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
                     self.view.window().show_quick_panel([[c.module.name] for c in self.candidates], self.on_done)
             else:
                 if len(self.candidates) == 1:
-                    Common.show_status_message(self.candidates[0])
+                    Common.sublime_status_message(self.candidates[0])
                 else:
                     sublime.message_dialog('\n'.join(self.candidates))
         else:
@@ -94,7 +94,7 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
             point = self.view.text_point(insert_line, 0)
             self.view.insert(edit, point, insert_text)
 
-            Common.show_status_message('Import {0} added'.format(module_name), True)
+            Common.sublime_status_message('Import {0} added'.format(module_name))
 
     def is_visible(self):
         return Common.is_haskell_source(self.view) and super().is_visible()

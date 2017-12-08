@@ -58,7 +58,7 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
             if not self.fly_mode:
                 ParseOutput.hide_output(self.view)
                 if cmds:
-                    self.status_msg = Common.status_message_process(msg + ': ' + self.filename, priority=2)
+                    self.status_msg = Common.status_message_process(msg + ': ' + self.filename)
                     self.status_msg.start()
                     self.go_chain(cmds)
                 else:
@@ -74,13 +74,13 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
                 self.go_chain(tail_cmds)
 
             def go_chain_err(_err, _details):
-                self.status_msg.fail()
+                self.status_msg.result_fail()
                 self.go_chain([])
 
             agent_func(modify_args(self.filename), contents=self.contents, wait_complete=False,
                        on_response=go_chain_resp, on_error=go_chain_err, **kwargs)
         else:
-            self.status_msg.stop()
+            self.status_msg.result_ok()
             BackendMgr.active_backend().autofix_show(self.msgs, False, on_response=self.on_autofix)
 
     def on_autofix(self, corrections):

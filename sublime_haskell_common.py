@@ -1,6 +1,9 @@
 # -*- coding: UTF-8 -*-
 
 import fnmatch
+import functools
+import heapq
+import itertools
 import os
 import os.path
 import re
@@ -367,74 +370,58 @@ def sublime_status_message(msg):
     sublime.set_timeout(lambda: sublime.status_message(u'SublimeHaskell: {0}'.format(msg)), 0)
 
 
-class StatusMessage(object):
-    # duration — duration of message
-    # is_process — whether to show dots in message
-    # is_ok — whether to show ✔ (True) or ✘ (False)
-    # Note, that is is_ok is not None, dots will not be shown (is_process is ignored)
-    def __init__(self, msg, duration=1, timeout=300, priority=0, is_process=True, is_ok=None):
+@functools.total_ordering
+class ProcessStatusMessage(object):
+    counter = itertools.count()
+
+    def __init__(self, msg, timeout=300.0, priority=0):
         self.msg = msg
-        self.duration = duration
-        self.timeout = timeout
         self.priority = priority
-        self.is_process = is_process
-        self.is_ok = is_ok
+        self.msg_id = next(self.counter)
+        self.timeout = timeout
+        self.result = None
 
     def is_active(self):
-        if self.is_process:
-            return self.timeout >= 0
-
-        return self.duration >= 0
+        return self.timeout >= 0.0 and self.result is None
 
     def tick(self, interval):
-        if self.is_process:
-            self.timeout = self.timeout - interval
-        else:
-            self.duration = self.duration - interval
-        return self.is_active()
+        self.timeout -= interval
+        return self
 
-    # Get message with dots or marks
     def message(self, ticks):
-        if self.is_ok is not None:
-            # return u'{0} {1}'.format(self.msg, u'\u2714' if self.is_ok else u'\u2718')
-            return u'{0} {1}'.format(self.msg, u'[ok]' if self.is_ok else u'[error]')
-        if self.is_process:
-            return u'{0}{1}'.format(self.msg, '.' * (int(ticks / 5) % 4))
-        return self.msg
+        if self.is_active():
+            return u'{0}{1}'.format(self.msg, '.' * (ticks % 4))
+
+        # not self.is_active():
+        return u'{0} {1}'.format(self.msg, '[timeout]' if self.result is None else (u'\u2714' if self.result else u'\u2718'))
 
     def change_message(self, new_msg):
         self.msg = new_msg
 
-    def ok(self):
-        self.is_ok = True
+    def result_ok(self):
+        self.result = True
 
-    def fail(self):
-        self.is_ok = False
+    def result_fail(self):
+        self.result = False
 
-    def stop(self, is_ok=None):
-        if is_ok is not None:
-            self.is_ok = is_ok
-        self.is_process = False
+    def __eq__(self, rhs):
+        return self.priority == rhs.priority and self.msg_id == rhs.msg_id
 
-    @staticmethod
-    def process(msg, timeout=300, duration=1, priority=0):
-        return StatusMessage(msg, duration=duration, timeout=timeout, priority=priority)
-
-    @staticmethod
-    def status(msg, duration=1, priority=0, is_ok=None):
-        return StatusMessage(msg, duration=duration, priority=priority, is_process=False, is_ok=is_ok)
+    def __gt__(self, rhs):
+        # This message belongs farther back in the queue if its message id is smaller than the rhs-compared message
+        # id. In othe words, newer (later) messages sort lower.
+        return self.priority > rhs.priority or (self.priority == rhs.priority and self.msg_id < rhs.msg_id)
 
 
 class StatusMessagesManager(threading.Thread):
     # msg ⇒ StatusMessage
-    messages = LockedObject.LockedObject({})
-    # [StatusMessage × time]
-    priorities = LockedObject.LockedObject([])
+    messages = []
+    msglock = threading.RLock()
 
     def __init__(self):
         super().__init__()
-        self.daemon = True
-        self.interval = 0.1
+        # self.daemon = True
+        self.interval = 0.5
         self.event = threading.Event()
         self.ticks = 0
         self.timer = None
@@ -445,73 +432,98 @@ class StatusMessagesManager(threading.Thread):
             self.event.clear()
             self.ticks = 0
             # Ok, there are some messages, start showing them
+            ## print('smgr, enter show: len(self.messages) = {0}'.format(len(self.messages)))
             while self.show():
                 self.timer = threading.Timer(self.interval, self.tick)
                 self.timer.start()
                 self.timer.join()
+                ## print('smgr, show: len(self.messages) = {0}'.format(len(self.messages)))
+
 
     def show(self):
-        # Show current message, clear event if no events
-        with StatusMessagesManager.priorities as prios:
-            if not prios:
-                return False
+        msg = ''
+        with self.msglock:
+            if self.messages:
+                msg = self.messages[0].message(self.ticks)
 
-            cur_msg, _ = prios[0]
-            sublime_status_message(cur_msg.message(self.ticks))
+        if msg:
+            sublime_status_message(msg)
             return True
+
+        return False
+
 
     def tick(self):
         self.ticks = self.ticks + 1
-        # Tick all messages, remove outdated, resort priority list
-        with StatusMessagesManager.priorities as prios:
-            for prio in prios:
-                prio[0].tick(self.interval)
-        self.update()
+        with self.msglock:
+            self.messages = [m for m in self.messages if m.tick(self.interval).is_active()]
+        self.show()
+
 
     def add(self, new_message):
-        with StatusMessagesManager.priorities as prios:
-            prios.append((new_message, time.clock()))
-        with StatusMessagesManager.messages as msgs:
-            msgs[new_message.msg] = new_message
-        self.update()
+        with self.msglock:
+            heapq.heappush(self.messages, new_message)
+
         self.event.set()
 
-    def get(self, key):
-        with StatusMessagesManager.messages as msgs:
-            return msgs.get(key)
+    def remove(self, msg):
+        def do_remove():
+            with self.msglock:
+                self.messages = [m for m in self.messages if m != msg]
+                # Note: heapify does its work in-place.
+                heapq.heapify(self.messages)
+                self.show()
+                self.event.set()
 
-    def update(self):
-        # Update priority list
-        with StatusMessagesManager.priorities as prios:
-            prios = [prio for prio in prios if prio[0].is_active()]
-            # Ended processes go first, then by priority, and then by time of message addition
-            prios.sort(key=lambda x: (x[0].is_process, -x[0].priority, x[1]))
-        with StatusMessagesManager.messages as msgs:
-            msgs.clear()
-            msgs.update(dict([item for item in msgs.items() if item[1].is_active()]))
+        if msg in self.messages:
+            if len(self.messages) > 1:
+                do_remove()
+            else:
+                threading.Timer(4.5, do_remove).start()
+
 
 STATUS_MSG_MANAGER = StatusMessagesManager()
 STATUS_MSG_MANAGER.start()
 
-def show_status_message(msg, is_ok=None, priority=0):
-    """
-    Show status message with check mark (is_ok = true), ballot x (is_ok = false)
-    """
-    STATUS_MSG_MANAGER.add(StatusMessage.status(msg, priority=priority, is_ok=is_ok))
+
+class StatusMessageContext(object):
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        if exc_type:
+            self.msg.result_fail()
+        else:
+            self.msg.result_ok()
+        self.stop()
+
+    def start(self):
+        STATUS_MSG_MANAGER.add(self.msg)
+
+    def stop(self):
+        STATUS_MSG_MANAGER.remove(self.msg)
 
 
-def show_status_message_process(msg, is_ok=None, timeout=300, priority=0):
-    """
-    Same as show_status_message, but shows permanently until called with is_ok not None
-    There can be only one message process in time, message with highest priority is shown
-    For example, when building project, there must be only message about building
-    """
-    if is_ok is not None:
-        smsg = STATUS_MSG_MANAGER.get(msg)
-        if smsg:
-            smsg.stop(is_ok=is_ok)
-    else:
-        STATUS_MSG_MANAGER.add(StatusMessage.process(msg, timeout=timeout, priority=priority))
+    def change_message(self, new_msg):
+        self.msg.change_message(new_msg)
+
+    def result_ok(self):
+        self.msg.result_ok()
+        STATUS_MSG_MANAGER.show()
+        self.stop()
+
+    def result_fail(self):
+        self.msg.result_fail()
+        STATUS_MSG_MANAGER.show()
+        self.stop()
+
+
+def status_message_process(msg, timeout=300.0, priority=0):
+    return StatusMessageContext(ProcessStatusMessage(msg, timeout=timeout, priority=priority))
 
 
 def is_with_syntax(view, syntax):
@@ -543,47 +555,6 @@ def is_haskell_repl(view=None):
 
 def is_haskell_symbol_info(view=None):
     return is_with_syntax(view, "HaskellSymbolInfo.tmLanguage")
-
-
-class StatusMessageContext(object):
-    def __init__(self, msg, is_ok):
-        self.msg = msg
-        self.is_ok = is_ok
-
-    def __enter__(self):
-        self.start()
-        return self
-
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        if exc_type:
-            self.fail()
-        self.stop()
-
-    def start(self):
-        STATUS_MSG_MANAGER.add(self.msg)
-
-    def stop(self):
-        self.msg.stop(self.is_ok)
-
-    def ok(self):
-        self.is_ok = True
-
-    def fail(self):
-        self.is_ok = False
-
-    def change_message(self, new_msg):
-        self.msg.change_message(new_msg)
-
-    def percentage_message(self, current, total=100):
-        self.change_message('{0} ({1}%)'.format(self.msg, int(current * 100 / total)))
-
-
-def status_message(msg, is_ok=True, priority=0):
-    return StatusMessageContext(StatusMessage.status(msg, priority=priority), is_ok=is_ok)
-
-
-def status_message_process(msg, is_ok=True, timeout=300, priority=0):
-    return StatusMessageContext(StatusMessage.process(msg, timeout=timeout, priority=priority), is_ok=is_ok)
 
 
 def sublime_haskell_cache_path():

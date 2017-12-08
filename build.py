@@ -212,7 +212,7 @@ class SublimeHaskellBuildCommand(CommandWin.SublimeHaskellWindowCommand):
             on_selected(psel[0], psel[1]['path'])
 
         if not projs:
-            Common.show_status_message("No active projects found.", is_ok=False, priority=5)
+            Common.sublime_status_message("No active projects found.")
         elif len(projs) == 1:
             # There's only one project, build it
             run_selected(projs[0])
@@ -254,7 +254,7 @@ class SublimeHaskellBuildCommand(CommandWin.SublimeHaskellWindowCommand):
         # names are of course possible, but unlikely, so we let them wait)
         if project_name in self.PROJECTS_BEING_BUILT:
             Logging.log("Waiting for build action on '%s' to complete." % project_name, Logging.LOG_WARNING)
-            Common.show_status_message('Already building %s' % project_name, is_ok=False, priority=5)
+            Common.sublime_status_message('Already building {0}'.format(project_name))
             return
 
         # Set project as building
@@ -297,7 +297,6 @@ class SublimeHaskellBuildCommand(CommandWin.SublimeHaskellWindowCommand):
         # Run them
         msg = '{0} {1} with {2}\ncommands:\n{3}'.format(action_title, project_name, tool_title, commands)
         Logging.log(msg, Logging.LOG_DEBUG)
-        Common.show_status_message_process(msg, priority=3)
         Utils.run_async('wait_for_chain_to_complete', self.wait_for_chain_to_complete, view, project_dir, msg, commands,
                         on_done=done_callback)
 

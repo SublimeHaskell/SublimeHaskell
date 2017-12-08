@@ -16,7 +16,7 @@ class SublimeHaskellCabalList(CommandWin.SublimeHaskellWindowCommand):
     def on_done(self, inp):
         self.packages = BackendMgr.active_backend().cabal_list(input)
         if not self.packages:
-            Common.show_status_message("Package {0} not found".format(inp))
+            Common.sublime_status_message("Package {0} not found".format(inp))
         else:
             self.window.show_quick_panel([([p.name] + ([p.synopsis] if p.synopsis else [])) for p in self.packages],
                                          self.on_select)

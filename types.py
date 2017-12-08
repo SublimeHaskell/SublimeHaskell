@@ -274,7 +274,7 @@ class SublimeHaskellShowType(CommandWin.SublimeHaskellTextCommand):
                                                    syntax='Haskell-SublimeHaskell')
             self.view.window().show_quick_panel([t.typename for t in self.types], self.on_done, 0, -1, self.on_changed)
         else:
-            Common.show_status_message("Can't infer type", False)
+            Common.sublime_status_message("Can't infer type")
 
     def on_done(self, idx):
         self.view.erase_regions('typed')
@@ -315,7 +315,7 @@ class SublimeHaskellShowTypes(SublimeHaskellShowType):
 
     def show_types(self, types):
         if not types:
-            Common.show_status_message("Can't infer type", False)
+            Common.sublime_status_message("Can't infer type")
             return
 
         self.types = types
@@ -354,7 +354,7 @@ class SublimeHaskellShowAllTypes(CommandWin.SublimeHaskellTextCommand):
 
     def show_types(self, types):
         if not types:
-            Common.show_status_message("Can't infer type", False)
+            Common.sublime_status_message("Can't infer type")
             return
 
         view_sel = self.view.sel()[0]
@@ -490,7 +490,7 @@ class SublimeHaskellExpandSelectionExpression(SublimeHaskellShowType):
             SublimeHaskellExpandSelectionExpression.Infos = [ExpandSelectionInfo(self.view, s) for s in selections]
 
         if not self.is_infos_valid(selections):
-            Common.show_status_message('Unable to retrieve expand selection info', False)
+            Common.sublime_status_message('Unable to retrieve expand selection info')
             return
 
         selinfo = [i.expand() for i in self.Infos]
