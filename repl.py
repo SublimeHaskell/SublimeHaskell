@@ -21,11 +21,8 @@ except ImportError:
     HAS_SUBLIME_REPL = False
 
 
-COMMAND_RE = re.compile(r'.*:(\w+)(\s+(\w+))?')
-IMPORT_RE = re.compile(r'.*\bimport\s+(qualified\s+)?(?P<module>[\w\d\.]*)$')
-
-
-# Not used. Keep it around just in case it becomes useful in the future.
+# Not used. Keep it around just in case it becomes useful in the future because we need to interact with
+# the REPL directly.
 #
 # def run_repl_command(repl, repl_cmd):
 #     repl.write("{0}\n".format(repl_cmd))
@@ -45,49 +42,36 @@ class SublimeHaskellAutocompleteRepl(sublime_plugin.EventListener):
         'reload!', 'reload', 'run', 'show', 'showi', 'script', 'sprint', 'step', 'steplocal', 'stepmodule',
         'trace', 'type', 'undef']]
 
-    GHCI_SHOW_ARG = [('{0}'.format(show), '{0}'.format(show)) for show in [
+    GHCI_SHOW_ARG = [('{0}\tghci show'.format(show), '{0}'.format(show)) for show in [
         'args', 'bindings', 'breaks', 'context', 'editor', 'imports', 'language', 'linker', 'modules', 'packages',
         'paths', 'prog', 'prompt', 'stop']]
 
-    GHCI_SHOWI_ARG = [('{0}'.format(show), '{0}'.format(show)) for show in [
+    GHCI_SHOWI_ARG = [('{0}\tghci showi'.format(show), '{0}'.format(show)) for show in [
         'language']]
+
+    COMMAND_RE = re.compile(r':(\w+)(\s+(\w+))?')
 
     def on_query_completions(self, view, _prefix, locations):
         if not HAS_SUBLIME_REPL or not Common.is_haskell_repl(view):
             return []
 
-        repl = sublimerepl.manager.repl_view(view)
-        extra_flags = sublime.INHIBIT_WORD_COMPLETIONS|sublime.INHIBIT_EXPLICIT_COMPLETIONS
-
-        line_contents = Common.get_line_contents(view, locations[0])
-        command = COMMAND_RE.match(line_contents)
+        compl_flags = sublime.INHIBIT_WORD_COMPLETIONS|sublime.INHIBIT_EXPLICIT_COMPLETIONS
+        replv = sublimerepl.manager.repl_view(view)
+        command = self.COMMAND_RE.match(replv.user_input)
         if command:
             cmd, arg = command.group(1, 3)
             if cmd == 'show':
-                return (self.GHCI_SHOW_ARG, extra_flags)
+                return (self.GHCI_SHOW_ARG, compl_flags)
             elif cmd == 'showi':
-                return (self.GHCI_SHOWI_ARG, extra_flags)
+                return (self.GHCI_SHOWI_ARG, compl_flags)
             elif cmd and not arg:
-                return (self.GHCI_CMDS, extra_flags)
+                return (self.GHCI_CMDS, compl_flags)
 
             # Have a command and an argument, but we don't know what to do with the argument...
             return []
 
-    #     imp = IMPORT_RE.match(line_contents)
-    #     if imp:
-    #         mod = imp.group('module')
-    #         repl_id = KNOWN_REPLS.get_repl_view(repl.external_id)
-    #         cwd = repl_id.path if repl_id else None
-
-    #         return (autocomplete.AutoCompletion().get_module_completions_for(mod, current_dir=cwd),
-    #                 sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
-
-    #     # ????
-    #     completions = []
-
-    #     if Settings.PLUGIN.inhibit_completions and len(completions) != 0:
-    #         return (completions, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
-    #     return completions
+        # Kind of a punt -- use word completions based on whatever ST finds in the view's buffer.
+        return ([], sublime.INHIBIT_EXPLICIT_COMPLETIONS)
 
 
 def repl_args(**kwargs):
@@ -119,7 +103,7 @@ def repl_wrapper_cmd(exec_with, args):
     return wrapper + args
 
 
-class SublimeHaskellReplGhci(CommandWin.SublimeHaskellWindowCommand):
+class SublimeHaskellReplGhciCommand(CommandWin.SublimeHaskellWindowCommand):
     # def __init__(self, window):
     #     super().__init__(window)
 
@@ -131,11 +115,11 @@ class SublimeHaskellReplGhci(CommandWin.SublimeHaskellWindowCommand):
         return HAS_SUBLIME_REPL
 
 
-class SublimeHaskellReplGhciCurrentFile(CommandWin.SublimeHaskellWindowCommand):
+class SublimeHaskellReplGhciCurrentFileCommand(CommandWin.SublimeHaskellWindowCommand):
     def run(self, **_kwargs):
         view = self.window.active_view()
         if not view:
-            Common.show_status_message("No file active", False)
+            Common.sublime_status_message("No file active")
         else:
             opts = Settings.PLUGIN.ghci_opts or []
             self.window.run_command("repl_open", repl_args(cmd=["ghci", "$file"] + opts,
@@ -143,10 +127,10 @@ class SublimeHaskellReplGhciCurrentFile(CommandWin.SublimeHaskellWindowCommand):
                                                            caption="ghci: {0}".format(os.path.basename(view.file_name()))))
 
     def is_enabled(self):
-        return HAS_SUBLIME_REPL and CommandWin.SublimeHaskellWindowCommand.is_enabled(self)
+        return HAS_SUBLIME_REPL
 
 
-class SublimeHaskellReplCabal(CommandWin.SublimeHaskellWindowCommand):
+class SublimeHaskellReplCabalCommand(CommandWin.SublimeHaskellWindowCommand):
     def __init__(self, window):
         super().__init__(window)
         self.view = None
@@ -186,16 +170,16 @@ class SublimeHaskellReplCabal(CommandWin.SublimeHaskellWindowCommand):
                         self.args[target] = (project_name, 'test', test['name'])
 
                 len_targets = len(self.targets)
-                if len_targets > 1:
-                    self.window.show_quick_panel(self.targets, self.on_done)
-                elif len_targets == 1:
+                if len_targets == 1:
                     self.on_done(0)
+                elif len_targets > 1:
+                    self.window.show_quick_panel(self.targets, self.on_done)
                 else:
-                    Common.show_status_message('No target found for REPL.')
+                    Common.sublime_status_message('No target found for REPL.')
             else:
-                Common.show_status_message("Not in project", False)
+                Common.sublime_status_message("Not in project")
         else:
-            Common.show_status_message("No file active", False)
+            Common.sublime_status_message("No file active")
 
     def on_done(self, idx):
         if idx >= 0:
@@ -229,20 +213,22 @@ class SublimeHaskellReplCabal(CommandWin.SublimeHaskellWindowCommand):
                                                                loaded=self.project_dir,
                                                                external_id=external_id))
             else:
-                # Hey, already running!
+                # Already have a REPL for this project, switch focus to it.
                 for repl in repl_views:
                     win = repl.view.window()
-                    win.focus_view(repl.view)
+                    if win:
+                        win.focus_view(repl.view)
+
 
     def is_enabled(self):
         return HAS_SUBLIME_REPL and Common.is_enabled_haskell_command(None, True)
 
 
-class SublimeHaskellReplLoad(CommandWin.SublimeHaskellWindowCommand):
+class SublimeHaskellReplLoadCommand(CommandWin.SublimeHaskellWindowCommand):
     def run(self, **_kwargs):
         view = self.window.active_view()
         if not view:
-            Common.show_status_message("No file active", False)
+            Common.sublime_status_message("No file active")
         else:
             project_dir = Common.locate_cabal_project_from_view(view)[0]
             if not project_dir:
