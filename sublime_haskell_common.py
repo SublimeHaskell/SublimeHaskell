@@ -8,12 +8,10 @@ import os
 import os.path
 import re
 import threading
-import time
 
 import sublime
 import sublime_plugin
 
-import SublimeHaskell.internals.locked_object as LockedObject
 import SublimeHaskell.internals.settings as Settings
 
 
@@ -428,7 +426,7 @@ class StatusMessagesManager(threading.Thread):
 
     def run(self):
         while True:
-            self.event.wait(60.0)
+            self.event.wait()
             self.event.clear()
             self.ticks = 0
             # Ok, there are some messages, start showing them
@@ -476,10 +474,10 @@ class StatusMessagesManager(threading.Thread):
                 self.event.set()
 
         if msg in self.messages:
+            tmo = 4.5
             if len(self.messages) > 1:
-                do_remove()
-            else:
-                threading.Timer(4.5, do_remove).start()
+                tmo = 0.0
+            threading.Timer(tmo, do_remove).start()
 
 
 STATUS_MSG_MANAGER = StatusMessagesManager()
