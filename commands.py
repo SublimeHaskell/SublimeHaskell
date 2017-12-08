@@ -400,6 +400,9 @@ class SublimeHaskellGoToHackageModule(CommandWin.BackendTextCommand):
 
 class SublimeHaskellReinspectAll(CommandWin.BackendWindowCommand):
     def run(self, **_kwargs):
+        Utils.run_async('reinspect all', self.reinspect_all)
+
+    def reinspect_all(self):
         Logging.log('reinspect all', Logging.LOG_TRACE)
         with BackendManager.inspector() as insp:
             insp.start_inspect()
@@ -423,13 +426,14 @@ class SublimeHaskellInferDocs(CommandWin.BackendTextCommand):
                                                             priority=3)
             self.status_msg.start()
 
-            def on_resp_(_resp):
+            def infer_on_resp(_resp):
                 self.status_msg.result_ok()
 
-            def on_err_(_err, _details):
+            def infer_on_err(_err, _details):
                 self.status_msg.result_fail()
 
-            BackendManager.active_backend().infer(files=[self.current_file_name], on_response=on_resp_, on_error=on_err_)
+            BackendManager.active_backend().infer(files=[self.current_file_name], on_response=infer_on_resp,
+                                                  on_error=infer_on_err)
 
         def on_resp(_resp):
             self.status_msg.result_ok()
