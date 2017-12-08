@@ -98,7 +98,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             if Settings.PLUGIN.use_improved_syntax:
                 name = os.path.basename(filename.lower())
                 if Settings.PLUGIN.use_improved_syntax and (name.endswith(".hs") or name.endswith(".hsc")):
-                    view.settings().set('syntax', 'Packages/SublimeHaskell/Syntaxes/Haskell-SublimeHaskell.sublime-syntax')
+                    view.settings().set('syntax', 'Packages/SublimeHaskell/Syntaxes/Haskell-SublimeHaskell.tmLanguage')
                 # TODO: Do we also have to fix Literate Haskell? Probably yes, but not today.
 
     def on_post_save(self, view):
