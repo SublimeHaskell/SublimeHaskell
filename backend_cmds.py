@@ -27,6 +27,7 @@ class SublimeHaskellStartBackend(sublime_plugin.WindowCommand):
                 backend_mgr.initialize()
             finally:
                 self.busy = False
+                cabal_project_status(self.window.active_view(), BackendManager.BackendManager())
 
     def is_enabled(self):
         return not self.busy and BackendManager.BackendManager().is_inactive_state()
@@ -49,6 +50,7 @@ class SublimeHaskellStopBackend(sublime_plugin.WindowCommand):
                 backend_mgr.shutdown_backend()
             finally:
                 self.busy = False
+                cabal_project_status(self.window.active_view(), BackendManager.BackendManager())
 
     def is_enabled(self):
         return not (self.busy or BackendManager.BackendManager().is_inactive_state())
@@ -73,6 +75,7 @@ class SublimeHaskellRestartBackend(sublime_plugin.WindowCommand):
             SublimeHaskellStartBackend(self.window).do_startup()
         finally:
             self.restart_ev.clear()
+            cabal_project_status(self.window.active_view(), BackendManager.BackendManager())
 
 class SublimeHaskellChooseBackend(sublime_plugin.WindowCommand):
     def __init__(self, window):
