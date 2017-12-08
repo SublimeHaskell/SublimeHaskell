@@ -1,16 +1,5 @@
 {
-        "install": "Messages/2.1.2.md",
-        "1.0.0": "Messages/1.0.0.md",
-        "1.0.1": "Messages/1.0.1.md",
-        "1.0.2": "Messages/1.0.2.md",
-        "1.0.3": "Messages/1.0.3.md",
-        "1.1.0": "Messages/1.1.0.md",
-        "1.2.0": "Messages/1.2.0.md",
-        "1.2.1": "Messages/1.2.1.md",
-        "1.2.2": "Messages/1.2.2.md",
-        "1.2.3": "Messages/1.2.3.md",
-        "1.2.4": "Messages/1.2.4.md",
-        "1.2.5": "Messages/1.2.5.md",
+        "install": "Messages/2.1.5.md",
         "2.0.0": "Messages/2.0.0.md",
         "2.0.1": "Messages/2.0.1.md",
         "2.0.2": "Messages/2.0.2.md",
@@ -21,5 +10,8 @@
         "2.0.7": "Messages/2.0.7.md",
         "2.1.0": "Messages/2.1.0.md",
         "2.1.1": "Messages/2.1.1.md",
-        "2.1.2": "Meesages/2.1.2.md"
+        "2.1.2": "Meesages/2.1.2.md",
+        "2.1.3": "Meesages/2.1.3.md",
+        "2.1.4": "Meesages/2.1.4.md",
+        "2.1.5": "Meesages/2.1.5.md"
 }
