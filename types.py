@@ -56,8 +56,8 @@ class FilePosition(object):
     def __lt__(self, other):
         if self.line == other.line:
             return self.column < other.column
-        else:
-            return self.line < other.line
+
+        return self.line < other.line
 
     def point(self, view):
         return view.text_point(self.line, self.column)
@@ -263,8 +263,8 @@ class SublimeHaskellShowType(CommandWin.SublimeHaskellTextCommand):
         file_region = region_by_region(self.view, region, '')
         if region.a != region.b:
             return sorted(types, key=lambda r: file_region.precise_in_region(self.view, r))[0]
-        else:
-            return types[0]
+
+        return types[0]
 
     def show_types(self, types):
         if types:
@@ -274,7 +274,7 @@ class SublimeHaskellShowType(CommandWin.SublimeHaskellTextCommand):
                                                    syntax='Haskell-SublimeHaskell')
             self.view.window().show_quick_panel([t.typename for t in self.types], self.on_done, 0, -1, self.on_changed)
         else:
-            Common.show_status_message("Can't infer type", False)
+            Common.sublime_status_message("Can't infer type")
 
     def on_done(self, idx):
         self.view.erase_regions('typed')
@@ -315,7 +315,7 @@ class SublimeHaskellShowTypes(SublimeHaskellShowType):
 
     def show_types(self, types):
         if not types:
-            Common.show_status_message("Can't infer type", False)
+            Common.sublime_status_message("Can't infer type")
             return
 
         self.types = types
@@ -354,7 +354,7 @@ class SublimeHaskellShowAllTypes(CommandWin.SublimeHaskellTextCommand):
 
     def show_types(self, types):
         if not types:
-            Common.show_status_message("Can't infer type", False)
+            Common.sublime_status_message("Can't infer type")
             return
 
         view_sel = self.view.sel()[0]
@@ -378,7 +378,7 @@ class SublimeHaskellShowAllTypes(CommandWin.SublimeHaskellTextCommand):
 
 
 class SublimeHaskellHideAllTypes(CommandWin.SublimeHaskellTextCommand):
-    def run(self, edit):
+    def run(self, edit, **_kwargs):
         SourceHaskellTypeCache().hide(self.view.file_name())
         Common.hide_panel(self.view.window(), panel_name=TYPES_PANEL_NAME)
 
@@ -390,10 +390,11 @@ class SublimeHaskellHideAllTypes(CommandWin.SublimeHaskellTextCommand):
 
 
 class SublimeHaskellToggleAllTypes(CommandWin.SublimeHaskellTextCommand):
-    def __init__(self, view):
-        super().__init__(view)
+    ## Uncomment if instance variables are needed.
+    # def __init__(self, view):
+    #     super().__init__(view)
 
-    def run(self, edit):
+    def run(self, edit, **_kwargs):
         if SourceHaskellTypeCache().shown(self.view.file_name()):
             self.view.run_command('sublime_haskell_hide_all_types')
         else:
@@ -405,10 +406,11 @@ class SublimeHaskellToggleAllTypes(CommandWin.SublimeHaskellTextCommand):
 
 # Works only with the cursor being in the name of a toplevel function so far.
 class SublimeHaskellInsertType(SublimeHaskellShowType):
-    def __init__(self, view):
-        super().__init__(view)
+    ## Uncomment if instance variables are needed.
+    # def __init__(self, view):
+    #     super().__init__(view)
 
-    def run(self, edit):
+    def run(self, edit, **_kwargs):
         filename = self.view.file_name()
         line, column = self.view.rowcol(self.view.sel()[0].b)
         project_name = Common.locate_cabal_project_from_view(self.view)[1]
@@ -477,17 +479,18 @@ class SublimeHaskellExpandSelectionExpression(SublimeHaskellShowType):
     # last expand regions with type
     Infos = None
 
-    def __init__(self, view):
-        super().__init__(view)
+    ## Uncomment if instance variables are needed.
+    # def __init__(self, view):
+    #     super().__init__(view)
 
-    def run(self, edit):
+    def run(self, edit, **_kwargs):
         selections = list(self.view.sel())
 
         if not self.is_infos_valid(selections):
             SublimeHaskellExpandSelectionExpression.Infos = [ExpandSelectionInfo(self.view, s) for s in selections]
 
         if not self.is_infos_valid(selections):
-            Common.show_status_message('Unable to retrieve expand selection info', False)
+            Common.sublime_status_message('Unable to retrieve expand selection info')
             return
 
         selinfo = [i.expand() for i in self.Infos]

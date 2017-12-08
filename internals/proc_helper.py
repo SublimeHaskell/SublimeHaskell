@@ -3,7 +3,6 @@
 # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
 import errno
-import platform
 import subprocess
 import os
 import os.path
@@ -70,10 +69,10 @@ class ProcHelper(object):
                                , 'Process exit code: {0}'.format(exit_code)
                                , ''
                                , "output:"
-                               , stdout if stdout and len(stdout) > 0 else "--no output--"
+                               , stdout if stdout else "--no output--"
                                , ''
                                , 'error:'
-                               , stderr if stderr and len(stderr) > 0 else "--no error output--"])
+                               , stderr if stderr else "--no error output--"])
                 self.process = None
             else:
                 self.process = None
@@ -104,8 +103,8 @@ class ProcHelper(object):
             # Ensure that we reap the file descriptors.
             self.cleanup()
             return (exit_code, Utils.decode_bytes(stdout), Utils.decode_bytes(stderr))
-        else:
-            return (-1, '', self.process_err or "?? unknown error -- no process.")
+
+        return (-1, '', self.process_err or "?? unknown error -- no process.")
 
     # Update the augmented environment when `add_to_PATH` or `add_standard_dirs` change.
     @staticmethod
@@ -145,6 +144,43 @@ class ProcHelper(object):
         """Execute a subprocess, wait for it to complete, returning a ``(exit_code, stdout, stderr)``` tuple."""
         with ProcHelper(command, **popen_kwargs) as proc:
             return proc.wait(input_string)
+
+
+def exec_wrapper_cmd(exec_with, cmd_list):
+    wrapper = []
+    if exec_with == 'cabal':
+        wrapper = ['cabal', 'exec', cmd_list[0]]
+    elif exec_with == 'cabal-new-build':
+        wrapper = ['cabal', 'new-run', 'exe:' + cmd_list[0]]
+    elif exec_with == 'stack':
+        wrapper = ['stack', 'exec', cmd_list[0]]
+    else:
+        errmsg = 'ProcHelper.exec_wrapper_cmd: Unknown execution prefix \'{0}\''.format(exec_with)
+        raise RuntimeError(errmsg)
+
+    return wrapper + ['--'] + cmd_list[1:] if cmd_list[1:] else wrapper
+
+def exec_with_wrapper(exec_with, install_dir, cmd_list):
+    '''Wrapper function for inserting the execution wrapper, e.g., 'cabal exec' or 'stack exec'
+
+    :returns: Process object from ProcHelper.
+    '''
+
+    proc_args = {}
+    if exec_with is not None:
+        cmd_list = exec_wrapper_cmd(exec_with, cmd_list)
+        if install_dir is not None:
+            proc_args['cwd'] = Utils.normalize_path(install_dir)
+        else:
+            raise RuntimeError('ProcHelper.exec_with_wrapper: invalid install_dir (None)')
+    else:
+        cmd = Which.which(cmd_list[0], ProcHelper.get_extended_path())
+        if cmd is not None:
+            cmd_list[0] = cmd
+
+    Logging.log('ProcHelper.exec_with_wrapper: {0} in {1}'.format(cmd_list, proc_args.get('cwd')), Logging.LOG_DEBUG)
+    return ProcHelper(cmd_list, **proc_args)
+
 
 def get_source_dir(filename):
     '''Get root of hs-source-dirs for filename in project.

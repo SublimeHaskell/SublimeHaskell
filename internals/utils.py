@@ -20,7 +20,7 @@ def encode_bytes(src):
 
 
 def head_of(lst):
-    return lst[0] if lst is not None and len(lst) > 0 else None
+    return lst[0] if lst else None
 
 
 def tool_enabled(feature):
@@ -28,7 +28,7 @@ def tool_enabled(feature):
     return 'enable_' + str(feature)
 
 def normalize_path(dpath):
-    return os.path.normpath(os.path.expandvars(os.path.expanduser(dpath)))
+    return os.path.normcase(os.path.normpath(os.path.expandvars(os.path.expanduser(dpath))))
 
 def is_windows():
     return platform.system() == 'Windows'

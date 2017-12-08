@@ -88,6 +88,16 @@
         "command": "sublime_haskell_run"
     },
     {
+        "caption": "SublimeHaskell: Freeze dependencies",
+        "command": "sublime_haskell_build_cabal_only",
+        "args": { "task": "freeze" }
+    },
+    {
+        "caption": "SublimeHaskell: Benchmarks",
+        "command": "sublime_haskell_build",
+        "args": { "task": "bench" }
+    },
+    {
         "caption": "SublimeHaskell: Check",
         "command": "sublime_haskell_check"
     },
@@ -106,10 +116,6 @@
     {
         "caption": "SublimeHaskell: HIndent",
         "command": "sublime_haskell_hindent"
-    },
-    {
-        "caption": "SublimeHaskell: Stack Exec",
-        "command": "sublime_haskell_stack_exec"
     },
     {
         "caption": "SublimeHaskell: Go to declaration",

@@ -46,10 +46,10 @@ class GHCModBackend(Backend.HaskellBackend):
                                                  '',
                                                  'Please check your \'backends\' configuration and retry.']))
                 raise RuntimeError('\'exec_with\' requires an \'install_dir\'.')
-            elif exec_with not in ['stack', 'cabal']:
+            elif exec_with not in ['stack', 'cabal', 'cabal-new-build']:
                 sublime.error_message('\n'.join(['Invalid backend \'exec_with\': {0}'.format(exec_with),
                                                  '',
-                                                 'Valid values are "cabal" or "stack".',
+                                                 'Valid values are "cabal", "cabal-new-build" or "stack".',
                                                  'Please check your \'backends\' configuration and retry.']))
                 raise RuntimeError('Invalid backend \'exec_with\': {0}'.format(exec_with))
 
@@ -123,19 +123,18 @@ class GHCModBackend(Backend.HaskellBackend):
 
     def remove(self, cabal=False, sandboxes=None, projects=None, files=None, packages=None, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
-
+    
     def remove_all(self, **backend_args):
         return self.dispatch_callbacks(None, None, **backend_args)
-
-    def list_modules(self, project=None, file=None, module=None, deps=None, sandbox=None, cabal=False, symdb=None, package=None,
-                     source=False, standalone=False, **backend_args):
+    
+    def list_modules(self, project=None, file=None, module=None, deps=None, sandbox=None, cabal=False, symdb=None,
+                     package=None, source=False, standalone=False, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
-
+    
     def list_packages(self, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
-
+    
     def list_projects(self, **backend_args):
-        # Yes, I know. This is gratuitous. But clear in what is intended.
         return super().list_projects(**backend_args)
 
     def symbol(self, lookup='', search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
@@ -183,7 +182,7 @@ class GHCModBackend(Backend.HaskellBackend):
         def make_pkg(pkg):
             pkg_info = pkg.split('-', 2)
             pkg_name = pkg_info[0]
-            if len(pkg_info) > 0:
+            if pkg_info:
                 pkg_ver = pkg_info[1]
             else:
                 pkg_ver = '<no version>'
@@ -338,7 +337,7 @@ class GHCModBackend(Backend.HaskellBackend):
 
         return self.dispatch_callbacks(flags, err, **backend_args)
 
-    def autofix_show(self, messages, **backend_args):
+    def autofix_show(self, messages, wait_complete, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def autofix_fix(self, messages, rest=None, pure=False, **backend_args):
@@ -388,8 +387,8 @@ class GHCModBackend(Backend.HaskellBackend):
         backend = self.get_backend(filename)
         if backend is not None:
             return backend.command_backend(cmd, do_map, file, contents)
-        else:
-            return ([], [])
+
+        return ([], [])
 
     def translate_regex_output(self, cmd, files, contents, regex, xlat_func):
         retval = []
@@ -468,8 +467,8 @@ class GHCModBackend(Backend.HaskellBackend):
         sig = signature.split(' => ')
         if len(sig) == 1:
             return (None, trim_name(sig[0].split()))
-        else:
-            return (sig[0], trim_name(sig[1].split()))
+
+        return (sig[0], trim_name(sig[1].split()))
 
     def get_name_decl(self, signature):
         sig = signature.split(' :: ')

@@ -30,8 +30,7 @@ class ScanStatus(object):
 
 def use_inspect_modules(inspect_fn):
     def wrapped(self, *args, **kwargs):
-        if Settings.PLUGIN.inspect_modules:
-            return inspect_fn(self, *args, **kwargs)
+        return inspect_fn(self, *args, **kwargs) if Settings.PLUGIN.inspect_modules else None
     return wrapped
 
 
@@ -77,7 +76,7 @@ class Inspector(object):
             projects = []
             files = []
 
-            if len(files_to_reinspect) > 0:
+            if files_to_reinspect:
                 projects = []
                 files = []
                 for finspect in files_to_reinspect:
@@ -157,6 +156,7 @@ class Inspector(object):
                               wait_complete=True,
                               timeout=None,
                               docs=Settings.PLUGIN.enable_hdocs)
+            smgr.result_ok()
 
     @use_inspect_modules
     def inspect(self, paths, projects, files):
@@ -170,6 +170,7 @@ class Inspector(object):
                                   timeout=None,
                                   ghc=Settings.PLUGIN.ghc_opts,
                                   docs=Settings.PLUGIN.enable_hdocs)
+            smgr.result_ok()
 
     @use_inspect_modules
     def inspect_path(self, path):
@@ -180,6 +181,7 @@ class Inspector(object):
                               timeout=None,
                               ghc=Settings.PLUGIN.ghc_opts,
                               docs=Settings.PLUGIN.enable_hdocs)
+            smgr.result_ok()
 
     @use_inspect_modules
     def inspect_project(self, cabal_dir):
@@ -191,6 +193,7 @@ class Inspector(object):
                               wait_complete=True,
                               timeout=None,
                               docs=Settings.PLUGIN.enable_hdocs)
+            smgr.result_ok()
 
     @use_inspect_modules
     def inspect_files(self, filenames):
@@ -201,6 +204,7 @@ class Inspector(object):
                               timeout=None,
                               ghc=Settings.PLUGIN.ghc_opts,
                               docs=Settings.PLUGIN.enable_hdocs)
+            smgr.result_ok()
 
     def is_busy(self):
         return self.busy

@@ -14,7 +14,7 @@ class SublimeHaskellStartBackend(sublime_plugin.WindowCommand):
         super().__init__(window)
         self.busy = False
 
-    def run(self):
+    def run(self, **_args):
         # Prevents the Python main thread from blocking.
         Utils.run_async(type(self).__name__ + '.do_startup', self.do_startup)
 
@@ -37,7 +37,7 @@ class SublimeHaskellStopBackend(sublime_plugin.WindowCommand):
         super().__init__(window)
         self.busy = False
 
-    def run(self):
+    def run(self, **_args):
         # Prevents the Python main thread from blocking.
         Utils.run_async(type(self).__name__ + '.do_shutdown', self.do_shutdown)
 
@@ -60,7 +60,7 @@ class SublimeHaskellRestartBackend(sublime_plugin.WindowCommand):
         self.restart_ev = threading.Event()
         self.restart_ev.clear()
 
-    def run(self):
+    def run(self, **_args):
         Utils.run_async('restarting backend', self.do_restart)
 
     def is_enabled(self):
@@ -80,12 +80,12 @@ class SublimeHaskellChooseBackend(sublime_plugin.WindowCommand):
         self.backends = {}
         self.backend_names = []
 
-    def run(self):
+    def run(self, **_args):
         backend_mgr = BackendManager.BackendManager()
 
         # Rescan for backends to ensure we have the most up-to-date list...
         backend_mgr.possible_backends = backend_mgr.filter_possible(Settings.PLUGIN.backends)
-        if len(backend_mgr.possible_backends) > 0:
+        if backend_mgr.possible_backends:
             print('plugin \'backends\' {0}'.format([name for name in Settings.PLUGIN.backends]))
             print('Possible/usable \'backends\': {0}'.format([name for name in backend_mgr.possible_backends]))
 

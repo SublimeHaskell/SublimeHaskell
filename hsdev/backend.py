@@ -22,10 +22,8 @@ import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.output_collector as OutputCollector
 import SublimeHaskell.internals.proc_helper as ProcHelper
 import SublimeHaskell.internals.settings as Settings
-import SublimeHaskell.internals.which as Which
 import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.sublime_haskell_common as Common
-import SublimeHaskell.symbols as symbol
 
 
 def result_identity(resp):
@@ -56,10 +54,10 @@ class HsDevBackend(Backend.HaskellBackend):
                                              '',
                                              'Please check your \'backends\' configuration and retry.']))
             raise RuntimeError('\'exec_with\' requires an \'install_dir\'.')
-        elif exec_with is not None and exec_with not in ['stack', 'cabal']:
+        elif exec_with is not None and exec_with not in ['stack', 'cabal', 'cabal-new-build']:
             sublime.error_message('\n'.join(['Invalid backend \'exec_with\': {0}'.format(exec_with),
                                              '',
-                                             'Valid values are "cabal" or "stack".',
+                                             'Valid values are "cabal", "cabal-new-build" or "stack".',
                                              'Please check your \'backends\' configuration and retry.']))
             raise RuntimeError('Invalid backend \'exec_with\': {0}'.format(exec_with))
 
@@ -95,10 +93,10 @@ class HsDevBackend(Backend.HaskellBackend):
             hsdev_ver = HsDevBackend.hsdev_version(kwargs.get('exec-with'), kwargs.get('install-dir'))
             Logging.log('hsdev version: {0}'.format('.'.join(map(str, hsdev_ver))), Logging.LOG_INFO)
             return hsdev_ver >= HsDevBackend.HSDEV_MIN_VER and hsdev_ver < HsDevBackend.HSDEV_MAX_VER
-        else:
-            # Assume that a remote backend is actually available. Ultimately, we might not connect to it, but
-            # it is available to us as a backend.
-            return True
+
+        # Assume that a remote backend is actually available. Ultimately, we might not connect to it, but
+        # it is available to us as a backend.
+        return True
 
     def start_backend(self):
         retval = True
@@ -117,7 +115,7 @@ class HsDevBackend(Backend.HaskellBackend):
                                     (not use_log_level and log_config, ["--log-config", log_config]),
                                     (use_log_level, ["--log-level", log_level])])
 
-            hsdev_proc = HsDevBackend.exec_with_wrapper(self.exec_with, self.install_dir, cmd)
+            hsdev_proc = ProcHelper.exec_with_wrapper(self.exec_with, self.install_dir, cmd)
             if hsdev_proc.process is not None:
                 # Use TextIOWrapper here because it combines decoding with newline handling,
                 # which means less to maintain.
@@ -194,11 +192,15 @@ class HsDevBackend(Backend.HaskellBackend):
     # File/project tracking functions:
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
-    def add_project_file(self, filename, project, project_dir):
-        super().add_project_file(filename, project, project_dir)
+    ## Pylint deems these two methods unncessary since all they do is call the superclass. However, I'm
+    ## leaving them here just in case something more interesting has to be done in addition to calling
+    ## the superclass.
 
-    def remove_project_file(self, filename):
-        super().remove_project_file(filename)
+    # def add_project_file(self, filename, project, project_dir):
+    #     super().add_project_file(filename, project, project_dir)
+
+    # def remove_project_file(self, filename):
+    #     super().remove_project_file(filename)
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # Utility functions used to implement the API:
@@ -207,17 +209,20 @@ class HsDevBackend(Backend.HaskellBackend):
     @staticmethod
     def hsdev_version(exec_with, install_dir):
         retval = [0, 0, 0, 0]
-        hsdev_proc = HsDevBackend.exec_with_wrapper(exec_with, install_dir, ['hsdev', 'version'])
+        hsdev_proc = ProcHelper.exec_with_wrapper(exec_with, install_dir, ['hsdev', 'version'])
         if hsdev_proc.process is not None:
             exit_code, out, _ = hsdev_proc.wait()
             if exit_code == 0:
-                hsver = re.match(r'(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)\.(?P<build>\d+)', out)
-                if hsver:
-                    major = int(hsver.group('major'))
-                    minor = int(hsver.group('minor'))
-                    revision = int(hsver.group('revision'))
-                    build = int(hsver.group('build'))
-                    retval = [major, minor, revision, build]
+                ## 'cabal new-run' can spit out multiple lines of status before executing the task:
+                for line in out.splitlines():
+                    hsver = re.match(r'(?P<major>\d+)\.(?P<minor>\d+)\.(?P<revision>\d+)\.(?P<build>\d+)', line)
+                    if hsver:
+                        major = int(hsver.group('major'))
+                        minor = int(hsver.group('minor'))
+                        revision = int(hsver.group('revision'))
+                        build = int(hsver.group('build'))
+                        retval = [major, minor, revision, build]
+                        break
 
         return retval
 
@@ -237,7 +242,7 @@ class HsDevBackend(Backend.HaskellBackend):
         return  retval
 
 
-    def hsdev_command(self, name, opts, on_result, async=False, timeout=HSDEV_CALL_TIMEOUT, is_list=False,
+    def hsdev_command(self, name, opts, on_result, async_cmd=False, timeout=HSDEV_CALL_TIMEOUT, is_list=False,
                       on_response=None, on_notify=None, on_error=None, on_result_part=None, split_result=None):
         if split_result is None:
             split_res = on_result_part is not None
@@ -260,79 +265,49 @@ class HsDevBackend(Backend.HaskellBackend):
                                     on_response=on_response,
                                     on_notify=hsdev_command_notify,
                                     on_error=on_error,
-                                    wait=not async,
+                                    wait=not async_cmd,
                                     timeout=timeout)
 
-            return result if not async else resp
+            return result if not async_cmd else resp
 
-        else:
-            def process_response(resp):
-                on_response(on_result(resp))
+        def process_response(resp):
+            on_response(on_result(resp))
 
-            resp = self.client.call(name,
-                                    opts,
-                                    on_response=process_response if on_response else None,
-                                    on_notify=on_notify,
-                                    on_error=on_error,
-                                    wait=not async,
-                                    timeout=timeout)
+        resp = self.client.call(name,
+                                opts,
+                                on_response=process_response if on_response else None,
+                                on_notify=on_notify,
+                                on_error=on_error,
+                                wait=not async_cmd,
+                                timeout=timeout)
 
-            return on_result(resp) if not async else resp
+        return on_result(resp) if not async_cmd else resp
 
     def command(self, name, opts, on_result=result_identity, timeout=HSDEV_CALL_TIMEOUT, on_response=None,
                 on_notify=None, on_error=None, on_result_part=None, split_result=None):
-        return self.hsdev_command(name, opts, on_result, async=False, timeout=timeout, is_list=False,
+        return self.hsdev_command(name, opts, on_result, async_cmd=False, timeout=timeout, is_list=False,
                                   on_response=on_response, on_notify=on_notify, on_error=on_error,
                                   on_result_part=on_result_part, split_result=split_result)
 
 
     def async_command(self, name, opts, on_result=result_identity, on_response=None, on_notify=None,
                       on_error=None, on_result_part=None, split_result=None):
-        return self.hsdev_command(name, opts, on_result, async=True, timeout=None, is_list=False,
+        return self.hsdev_command(name, opts, on_result, async_cmd=True, timeout=None, is_list=False,
                                   on_response=on_response, on_notify=on_notify, on_error=on_error,
                                   on_result_part=on_result_part, split_result=split_result)
 
 
     def list_command(self, name, opts, on_result=result_identity, timeout=HSDEV_CALL_TIMEOUT, on_response=None,
                      on_notify=None, on_error=None, on_result_part=None, split_result=None):
-        return self.hsdev_command(name, opts, on_result, async=False, timeout=timeout, is_list=True,
+        return self.hsdev_command(name, opts, on_result, async_cmd=False, timeout=timeout, is_list=True,
                                   on_response=on_response, on_notify=on_notify, on_error=on_error,
                                   on_result_part=on_result_part, split_result=split_result)
 
     def async_list_command(self, name, opts, on_result=result_identity, on_response=None,
                            on_notify=None, on_error=None, on_result_part=None, split_result=None):
-        return self.hsdev_command(name, opts, on_result, async=True, timeout=None, is_list=True,
+        return self.hsdev_command(name, opts, on_result, async_cmd=True, timeout=None, is_list=True,
                                   on_response=on_response, on_notify=on_notify, on_error=on_error,
                                   on_result_part=on_result_part, split_result=split_result)
-
-    @staticmethod
-    def exec_with_wrapper(exec_with, install_dir, cmd_list):
-        '''Wrapper function for inserting the execution wrapper, e.g., 'cabal exec' or 'stack exec'
-
-        :returns: Process object from ProcHelper.
-        '''
-
-        proc_args = {}
-        if exec_with is not None:
-            if exec_with == 'cabal':
-                cmd_list = ['cabal', 'exec'] + cmd_list
-                cmd_list.insert(3, '--')
-            elif exec_with == 'stack':
-                cmd_list = ['stack', 'exec'] + cmd_list
-                cmd_list.insert(3, '--')
-            else:
-                errmsg = 'HsDevBackend.exec_with_wrapper: Unknown execution prefix \'{0}\''.format(exec_with)
-                raise RuntimeError(errmsg)
-
-            if install_dir is not None:
-                proc_args['cwd'] = Utils.normalize_path(install_dir)
-        else:
-            cmd = Which.which(cmd_list[0], ProcHelper.ProcHelper.get_extended_path())
-            if cmd is not None:
-                cmd_list[0] = cmd
-
-        Logging.log('HsDevBackend.exec_with_wrapper: {0}'.format(cmd_list), Logging.LOG_DEBUG)
-        return ProcHelper.ProcHelper(cmd_list, **proc_args)
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # API implementation:
@@ -544,7 +519,7 @@ class HsDevBackend(Backend.HaskellBackend):
     def flags(self, _projectname, **backend_args):
         return self.command('flags', {}, **backend_args)
 
-    def autofix_show(self, messages, wait_complete=False, **backend_args):
+    def autofix_show(self, messages, wait_complete, **backend_args):
         action = self.list_command if wait_complete else self.async_list_command
         return action('autofix show', {'messages': messages}, ResultParse.parse_corrections, **backend_args)
 
@@ -565,16 +540,16 @@ class HsDevBackend(Backend.HaskellBackend):
     # Advanced features:
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
-    def query_import(self, symbol, filename):
-        if self.whois(symbol, filename):
-            return (False, ['Symbol {0} already in scope'.format(symbol)])
-        else:
-            candidates = self.lookup(symbol, filename)
-            return (True, candidates) if candidates else (False, ['Symbol {0} not found'.format(symbol)])
+    def query_import(self, symname, filename):
+        if self.whois(symname, filename):
+            return (False, ['Symbol {0} already in scope'.format(symname)])
+
+        candidates = self.lookup(symname, filename)
+        return (True, candidates) if candidates else (False, ['Symbol {0} not found'.format(symname)])
 
     def contents_to_module(self, contents):
         imp_module = None
-        hsinspect_proc = HsDevBackend.exec_with_wrapper(self.exec_with, self.install_dir, ['hsinspect'])
+        hsinspect_proc = ProcHelper.exec_with_wrapper(self.exec_with, self.install_dir, ['hsinspect'])
         if hsinspect_proc.process is not None:
             exit_code, result, _ = hsinspect_proc.wait(input_str=contents)
             if exit_code == 0:
@@ -590,15 +565,15 @@ class HsDevBackend(Backend.HaskellBackend):
 
     def clean_imports(self, filename):
         cmd = ['hsclearimports', filename, '--max-import-list', '64']
-        hsclean_proc = HsDevBackend.exec_with_wrapper(self.exec_with, self.install_dir, cmd)
+        hsclean_proc = ProcHelper.exec_with_wrapper(self.exec_with, self.install_dir, cmd)
         if hsclean_proc.process is not None:
             exit_code, result, err = hsclean_proc.wait()
             if exit_code == 0:
                 return (True, result.splitlines())
-            else:
-                return (False, err)
-        else:
-            return (False, ['\'hscleanimports\' utility not found.'])
+
+            return (False, err)
+
+        return (False, ['\'hscleanimports\' utility not found.'])
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # Utility functions:

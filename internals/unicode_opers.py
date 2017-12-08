@@ -24,5 +24,5 @@ def use_unicode_operators(src, force=False):
         for oper, unicode_oper in UNICODE_OPERS.items():
             repl = re.sub(oper, unicode_oper, repl)
         return repl
-    else:
-        return src
+
+    return src

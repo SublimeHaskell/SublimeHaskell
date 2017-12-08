@@ -63,9 +63,9 @@ class IndentedFileReader(object):
         if tok[0] == self.TOK_ERROR:
             print('parse_indented_file {0}: {1}'.format(project_name, tok[1]))
             return {}
-        else:
-            # pprint.pprint(element_dict)
-            return element_dict
+
+        # pprint.pprint(element_dict)
+        return element_dict
 
 
     def parse_elements(self, tok, file):

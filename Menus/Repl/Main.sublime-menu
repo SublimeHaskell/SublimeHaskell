@@ -4,8 +4,6 @@
         "children":
         [
             {
-                "caption": "SublimeREPL",
-                "mnemonic": "r",
                 "id": "SublimeREPL",
                 "children":
                 [
@@ -17,16 +15,16 @@
                             {
                                 "command": "sublime_haskell_repl_ghci",
                                 "caption": "GHCi",
-                                "id": "repl_sublime_haskell_ghci"
+                                "id": "repl_sublime_haskell_ghci",
                             },
                             {
                                 "command": "sublime_haskell_repl_ghci_current_file",
                                 "caption": "GHCi current file",
-                                "id": "repl_sublime_haskell_ghci_file"
+                                "id": "repl_sublime_haskell_ghci_file",
                             },
                             {
                                 "command": "sublime_haskell_repl_cabal",
-                                "caption": "Cabal Repl",
+                                "caption": "Cabal/Stack-wrapped Repl",
                                 "id": "repl_sublime_haskell_cabal_repl"
                             }
                         ]

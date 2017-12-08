@@ -19,8 +19,8 @@ def get_value(table, keyvals, defval=None):
             if cur is None:
                 return defval
         return cur
-    else:
-        return table.get(keyvals, defval)
+
+    return table.get(keyvals, defval)
 
 
 # 'global-db', 'user-db' or {'package-db':path}
@@ -32,6 +32,7 @@ def parse_package_db(pkgdb, defval=None):
         return symbols.PackageDb(global_db=True)
     if pkgdb == 'user-db':
         return symbols.PackageDb(user_db=True)
+
     return defval
 
 
@@ -124,8 +125,8 @@ def parse_module_declaration(mod_decl, parse_module_info=True):
         if decl:
             decl.module = mod_id
             return decl
-        else:
-            return None
+
+        return None
     except AttributeError:
         return None
 

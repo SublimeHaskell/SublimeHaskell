@@ -199,8 +199,8 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
 
     def on_query_completions(self, view, prefix, locations):
         # Defer starting the backend until as late as possible...
-        ## if Settings.COMPONENT_DEBUG.event_viewer or Settings.COMPONENT_DEBUG.completions:
-        ##    print('{0} invoked (prefix: {1}).'.format(type(self).__name__ + '.on_query_completions', prefix))
+        if Settings.COMPONENT_DEBUG.event_viewer or Settings.COMPONENT_DEBUG.completions:
+            print('{0} invoked (prefix: {1}).'.format(type(self).__name__ + '.on_query_completions', prefix))
 
         if not Common.is_haskell_source(view):
             return []
@@ -297,7 +297,8 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
                 Utils.run_async('{0}: drop completions'.format(file), self.autocompleter.drop_completions_async, file)
 
         for file in files or []:
-            Utils.run_async('{0}: init completions'.format(file), self.autocompleter.generate_completions_cache, project_name, file)
+            Utils.run_async('{0}: init completions'.format(file), self.autocompleter.generate_completions_cache,
+                            project_name, file)
 
 
     def is_scanned_source(self, view):
@@ -310,9 +311,9 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         file_shown_in_view = Common.get_haskell_command_window_view_file_project(view)[2]
         if file_shown_in_view is None:
             return False
-        else:
-            src_module = Utils.head_of(BackendManager.active_backend().module(file=file_shown_in_view))
-            return src_module is not None and src_module.location.project is not None
+
+        src_module = Utils.head_of(BackendManager.active_backend().module(file=file_shown_in_view))
+        return src_module is not None and src_module.location.project is not None
 
 
     def fly(self, view):
@@ -355,7 +356,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
                 auto_lint_enabled = Settings.PLUGIN.enable_auto_lint
                 sublime.set_timeout(lambda: self.scan_contents(view_), 0)
 
-                fly_window = view_.window()
+                ## (unused?) fly_window = view_.window()
                 if auto_check_enabled and auto_lint_enabled:
                     sublime.set_timeout(lambda: view.run_command('sublime_haskell_check_and_lint', {'fly': True}), 0)
                 elif auto_check_enabled:
@@ -370,12 +371,11 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
 
         def scan_resp(_resp):
             Logging.log('scan_contents:scan_resp invoked.', Logging.LOG_INFO)
-            status_msg.stop()
+            status_msg.result_ok()
             self.update_completions_async([current_file_name])
 
         def scan_err(_err, _details):
-            status_msg.fail()
-            status_msg.stop()
+            status_msg.result_fail()
 
         scan_contents = {current_file_name: view.substr(sublime.Region(0, view.size()))}
         BackendManager.active_backend().scan(contents=scan_contents, on_response=scan_resp, on_error=scan_err)

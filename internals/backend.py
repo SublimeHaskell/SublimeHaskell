@@ -4,11 +4,6 @@
 
 # [SublimeLinter pylint-disable:"W0613"]
 
-import SublimeHaskell.sublime_haskell_common as Common
-import SublimeHaskell.symbols as symbol
-
-# import pprint
-
 class HaskellBackend(object):
     '''Base class for SublimeHaskell backends. Provides the basic interface for managing and communicating with a
     backend (hsdev, hdevtools, ghc-mod).
@@ -244,7 +239,13 @@ class HaskellBackend(object):
     def flags(self, project_name, **backend_args):
         raise NotImplementedError("HaskellBackend.flags needs an implementation.")
 
-    def autofix_show(self, messages, **backend_args):
+    def autofix_show(self, messages, wait_complete, **backend_args):
+        '''Show autofixes for errors, when possible. Can be used synchrnously or asynchronously.
+
+        :param list(str) messages: A list of error messages
+        :param bool wait_complete: If True, wait to receive a response from the backend.
+        :return: The JSON autofix response from the backend, if :py:param:`wait_complete` is True, or None.
+        '''
         raise NotImplementedError("HaskellBackend.autofix_show needs an implementation.")
 
     def autofix_fix(self, messages, rest=None, pure=False, **backend_args):
@@ -260,7 +261,7 @@ class HaskellBackend(object):
     # Advanced features:
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
-    def query_import(self, symbol, filename):
+    def query_import(self, symname, filename):
         '''Query possible import modules for symbol :py:var:`name` in the file named :py:var:`filename`.
 
         :rtype: (Boolean, List(String)) tuple
@@ -314,8 +315,9 @@ class NullHaskellBackend(HaskellBackend):
     should do.
     '''
 
-    def __init__(self, backend_mgr):
-        super().__init__(backend_mgr)
+    ## Uncomment if instance variables are needed.
+    # def __init__(self, backend_mgr):
+    #     super().__init__(backend_mgr)
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # Management functions:
@@ -352,11 +354,13 @@ class NullHaskellBackend(HaskellBackend):
     # File/project tracking functions:
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
-    def add_project_file(self, filename, project, project_dir):
-        super().add_project_file(filename, project, project_dir)
+    ## Uncomment if we do more than just super delegation.
+    # def add_project_file(self, filename, project, project_dir):
+    #     super().add_project_file(filename, project, project_dir)
 
-    def remove_project_file(self, filename):
-        super().remove_project_file(filename)
+    ## Uncomment if we do more than just super delegation.
+    # def remove_project_file(self, filename):
+    #     super().remove_project_file(filename)
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # API/action functions:
@@ -388,9 +392,9 @@ class NullHaskellBackend(HaskellBackend):
     def list_packages(self, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
-    def list_projects(self, **backend_args):
-        # Yes, I know. This is gratuitous. But clear in what is intended.
-        return super().list_projects(**backend_args)
+    ## Uncomment if we do more than just super delegation.
+    # def list_projects(self, **backend_args):
+    #     return super().list_projects(**backend_args)
 
     def symbol(self, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
                cabal=False, symdb=None, package=None, source=False, standalone=False, local_names=False, **backend_args):
@@ -448,7 +452,7 @@ class NullHaskellBackend(HaskellBackend):
     def flags(self, _projectname, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
-    def autofix_show(self, messages, **backend_args):
+    def autofix_show(self, messages, wait_complete, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def autofix_fix(self, messages, rest=None, pure=False, **backend_args):
@@ -464,7 +468,7 @@ class NullHaskellBackend(HaskellBackend):
     # Advanced features:
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
-    def query_import(self, symbol, filename):
+    def query_import(self, symname, filename):
         '''Query possible import modules for symbol :py:var:`name` in the file named :py:var:`filename`.
 
         :rtype: (Boolean, List(String)) tuple

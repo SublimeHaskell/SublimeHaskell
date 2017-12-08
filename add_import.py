@@ -16,12 +16,12 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
         self.candidates = None
         self.backend = Backend.NullHaskellBackend(BackendManager.BackendManager())
 
-    def run(self, edit, **kwargs):
-        kw_module = kwargs.get('module')
+    def run(self, edit, **args):
+        kw_module = args.get('module')
         self.backend = BackendManager.active_backend()
 
         if not kw_module:
-            kw_decl = kwargs.get('decl')
+            kw_decl = args.get('decl')
             if kw_decl is None:
                 qsymbol = Common.get_qualified_symbol_at_region(self.view, self.view.sel()[0])
                 kw_decl = qsymbol.qualified_name()
@@ -39,7 +39,7 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
                     self.view.window().show_quick_panel([[c.module.name] for c in self.candidates], self.on_done)
             else:
                 if len(self.candidates) == 1:
-                    Common.show_status_message(self.candidates[0])
+                    Common.sublime_status_message(self.candidates[0])
                 else:
                     sublime.message_dialog('\n'.join(self.candidates))
         else:
@@ -56,7 +56,7 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
 
         # Truncate contents to the module declaration and the imports list, if present.
         imports_list = list(re.finditer('^import.*$', contents, re.MULTILINE))
-        if len(imports_list) > 0:
+        if imports_list:
             contents = contents[0:imports_list[-1].end()]
 
         # Phase 2: Ask the backend to turn the contents into a list of Module objects:
@@ -68,13 +68,13 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
             insert_line = 0
             insert_gap = False
 
-            if len(after) > 0:
+            if after:
                 # Insert before after[0]
                 insert_line = after[0].position.line - 1
-            elif len(imports) > 0:
+            elif imports:
                 # Insert after all imports
                 insert_line = imports[-1].position.line
-            elif len(imp_module.declarations) > 0:
+            elif imp_module.declarations:
                 # Insert before first declaration
                 insert_line = min([d.position.line for d in imp_module.declarations.values()]) - 1
                 insert_gap = True
@@ -94,7 +94,7 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
             point = self.view.text_point(insert_line, 0)
             self.view.insert(edit, point, insert_text)
 
-            Common.show_status_message('Import {0} added'.format(module_name), True)
+            Common.sublime_status_message('Import {0} added'.format(module_name))
 
     def is_visible(self):
         return Common.is_haskell_source(self.view) and super().is_visible()

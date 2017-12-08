@@ -10,7 +10,11 @@
     "@python": 3,
     "linters": {
       "pylint" : {
-	    "paths": [ "${sublime}", "${project}", "${project}/.." ]
+	    "paths": [ "${sublime}",
+                 "${project}",
+                 "${project}/..",
+                 "/Applications/Sublime Text.app/Contents/MacOS/"
+               ]
       }
     }
   }

@@ -1,18 +1,18 @@
 [
     {
-        "caption": "SublimeHaskell Repl: GHCi",
+        "caption": "SublimeHaskell: GHCi REPL",
         "command": "sublime_haskell_repl_ghci"
     },
     {
-        "caption": "SublimeHaskell Repl: GHCi current file",
+        "caption": "SublimeHaskell: GHCi current file",
         "command": "sublime_haskell_repl_ghci_current_file"
     },
     {
-        "caption": "SublimeHaskell Repl: Cabal Repl",
+        "caption": "SublimeHaskell: Cabal/Stack-wrapped REPL",
         "command": "sublime_haskell_repl_cabal"
     },
     {
-        "caption": "SublimeHaskell Repl: Load",
+        "caption": "SublimeHaskell: Load into REPL",
         "command": "sublime_haskell_repl_load"
     }
 ]

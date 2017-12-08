@@ -83,13 +83,13 @@ class Styles(object):
             # find scope or its parent in scheme
             scope_parts = scope.split('.')
             scopes = ['.'.join(scope_parts[0:i+1]) for i in range(0, len(scope_parts))]
-            for scope in reversed(scopes):
-                if scope in scheme:  # Found some scope, fill style class
+            for css_scope in reversed(scopes):
+                if css_scope in scheme:  # Found some scope, fill style class
                     style_parts = []
-                    if 'foreground' in scheme[scope]:
-                        style_parts.append("color: {0}".format(scheme[scope]['foreground']))
-                    if 'fontStyle' in scheme[scope]:
-                        style_parts.append("font-style: {0}".format(scheme[scope]['fontStyle']))
+                    if 'foreground' in scheme[css_scope]:
+                        style_parts.append("color: {0}".format(scheme[css_scope]['foreground']))
+                    if 'fontStyle' in scheme[css_scope]:
+                        style_parts.append("font-style: {0}".format(scheme[css_scope]['fontStyle']))
                     parts.append(".{0} {{ {1} }}".format(cls, "; ".join(style_parts)))
                     break
         parts.append("</style>")
