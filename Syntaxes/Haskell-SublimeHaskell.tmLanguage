@@ -10,7 +10,7 @@
 	<key>keyEquivalent</key>
 	<string>^~H</string>
 	<key>name</key>
-	<string>Haskell (ST2)</string>
+	<string>Haskell</string>
 	<key>patterns</key>
 	<array>
 		<dict>
