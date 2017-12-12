@@ -17,6 +17,10 @@ import SublimeHaskell.hsdev.callback as HsCallback
 import SublimeHaskell.internals.logging as Logging
 
 class HsDevConnection(object):
+    MAX_SOCKET_READ = 10240
+    '''Byte stream length that the client receiver will read from a socket at one time.
+    '''
+
     def __init__(self, sock, rcvr_queue, ident):
         super().__init__()
         self.socket = sock
@@ -49,21 +53,30 @@ class HsDevConnection(object):
                     # print('got resp from partial.')
                 else:
                     req_resp = partial
-                    complete_req = False
-                    while not complete_req and self.socket is not None:
-                        # Complete paranoia here with newlines.
-                        streaminp = self.socket.recv(8192).decode('utf-8').replace('\r\n', '\n').replace('\r', '\n')
-                        pre, sep, post = streaminp.partition('\n')
-                        req_resp += pre
-                        if sep:
-                            complete_req = True
-                            partial = post
-                            # print('got complete resp, partial length is {0}'.format(len(partial)))
-                        else:
-                            # print('incomplete request, reading more.')
+                    decoded_req = False
+                    raw_req = bytearray()
+
+                    while not decoded_req and self.socket is not None:
+                        raw_req.extend(self.socket.recv(self.MAX_SOCKET_READ))
+                        try:
+                            decoded_inp = raw_req.decode('utf-8').replace('\r\n', '\n').replace('\r', '\n')
+                            pre, sep, post = decoded_inp.partition('\n')
+                            req_resp += pre
+                            if sep:
+                                decoded_req = True
+                                partial = post
+                                # print('got complete resp, partial length is {0}'.format(len(partial)))
+                            else:
+                                # print('incomplete request, reading more.')
+                                # We read a successfully decoded raw request, but didn't see the newline yet. Need to
+                                # clear out the raw request for the next iteration.
+                                raw_req = bytearray()
+                        except UnicodeDecodeError:
+                            # Couldn't decode the string, so continue reading from the socket, accumulating
+                            # into stream_inp until utf-8 decoding succeeds.
                             pass
 
-                if self.rcvr_queue is not None and complete_req:
+                if self.rcvr_queue is not None and decoded_req:
                     # Catch the case here where the socket gets closed, but close() has already assigned rcvr_queue
                     # to None.
                     self.rcvr_queue.put(json.loads(req_resp))
