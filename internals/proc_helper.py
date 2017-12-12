@@ -98,7 +98,7 @@ class ProcHelper(object):
         """Wait for subprocess to complete and exit, collect and decode ``stdout`` and ``stderr``,
         returning the tuple ``(exit_code, stdout, stderr)```"""
         if self.process is not None:
-            stdout, stderr = self.process.communicate(Utils.encode_bytes(input_str if input_str is not None else ''))
+            stdout, stderr = self.process.communicate(Utils.encode_bytes(input_str if input_str else ''))
             exit_code = self.process.wait()
             # Ensure that we reap the file descriptors.
             self.cleanup()
