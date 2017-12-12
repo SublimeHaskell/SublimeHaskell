@@ -49,12 +49,18 @@ class HsDevBackend(Backend.HaskellBackend):
         # Sanity checking:
         exec_with = kwargs.get('exec-with')
         install_dir = kwargs.get('install-dir')
-        if exec_with is not None and install_dir is None:
-            sublime.error_message('\n'.join(['\'exec_with\' requires an \'install_dir\'.',
-                                             '',
-                                             'Please check your \'backends\' configuration and retry.']))
-            raise RuntimeError('\'exec_with\' requires an \'install_dir\'.')
-        elif exec_with is not None and exec_with not in ['stack', 'cabal', 'cabal-new-build']:
+        if bool(exec_with) ^ bool(install_dir):
+            if install_dir is None:
+                sublime.error_message('\n'.join(['\'exec_with\' requires an \'install_dir\'.',
+                                                 '',
+                                                 'Please check your \'backends\' configuration and retry.']))
+                raise RuntimeError('\'exec_with\' requires an \'install_dir\'.')
+            else:
+                sublime.error_message('\n'.join(['\'install_dir\' requires an \'exec_with\'.',
+                                                 '',
+                                                 'Please check your \'backends\' configuration and retry.']))
+                raise RuntimeError('\'install_dir\' requires an \'exec_with\'.')
+        elif exec_with and exec_with not in ['stack', 'cabal', 'cabal-new-build']:
             sublime.error_message('\n'.join(['Invalid backend \'exec_with\': {0}'.format(exec_with),
                                              '',
                                              'Valid values are "cabal", "cabal-new-build" or "stack".',
@@ -88,9 +94,16 @@ class HsDevBackend(Backend.HaskellBackend):
     def is_available(**kwargs):
         # Yes, this is slightly redundant because eventually __init__ does the same thing for a class
         # instance.
-        local = kwargs.get('local', True)
-        if local:
-            hsdev_ver = HsDevBackend.hsdev_version(kwargs.get('exec-with'), kwargs.get('install-dir'))
+        exec_with = kwargs.get('exec-with')
+        install_dir = kwargs.get('install-dir')
+        local = kwargs.get('local', False)
+        exec_install_set = not bool(exec_with) ^ bool(install_dir)
+        if exec_install_set or local:
+            if not exec_install_set:
+                # Either exec-with or install-dir isn't set, so the corresponding configuration target is unavailable.
+                return False
+
+            hsdev_ver = HsDevBackend.hsdev_version(exec_with, install_dir)
             Logging.log('hsdev version: {0}'.format('.'.join(map(str, hsdev_ver))), Logging.LOG_INFO)
             return hsdev_ver >= HsDevBackend.HSDEV_MIN_VER and hsdev_ver < HsDevBackend.HSDEV_MAX_VER
 

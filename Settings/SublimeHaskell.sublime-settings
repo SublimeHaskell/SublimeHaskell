@@ -201,7 +201,6 @@
             "default": false,
             "backend": "hsdev",
             "options": {
-              "local": true,
               "port": 4567,
               "exec-with": "cabal-new-build"
               // ^^^^^^^^^^^^^^^^^ Remember to insert a comma (",") after this line once you set install-dir
