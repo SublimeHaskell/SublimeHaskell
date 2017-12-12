@@ -1,14 +1,14 @@
 import os
 import os.path
 
-import SublimeHaskell.internals.locked_object as LockedObject
+import SublimeHaskell.internals.atomics as Atomics
 import SublimeHaskell.internals.utils as Utils
 
 def is_exe(fpath):
     return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 
 # Tool name -> executable path cache. Avoids probing the file system multiple times.
-WHICH_CACHE = LockedObject.LockedObject({})
+WHICH_CACHE = Atomics.AtomicDuck()
 
 def which(cmd, env_path):
     cmd_is_list = isinstance(cmd, list)
@@ -45,4 +45,4 @@ def which(cmd, env_path):
 
 def reset_cache():
     global WHICH_CACHE
-    WHICH_CACHE = LockedObject.LockedObject({})
+    WHICH_CACHE = Atomics.AtomicDuck()

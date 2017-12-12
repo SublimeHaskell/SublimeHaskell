@@ -4,12 +4,12 @@
 
 import re
 
-import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.internals.atomics as Atomics
 import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.internals.logging as Logging
-import SublimeHaskell.internals.locked_object as LockedObject
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.utils as Utils
+import SublimeHaskell.sublime_haskell_common as Common
 
 
 # Checks if we are in an import statement.
@@ -42,13 +42,22 @@ def make_locations(comps):
                   key=lambda k: k[0])
 
 
-class CompletionCache(object):
+class CompletionCache(Atomics.LockedObject):
     def __init__(self):
+        super().__init__()
         self.files = {}
         self.cabal = []
         self.sources = []
         self.global_comps = []
         self.source_locs = None
+
+    def __enter__(self):
+        super().__enter__()
+        return self
+
+    # Technically, useless super() delegation. Uncomment if more is needed.
+    # def __exit__(self, otype, value, traceback):
+    #     super().__exit__(otype, value, traceback)
 
     def set_files(self, filename, comps):
         self.files[filename] = comps
@@ -78,7 +87,7 @@ class AutoCompleter(object):
 
         # cabal name => set of modules, where cabal name is 'cabal' for cabal or sandbox path
         # for cabal-devs
-        self.module_completions = LockedObject.LockedObject({})
+        self.module_completions = Atomics.AtomicDuck()
 
         # keywords
         self.keywords = ['do', 'case', 'of', 'let', 'in', 'data', 'instance', 'type', 'newtype', 'where',
@@ -87,7 +96,7 @@ class AutoCompleter(object):
         self.current_filename = None
 
         # filename ⇒ preloaded completions + None ⇒ all completions
-        self.cache = LockedObject.LockedObject(CompletionCache())
+        self.cache = CompletionCache()
 
     def keyword_completions(self, query):
         return [(k + '\tkeyword', k) for k in self.keywords if k.startswith(query)] if isinstance(query, ''.__class__) else []

@@ -1,10 +1,9 @@
 
 import os.path
-import threading
 
 import sublime
 
-import SublimeHaskell.internals.locked_object as LockedObject
+import SublimeHaskell.internals.atomics as Atomics
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.utils as Utils
@@ -44,10 +43,9 @@ class Inspector(object):
         # The backend, whose support functions we invoke:
         self.backend = backend
         # (Re-)Inspection state:
-        self.dirty_lock = threading.Lock()
-        self.cabal_to_load = LockedObject.LockedObject([])
-        self.dirty_files = LockedObject.LockedObject([])
-        self.dirty_paths = LockedObject.LockedObject([])
+        self.cabal_to_load = Atomics.AtomicList()
+        self.dirty_files = Atomics.AtomicList()
+        self.dirty_paths = Atomics.AtomicList()
         self.busy = False
 
     def __enter__(self):
@@ -66,12 +64,12 @@ class Inspector(object):
             scan_paths = []
             with self.dirty_paths as dirty_paths:
                 scan_paths = dirty_paths[:]
-                dirty_paths[:] = []
+                dirty_paths = []
 
             files_to_reinspect = []
             with self.dirty_files as dirty_files:
                 files_to_reinspect = dirty_files[:]
-                dirty_files[:] = []
+                dirty_files = []
 
             projects = []
             files = []
@@ -111,16 +109,12 @@ class Inspector(object):
     @use_inspect_modules
     def mark_all_files(self):
         for window in sublime.windows():
-            dirty_files = []
-            with self.dirty_files:
+            with self.dirty_files as dirty_files:
                 dirty_files.extend([f for f in [v.file_name() for v in window.views()] if f and f.endswith('.hs')])
                 Logging.log("dirty files: : {0}".format(dirty_files), Logging.LOG_DEBUG)
-                self.dirty_files.set(dirty_files)
 
-            dirty_paths = []
-            with self.dirty_paths:
+            with self.dirty_paths as dirty_paths:
                 dirty_paths.extend(window.folders())
-                self.dirty_paths.set(dirty_paths)
 
     @use_inspect_modules
     def mark_file_dirty(self, filename):
@@ -133,7 +127,7 @@ class Inspector(object):
         '''Scam all open window views, adding actual cabal files  or those indirectly identified by the Haskell sources
         to the list of cabal files to inspect.
         '''
-        with self.cabal_to_load:
+        with self.cabal_to_load as cand_cabals:
             cand_cabals = []
             for window in sublime.windows():
                 for view in window.views():
@@ -146,7 +140,7 @@ class Inspector(object):
                             if proj_dir is not None:
                                 cand_cabals.append(proj_dir)
             # Make the list of cabal files unique
-            self.cabal_to_load.set(list(set(cand_cabals)))
+            cand_cabals[:] = list(set(cand_cabals))
 
     def inspect_cabal(self, cabal):
         with Common.status_message_process('Inspecting {0}'.format(cabal or 'cabal'), priority=1) as smgr:

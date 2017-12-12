@@ -11,13 +11,13 @@ import threading
 import time
 import traceback
 
-import SublimeHaskell.internals.locked_object as LockedObject
-import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.hsdev.callback as HsCallback
+import SublimeHaskell.internals.atomics as Atomics
 import SublimeHaskell.internals.logging as Logging
+import SublimeHaskell.internals.settings as Settings
 
 class HsDevConnection(object):
-    MAX_SOCKET_READ = 4096
+    MAX_SOCKET_READ = 10240
     '''Byte stream length that the client receiver will read from a socket at one time.
     '''
 
@@ -148,7 +148,7 @@ class HsDevClient(object):
         self.rcvr_thread = None
         self.rcvr_event = threading.Event()
         self.request_q = queue.Queue()
-        self.request_map = LockedObject.LockedObject({})
+        self.request_map = Atomics.AtomicDuck()
         self.serial_lock = threading.RLock()
         self.request_serial = 1
 

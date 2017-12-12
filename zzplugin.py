@@ -9,8 +9,8 @@ import sublime_plugin
 import SublimeHaskell.autocomplete as Autocomplete
 import SublimeHaskell.backend_cmds as BackendCmds
 import SublimeHaskell.check_lint as CheckAndLint
+import SublimeHaskell.internals.atomics as Atomics
 import SublimeHaskell.internals.backend_mgr as BackendManager
-import SublimeHaskell.internals.locked_object as LockedObject
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.proc_helper as ProcHelper
 import SublimeHaskell.internals.settings as Settings
@@ -60,7 +60,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         self.type_cache = Types.SourceHaskellTypeCache()
         self.autocompleter = Autocomplete.AutoCompleter()
         # Fly mode state:
-        self.fly_view = LockedObject.LockedObject({'view': None, 'mtime': None})
+        self.fly_view = Atomics.AtomicDuck({'view': None, 'mtime': None})
         self.fly_event = threading.Event()
         self.fly_agent = threading.Thread(target='fly_check')
 

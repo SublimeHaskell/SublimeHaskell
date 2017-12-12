@@ -4,7 +4,7 @@ import threading
 
 import sublime
 
-import SublimeHaskell.internals.locked_object as LockedObject
+import SublimeHaskell.internals.atomics as Atomics
 
 SETTING_SUBHASK_PROJECT = 'subhask_project_name'
 '''View-private setting that identifies the project to which a view belongs. This is the cabal file's name, without the
@@ -111,7 +111,7 @@ class SettingsContainer(object):
             setattr(self, attr, default)
 
         # Additional change callbacks to propagate:
-        self.changes = LockedObject.LockedObject({})
+        self.changes = Atomics.AtomicDuck()
         # Write-access lock
         self.wlock = threading.RLock()
 
@@ -128,7 +128,7 @@ class SettingsContainer(object):
             ## print('Settings.load: {0} = {1}'.format(attr, value))
             setattr(self, attr, value)
             install_updater(settings, self, key)
-        self.changes = LockedObject.LockedObject({})
+        self.changes = Atomics.AtomicDuck()
 
         ## New backend upgrade warning:
         old_stuff = []

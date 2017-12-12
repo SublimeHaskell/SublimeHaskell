@@ -12,11 +12,11 @@ import traceback
 import SublimeHaskell.internals.logging as Logging
 
 def decode_bytes(src):
-    return src.decode('utf-8').replace('\r\n', '\n').replace('\r', '\n') if src is not None else None
+    return src.decode('utf-8').replace('\r\n', '\n').replace('\r', '\n') if src else None
 
 
 def encode_bytes(src):
-    return src.replace('\r\n', os.linesep).replace('\n', os.linesep).encode('utf-8') if src is not None else None
+    return src.replace('\r\n', os.linesep).replace('\n', os.linesep).encode('utf-8') if src else None
 
 
 def head_of(lst):
