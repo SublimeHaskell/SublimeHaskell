@@ -13,18 +13,19 @@ SETTING_SUBHASK_PROJECT = 'subhask_project_name'
 SETTING_SUBHASK_PROJDIR = 'subhask_project_dir'
 '''View-private setting that identifies the project directory in which the project's cabal file can be found.'''
 
-def access_sync(lock_name):
-    '''Decorate a function that requires lock synchronization: acquire the lock named `lock_name` (a member of an object)
-    and execute a function. This ensures that readers and writers don't collide with each other.'''
-    def decorator(method):
-        def synced_method(self, *args, **kwargs):
-            # Because we use this on an object's __getattribute__ method, we have to call object.__getattribute__
-            # directly to avoid infinite recursion.
-            lock = object.__getattribute__(self, lock_name)
-            with lock:
-                return method(self, *args, **kwargs)
-        return synced_method
-    return decorator
+def make_config_property(attr):
+    def locked_getter(self):
+        with self.wlock:
+            return getattr(self, '_' + attr)
+
+    def locked_setter(self, value):
+        with self.wlock:
+            setattr(self, '_' + attr, value)
+
+    return property(locked_getter, locked_setter)
+
+def same_property_pref(prop):
+    return (prop, prop)
 
 KEY_COMPONENT_DEBUG_DEBUG = 'component_debug'
 SUBHASK_PROJECT_KEY = 'SublimeHaskell'
@@ -38,98 +39,174 @@ class SettingsContainer(object):
     #
     # Note: Must keep this consistent with the instance attributes in __init__()
     # and with the SublimeHaskell.sublime-settings file's contents.
-    attr_dict = {
-        'add_default_completions': ('add_default_completions', False),
-        'add_standard_dirs': ('add_standard_dirs', True),
-        'add_to_PATH': ('add_to_path', []),
-        'add_word_completions': ('add_word_completions', False),
-        'auto_build_mode': ('auto_build_mode', 'normal-then-warnings'),
-        'auto_complete_imports': ('auto_complete_imports', True),
-        'auto_complete_language_pragmas': ('auto_complete_language_pragmas', True),
-        'auto_completion_popup': ('auto_completion_popup', False),
-        'backends': ('backends', {}),
-        KEY_COMPONENT_DEBUG_DEBUG: ('component_debug', []),
-        'enable_auto_build': ('enable_auto_build', False),
-        'enable_auto_check': ('enable_auto_check', True),
-        'enable_auto_lint': ('enable_auto_lint', True),
-        'enable_hdocs': ('enable_hdocs', False),
-        'ghc_opts': ('ghc_opts', []),
-        'ghci_opts': ('ghci_opts', []),
-        'haskell_build_tool': ('haskell_build_tool', 'stack'),
-        'hindent_options': ('hindent_options', []),
-        'hsdev_log_config': ('hsdev_log_config', 'use silent'),
-        'hsdev_log_level': ('hsdev_log_level', 'warning'),
-        'inspect_modules': ('inspect_modules', True),
-        'lint_check_fly': ('lint_check_fly', False),
-        'lint_check_fly_idle': ('lint_check_fly_idle', 5),
-        'log': ('log', 1),
-        'prettify_on_save': ('prettify_on_save', False),
-        'prettify_executable': ('prettify_executable', 'stylish-haskell'),
-        'show_error_window': ('show_error_window', True),
-        'show_output_window': ('show_output_window', True),
-        'stylish_options': ('stylish_options', []),
-        'unicode_symbol_info': ('unicode_symbol_info', True),
-        'use_improved_syntax': ('use_improved_syntax', True)
-    }
+    config_properties = dict([
+        same_property_pref('add_default_completions'),
+        same_property_pref('add_standard_dirs'),
+        # ('_add_to_path', 'add_to_PATH'),
+        ('add_to_path', 'add_to_PATH'),
+        same_property_pref('add_word_completions'),
+        same_property_pref('auto_build_mode'),
+        same_property_pref('auto_complete_imports'),
+        same_property_pref('auto_complete_language_pragmas'),
+        same_property_pref('auto_completion_popup'),
+        same_property_pref('backends'),
+        same_property_pref(KEY_COMPONENT_DEBUG_DEBUG),
+        same_property_pref('enable_auto_build'),
+        same_property_pref('enable_auto_check'),
+        same_property_pref('enable_auto_lint'),
+        same_property_pref('enable_hdocs'),
+        same_property_pref('ghc_opts'),
+        same_property_pref('ghci_opts'),
+        same_property_pref('haskell_build_tool'),
+        same_property_pref('hindent_options'),
+        same_property_pref('hsdev_log_config'),
+        same_property_pref('hsdev_log_level'),
+        same_property_pref('inspect_modules'),
+        same_property_pref('lint_check_fly'),
+        same_property_pref('lint_check_fly_idle'),
+        same_property_pref('log'),
+        same_property_pref('prettify_on_save'),
+        same_property_pref('prettify_executable'),
+        same_property_pref('show_error_window'),
+        same_property_pref('show_output_window'),
+        same_property_pref('stylish_options'),
+        same_property_pref('unicode_symbol_info'),
+        same_property_pref('use_improved_syntax')
+    ])
+
 
     def __init__(self):
-        # Instantiate the attributes (rationale: style and pylint error checking)
-        self.add_default_completions = False
-        self.add_standard_dirs = None
-        self.add_to_path = []
-        self.add_word_completions = False
-        self.auto_build_mode = None
-        self.auto_complete_imports = None
-        self.auto_complete_language_pragmas = None
-        self.auto_completion_popup = None
-        self.backends = {}
-        self.component_debug = []
-        self.enable_auto_build = None
-        self.enable_auto_check = None
-        self.enable_auto_lint = None
-        self.enable_hdocs = None
-        self.ghc_opts = None
-        self.ghci_opts = None
-        self.haskell_build_tool = None
-        self.hindent_options = []
-        self.hsdev_log_config = None
-        self.hsdev_log_level = None
-        self.inspect_modules = None
-        self.lint_check_fly = None
-        self.lint_check_fly_idle = None
-        self.log = None
-        self.prettify_on_save = None
-        self.prettify_executable = None
-        self.show_error_window = None
-        self.show_output_window = None
-        self.stylish_options = []
-        self.unicode_symbol_info = None
-        self.use_improved_syntax = None
-
-        # Set attributes to their respective default values:
-        for attr, default in SettingsContainer.attr_dict.values():
-            setattr(self, attr, default)
+        # Property value holders:
+        self._add_default_completions = False
+        self._add_standard_dirs = True
+        self._add_to_path = []
+        self._add_word_completions = False
+        self._auto_build_mode = 'normal-then-warnings'
+        self._auto_complete_imports = True
+        self._auto_complete_language_pragmas = True
+        self._auto_completion_popup = False
+        self._backends = {}
+        self._component_debug = []
+        self._enable_auto_build = False
+        self._enable_auto_check = True
+        self._enable_auto_lint = True
+        self._enable_hdocs = False
+        self._ghc_opts = []
+        self._ghci_opts = []
+        self._haskell_build_tool = 'stack'
+        self._hindent_options = []
+        self._hsdev_log_config = 'use silent'
+        self._hsdev_log_level = 'warning'
+        self._inspect_modules = True
+        self._lint_check_fly = False
+        self._lint_check_fly_idle = 5
+        self._log = 1
+        self._prettify_on_save = False
+        self._prettify_executable = 'stylish-haskell'
+        self._show_error_window = True
+        self._show_output_window = None
+        self._stylish_options = []
+        self._unicode_symbol_info = True
+        self._use_improved_syntax = True
 
         # Additional change callbacks to propagate:
         self.changes = Atomics.AtomicDuck()
         # Write-access lock
         self.wlock = threading.RLock()
 
-    @access_sync('wlock')
-    def __getattribute__(self, attr):
-        return object.__getattribute__(self, attr)
 
-    @access_sync('wlock')
+    ## And the properties themselves... Note that the property's getter/setter functions are actually
+    ## wrappers created by make_config_property, which ensures thread-safe access to the underlying
+    ## value holder.
+
+    add_default_completions = make_config_property('add_default_completions')
+    add_standard_dirs = make_config_property('add_standard_dirs')
+    add_to_path = make_config_property('add_to_path')
+    add_word_completions = make_config_property('add_word_completions')
+    auto_build_mode = make_config_property('auto_build_mode')
+    auto_complete_imports = make_config_property('auto_complete_imports'),
+    auto_complete_language_pragmas = make_config_property('auto_complete_language_pragmas')
+    auto_completion_popup = make_config_property('auto_completion_popup')
+    backends = make_config_property('backends')
+    component_debug = make_config_property('component_debug')
+    enable_auto_build = make_config_property('enable_auto_build')
+    enable_auto_check = make_config_property('enable_auto_check')
+    enable_auto_lint = make_config_property('enable_auto_lint')
+    enable_hdocs = make_config_property('enable_hdocs')
+    ghc_opts = make_config_property('ghc_opts')
+    ghci_opts = make_config_property('ghci_opts')
+    haskell_build_tool = make_config_property('haskell_build_tool')
+    hindent_options = make_config_property('hindent_options')
+    hsdev_log_config = make_config_property('hsdev_log_config')
+    hsdev_log_level = make_config_property('hsdev_log_level')
+    inspect_modules = make_config_property('inspect_modules')
+    lint_check_fly = make_config_property('lint_check_fly')
+    lint_check_fly_idle = make_config_property('lint_check_fly_idle')
+
+    # Of course, we have a couple of properties where we'd like to validate the new value.
+
+    @property
+    def log(self):
+        with self.wlock:
+            return self._log
+    @log.setter
+    def log(self, newval):
+        with self.wlock:
+            if newval >= 0 and newval <= 5:
+                self._log = newval
+            else:
+                msg = ['Invalid log level: {0} (0 <= log <= 5), keeping current level at {1}']
+                sublime.message_dialog('\n'.join(msg).format(newval, self._log))
+
+    prettify_on_save = make_config_property('prettify_on_save')
+
+    @property
+    def prettify_executable(self):
+        with self.wlock:
+            return self._prettify_executable
+    @prettify_executable.setter
+    def prettify_executable(self, newval):
+        with self.wlock:
+            if newval:
+                if os.path.exists(newval) or newval in ['stylish-haskell', 'hindent']:
+                    self._prettify_executable = newval
+                else:
+                    msg = ['\'{0}\' is not a recognized Haskell indenter/prettifier. Recognized prettifiers are:',
+                           '',
+                           'stylish-haskell',
+                           'hindent',
+                           '',
+                           'Please check your \'prettify_executable\' preference.']
+                    sublime.message_dialog('\n'.join(msg).format(newval))
+            elif self.prettify_on_save:
+                msg = ['The \'prettify_executable\' setting is missing from the plugin\'s  settings.',
+                       'This affects prettify-on-save functionality, which is now set to false.']
+                self.prettify_on_save = False
+                sublime.message_dialog('\n'.join(msg))
+
+
+    show_error_window = make_config_property('show_error_window')
+    show_output_window = make_config_property('show_output_window')
+    stylish_options = make_config_property('stylish_options')
+    unicode_symbol_info = make_config_property('unicode_symbol_info')
+    use_improved_syntax = make_config_property('use_improved_syntax')
+
+
     def load(self):
         settings = get_settings()
-        for (key, (attr, default)) in SettingsContainer.attr_dict.items():
-            value = settings.get(key, default)
-            ## Uncomment to debug. Do NOT use logging because it causes a circular dependency.
-            ## print('Settings.load: {0} = {1}'.format(attr, value))
-            setattr(self, attr, value)
-            install_updater(settings, self, key)
+        self.check_preferences(settings)
+        with self.wlock:
+            for (attr, preference) in self.config_properties.items():
+                value = settings.get(preference)
+                if value:
+                    ## Uncomment to debug. Do NOT use logging because it causes a circular dependency.
+                    ## print('Settings.load: {0} = {1}'.format(attr, value))
+                    setattr(self, attr, value)
+
+                install_updater(settings, self, attr)
         self.changes = Atomics.AtomicDuck()
 
+    def check_preferences(self, settings):
         ## New backend upgrade warning:
         old_stuff = []
         for old_setting in ['enable_hsdev', 'enable_ghc_mod', 'enable_hdevtools', 'hdevtools_socket',
@@ -159,22 +236,6 @@ class SettingsContainer(object):
                    '\'auto_build_mode\' preference']
             sublime.message_dialog(''.join(msg))
 
-        if self.prettify_executable:
-            if not os.path.exists(self.prettify_executable) and \
-               self.prettify_executable not in ['stylish-haskell', 'hindent']:
-                msg = ['\'{0}\' is not a recognized Haskell indenter/prettifier. Recognized prettifiers are:',
-                       '',
-                       'stylish-haskell',
-                       'hindent',
-                       '',
-                       'Please check your \'prettify_executable\' setting.']
-                sublime.message_dialog('\n'.join(msg).format(self.prettify_executable))
-        elif self.prettify_on_save:
-            msg = ['The \'prettify_executable\' setting is missing from the plugin\'s  settings.',
-                   'This affects prettify-on-save functionality, which is now set to false.']
-            self.prettify_on_save = False
-            sublime.message_dialog('\n'.join(msg))
-
         if settings.get('inhibit_completions'):
             msg = ['The \'inhibit_completions\' setting has been replaced by '
                    '\'add_word_completions\' and \'add_default_completions\'',
@@ -183,29 +244,30 @@ class SettingsContainer(object):
                    'delete the \'inhibit_completions\' setting.']
             sublime.message_dialog('\n'.join(msg))
 
-    def update_setting(self, key):
+    def update_setting(self, attr):
         settings = get_settings()
-        attr, default = SettingsContainer.attr_dict[key]
+        preference = self.config_properties[attr]
         oldval = getattr(self, attr)
-        newval = settings.get(key, default)
+        newval = settings.get(preference, oldval)
         if oldval != newval:
             # Only acquire the lock when we really need it.
+            ## print('update: {0}/{3} -> old {1} new {2}'.format(attr, oldval, newval, preference))
             with self.wlock:
-                if key == KEY_COMPONENT_DEBUG_DEBUG:
+                if attr == KEY_COMPONENT_DEBUG_DEBUG:
                     COMPONENT_DEBUG.load(newval)
                 else:
                     setattr(self, attr, newval)
                 with self.changes as changes_:
-                    for change_fn in changes_.get(key, []):
-                        change_fn(key, newval)
+                    for change_fn in changes_.get(attr, []):
+                        change_fn(attr, newval)
 
-    @access_sync('wlock')
     def add_change_callback(self, key, change_fn):
-        with self.changes as changes_:
-            if key not in changes_:
-                changes_[key] = []
+        with self.wlock:
+            with self.changes as changes_:
+                if key not in changes_:
+                    changes_[key] = []
 
-            changes_[key].append(change_fn)
+                changes_[key].append(change_fn)
 
 
 def install_updater(settings, setting_obj, key):

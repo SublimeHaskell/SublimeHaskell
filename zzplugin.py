@@ -75,7 +75,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
 
         self.assoc_to_project(view, filename)
         project_name = Common.locate_cabal_project_from_view(view)[1]
-        self.rescan_source(project_name, filename)
+        Utils.run_async('rescan source {0}/{1}'.format(project_name, filename), self.rescan_source, project_name, filename)
         view.settings().set('translate_tabs_to_spaces', True)
 
     def on_load(self, view):
@@ -88,7 +88,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
 
         self.assoc_to_project(view, filename)
         project_name = Common.locate_cabal_project_from_view(view)[1]
-        self.rescan_source(project_name, filename)
+        Utils.run_async('rescan source {0}/{1}'.format(project_name, filename), self.rescan_source, project_name, filename)
 
         if Common.is_haskell_source(view):
             if Settings.COMPONENT_DEBUG.event_viewer:
