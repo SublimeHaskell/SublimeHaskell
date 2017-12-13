@@ -41,34 +41,16 @@ class HsDevConnection(object):
         is stashed in self.part for the next time the connection reads a request.
         '''
 
-        partial = ''
-        while not self.stop_event.is_set():
+        req_remain = ''
+        while not self.stop_event.is_set() and self.socket is not None:
             # Note: We could have read a lot from the socket, which could have resulted in multiple request responses
             # being read (this can happen when the 'scan' command sends status updates):
-            pre, sep, post = partial.partition('\n')
-            if sep:
-                req_resp = pre
-                partial = post
-                # print('got resp from partial.')
-            else:
-                req_resp = partial
-                decoded_req = False
-
-                while not decoded_req and self.socket is not None:
-                    pre, sep, post = self.read_decoded_req().partition('\n')
-                    req_resp += pre
-                    if sep:
-                        decoded_req = True
-                        partial = post
-                        # print('got complete resp, partial length is {0}'.format(len(partial)))
-                    else:
-                        # print('incomplete request, reading more.')
-                        pass
-
-            if self.rcvr_queue is not None and decoded_req:
-                # Catch the case here where the socket gets closed, but close() has already assigned rcvr_queue
-                # to None.
-                self.rcvr_queue.put(json.loads(req_resp))
+            pre, sep, post = self.read_decoded_req().partition('\n')
+            pre = ''.join([req_remain, pre])
+            while sep and self.rcvr_queue:
+                self.rcvr_queue.put(json.loads(pre))
+                (pre, sep, post) = post.partition('\n')
+            req_remain = pre
 
     def read_decoded_req(self):
         raw_req = bytearray()
