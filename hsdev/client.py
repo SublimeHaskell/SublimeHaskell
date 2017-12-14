@@ -46,7 +46,7 @@ class HsDevConnection(object):
             # Note: We could have read a lot from the socket, which could have resulted in multiple request responses
             # being read (this can happen when the 'scan' command sends status updates):
             pre, sep, post = self.read_decoded_req().partition('\n')
-            pre = req_remain + pre
+            pre = ''.join([req_remain, pre])
             while sep and self.rcvr_queue:
                 self.rcvr_queue.put(json.loads(pre))
                 (pre, sep, post) = post.partition('\n')
