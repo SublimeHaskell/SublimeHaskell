@@ -64,6 +64,8 @@ class Worker(object, metaclass=Singleton):
             except Exception:
                 Logging.log('worker: job {0} failed, see console window traceback'.format(name), Logging.LOG_ERROR)
                 traceback.print_exc()
+            finally:
+                self.jobs.task_done()
 
     def async(self, name, worker_fn, *args, **kwargs):
         self.jobs.put((name, worker_fn, args, kwargs))

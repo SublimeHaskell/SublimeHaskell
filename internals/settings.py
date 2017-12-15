@@ -31,14 +31,9 @@ KEY_COMPONENT_DEBUG_DEBUG = 'component_debug'
 SUBHASK_PROJECT_KEY = 'SublimeHaskell'
 
 class SettingsContainer(object):
-    """Container object for default and user preference settings."""
+    '''Container object for default and user preference settings.
+    '''
 
-    # Map instance settings keys to attributes and default values.
-    # Key: Setting name
-    # Value: (Instance attribute, default value)
-    #
-    # Note: Must keep this consistent with the instance attributes in __init__()
-    # and with the SublimeHaskell.sublime-settings file's contents.
     config_properties = dict([
         same_property_pref('add_default_completions'),
         same_property_pref('add_standard_dirs'),
@@ -304,18 +299,20 @@ class ComponentDebug(object):
     '''
     def __init__(self):
         self.all_messages = False
-        self.send_messages = False
-        self.recv_messages = False
-        self.socket_pool = False
         self.callbacks = False
-        self.event_viewer = False
         self.completions = False
+        self.event_viewer = False
+        self.fly_mode = False
+        self.recv_messages = False
+        self.send_messages = False
+        self.socket_pool = False
 
     def load(self, backend_settings):
         self.all_messages = 'all_messages' in backend_settings
         self.callbacks = 'callbacks' in backend_settings
         self.completions = 'completions' in backend_settings
         self.event_viewer = 'event_viewer' in backend_settings
+        self.fly_mode = 'fly_mode' in backend_settings
         self.recv_messages = 'recv_messages' in backend_settings
         self.send_messages = 'send_messages' in backend_settings
         self.socket_pool = 'socket_pool' in backend_settings

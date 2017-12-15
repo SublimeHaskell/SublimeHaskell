@@ -276,8 +276,8 @@
     "hsdev_log_config": "use silent",
     "hsdev_log_level": "warning",
 
-    // Backend debugging flags/tokens: This is a list of tokens used for backend debugging, primarily in the hsdev
-    // backend.
+    // Backend debugging flags/tokens: This is a list of tokens used for debugging the various SublimeHaskell components,
+    // inspired by hacking on the hsdev backend.
     //
     // "all_messages": Emit all messages (send and receive)
     // "send_messages": Emit all sent messages
@@ -286,6 +286,7 @@
     // "callbacks": Show interesting information about 'hsdev' callbacks
     // "event_viewer": Event handling dignostics and debug
     // "completions": Completion generator diagnostics and debug
+    // "fly_mode": Fly mode debugging
     "component_debug": []
 
     // SublimeHaskell per-project settings (or "things you can put in your .sublime-project file")

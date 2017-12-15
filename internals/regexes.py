@@ -11,3 +11,9 @@ OUTPUT_REGEX = re.compile(r'\s*^(\S*):(\d+):(\d+):(.*$(?:\n^[ \t].*$)*)', re.MUL
 
 # Extract the filename, line, column, and description from an error message:
 RESULT_FILE_REGEX = r'^\s{2}(\S*?): line (\d+), column (\d+):$'
+
+LANGUAGE_RE = re.compile(r'{-#\s+LANGUAGE.*')
+'''Regular expression for GHC "LANGUAGE" pragmas.
+'''
+
+OPTIONS_GHC_RE = re.compile(r'{-#\s+OPTIONS_GHC.*')

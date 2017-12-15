@@ -52,7 +52,7 @@ class SublimeHaskellAutocompleteRepl(sublime_plugin.EventListener):
     COMMAND_RE = re.compile(r':(\w+)(\s+(\w+))?')
 
     def on_query_completions(self, view, _prefix, locations):
-        if not HAS_SUBLIME_REPL or not Common.is_haskell_repl(view):
+        if not HAS_SUBLIME_REPL or not Common.view_is_haskell_repl(view):
             return []
 
         compl_flags = sublime.INHIBIT_WORD_COMPLETIONS|sublime.INHIBIT_EXPLICIT_COMPLETIONS

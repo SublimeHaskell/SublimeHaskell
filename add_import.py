@@ -97,4 +97,4 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
             Common.sublime_status_message('Import {0} added'.format(module_name))
 
     def is_visible(self):
-        return Common.is_haskell_source(self.view) and super().is_visible()
+        return Common.view_is_haskell_source(self.view) and super().is_visible()

@@ -236,7 +236,7 @@ class SublimeHaskellBuildCommand(CommandWin.SublimeHaskellWindowCommand):
     def get_projects(self):
         folders = sublime.active_window().folders()
         view_files = [v.file_name() for v in sublime.active_window().views()
-                      if (Common.is_haskell_source(v) or Common.is_cabal_source(v)) and v.file_name()]
+                      if (Common.view_is_haskell_source(v) or Common.view_is_cabal_source(v)) and v.file_name()]
 
         def childof(path, prefix):
             return Utils.normalize_path(path).startswith(Utils.normalize_path(prefix))

@@ -311,7 +311,7 @@ class SublimeHaskellGoToHackagePackage(CommandWin.SublimeHaskellTextCommand):
         return self.view.settings().get('package') is not None
 
     def is_visible(self):
-        return Common.is_haskell_symbol_info(self.view)
+        return Common.view_is_haskell_symbol_info(self.view)
 
 
 class SublimeHaskellGoToHackageModule(CommandWin.BackendTextCommand):
@@ -320,7 +320,7 @@ class SublimeHaskellGoToHackageModule(CommandWin.BackendTextCommand):
         self.candidates = []
 
     def run(self, _edit, **_kwargs):
-        if Common.is_haskell_symbol_info(self.view):
+        if Common.view_is_haskell_symbol_info(self.view):
             pack = self.view.settings().get('package')
             mod = self.view.settings().get('module')
             if pack and mod:
@@ -371,13 +371,13 @@ class SublimeHaskellGoToHackageModule(CommandWin.BackendTextCommand):
 
     def is_enabled(self):
         return (self.view.settings().get('package') is not None) or \
-               Common.is_haskell_source(self.view) or \
-               Common.is_haskell_repl(self.view)
+               Common.view_is_haskell_source(self.view) or \
+               Common.view_is_haskell_repl(self.view)
 
     def is_visible(self):
-        return Common.is_haskell_symbol_info(self.view) or \
-               Common.is_haskell_source(self.view) or \
-               Common.is_haskell_repl(self.view)
+        return Common.view_is_haskell_symbol_info(self.view) or \
+               Common.view_is_haskell_source(self.view) or \
+               Common.view_is_haskell_repl(self.view)
 
 
 ## Not referenced in default commands or anywhere in the plugin:
@@ -534,7 +534,7 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
         show_declaration_info_panel(self.view, decl)
 
     def is_visible(self):
-        return Common.is_haskell_source(self.view) or Common.is_haskell_repl(self.view)
+        return Common.view_is_haskell_source(self.view) or Common.view_is_haskell_repl(self.view)
 
     def collect_candidates(self, qualified_name, unqualified_name, filename, module_name, package_name, symdb):
         candidates = BackendManager.active_backend().whois(qualified_name, file=self.current_file_name)
@@ -566,7 +566,7 @@ class SublimeHaskellToggleSymbolInfoCommand(CommandWin.BackendWindowCommand):
 
 class SublimeHaskellContinuousSymbolInfo(sublime_plugin.EventListener):
     def on_selection_modified(self, view):
-        if TOGGLE_SYMBOL_INFO and Common.is_haskell_source(view) and view.file_name():
+        if TOGGLE_SYMBOL_INFO and Common.view_is_haskell_source(view) and view.file_name():
             view.run_command('sublime_haskell_symbol_info', {'no_browse': True})
 
 
@@ -712,7 +712,7 @@ class SublimeHaskellGoToDeclaration(CommandWin.BackendTextCommand):
     def run(self, _edit, **_kwargs):
         qsymbol = Common.get_qualified_symbol_at_region(self.view, self.view.sel()[0])
 
-        if Common.is_haskell_symbol_info(self.view):  # Go to within symbol info window
+        if Common.view_is_haskell_symbol_info(self.view):  # Go to within symbol info window
             loc = self.view.settings().get('location')
             if loc:
                 self.view.window().open_file(loc, sublime.ENCODED_POSITION)
@@ -783,8 +783,8 @@ class SublimeHaskellGoToDeclaration(CommandWin.BackendTextCommand):
                 self.view.window().open_file(selected[0][1], sublime.TRANSIENT)
 
     def is_enabled(self):
-        return Common.is_haskell_source(self.view) or Common.is_haskell_repl(self.view) or \
-               (Common.is_haskell_symbol_info(self.view) and self.view.settings().get('location'))
+        return Common.view_is_haskell_source(self.view) or Common.view_is_haskell_repl(self.view) or \
+               (Common.view_is_haskell_symbol_info(self.view) and self.view.settings().get('location'))
 
 
 class SublimeHaskellEvalReplaceCommand(CommandWin.SublimeHaskellTextCommand):

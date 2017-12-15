@@ -374,7 +374,7 @@ class SublimeHaskellShowAllTypes(CommandWin.SublimeHaskellTextCommand):
         Common.show_panel(self.view.window(), panel_name=TYPES_PANEL_NAME)
 
     def is_enabled(self):
-        return Common.is_haskell_source(self.view) and self.view.file_name() is not None
+        return Common.view_is_haskell_source(self.view) and self.view.file_name() is not None
 
 
 class SublimeHaskellHideAllTypes(CommandWin.SublimeHaskellTextCommand):
@@ -383,7 +383,7 @@ class SublimeHaskellHideAllTypes(CommandWin.SublimeHaskellTextCommand):
         Common.hide_panel(self.view.window(), panel_name=TYPES_PANEL_NAME)
 
     def is_enabled(self):
-        return Common.is_haskell_source(self.view) and \
+        return Common.view_is_haskell_source(self.view) and \
                self.view.file_name() is not None and \
                SourceHaskellTypeCache().has(self.view.file_name()) and \
                SourceHaskellTypeCache().shown(self.view.file_name())
@@ -401,7 +401,7 @@ class SublimeHaskellToggleAllTypes(CommandWin.SublimeHaskellTextCommand):
             self.view.run_command('sublime_haskell_show_all_types')
 
     def is_enabled(self):
-        return Common.is_haskell_source(self.view) and self.view.file_name() is not None
+        return Common.view_is_haskell_source(self.view) and self.view.file_name() is not None
 
 
 # Works only with the cursor being in the name of a toplevel function so far.
@@ -511,7 +511,7 @@ class SublimeHaskellExpandSelectionExpression(SublimeHaskellShowType):
 
 class SublimeHaskellTypes(sublime_plugin.EventListener):
     def on_selection_modified(self, view):
-        if Common.is_haskell_source(view) and view.file_name():
+        if Common.view_is_haskell_source(view) and view.file_name():
             srcfile = view.file_name()
             if SourceHaskellTypeCache().has(srcfile) and SourceHaskellTypeCache().shown(srcfile):
                 view.run_command('sublime_haskell_show_all_types', {'filename': srcfile})

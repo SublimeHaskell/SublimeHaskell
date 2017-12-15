@@ -35,12 +35,12 @@ IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']
 def is_enabled_haskell_command(view, must_be_project):
     '''Returns True if command for Haskell source can be invoked.
     '''
-    window, view = get_haskell_command_window_view_file_project(view)[0:2]
+    window, view = window_view_and_file(view)[0:2]
 
     if not window or not view:
         return False
     else:
-        # Note: file_show_in_view is the third element of the get_haskell_command_window_view_file_project() return tuple.
+        # Note: file_show_in_view is the third element of the window_view_and_file() return tuple.
         # if must_be_file and not file_shown_in_view:
         #     return False
 
@@ -55,19 +55,18 @@ def is_enabled_haskell_command(view, must_be_project):
         return cabal_project_dir is not None
 
 
-def get_haskell_command_window_view_file_project(view=None):
-    """Returns window, view and file"""
+def window_view_and_file(view=None):
+    '''Returns window, view and the view's file name. If view is None, use the active window, the window's active view.
+    '''
+
     if view:
         return view.window(), view, view.file_name()
 
     window = sublime.active_window()
-    view = None
-    if window:
-        view = window.active_view()
-    file_name = None
-    if view:
-        file_name = view.file_name()
-    return window, view, file_name
+    view = window.active_view() if window else None
+    fname = view.file_name() if view else None
+
+    return window, view, fname
 
 def locate_cabal_project_from_view(view):
     """Return the path to the .cabal file project for the source file in the
@@ -391,7 +390,7 @@ class ProcessStatusMessage(object):
             return u'{0}{1}'.format(self.msg, '.' * (ticks % 4))
 
         # not self.is_active():
-        return u'{0} {1}'.format(self.msg, '[timeout]' if self.result is None else (u'\u2714' if self.result else u'\u2718'))
+        return u'{0} {1}'.format(self.msg, '[timeout]' if self.result is None else (u'\u2713' if self.result else u'\u2717'))
 
     def change_message(self, new_msg):
         self.msg = new_msg
@@ -524,35 +523,52 @@ def status_message_process(msg, timeout=300.0, priority=0):
     return StatusMessageContext(ProcessStatusMessage(msg, timeout=timeout, priority=priority))
 
 
-def is_with_syntax(view, syntax):
-    window, view = get_haskell_command_window_view_file_project(view)[0:2]
-    if window and view:
-        _, synfile = os.path.split(view.settings().get('syntax'))
-        return synfile and synfile.lower() == syntax.lower()
-
-    return False
-
-def is_cabal_source(view):
-    return is_with_syntax(view, "Cabal.tmLanguage")
+def settings_has_syntax(settings, syntax):
+    # print('settings.get(syntax) = {0}'.format(settings.get('syntax')))
+    _, synfile = os.path.split(settings.get('syntax') or '')
+    return synfile and synfile.lower() == syntax.lower()
 
 
-def is_haskell_source(view):
-    return any([is_with_syntax(view, syn) for syn in ["Haskell.tmLanguage",
-                                                      "Haskell.sublime-syntax",
-                                                      'Haskell-SublimeHaskell.tmLanguage']])
+def view_has_syntax(view, syntax):
+    if not view:
+        view = window_view_and_file(view)[1]
+        if not view:
+            return False
+
+    return settings_has_syntax(view.settings(), syntax)
 
 
-def is_inspected_source(view=None):
-    return is_haskell_source(view) or is_cabal_source(view)
+def view_is_cabal_source(view):
+    return view_has_syntax(view, "Cabal.tmLanguage")
 
 
-def is_haskell_repl(view=None):
-    return any(is_with_syntax(view, syn) for syn in ['HaskellRepl.tmLanguage',
-                                                     'HaskellRepl.sublime-syntax'])
+def settings_has_cabal_source(settings):
+    return settings_has_syntax(settings, "Cabal.tmLanguage")
+
+HASKELL_SYNTAXES = ["Haskell.tmLanguage",
+                    "Haskell.sublime-syntax",
+                    'Haskell-SublimeHaskell.tmLanguage']
 
 
-def is_haskell_symbol_info(view=None):
-    return is_with_syntax(view, "HaskellSymbolInfo.tmLanguage")
+def view_is_haskell_source(view):
+    return any([view_has_syntax(view, syn) for syn in HASKELL_SYNTAXES])
+
+
+def settings_has_haskell_source(settings):
+    return any([settings_has_syntax(settings, syn) for syn in HASKELL_SYNTAXES])
+
+
+def view_is_inspected_source(view):
+    return view_is_haskell_source(view) or view_is_cabal_source(view)
+
+
+def view_is_haskell_repl(view):
+    return any(view_has_syntax(view, syn) for syn in ['HaskellRepl.tmLanguage',
+                                                      'HaskellRepl.sublime-syntax'])
+
+
+def view_is_haskell_symbol_info(view):
+    return view_has_syntax(view, "HaskellSymbolInfo.tmLanguage")
 
 
 def sublime_haskell_cache_path():

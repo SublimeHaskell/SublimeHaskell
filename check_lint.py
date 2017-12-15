@@ -1,6 +1,7 @@
 # -*- coding: UTF-8 -*-
 
 import os
+import threading
 
 import sublime
 
@@ -32,37 +33,49 @@ def messages_as_hints(cmd):
 
 
 class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
+    RUN_CHAIN_FLAG = threading.Event()
+    '''Event flag used to signal that a command chain has run to completion.
+    '''
+
     def __init__(self, view):
         super().__init__(view)
-        self.msgs = []
+        self.contents = {}
         self.corrections = []
         self.corrections_dict = {}
-        self.fly_mode = False
         self.filename = None
-        self.contents = {}
+        self.fly_mode = False
+        self.msgs = []
         self.status_msg = None
+
 
     def run(self, edit, **_args):
         print('SublimeHaskellHsDevChain.run??')
         raise NotImplementedError("SublimeHaskellDevChain.run needs an implementation.")
 
+
     def run_chain(self, cmds, msg, fly_mode=False):
-        self.filename = self.view.file_name()
-        if self.filename:
-            self.msgs = []
-            self.corrections = []
-            self.fly_mode = fly_mode
-            self.contents = {}
-            if self.view.is_dirty():
-                self.contents[self.filename] = self.view.substr(sublime.Region(0, self.view.size()))
-            if not self.fly_mode:
-                ParseOutput.hide_output(self.view)
+        try:
+            self.filename = self.view.file_name()
+            if self.filename:
+                self.msgs = []
+                self.corrections = []
+                self.fly_mode = fly_mode
+                self.contents = {}
+                if self.view.is_dirty():
+                    self.contents[self.filename] = self.view.substr(sublime.Region(0, self.view.size()))
+                if not self.fly_mode:
+                    ParseOutput.hide_output(self.view)
                 if cmds:
                     self.status_msg = Common.status_message_process(msg + ': ' + self.filename)
                     self.status_msg.start()
                     self.go_chain(cmds)
                 else:
                     sublime.error_message('Empty command chain (check_lint.run_chain)')
+            else:
+                print('run_chain: no file name? {0}'.format(self.filename))
+        finally:
+            self.RUN_CHAIN_FLAG.set()
+
 
     def go_chain(self, cmds):
         if cmds:
@@ -82,6 +95,7 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
         else:
             self.status_msg.result_ok()
             BackendMgr.active_backend().autofix_show(self.msgs, False, on_response=self.on_autofix)
+
 
     def on_autofix(self, corrections):
         # Oh, this looks pretty ugly. But, list comprehensions are supposedly faster than loops. And since this is
@@ -113,7 +127,17 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
         sublime.set_timeout(lambda: ParseOutput.mark_messages_in_views(output_messages), 0)
 
     def is_enabled(self):
-        return Common.is_haskell_source(None) and super().is_enabled()
+        return Common.view_is_haskell_source(None) and super().is_enabled()
+
+
+    @staticmethod
+    def reset_chain_flag():
+        SublimeHaskellHsDevChain.RUN_CHAIN_FLAG.clear()
+
+
+    @staticmethod
+    def run_chain_flag():
+        return SublimeHaskellHsDevChain.RUN_CHAIN_FLAG
 
 
 class SublimeHaskellCheck(SublimeHaskellHsDevChain):
@@ -125,10 +149,8 @@ class SublimeHaskellCheck(SublimeHaskellHsDevChain):
         Utils.run_async('SublimeHaskellCheck', self.run_chain, [hsdev_check()], 'Checking', fly_mode=kwargs.get('fly', False))
 
 
-def exec_check_process(view):
-    '''Utility function to unconditionally execute `SublimeHaskellCheck.run()` without worrying about the command's status.
-    '''
-    return SublimeHaskellCheck(view).run(None)
+def exec_check_process(view, fly=False):
+    return SublimeHaskellCheck(view).run(None, fly=fly)
 
 
 class SublimeHaskellLint(SublimeHaskellHsDevChain):
@@ -140,10 +162,10 @@ class SublimeHaskellLint(SublimeHaskellHsDevChain):
         Utils.run_async('SublimeHaskellLint', self.run_chain, [hsdev_lint()], 'Linting', fly_mode=kwargs.get('fly', False))
 
 
-def exec_lint_process(view):
+def exec_lint_process(view, fly=False):
     '''Utility function to unconditionally execute `SublimeHaskellLint.run()` without worrying about the command's status.
     '''
-    return SublimeHaskellLint(view).run(None)
+    return SublimeHaskellLint(view).run(None, fly=fly)
 
 
 class SublimeHaskellCheckAndLint(SublimeHaskellHsDevChain):
@@ -155,9 +177,8 @@ class SublimeHaskellCheckAndLint(SublimeHaskellHsDevChain):
         Utils.run_async('SublimeHaskellCheckAndLint', self.run_chain, [hsdev_check(), hsdev_lint()], 'Checking and Linting',
                         fly_mode=kwargs.get('fly', False))
 
-
-def exec_check_and_lint_process(view):
+def exec_check_and_lint_process(view, fly=False):
     '''Utility function to unconditionally execute 'SublimeHaskellCHeckAndLint.run()' without worrying
     about the command's status.
     '''
-    return SublimeHaskellCheckAndLint(view).run(None)
+    return SublimeHaskellCheckAndLint(view).run(None, fly=fly)
