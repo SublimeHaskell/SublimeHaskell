@@ -114,6 +114,9 @@ class SublimeHaskellReplGhciCommand(CommandWin.SublimeHaskellWindowCommand):
     def is_enabled(self):
         return HAS_SUBLIME_REPL
 
+    def is_visible(self):
+        return True
+
 
 class SublimeHaskellReplGhciCurrentFileCommand(CommandWin.SublimeHaskellWindowCommand):
     def run(self, **_kwargs):
