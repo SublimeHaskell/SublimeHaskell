@@ -25,6 +25,13 @@
     // Enable auto lint on save (as hints when building)
     "enable_auto_lint": true,
 
+    // Show only: Limit what compiler or backend messages get marked or displayed
+    "show_only": {
+        "errors": true,
+        "warnings": true,
+        "hints": true
+    },
+
     // How to build the cabal project in order to obtain error messages.
     // This option exists because `cabal build` is slow and cannot re-print
     // warnings of already compiled modules.
@@ -294,6 +301,7 @@
     // - active_stack_config
     // - auto_build_mode
     // - haskell_build_tool
+    // - show_only
     //
     // Example:
     // {

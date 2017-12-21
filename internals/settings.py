@@ -37,7 +37,6 @@ class SettingsContainer(object):
     config_properties = dict([
         same_property_pref('add_default_completions'),
         same_property_pref('add_standard_dirs'),
-        # ('_add_to_path', 'add_to_PATH'),
         ('add_to_path', 'add_to_PATH'),
         same_property_pref('add_word_completions'),
         same_property_pref('auto_build_mode'),
@@ -63,6 +62,7 @@ class SettingsContainer(object):
         same_property_pref('prettify_on_save'),
         same_property_pref('prettify_executable'),
         same_property_pref('show_error_window'),
+        same_property_pref('show_only'),
         same_property_pref('show_output_window'),
         same_property_pref('stylish_options'),
         same_property_pref('unicode_symbol_info'),
@@ -99,6 +99,9 @@ class SettingsContainer(object):
         self._prettify_on_save = False
         self._prettify_executable = 'stylish-haskell'
         self._show_error_window = True
+        self._show_only = {'errors': True,
+                           'warnings': True,
+                           'hints': True}
         self._show_output_window = None
         self._stylish_options = []
         self._unicode_symbol_info = True
@@ -144,6 +147,7 @@ class SettingsContainer(object):
     def log(self):
         with self.wlock:
             return self._log
+
     @log.setter
     def log(self, newval):
         with self.wlock:
@@ -181,6 +185,27 @@ class SettingsContainer(object):
 
 
     show_error_window = make_config_property('show_error_window')
+
+    @property
+    def show_only(self):
+        return self._show_only
+
+    @show_only.setter
+    def show_only(self, newval):
+        if isinstance(newval, dict):
+            self._show_only = newval
+        else:
+            msg = ['The \'show_only\' setting should be a dictionary, e.g.:',
+                   '',
+                   '  show_only: {',
+                   '    "errors": true,'
+                   '    "warnings": true,'
+                   '    "hints": false',
+                   '  }',
+                   '',
+                   'Please refer to SublimeHaskell\'s default settings for documentation.']
+            sublime.message_dialog('\n'.join(msg))
+
     show_output_window = make_config_property('show_output_window')
     stylish_options = make_config_property('stylish_options')
     unicode_symbol_info = make_config_property('unicode_symbol_info')
@@ -213,7 +238,7 @@ class SettingsContainer(object):
                    '']
             msg = msg + old_stuff
             msg = msg + ['',
-                         'You are now using the default SublimeHaskell settings'
+                         'You are using the default SublimeHaskell settings'
                          'for the \'backend\' preference.',
                          '',
                          'Please look at the default settings and customize/migrate',
@@ -238,6 +263,7 @@ class SettingsContainer(object):
                    'Please customize your settings with these two flags, '
                    'delete the \'inhibit_completions\' setting.']
             sublime.message_dialog('\n'.join(msg))
+
 
     def update_setting(self, attr):
         settings = get_settings()

@@ -30,7 +30,7 @@ class OutputMessage(object):
     '''
     def __init__(self, view, filename, region, message, level, correction=None):
         super().__init__()
-        self.view = view.window().file_open_file(filename) or view
+        self.view = view.window().find_open_file(filename) or view
         self._filename = filename
         self.region = region
         self.message = message
@@ -130,8 +130,12 @@ class MarkerManager(object):
                                        msg.get('level', 'uncategorized'))
                          for msg in msgs]
 
+        self.limit_messages(view)
+
         # Hack alert: Region and Position.to_zero_based() return the original object (self) after updating it.
         # 'and' returns the right hand side, which is never None or a false value.
+        #
+        # Bascially, a Pythonic way to make side effects happen and still get a list of things we want.
         corrections_dict = dict(((os.path.normpath(c.file), c.message_region.start.line, c.message_region.start.column), c)
                                 for c in [corr.message_region.to_zero_based() and corr for corr in corrections or []])
 
@@ -169,6 +173,7 @@ class MarkerManager(object):
                                  'warning' if 'warning' in messy_details.lower() else 'error')
 
         self.messages = [to_error(err) for err in Regexes.OUTPUT_REGEX.finditer(text)]
+        self.limit_messages(view)
 
         output_text = self.format_output_messages()
         unparsed = Regexes.OUTPUT_REGEX.sub('', text).strip()
@@ -209,6 +214,18 @@ class MarkerManager(object):
         uncategorized = messages_level('Uncategorized', 'uncategorized')
 
         return '\n\n'.join(filter(lambda s: s, [summary_line, errors, warnings, hints, uncategorized]))
+
+
+    def limit_messages(self, view):
+        show_only = Settings.get_project_setting(view, 'show_only', Settings.PLUGIN.show_only)
+        show_errors = show_only.get('errors', True)
+        show_warnings = show_only.get('warnings', True)
+        show_hints = show_only.get('hints', True)
+
+        if not show_errors or not show_warnings or not show_hints:
+            self.messages = [msg for msg in self.messages if (msg.level == 'error' and show_errors) or \
+                                                             (msg.level == 'warning' and show_warnings) or \
+                                                             (msg.level == 'hint' and show_hints)]
 
     def clear_error_marks(self):
         for err in self.error_marks:
