@@ -6,13 +6,11 @@ import threading
 import sublime
 
 import SublimeHaskell.cmdwin_types as CommandWin
-import SublimeHaskell.hsdev.result_parse as HsResultParse
 import SublimeHaskell.internals.backend_mgr as BackendMgr
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.parseoutput as ParseOutput
 import SublimeHaskell.sublime_haskell_common as Common
-import SublimeHaskell.symbols as Symbols
 
 
 def file_as_file_list(file):
@@ -98,33 +96,7 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
 
 
     def on_autofix(self, corrections):
-        # Oh, this looks pretty ugly. But, list comprehensions are supposedly faster than loops. And since this is
-        # is supporting Haskell, why not use the functional approach? :-)
-        output_messages = [ParseOutput.OutputMessage(msg.get('source', {}).get('file', '<no file/command line/OPTIONS_GHC>'),
-                                                     HsResultParse.parse_region(msg.get('region')).to_zero_based() \
-                                                       if msg.get('region') is not None else Symbols.Region(0),
-                                                     msg.get('level', 'uncategorized').capitalize() + ': ' + \
-                                                       msg.get('note', {}).get('message', '').replace('\n', '\n  '),
-                                                     msg.get('level', 'uncategorized'))
-                           for msg in self.msgs]
-
-        # Hack alert: Region and Position.to_zero_based() return the original object (self) after updating it. 'and' returns the
-        # right hand side, which is never None or a false value.
-        self.corrections_dict = dict(((os.path.normpath(c.file), c.message_region.start.line, c.message_region.start.column), c)
-                                     for c in [corr.message_region.to_zero_based() and corr for corr in corrections or []])
-
-        for omsg in output_messages:
-            okey = (os.path.normpath(omsg.filename), omsg.region.start.line, omsg.region.start.column)
-            if okey in self.corrections_dict:
-                omsg.correction = self.corrections_dict[okey]
-
-        ParseOutput.set_global_error_messages(output_messages)
-        output_text = ParseOutput.format_output_messages(output_messages)
-        if Settings.PLUGIN.show_error_window:
-            cabal_proj_dir = Common.get_cabal_project_dir_of_file(self.filename) or os.path.dirname(self.filename)
-            panel_display = not self.fly_mode and output_messages
-            sublime.set_timeout(lambda: ParseOutput.write_output(self.view, output_text, cabal_proj_dir, panel_display), 0)
-        sublime.set_timeout(lambda: ParseOutput.mark_messages_in_views(output_messages), 0)
+        ParseOutput.MARKER_MANAGER.mark_response(self.view, self.msgs, corrections, self.fly_mode)
 
     def is_enabled(self):
         return Common.view_is_haskell_source(None) and super().is_enabled()

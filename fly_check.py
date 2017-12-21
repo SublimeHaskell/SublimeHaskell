@@ -32,7 +32,7 @@ class FlyCheckViewEventListener(EventCommon.SublimeHaskellEventCommon, sublime_p
         self.fly_check_loop = threading.Event()
         self.fly_check_flag = threading.Event()
         self.fly_check_thread = None
-        self.next_flycheck = time.time()+ Settings.PLUGIN.lint_check_fly_idle
+        self.next_flycheck = time.time() + Settings.PLUGIN.lint_check_fly_idle
 
         # They should start out as clear. Paranoia.
         self.fly_check_loop.clear()
@@ -42,7 +42,8 @@ class FlyCheckViewEventListener(EventCommon.SublimeHaskellEventCommon, sublime_p
     def on_activated(self):
         if Settings.PLUGIN.lint_check_fly:
             with self.fly_lock:
-                self.fly_check_thread = threading.Thread(target=self.fly_check)
+                self.fly_check_thread = threading.Thread(target=self.fly_check,
+                                                         name='fly-{0}'.format(self.view.file_name()))
                 self.fly_check_loop.clear()
                 self.fly_check_flag.clear()
                 self.next_flycheck = time.time() + Settings.PLUGIN.lint_check_fly_idle

@@ -12,6 +12,7 @@ import SublimeHaskell.event_common as EventCommon
 import SublimeHaskell.internals.proc_helper as ProcHelper
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.utils as Utils
+import SublimeHaskell.parseoutput as ParseOutput
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.types as Types
 import SublimeHaskell.internals.regexes as Regexs
@@ -39,6 +40,7 @@ def plugin_loaded():
 def plugin_unloaded():
     '''Finalization actions when SublimeHaskell is unloaded.
     '''
+    ParseOutput.MARKER_MANAGER.clear_error_marks()
     BackendManager.BackendManager().shutdown_backend()
 
 

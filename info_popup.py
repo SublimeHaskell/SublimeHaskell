@@ -142,7 +142,7 @@ class SublimeHaskellHoverPopup(object):
                 self.create_symbol_popup(typed_expr, decl, suggest_import)
 
         elif self.hover_zone == sublime.HOVER_GUTTER:
-            errs = [err for err in ParseOutput.errors_for_view(self.view) if err.region.start.line == self.line]
+            errs = [err for err in ParseOutput.MARKER_MANAGER.marks_for_view(self.view) if err.region.start.line == self.line]
             if errs:
                 popup_parts = [self.STYLES.gen_style(self.view.settings().get('color_scheme'))]
                 for err in errs:
@@ -196,27 +196,7 @@ class SublimeHaskellHoverPopup(object):
                 webbrowser.open(url)
             elif url[0:8] == 'autofix:':
                 rgn = symbols.Region.from_str(url[8:])
-                errs = ParseOutput.errors_for_view(self.view)
-                # Give err_text, err_rgn scope other than the loop.
-                err_text = ''
-                err_rgn = None
-                repl_text = None
-
-                for err in errs:
-                    if err.correction is not None and err.correction.corrector.region == rgn:
-                        err.erase_from_view()
-                        ParseOutput.ERRORS.remove(err)
-                        errs.remove(err)
-                        ParseOutput.mark_messages_in_view(errs, self.view)
-
-                        corrector = err.correction.corrector
-                        err_rgn = corrector.to_region(self.view)
-                        err_text = corrector.contents
-
-                        repl_text = {'text': err_text,
-                                     'begin': err_rgn.begin(),
-                                     'end': err_rgn.end()}
-                        sublime.set_timeout(lambda: self.view.run_command('sublime_haskell_replace_text', repl_text), 0)
+                ParseOutput.MARKER_MANAGER.apply_autocorrect(self.view, rgn)
             elif url[0:7] == "import:":
                 decl_name = urllib.parse.unquote(url[7:])
                 self.view.run_command('sublime_haskell_insert_import_for_symbol',

@@ -301,7 +301,7 @@ class SublimeHaskellBuildCommand(CommandWin.SublimeHaskellWindowCommand):
                         on_done=done_callback)
 
 
-    def wait_for_chain_to_complete(self, view, cabal_project_dir, msg, cmds, on_done):
+    def wait_for_chain_to_complete(self, view, cabal_project_dir, banner, cmds, on_done):
         '''Chains several commands, wait for them to complete, then parse and display
         the resulting errors.'''
 
@@ -340,29 +340,7 @@ class SublimeHaskellBuildCommand(CommandWin.SublimeHaskellWindowCommand):
 
         # Notify UI thread that commands are done
         sublime.set_timeout(on_done, 0)
-        the_stderr = ''.join(collected_out)
-
-        # The process has terminated; parse and display the output:
-        parsed_messages = ParseOutput.parse_output_messages(view, cabal_project_dir, the_stderr)
-        # The unparseable part (for other errors)
-        unparsable = Regexes.OUTPUT_REGEX.sub('', the_stderr).strip()
-
-        # Set global error list
-        ParseOutput.set_global_error_messages(parsed_messages)
-
-        # If we couldn't parse any messages, just show the stderr
-        # Otherwise the parsed errors and the unparsable stderr remainder
-        outputs = []
-
-        if parsed_messages:
-            outputs += [ParseOutput.format_output_messages(parsed_messages)]
-            if unparsable:
-                outputs += ['', '']
-        if unparsable:
-            outputs += ["Collected output:\n", unparsable]
-
-        ParseOutput.show_output_result_text(view, msg, '\n'.join(outputs), exit_code, cabal_project_dir)
-        sublime.set_timeout(lambda: ParseOutput.mark_messages_in_views(parsed_messages), 0)
+        ParseOutput.MARKER_MANAGER.mark_compiler_output(view, cabal_project_dir, banner, ''.join(collected_out), exit_code)
 
 
     def project_dist_path(self, project_dir):

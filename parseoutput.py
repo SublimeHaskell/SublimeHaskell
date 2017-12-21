@@ -8,19 +8,14 @@ import time
 import sublime
 
 import SublimeHaskell.cmdwin_types as CommandWin
+import SublimeHaskell.hsdev.result_parse as HsResultParse
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.regexes as Regexes
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.sublime_haskell_common as Common
-import SublimeHaskell.symbols as symbols
+import SublimeHaskell.symbols as Symbols
 
 OUTPUT_PANEL_NAME = 'sublime_haskell_output_panel'
-
-# Global list of errors.
-ERRORS = []
-
-# Global ref to view with errors
-ERROR_VIEW = None
 
 
 def filename_of_path(path):
@@ -31,9 +26,12 @@ def filename_of_path(path):
 
 
 class OutputMessage(object):
-    "Describe an error or warning message produced by GHC."
-    def __init__(self, filename, region, message, level, correction=None):
-        self.filename = filename
+    '''Describe an error or warning message produced by GHC.
+    '''
+    def __init__(self, view, filename, region, message, level, correction=None):
+        super().__init__()
+        self.view = view.window().file_open_file(filename) or view
+        self._filename = filename
         self.region = region
         self.message = message
         self.level = level
@@ -42,7 +40,7 @@ class OutputMessage(object):
     def __unicode__(self):
         # must match RESULT_FILE_REGEX
         # TODO: Columns must be recalculated, such that one tab is of tab_size length
-        # We can do this for opened views, but how to do this for files, that are not open?
+        # We can do this for opened views, but how to do this for files that are not open?
         if self.region is not None:
             retval = u'  {0}: line {1}, column {2}:\n    {3}'.format(self.filename, self.region.start.line + 1,
                                                                      self.region.start.column + 1, self.message)
@@ -51,16 +49,24 @@ class OutputMessage(object):
 
         return retval
 
+    @property
+    def filename(self):
+        return self._filename
+
+    @filename.setter
+    def filename(self, _value):
+        # Cannot assign the file name. :-)
+        pass
+
 
     def __str__(self):
         return self.__unicode__()
 
     def __repr__(self):
-        return '<OutputMessage {0}:{1}-{2}: {3}>'.format(
-            filename_of_path(self.filename),
-            self.region.start.__repr__(),
-            self.region.end.__repr__(),
-            self.message[:10] + '..')
+        return '<OutputMessage {0}:{1}-{2}: {3}>'.format(filename_of_path(self.view.file_name()),
+                                                         self.region.start.__repr__(),
+                                                         self.region.end.__repr__(),
+                                                         self.message[:10] + '..')
 
     def to_region(self, view):
         "Return the Region referred to by this error message."
@@ -80,135 +86,247 @@ class OutputMessage(object):
             self.correction.corrector.region.erase()
 
 
-def clear_error_marks():
-    global ERRORS
-    for err in ERRORS:
-        err.erase_from_view()
-    ERRORS = []
+class MarkerManager(object):
+    '''Convert and display errors, warnings and autofix/hint markers produced by the SublimeHaskell backend and build
+    outputs.
+    '''
+
+    MESSAGE_LEVELS = {
+        'hint': {
+            'style': 'sublimehaskell.mark.hint',
+            'icon': {'normal': 'haskell-hint.png',
+                     'fix': 'haskell-hint-fix.png'}
+        },
+        'warning': {'style': 'sublimehaskell.mark.warning',
+                    'icon': {'normal': 'haskell-warning.png',
+                             'fix': 'haskell-warning-fix.png'}
+                   },
+        'error': {'style': 'sublimehaskell.mark.error',
+                  'icon': {'normal': 'haskell-error.png',
+                           'fix': 'haskell-error-fix.png'}
+                 },
+        'uncategorized': {'style': 'sublimehaskell.mark.warning',
+                          'icon': {'normal': 'haskell-warning.png',
+                                   'fix': 'haskell-warning-fix.png'}
+                         }
+    }
+
+    def __init__(self):
+        super().__init__()
+        self.error_marks = []
+        self.messages = []
+        self.message_panel = None
+
+    def mark_response(self, view, msgs, corrections, fly_mode):
+        '''Generate a list of :py:class:`OutputMessage` objects from a backend response.
+        '''
+        self.clear_error_marks()
+
+        self.messages = [OutputMessage(view, msg.get('source', {}).get('file', '<no file/command line/OPTIONS_GHC>'),
+                                       HsResultParse.parse_region(msg.get('region')).to_zero_based() \
+                                         if msg.get('region') is not None else Symbols.Region(0),
+                                       msg.get('level', 'uncategorized').capitalize() + ': ' + \
+                                         msg.get('note', {}).get('message', '').replace('\n', '\n  '),
+                                       msg.get('level', 'uncategorized'))
+                         for msg in msgs]
+
+        # Hack alert: Region and Position.to_zero_based() return the original object (self) after updating it.
+        # 'and' returns the right hand side, which is never None or a false value.
+        corrections_dict = dict(((os.path.normpath(c.file), c.message_region.start.line, c.message_region.start.column), c)
+                                for c in [corr.message_region.to_zero_based() and corr for corr in corrections or []])
+
+        for omsg in self.messages:
+            okey = (os.path.normpath(omsg.filename), omsg.region.start.line, omsg.region.start.column)
+            if okey in corrections_dict:
+                omsg.correction = corrections_dict[okey]
+
+        self.error_marks.extend(self.messages)
+
+        if Settings.PLUGIN.show_error_window:
+            filename = view.file_name()
+            cabal_proj_dir = Common.get_cabal_project_dir_of_file(filename) or os.path.dirname(filename)
+            show_panel = not fly_mode and self.messages
+            output_text = self.format_output_messages()
+            sublime.set_timeout(lambda: self.make_message_panel(view, output_text, cabal_proj_dir, show_panel), 0)
+
+        sublime.set_timeout(self.update_markers_across_views, 0)
 
 
-def set_global_error_messages(messages):
-    clear_error_marks()
-    ERRORS.extend(messages)
+    def mark_compiler_output(self, view, banner, base_dir, text, exit_code):
+        '''Parse text into a list of OutputMessage objects.
+        '''
+
+        def to_error(errmsg):
+            filename, line, column, messy_details = errmsg.groups()
+            line, column = int(line), int(column)
+
+            column = ghc_column_to_sublime_column(view, line, column)
+            line = line - 1
+            # Record the absolute, normalized path.
+            return OutputMessage(view, os.path.normpath(os.path.join(base_dir, filename)),
+                                 Symbols.Region(Symbols.Position(line, column)),
+                                 messy_details.strip(),
+                                 'warning' if 'warning' in messy_details.lower() else 'error')
+
+        self.messages = [to_error(err) for err in Regexes.OUTPUT_REGEX.finditer(text)]
+
+        output_text = self.format_output_messages()
+        unparsed = Regexes.OUTPUT_REGEX.sub('', text).strip()
+        if unparsed:
+            output_text += '\n\nAdditional output:\n------------------\n' + unparsed
+
+        self.clear_error_marks()
+        self.error_marks.extend(self.messages)
+
+        if Settings.PLUGIN.show_error_window and self.messages:
+            output_text = u'{0} {1}\n\n{2}'.format(banner, u'SUCCEEDED' if exit_code == 0 else u'FAILED', output_text)
+            sublime.set_timeout(lambda: self.make_message_panel(view, output_text, base_dir, True), 0)
+
+        sublime.set_timeout(self.update_markers_across_views, 0)
 
 
-def format_output_messages(messages):
-    """Formats list of messages"""
-    summary = {'error': 0, 'warning': 0, 'hint': 0, 'uncategorized': 0}
-    for msg in messages:
-        summary[msg.level] = summary[msg.level] + 1
-    summary_line = 'Errors: {0}, Warnings: {1}, Hints: {2}, Uncategorized {3}'.format(summary['error'],
-                                                                                      summary['warning'],
-                                                                                      summary['hint'],
-                                                                                      summary['uncategorized'])
+    def format_output_messages(self):
+        """Formats list of messages"""
+        summary = {'error': 0, 'warning': 0, 'hint': 0, 'uncategorized': 0}
+        for msg in self.messages:
+            summary[msg.level] = summary[msg.level] + 1
+        summary_line = 'Errors: {0}, Warnings: {1}, Hints: {2}, Uncategorized {3}'.format(summary['error'],
+                                                                                          summary['warning'],
+                                                                                          summary['hint'],
+                                                                                          summary['uncategorized'])
 
-    def messages_level(name, level):
-        if not summary[level]:
+        def messages_level(name, level):
+            if summary[level]:
+                count = '{0}: {1}'.format(name, summary[level])
+                msgs = '\n'.join(str(m) for m in self.messages if m.level == level)
+                return '{0}\n\n{1}'.format(count, msgs)
+
             return ''
-        count = '{0}: {1}'.format(name, summary[level])
-        msgs = '\n'.join(str(m) for m in messages if m.level == level)
-        return '{0}\n\n{1}'.format(count, msgs)
 
-    errors = messages_level('Errors', 'error')
-    warnings = messages_level('Warnings', 'warning')
-    hints = messages_level('Hints', 'hint')
-    uncategorized = messages_level('Uncategorized', 'uncategorized')
+        errors = messages_level('Errors', 'error')
+        warnings = messages_level('Warnings', 'warning')
+        hints = messages_level('Hints', 'hint')
+        uncategorized = messages_level('Uncategorized', 'uncategorized')
 
-    return '\n\n'.join(filter(lambda s: s, [summary_line, errors, warnings, hints, uncategorized]))
+        return '\n\n'.join(filter(lambda s: s, [summary_line, errors, warnings, hints, uncategorized]))
 
-
-def show_output_result_text(view, msg, text, exit_code, base_dir):
-    """Shows text (formatted messages) in output with build result"""
-
-    success = exit_code == 0
-    success_message = 'SUCCEEDED' if success else 'FAILED'
-
-    # Show panel if there is any text to show (without the part that we add)
-    if text and Settings.PLUGIN.show_error_window:
-        sublime.set_timeout(lambda: write_output(view, u'Build {0}\n\n{1}'.format(success_message, text.strip()), base_dir), 0)
+    def clear_error_marks(self):
+        for err in self.error_marks:
+            err.erase_from_view()
+        self.error_marks = []
 
 
-def mark_messages_in_views(errors):
-    "Mark the regions in open views where errors were found."
-    begin_time = time.clock()
-    # Mark each diagnostic in each open view in all windows:
-    view_filename = ''
-    for win in sublime.windows():
-        for view in win.views():
-            view_filename = view.file_name()
-            # Unsaved files have no file name
-            if view_filename is not None:
-                mark_messages_in_view([err for err in errors \
-                                       if os.path.exists(err.filename) and os.path.samefile(view_filename, err.filename)],
-                                      view)
-    end_time = time.clock()
-    Logging.log('total time to mark {0} diagnostics: {1} seconds'.format(len(errors), end_time - begin_time),
-                Logging.LOG_DEBUG)
+    def update_markers_across_views(self):
+        '''Mark the regions in open views where errors were found.
+        '''
+        begin_time = time.clock()
+        for win in sublime.windows():
+            for view in win.views():
+                self.update_markers_in_view(view)
+        end_time = time.clock()
+        Logging.log('total time to mark {0} diagnostics: {1} seconds'.format(len(self.messages), end_time - begin_time),
+                    Logging.LOG_DEBUG)
 
 
-MESSAGE_LEVELS = {
-    'hint': {
-        'style': 'sublimehaskell.mark.hint',
-        'icon': {'normal': 'haskell-hint.png',
-                 'fix': 'haskell-hint-fix.png'}
-    },
-    'warning': {'style': 'sublimehaskell.mark.warning',
-                'icon': {'normal': 'haskell-warning.png',
-                         'fix': 'haskell-warning-fix.png'}
-               },
-    'error': {'style': 'sublimehaskell.mark.error',
-              'icon': {'normal': 'haskell-error.png',
-                       'fix': 'haskell-error-fix.png'}
-             },
-    'uncategorized': {'style': 'sublimehaskell.mark.warning',
-                      'icon': {'normal': 'haskell-warning.png',
-                               'fix': 'haskell-warning-fix.png'}
-                     }
-}
+    def update_markers_in_view(self, view):
+        def region_key(name, is_fix):
+            return 'output-{0}s{1}'.format(name, '' if not is_fix else '-fix')
 
 
-def errors_for_view(view):
-    errs = []
-    for err in ERRORS:
-        if os.path.samefile(err.filename, view.file_name()):
-            err.update_region()
-            errs.append(err)
-    return sorted(errs, key=lambda e: e.region)
+        def get_icon(png):
+            return '/'.join(["Packages", os.path.basename(os.path.dirname(__file__)), "Icons", png])
+
+        view_specific = self.marks_for_view(view)
+        if not view_specific:
+            return
+
+        for msg in view_specific:
+            msg.erase_from_view()
+
+        for i, msg in enumerate(view_specific):
+            msg.region.save(view, '{0}-{1}'.format(region_key(msg.level, msg.correction is not None), str(i)))
+            view.add_regions(msg.region.region_key,
+                             [msg.to_region(view)],
+                             self.MESSAGE_LEVELS[msg.level]['style'],
+                             get_icon(self.MESSAGE_LEVELS[msg.level]['icon']['fix' if msg.correction else 'normal']),
+                             sublime.DRAW_OUTLINED)
+
+            if msg.correction and msg.correction.corrector:
+                msg.correction.corrector.region.save(view, 'autofix-{0}'.format(str(i)))
+                view.add_regions(msg.correction.corrector.region.region_key,
+                                 [msg.correction.corrector.region.to_region(view)],
+                                 'autofix.region',
+                                 '',
+                                 sublime.HIDDEN)
+
+
+    def marks_for_view(self, view):
+        return sorted([mark for mark in self.error_marks if mark.view == view], key=lambda e: e.region)
+
+
+    def apply_autocorrect(self, view, rgn):
+        # repl_text needs visibility scope outside of the loop.
+        repl_text = None
+
+        for err in [mark for mark in self.marks_for_view(view) if mark.correction and mark.correction.corrector.region == rgn]:
+            err.erase_from_view()
+            self.error_marks.remove(err)
+
+            corrector = err.correction.corrector
+            err_rgn = corrector.to_region(view)
+            err_text = corrector.contents
+
+            repl_text = {'text': err_text,
+                         'begin': err_rgn.begin(),
+                         'end': err_rgn.end()}
+
+            sublime.set_timeout(lambda: view.run_command('sublime_haskell_replace_text', repl_text), 0)
+
+        self.update_markers_in_view(view)
+
+
+    def make_message_panel(self, view, text, cabal_project_dir, panel_out):
+        '''Create the message panel for error/warnings/hints/uncategorized errors'''
+        self.message_panel = Common.output_panel(view.window(), text, panel_name=OUTPUT_PANEL_NAME, syntax='HaskellOutputPanel',
+                                                 panel_display=panel_out)
+        self.message_panel.settings().set("result_file_regex", Regexes.RESULT_FILE_REGEX)
+        self.message_panel.settings().set("result_base_dir", cabal_project_dir)
+
+
+MARKER_MANAGER = MarkerManager()
+'''The global marker manager object.
+'''
 
 
 # These next and previous commands were shamelessly copied
 # from the great SublimeClang plugin.
 
 
-def goto_error(view, error):
-    line = error.region.start.line + 1
-    column = error.region.start.column + 1
-    filename = error.filename
-    # global ERROR_VIEW
-    if ERROR_VIEW:
-        show_output(view)
-        # error_region = ERROR_VIEW.find('{0}: line {1}, column \\d+:(\\n\\s+.*)*'.format(re.escape(filename), line), 0)
-        error_region = ERROR_VIEW.find(re.escape(str(error)), 0)
-        # error_region = ERROR_VIEW.find('\\s{{2}}{0}: line {1}, column {2}:(\\n\\s+.*)*'.format(re.escape(filename),
-        #                                                                                        line, column), 0)
-        ERROR_VIEW.add_regions("current_error", [error_region], 'string', 'dot', sublime.HIDDEN)
-        ERROR_VIEW.show(error_region.a)
-    view.window().open_file("{0}:{1}:{2}".format(filename, line, column), sublime.ENCODED_POSITION)
+def goto_error(view, mark):
+    line = mark.region.start.line + 1
+    column = mark.region.start.column + 1
+
+    show_output(view)
+    msg_panel = MARKER_MANAGER.message_panel
+    # error_region = msg_panel.find('{0}: line {1}, column \\d+:(\\n\\s+.*)*'.format(re.escape(mark.filename), line), 0)
+    error_region = msg_panel.find(re.escape(str(mark)), 0)
+    # error_region = msg_panel.find('\\s{{2}}{0}: line {1}, column {2}:(\\n\\s+.*)*'.format(re.escape(mark.filename),
+    #                                                                                        line, column), 0)
+    msg_panel.add_regions("current_error", [error_region], 'string', 'dot', sublime.HIDDEN)
+    msg_panel.show(error_region.a)
+
+    view.window().open_file("{0}:{1}:{2}".format(mark.filename, line, column), sublime.ENCODED_POSITION)
 
 
 class SublimeHaskellNextError(CommandWin.SublimeHaskellTextCommand):
-    ## Uncomment if instance variables are needed.
-    # def __init__(self, view):
-    #     super().__init__(view)
-
     def run(self, _edit, **_kwargs):
-        errs = errors_for_view(self.view)
+        errs = MARKER_MANAGER.marks_for_view(self.view)
         if not errs:
             Common.sublime_status_message('No errors or warnings!')
         else:
             view_pt = self.view.sel()[0]
             # Bump just past the view's point, just in case we're sitting on top of the current
-            cur_point = symbols.Region.from_region(self.view, view_pt)
+            cur_point = Symbols.Region.from_region(self.view, view_pt)
             err_iter = filter(lambda e: e.region > cur_point, errs)
             next_err = next(err_iter, None)
             # If the view's point is really on top of the start of an error, move to the next, otherwise,
@@ -224,16 +342,12 @@ class SublimeHaskellNextError(CommandWin.SublimeHaskellTextCommand):
 
 
 class SublimeHaskellPreviousError(CommandWin.SublimeHaskellTextCommand):
-    ## Uncomment if instance variables are needed.
-    # def __init__(self, view):
-    #     super().__init__(view)
-
     def run(self, _edit, **_kwargs):
-        errs = errors_for_view(self.view)
+        errs = MARKER_MANAGER.marks_for_view(self.view)
         if not errs:
             Common.sublime_status_message("No errors or warnings!")
         else:
-            cur_point = symbols.Region.from_region(self.view, self.view.sel()[0])
+            cur_point = Symbols.Region.from_region(self.view, self.view.sel()[0])
             prev_err = next(filter(lambda e: e.region < cur_point, reversed(errs)), None)
             # Cycle around to the last error if we run off the first
             if prev_err is None:
@@ -241,52 +355,6 @@ class SublimeHaskellPreviousError(CommandWin.SublimeHaskellTextCommand):
             self.view.sel().clear()
             self.view.sel().add(prev_err.region.to_region(self.view))
             goto_error(self.view, prev_err)
-
-
-def region_key(name, is_fix=False):
-    if is_fix:
-        return 'output-{0}s-fix'.format(name)
-
-    return 'output-{0}s'.format(name)
-
-
-def get_icon(png):
-    return "/".join([
-        "Packages",
-        os.path.basename(os.path.dirname(__file__)),
-        "Icons",
-        png])
-
-
-def mark_messages_in_view(messages, view):
-    for msg in messages:
-        msg.erase_from_view()
-
-    for i, msg in enumerate(messages):
-        msg.region.save(view, '{0}-{1}'.format(region_key(msg.level, msg.correction is not None), str(i)))
-        view.add_regions(msg.region.region_key,
-                         [msg.to_region(view)],
-                         MESSAGE_LEVELS[msg.level]['style'],
-                         get_icon(MESSAGE_LEVELS[msg.level]['icon']['fix' if msg.correction is not None else 'normal']),
-                         sublime.DRAW_OUTLINED)
-        if msg.correction and msg.correction.corrector:
-            msg.correction.corrector.region.save(view, 'autofix-{0}'.format(str(i)))
-            view.add_regions(msg.correction.corrector.region.region_key,
-                             [msg.correction.corrector.region.to_region(view)],
-                             'autofix.region',
-                             '',
-                             sublime.HIDDEN)
-
-
-def write_output(view, text, cabal_project_dir, panel_out=True):
-    "Write text to Sublime's output panel."
-    global ERROR_VIEW
-    ERROR_VIEW = Common.output_panel(view.window(), text,
-                                     panel_name=OUTPUT_PANEL_NAME,
-                                     syntax='HaskellOutputPanel',
-                                     panel_display=panel_out)
-    ERROR_VIEW.settings().set("result_file_regex", Regexes.RESULT_FILE_REGEX)
-    ERROR_VIEW.settings().set("result_base_dir", cabal_project_dir)
 
 
 def hide_output(view, panel_name=OUTPUT_PANEL_NAME):
@@ -330,25 +398,6 @@ def ghc_column_to_sublime_column(view, line, column):
     return real_col
 
 
-def parse_output_messages(view, base_dir, text):
-    "Parse text into a list of OutputMessage objects."
-    matches = Regexes.OUTPUT_REGEX.finditer(text)
-
-    def to_error(errmsg):
-        filename, line, column, messy_details = errmsg.groups()
-        line, column = int(line), int(column)
-
-        column = ghc_column_to_sublime_column(view, line, column)
-        line = line - 1
-        # Record the absolute, normalized path.
-        return OutputMessage(os.path.normpath(os.path.join(base_dir, filename)),
-                             symbols.Region(symbols.Position(line, column)),
-                             messy_details.strip(),
-                             'warning' if 'warning' in messy_details.lower() else 'error')
-
-    return list(map(to_error, matches))
-
-
 def trim_region(view, region):
     "Return the specified Region, but without leading or trailing whitespace."
     text = view.substr(region)
@@ -374,7 +423,7 @@ CLASS_REGEX = re.compile(r'(?P<what>class)\s+((?P<ctx>(.*))=>\s+)?(?P<name>\S+)\
 
 def parse_info(name, contents):
     """
-    Parses result of :i <name> command of ghci and returns derived symbols.Declaration
+    Parses result of :i <name> command of ghci and returns derived Symbols.Declaration
     """
     if name[0].isupper():
         # data, class, type or newtype
@@ -388,13 +437,13 @@ def parse_info(name, contents):
                 definition.strip()
 
             if what == 'class':
-                return symbols.Class(name, ctx, args)
+                return Symbols.Class(name, ctx, args)
             elif what == 'data':
-                return symbols.Data(name, ctx, args, definition)
+                return Symbols.Data(name, ctx, args, definition)
             elif what == 'type':
-                return symbols.Type(name, ctx, args, definition)
+                return Symbols.Type(name, ctx, args, definition)
             elif what == 'newtype':
-                return symbols.Newtype(name, ctx, args, definition)
+                return Symbols.Newtype(name, ctx, args, definition)
             else:
                 raise RuntimeError('Unknown type of symbol: {0}'.format(what))
 
@@ -403,6 +452,6 @@ def parse_info(name, contents):
         function_regex = r'{0}\s+::\s+(?P<type>.*?)(\s+--(.*))?$'.format(name)
         matched = re.search(function_regex, contents, re.MULTILINE)
         if matched:
-            return symbols.Function(name, matched.group('type'))
+            return Symbols.Function(name, matched.group('type'))
 
     return None
