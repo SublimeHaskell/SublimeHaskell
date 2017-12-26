@@ -119,7 +119,9 @@ class FlyCheckViewEventListener(EventCommon.SublimeHaskellEventCommon, sublime_p
 
     def scan_contents(self, view):
         current_file_name = view.file_name()
-        status_msg = Common.status_message_process("Scanning {0}".format(current_file_name), priority=3)
+        view_contents = {current_file_name: view.substr(sublime.Region(0, view.size()))}
+
+        status_msg = Common.status_message_process("Scanning {0}".format(current_file_name))
         status_msg.start()
 
         def scan_resp(_resp):
@@ -129,5 +131,4 @@ class FlyCheckViewEventListener(EventCommon.SublimeHaskellEventCommon, sublime_p
         def scan_err(_err, _details):
             status_msg.result_fail()
 
-        view_contents = {current_file_name: view.substr(sublime.Region(0, view.size()))}
         BackendManager.active_backend().scan(contents=view_contents, on_response=scan_resp, on_error=scan_err)

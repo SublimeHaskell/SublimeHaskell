@@ -1,6 +1,5 @@
 # -*- coding: UTF-8 -*-
 
-import os
 import threading
 
 import sublime
@@ -66,6 +65,7 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
                 if cmds:
                     self.status_msg = Common.status_message_process(msg + ': ' + self.filename)
                     self.status_msg.start()
+                    ParseOutput.MARKER_MANAGER.clear_error_marks()
                     self.go_chain(cmds)
                 else:
                     sublime.error_message('Empty command chain (check_lint.run_chain)')

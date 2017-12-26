@@ -97,7 +97,8 @@ class SublimeHaskellEventCommon(object):
 
         self.assoc_to_project(self.view, filename)
         _project_dir, project_name = Common.locate_cabal_project_from_view(self.view)
-        Utils.run_async('rescan {0}/{1}'.format(project_name, filename), self.rescan_source, project_name, filename)
+        Utils.run_async('rescan {0}/{1}'.format(project_name, filename), self.rescan_source, project_name, filename,
+                        {'drop_all': True})
         self.view.settings().set('translate_tabs_to_spaces', True)
 
 
@@ -111,7 +112,8 @@ class SublimeHaskellEventCommon(object):
 
         self.assoc_to_project(self.view, filename)
         _project_dir, project_name = Common.locate_cabal_project_from_view(self.view)
-        Utils.run_async('rescan source {0}/{1}'.format(project_name, filename), self.rescan_source, project_name, filename)
+        Utils.run_async('rescan source {0}/{1}'.format(project_name, filename), self.rescan_source, project_name, filename,
+                        {'drop_all': False})
 
 
     def do_post_save(self):
@@ -127,7 +129,8 @@ class SublimeHaskellEventCommon(object):
         self.post_save_actions(filename)
 
         _project_dir, project_name = Common.locate_cabal_project_from_view(self.view)
-        Utils.run_async('rescan source {0}/{1}'.format(project_name, filename), self.rescan_source, project_name, filename)
+        Utils.run_async('rescan source {0}/{1}'.format(project_name, filename), self.rescan_source, project_name, filename,
+                        {'drop_all': False})
 
 
     def do_query_context(self, key, operator, operand, matchall):
@@ -177,12 +180,12 @@ class SublimeHaskellEventCommon(object):
         pass
 
 
-    def rescan_source(self, project_name, filename):
+    def rescan_source(self, project_name, filename, drop_all=True):
         with self.backend_mgr:
             with self.backend_mgr.inspector() as insp:
                 insp.mark_file_dirty(filename)
 
-            self.update_completions_async(project_name, [filename], drop_all=True)
+            self.update_completions_async(project_name, [filename], drop_all)
 
 
     def update_completions_async(self, project_name, files=None, drop_all=False):

@@ -30,7 +30,7 @@ class OutputMessage(object):
     '''
     def __init__(self, view, filename, region, message, level, correction=None):
         super().__init__()
-        self.view = view.window().find_open_file(filename) or view
+        self.view = view
         self._filename = filename
         self.region = region
         self.message = message
@@ -122,14 +122,20 @@ class MarkerManager(object):
         '''
         self.clear_error_marks()
 
-        self.messages = [OutputMessage(view, msg.get('source', {}).get('file', '<no file/command line/OPTIONS_GHC>'),
-                                       HsResultParse.parse_region(msg.get('region')).to_zero_based() \
-                                         if msg.get('region') is not None else Symbols.Region(0),
-                                       msg.get('level', 'uncategorized').capitalize() + ': ' + \
-                                         msg.get('note', {}).get('message', '').replace('\n', '\n  '),
-                                       msg.get('level', 'uncategorized'))
-                         for msg in msgs]
+        def to_output_message(msg):
+            filename = msg.get('source', {}).get('file', '<no file/command line/OPTIONS_GHC>')
+            file_view = view.window().find_open_file(filename)
+            if msg.get('region'):
+                region = HsResultParse.parse_region(msg.get('region')).to_zero_based()
+            else:
+                region = Symbols.Region(0)
+            level = msg.get('level', 'uncategorized')
+            caption = level.capitalize() + ': ' + msg.get('note', {}).get('message', '')
+            caption.replace('\n', '\n  ')
 
+            return OutputMessage(file_view, filename, region, caption, level)
+
+        self.messages = [to_output_message(msg) for msg in msgs]
         self.limit_messages(view)
 
         # Hack alert: Region and Position.to_zero_based() return the original object (self) after updating it.
@@ -167,7 +173,8 @@ class MarkerManager(object):
             column = ghc_column_to_sublime_column(view, line, column)
             line = line - 1
             # Record the absolute, normalized path.
-            return OutputMessage(view, os.path.normpath(os.path.join(base_dir, filename)),
+            return OutputMessage(view.window().find_open_file(filename),
+                                 os.path.normpath(os.path.join(base_dir, filename)),
                                  Symbols.Region(Symbols.Position(line, column)),
                                  messy_details.strip(),
                                  'warning' if 'warning' in messy_details.lower() else 'error')
@@ -298,8 +305,6 @@ class MarkerManager(object):
                          'end': err_rgn.end()}
 
             sublime.set_timeout(lambda: view.run_command('sublime_haskell_replace_text', repl_text), 0)
-
-        self.update_markers_in_view(view)
 
 
     def make_message_panel(self, view, text, cabal_project_dir, panel_out):

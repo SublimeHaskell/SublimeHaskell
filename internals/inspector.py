@@ -44,7 +44,7 @@ class Inspector(object):
         self.backend = backend
         # (Re-)Inspection state:
         self.cabal_to_load = Atomics.AtomicList()
-        self.dirty_files = Atomics.AtomicList()
+        self.dirty_files = Atomics.AtomicDuck()
         self.dirty_paths = Atomics.AtomicList()
         self.busy = False
 
@@ -62,32 +62,33 @@ class Inspector(object):
         self.busy = True
         try:
             scan_paths = []
+            files_to_reinspect = []
+            projects = []
+            files = []
+
             with self.dirty_paths as dirty_paths:
                 scan_paths = dirty_paths[:]
                 dirty_paths = []
 
-            files_to_reinspect = []
             with self.dirty_files as dirty_files:
-                files_to_reinspect = dirty_files[:]
-                dirty_files = []
+                files_to_reinspect = dirty_files.keys()
 
-            projects = []
-            files = []
-
-            if files_to_reinspect:
                 projects = []
                 files = []
-                for finspect in files_to_reinspect:
+                for finspect in files_to_reinspect or []:
                     projdir = Common.get_cabal_project_dir_of_file(finspect)
                     if projdir is not None:
                         projects.append(projdir)
                     else:
                         files.append(finspect)
 
-            projects = list(set(projects))
-            files = list(set(files))
+                projects = list(set(projects))
+                files = list(set(files))
 
-            self.inspect(paths=scan_paths, projects=projects, files=files)
+                file_contents = dict([(file, content) for file, content in dirty_files.items() if content])
+                dirty_files = {}
+
+                self.inspect(scan_paths, projects, files, file_contents)
 
             load_cabal = []
             with self.cabal_to_load as cabal_to_load:
@@ -110,17 +111,18 @@ class Inspector(object):
     def mark_all_files(self):
         for window in sublime.windows():
             with self.dirty_files as dirty_files:
-                dirty_files.extend([f for f in [v.file_name() for v in window.views()] if f and f.endswith('.hs')])
+                dirty_files.update([(f, None) for f in [v.file_name() for v in window.views()] \
+                                      if f and (f.endswith('.hs') or f.endswith('.hsc')) and f not in dirty_files])
                 Logging.log("dirty files: : {0}".format(dirty_files), Logging.LOG_DEBUG)
 
             with self.dirty_paths as dirty_paths:
                 dirty_paths.extend(window.folders())
 
     @use_inspect_modules
-    def mark_file_dirty(self, filename):
+    def mark_file_dirty(self, filename, contents=None):
         if filename is not None:
             with self.dirty_files as dirty_files:
-                dirty_files.append(filename)
+                dirty_files[filename] = contents
 
     @use_inspect_modules
     def mark_cabal(self):
@@ -153,12 +155,13 @@ class Inspector(object):
             smgr.result_ok()
 
     @use_inspect_modules
-    def inspect(self, paths, projects, files):
+    def inspect(self, paths, projects, files, contents):
         if paths or projects or files:
             with Common.status_message_process('Inspecting', priority=1) as smgr:
                 self.backend.scan(paths=paths,
                                   projects=projects,
                                   files=files,
+                                  contents=contents,
                                   on_notify=ScanStatus(smgr),
                                   wait_complete=True,
                                   timeout=None,
