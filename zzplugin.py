@@ -44,7 +44,189 @@ def plugin_unloaded():
     BackendManager.BackendManager().shutdown_backend()
 
 
-class HaskellSourceViewEventListener(EventCommon.SublimeHaskellEventCommon, sublime_plugin.ViewEventListener):
+class SublimeHaskellEventListener(sublime_plugin.EventListener):
+    COMPLETION_CHARS = {'is_module_completion': '.',
+                        'is_import_completion': '('}
+
+    def context_haskell_autofix(self, view, _key, _operator, _operand, _matchall):
+        return view.settings().get('autofix', False)
+
+    def context_auto_completion_popup(self, _view, _key, _operator, _operand, _matchall):
+        return Settings.PLUGIN.auto_completion_popup
+
+    def context_haskell_source(self, view, _key, _operator, _operand, _matchall):
+        return Common.view_is_haskell_source(view)
+
+    def context_haskell_source_or_repl(self, view, _key, _operator, _operand, _matchall):
+        return Common.view_is_haskell_source(view) or Common.view_is_haskell_repl(view)
+
+    def context_haskell_repl(self, view, _key, _operator, _operand, _matchall):
+        return Common.view_is_haskell_repl(view)
+
+    def context_haskell_symbol_info(self, view, _key, _operator, _operand, _matchall):
+        return Common.view_is_haskell_symbol_info(view)
+
+    def context_cabal_source(self, view, _key, _operator, _operand, _matchall):
+        return Common.view_is_cabal_source(view)
+
+    def context_scanned_source(self, view, _key, _operator, _operand, _matchall):
+        return self.is_scanned_source(view)
+
+    def context_in_project(self, view, _key, _operator, _operand, _matchall):
+        return self.is_in_project(view)
+
+    def context_completion(self, view, key, _operator, _operand, _matchall):
+        # Completion context is the only branch here where a backend is needed.
+        retval = False
+        with self.backend_mgr:
+            project_dir, project_name = Common.locate_cabal_project_from_view(view)
+            region = view.sel()[0]
+            if region.a == region.b:
+                word_region = view.word(region)
+                preline = Common.get_line_contents_before_region(view, word_region)
+                preline += self.COMPLETION_CHARS[key]
+                qsymbol = Common.get_qualified_symbol(preline)
+                if qsymbol.module:
+                    mod_completions = self.autocompleter.get_current_module_completions(project_name, project_dir)
+                    if qsymbol.is_import_list:
+                        retval = qsymbol.module in mod_completions
+                    else:
+                        retval = [m for m in mod_completions if m.startswith(qsymbol.module)] != []
+
+        return retval
+
+
+    CONTEXT_DISPATCH = {'haskell_autofix': context_haskell_autofix,
+                        'auto_completion_popup': context_auto_completion_popup,
+                        'haskell_source': context_haskell_source,
+                        'haskell_source_or_repl': context_haskell_source_or_repl,
+                        'haskell_repl': context_haskell_repl,
+                        'haskell_symbol_info': context_haskell_symbol_info,
+                        'cabal_source': context_cabal_source,
+                        'scanned_source': context_scanned_source,
+                        'in_project': context_in_project,
+                        'is_module_completion': context_completion,
+                        'is_import_completion': context_completion}
+    '''Context-to-function dispatch dictionary. Used in py:method:`on_qeuery_context` to reduce the branch overhead
+    incurred by testing against each key.
+    '''
+
+
+    def __init__(self):
+        super().__init__()
+        self.autocompleter = Autocomplete.AutoCompleter()
+        self.backend_mgr = BackendManager.BackendManager()
+        self.type_cache = Types.SourceHaskellTypeCache()
+
+
+    def on_new(self, view):
+        filename = view.file_name()
+        if not Common.view_is_haskell_source(view) or not filename:
+            return
+
+        if Settings.COMPONENT_DEBUG.event_viewer:
+            print('{0} invoked.'.format(type(self).__name__ + ".on_new"))
+
+        EventCommon.assoc_to_project(view, self.backend_mgr, filename)
+        _project_dir, project_name = Common.locate_cabal_project_from_view(view)
+        Utils.run_async('rescan {0}/{1}'.format(project_name, filename), self.rescan_source, project_name, filename,
+                        {'drop_all': True})
+        view.settings().set('translate_tabs_to_spaces', True)
+
+
+    def on_load(self, view):
+        filename = view.file_name()
+        if not Common.view_is_haskell_source(view) or not filename:
+            return
+
+        if Settings.COMPONENT_DEBUG.event_viewer:
+            print('{0} {1}.'.format(type(self).__name__ + ".on_load", filename))
+
+        EventCommon.assoc_to_project(view, self.backend_mgr, filename)
+        _project_dir, project_name = Common.locate_cabal_project_from_view(view)
+        Utils.run_async('rescan source {0}/{1}'.format(project_name, filename), self.rescan_source, project_name, filename,
+                        {'drop_all': False})
+
+
+    def on_post_save(self, view):
+        if not Common.view_is_inspected_source(view):
+            return
+
+        if Settings.COMPONENT_DEBUG.event_viewer:
+            print('{0} invoked.'.format(type(self).__name__ + ".on_post_save"))
+
+        filename = view.file_name()
+        if not filename:
+            if Settings.COMPONENT_DEBUG.event_viewer:
+                print('{0}: no file name.'.format(type(self).__name__ + ".on_post_save"))
+            return
+
+        if Common.view_is_haskell_source(view):
+            self.type_cache.remove(filename)
+
+            # Invoke methods directly (surely, there is a better way) to ensure that they are actually executed, even if the
+            # source inspector is active. If the inspector is active, that will effectively make the SublimeText commands
+            # appear to be disabled.
+
+            # auto build enabled and file within a cabal project
+            if Settings.PLUGIN.enable_auto_build:
+                view.window().run_command('sublime_haskell_build_auto')
+            elif Settings.PLUGIN.enable_auto_check and Settings.PLUGIN.enable_auto_lint:
+                CheckAndLint.exec_check_and_lint_process(view)
+                Types.refresh_view_types(view)
+            elif Settings.PLUGIN.enable_auto_check:
+                CheckAndLint.exec_check_process(view)
+                Types.refresh_view_types(view)
+            elif Settings.PLUGIN.enable_auto_lint:
+                CheckAndLint.exec_lint_process(view)
+
+            if Settings.PLUGIN.prettify_on_save:
+                if Settings.PLUGIN.prettify_executable == 'stylish-haskell':
+                    view.run_command('sublime_haskell_stylish')
+                elif Settings.PLUGIN.prettify_executable == 'hindent':
+                    view.run_command('sublime_haskell_hindent')
+
+        _project_dir, project_name = Common.locate_cabal_project_from_view(view)
+        Utils.run_async('rescan source {0}/{1}'.format(project_name, filename), self.rescan_source, project_name, filename,
+                        {'drop_all': False})
+
+
+    def on_query_context(self, view, key, operator, operand, matchall):
+        if Settings.COMPONENT_DEBUG.event_viewer:
+            print('{0} key = {1}.'.format(type(self).__name__ + '.on_query_context', key))
+
+        dispatch = self.CONTEXT_DISPATCH.get(key)
+        if dispatch:
+            ## print('on_query_context: {0}({1}, {2}, {3}, {4})'.format(dispatch.__name__, key, operator, operand, matchall))
+            return dispatch(self, view, key, operator, operand, matchall)
+
+        return None
+
+
+    def rescan_source(self, project_name, filename, drop_all=True):
+        with self.backend_mgr:
+            with self.backend_mgr.inspector() as insp:
+                insp.mark_file_dirty(filename)
+
+            EventCommon.update_completions_async(self.autocompleter, project_name, [filename], drop_all)
+
+
+    def is_in_project(self, view):
+        file_shown_in_view = Common.window_view_and_file(view)[2]
+        if file_shown_in_view is None:
+            return False
+
+        src_module = Utils.head_of(BackendManager.active_backend().module(file=file_shown_in_view))
+        return src_module is not None and src_module.location.project is not None
+
+
+    def is_scanned_source(self, view):
+        file_shown_in_view = Common.window_view_and_file(view)[2]
+        return file_shown_in_view is not None and \
+               Utils.head_of(BackendManager.active_backend().module(file=file_shown_in_view)) is not None
+
+
+class HaskellSourceViewEventListener(sublime_plugin.ViewEventListener):
     IMPROVED_SYNTAX_FILE = 'Packages/SublimeHaskell/Syntaxes/Haskell-SublimeHaskell.tmLanguage'
     '''The improved syntax module/file.
     '''
@@ -58,23 +240,11 @@ class HaskellSourceViewEventListener(EventCommon.SublimeHaskellEventCommon, subl
     def applies_to_primary_view_only(cls):
         return False
 
-
-    def on_new(self):
-        return self.do_new()
-
-
-    def on_load(self):
-        self.do_load()
-
-        if Settings.COMPONENT_DEBUG.event_viewer:
-            print('{0} Haskell source {1}.'.format(type(self).__name__ + ".on_load", self.view.file_name()))
-
-        self.view.settings().set('translate_tabs_to_spaces', True)
-        if Settings.PLUGIN.use_improved_syntax:
-            name = os.path.basename(self.view.file_name().lower())
-            if Settings.PLUGIN.use_improved_syntax and any([name.endswith(ext) for ext in [".hs", ".hsc"]]):
-                self.view.settings().set('syntax', self.IMPROVED_SYNTAX_FILE)
-            # TODO: Do we also have to fix Literate Haskell? Probably yes, but not today.
+    def __init__(self, view):
+        super().__init__(view)
+        self.autocompleter = Autocomplete.AutoCompleter()
+        self.backend_mgr = BackendManager.BackendManager()
+        self.type_cache = Types.SourceHaskellTypeCache()
 
 
     def on_activated(self):
@@ -96,10 +266,6 @@ class HaskellSourceViewEventListener(EventCommon.SublimeHaskellEventCommon, subl
         self.type_cache.remove(filename)
 
 
-    def on_post_save(self):
-        self.do_post_save()
-
-
     def on_hover(self, point, hover_zone):
         # Note: view.file_name() is not set in certain views, such as the "Haskell Show Types Panel". Avoid
         # generating lookup errors, which are logged in the console window (for better or worse.)
@@ -107,10 +273,6 @@ class HaskellSourceViewEventListener(EventCommon.SublimeHaskellEventCommon, subl
             # Ensure that we never block the Python main thread.
             info_pop = InfoPop.SublimeHaskellHoverPopup(self.view, self.view.file_name(), point, hover_zone)
             Utils.run_async('SublimeHaskellPopup.on_hover', info_pop.do_hover)
-
-
-    def on_query_context(self, key, operator, operand, matchall):
-        return self.do_query_context(key, operator, operand, matchall)
 
 
     def on_query_completions(self, prefix, locations):
@@ -168,54 +330,22 @@ class HaskellSourceViewEventListener(EventCommon.SublimeHaskellEventCommon, subl
         return (completions, completion_flags) # if completions else None
 
 
-    def post_save_actions(self, filename):
-        self.type_cache.remove(filename)
-
-        # Invoke methods directly (surely, there is a better way) to ensure that they are actually executed, even if the
-        # source inspector is active. If the inspector is active, that will effectively make the SublimeText commands
-        # appear to be disabled.
-
-        # auto build enabled and file within a cabal project
-        if Settings.PLUGIN.enable_auto_build:
-            self.view.window().run_command('sublime_haskell_build_auto')
-        elif Settings.PLUGIN.enable_auto_check and Settings.PLUGIN.enable_auto_lint:
-            CheckAndLint.exec_check_and_lint_process(self.view)
-            Types.refresh_view_types(self.view)
-        elif Settings.PLUGIN.enable_auto_check:
-            CheckAndLint.exec_check_process(self.view)
-            Types.refresh_view_types(self.view)
-        elif Settings.PLUGIN.enable_auto_lint:
-            CheckAndLint.exec_lint_process(self.view)
-
-        if Settings.PLUGIN.prettify_on_save:
-            if Settings.PLUGIN.prettify_executable == 'stylish-haskell':
-                self.view.run_command('sublime_haskell_stylish')
-            elif Settings.PLUGIN.prettify_executable == 'hindent':
-                self.view.run_command('sublime_haskell_hindent')
+    def activated_worker(self, view, filename):
+        with self.backend_mgr:
+            EventCommon.assoc_to_project(view, self.backend_mgr, filename)
+            _, project_name = Common.locate_cabal_project_from_view(view)
+            if Common.view_is_haskell_source(view):
+                self.autocompleter.generate_completions_cache(project_name, filename)
 
 
-class CabalSourceViewEventListener(EventCommon.SublimeHaskellEventCommon, sublime_plugin.ViewEventListener):
-    @classmethod
-    def is_applicable(cls, settings):
-        return Common.settings_has_cabal_source(settings)
-
-
-    @classmethod
-    def applies_to_primary_view_only(cls):
-        return False
-
-
-    def on_new(self):
-        return self.do_new()
-
-
-    def on_load(self):
-        return self.do_load()
-
-
-    def on_post_save(self):
-        self.do_post_save()
-
-
-    def on_query_context(self, key, operator, operand, matchall):
-        return self.do_query_context(key, operator, operand, matchall)
+## Not needed at present.
+##
+# class CabalSourceViewEventListener(sublime_plugin.ViewEventListener):
+#     @classmethod
+#     def is_applicable(cls, settings):
+#         return Common.settings_has_cabal_source(settings)
+#
+#
+#     @classmethod
+#     def applies_to_primary_view_only(cls):
+#         return False

@@ -4,6 +4,7 @@ import time
 import sublime
 import sublime_plugin
 
+import SublimeHaskell.autocomplete as Autocomplete
 import SublimeHaskell.check_lint as CheckLint
 import SublimeHaskell.event_common as EventCommon
 import SublimeHaskell.internals.backend_mgr as BackendManager
@@ -11,7 +12,7 @@ import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.sublime_haskell_common as Common
 
 
-class FlyCheckViewEventListener(EventCommon.SublimeHaskellEventCommon, sublime_plugin.ViewEventListener):
+class FlyCheckViewEventListener(sublime_plugin.ViewEventListener):
     '''The heart of fly-check support. As a view event listener, there will be an instance of this view listener
     attached to each Haskell source view.
     '''
@@ -28,6 +29,7 @@ class FlyCheckViewEventListener(EventCommon.SublimeHaskellEventCommon, sublime_p
 
     def __init__(self, view):
         super().__init__(view)
+        self.autocompleter = Autocomplete.AutoCompleter()
         self.fly_lock = threading.RLock()
         self.fly_check_loop = threading.Event()
         self.fly_check_flag = threading.Event()
@@ -126,7 +128,8 @@ class FlyCheckViewEventListener(EventCommon.SublimeHaskellEventCommon, sublime_p
 
         def scan_resp(_resp):
             status_msg.result_ok()
-            self.update_completions_async([current_file_name])
+            _project_dir, project_name = Common.locate_cabal_project_from_view(view)
+            EventCommon.update_completions_async(self.autocompleter, project_name, [current_file_name], False)
 
         def scan_err(_err, _details):
             status_msg.result_fail()

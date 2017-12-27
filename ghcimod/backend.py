@@ -123,19 +123,20 @@ class GHCModBackend(Backend.HaskellBackend):
 
     def remove(self, cabal=False, sandboxes=None, projects=None, files=None, packages=None, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
-    
+
     def remove_all(self, **backend_args):
         return self.dispatch_callbacks(None, None, **backend_args)
-    
+
     def list_modules(self, project=None, file=None, module=None, deps=None, sandbox=None, cabal=False, symdb=None,
                      package=None, source=False, standalone=False, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
-    
+
     def list_packages(self, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
-    
-    def list_projects(self, **backend_args):
-        return super().list_projects(**backend_args)
+
+    # Probably a little too explicit... useless call to super()
+    # def list_projects(self, **backend_args):
+    #     return super().list_projects(**backend_args)
 
     def symbol(self, lookup='', search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
                cabal=False, symdb=None, package=None, source=False, standalone=False, local_names=False, **backend_args):
