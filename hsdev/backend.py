@@ -250,8 +250,8 @@ class HsDevBackend(Backend.HaskellBackend):
         return reduce(inner_concat, args, (True, []))[1]
 
     def files_and_contents(self, files, contents):
+        contents = contents or {}
         retval = [{'file': f, 'contents': contents.get(f)} for f in files] if files else []
-        ## retval.extend([{'file': f, 'contents': cts} for f, cts in contents.items()] if contents is not None else [])
         return  retval
 
 
