@@ -1,5 +1,5 @@
 {
-        "install": "Messages/2.1.9.2.md",
+        "install": "Messages/2.1.10.md",
         "2.0.0": "Messages/2.0.0.md",
         "2.0.1": "Messages/2.0.1.md",
         "2.0.2": "Messages/2.0.2.md",
@@ -19,5 +19,5 @@
         "2.1.8": "Messages/2.1.8.md",
 	"2.1.9": "Messages/2.1.9.md",
 	"2.1.9.1": "Messages/2.1.9.1.md",
-	"2.1.9.2": "Messages/2.1.9.2.md"
+	"2.1.10": "Messages/2.1.10.md"
 }
