@@ -250,9 +250,6 @@ class SublimeHaskellGoTo(CommandWin.BackendWindowCommand):
                                          self.closest_idx(decls),
                                          self.on_highlighted if not project else None)
 
-    def qualified_decls(self, decls):
-        return [decl.make_qualified() for decl in decls]
-
     def sorted_decls_name(self, decls):
         return list(sorted(decls, key=lambda d: d.name))
 

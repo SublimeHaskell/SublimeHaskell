@@ -38,8 +38,8 @@ class HsDevBackend(Backend.HaskellBackend):
 
     HSDEV_DEFAULT_PORT = 4567
     HSDEV_DEFAULT_HOST = 'localhost'
-    HSDEV_MIN_VER = [0, 2, 0, 0]  # minimum hsdev version
-    HSDEV_MAX_VER = [0, 3, 0, 0]  # maximum hsdev version
+    HSDEV_MIN_VER = [0, 3, 0, 0]  # minimum hsdev version
+    HSDEV_MAX_VER = [0, 3, 1, 0]  # maximum hsdev version
     HSDEV_CALL_TIMEOUT = 300.0 # second timeout for synchronous requests (5 minutes should be enough, no?)
 
     def __init__(self, backend_mgr, local=True, port=HSDEV_DEFAULT_PORT, host=HSDEV_DEFAULT_HOST, **kwargs):
@@ -70,7 +70,7 @@ class HsDevBackend(Backend.HaskellBackend):
         # Local hsdev server process and params
         self.is_local_hsdev = local
         self.hsdev_process = None
-        self.cache = os.path.join(Common.sublime_haskell_cache_path(), 'hsdev')
+        self.cache = os.path.join(Common.sublime_haskell_cache_path(), 'hsdev', 'hsdev.db')
         self.log_file = os.path.join(Common.sublime_haskell_cache_path(), 'hsdev', 'hsdev.log')
         self.exec_with = exec_with
         self.install_dir = Utils.normalize_path(install_dir) if install_dir is not None else None
@@ -116,17 +116,14 @@ class HsDevBackend(Backend.HaskellBackend):
         if self.is_local_hsdev:
             Logging.log('Starting local \'hsdev\' server', Logging.LOG_INFO)
 
-            use_log_level = (self.version >= [0, 2, 3, 2])
-            log_config = Settings.PLUGIN.hsdev_log_config
             log_level = Settings.PLUGIN.hsdev_log_level
 
             cmd = self.concat_args([(True, ["hsdev"]),
                                     (True, ["run"]),
                                     (self.port, ["--port", str(self.port)]),
-                                    (self.cache, ["--cache", self.cache]),
+                                    (self.cache, ["--db", self.cache]),
                                     (self.log_file, ["--log", self.log_file]),
-                                    (not use_log_level and log_config, ["--log-config", log_config]),
-                                    (use_log_level, ["--log-level", log_level])])
+                                    (True, ["--log-level", log_level])])
 
             hsdev_proc = ProcHelper.exec_with_wrapper(self.exec_with, self.install_dir, cmd)
             if hsdev_proc.process is not None:
@@ -345,54 +342,25 @@ class HsDevBackend(Backend.HaskellBackend):
                                'infer': infer},
                       **backend_args)
 
-    def docs(self, projects=None, files=None, modules=None, **backend_args):
+    def docs(self, projects=None, files=None, **backend_args):
         return self.async_command('docs', {'projects': projects or [],
-                                           'files': files or [],
-                                           'modules': modules or []},
+                                           'files': files or []},
                                   **backend_args)
 
-    def infer(self, projects=None, files=None, modules=None, **backend_args):
+    def infer(self, projects=None, files=None, **backend_args):
         return self.async_command('infer', {'projects': projects or [],
-                                            'files': files or [],
-                                            'modules': modules or []},
+                                            'files': files or []},
                                   **backend_args)
 
-    def remove(self, cabal=False, sandboxes=None, projects=None, files=None, packages=None, **backend_args):
+    def remove(self, cabal=False, sandboxes=None, projects=None, files=None, **backend_args):
         return self.async_list_command('remove', {'projects': projects or [],
                                                   'cabal': cabal,
                                                   'sandboxes': sandboxes or [],
-                                                  'files': files or [],
-                                                  'packages': packages or []},
+                                                  'files': files or []},
                                        **backend_args)
 
     def remove_all(self, **backend_args):
         return self.command('remove-all', {}, **backend_args)
-
-    def list_modules(self, project=None, file=None, module=None, deps=None, sandbox=None, cabal=False, symdb=None, package=None,
-                     source=False, standalone=False, **backend_args):
-        filters = []
-        if project:
-            filters.append({'project': project})
-        if file:
-            filters.append({'file': file})
-        if module:
-            filters.append({'module': module})
-        if deps:
-            filters.append({'deps': deps})
-        if sandbox:
-            filters.append({'cabal': {'sandbox': sandbox}})
-        if cabal:
-            filters.append({'cabal': 'cabal'})
-        if symdb:
-            filters.append({'db': ResultParse.encode_package_db(symdb)})
-        if package:
-            filters.append({'package': package})
-        if source:
-            filters.append('sourced')
-        if standalone:
-            filters.append('standalone')
-
-        return self.list_command('modules', {'filters': filters}, ResultParse.parse_modules_brief, **backend_args)
 
     def list_packages(self, **backend_args):
         return self.list_command('packages', {}, **backend_args)
@@ -400,9 +368,12 @@ class HsDevBackend(Backend.HaskellBackend):
     def list_projects(self, **backend_args):
         return self.list_command('projects', {}, **backend_args)
 
+    def list_sandboxes(self, **backend_args):
+        return self.list_command('sandboxes', {}, **backend_args)
+
     def symbol(self, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
-               cabal=False, symdb=None, package=None, source=False, standalone=False, local_names=False, **backend_args):
-        # search_type is one of: exact, prefix, infix, suffix, regex
+               cabal=False, symdb=None, package=None, source=False, standalone=False, local_names=False, header=False, **backend_args):
+        # search_type is one of: exact, prefix, infix, suffix
         query = {'input': lookup, 'type': search_type}
 
         filters = []
@@ -427,11 +398,11 @@ class HsDevBackend(Backend.HaskellBackend):
         if standalone:
             filters.append('standalone')
 
-        return self.list_command('symbol', {'query': query, 'filters': filters, 'locals': local_names},
-                                 ResultParse.parse_decls, **backend_args)
+        return self.list_command('symbol', {'query': query, 'filters': filters, 'locals': local_names, 'header': header},
+                                 ResultParse.parse_symbol_ids if header else ResultParse.parse_symbols, **backend_args)
 
     def module(self, _projectname, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None,
-               sandbox=None, cabal=False, symdb=None, package=None, source=False, standalone=False, **backend_args):
+               sandbox=None, cabal=False, symdb=None, package=None, source=False, standalone=False, header=False, **backend_args):
         query = {'input': lookup, 'type': search_type}
 
         filters = []
@@ -456,10 +427,8 @@ class HsDevBackend(Backend.HaskellBackend):
         if standalone:
             filters.append('standalone')
 
-        return self.command('module', {'query': query, 'filters': filters}, ResultParse.parse_modules, **backend_args)
-
-    def resolve(self, file, exports=False, **backend_args):
-        return self.command('resolve', {'file': file, 'exports': exports}, ResultParse.parse_module, **backend_args)
+        return self.command('module', {'query': query, 'filters': filters, 'header': header, 'inspection': False},
+                            ResultParse.parse_module_ids if header else ResultParse.parse_modules, **backend_args)
 
     def project(self, project=None, path=None, **backend_args):
         return self.command('project', {'name': project} if project else {'path': path}, **backend_args)
@@ -468,37 +437,45 @@ class HsDevBackend(Backend.HaskellBackend):
         return self.command('sandbox', {'path': path}, **backend_args)
 
     def lookup(self, name, file, **backend_args):
-        return self.list_command('lookup', {'name': name, 'file': file}, ResultParse.parse_decls, **backend_args)
+        return self.list_command('lookup', {'name': name, 'file': file}, ResultParse.parse_symbols, **backend_args)
 
     def whois(self, name, file, **backend_args):
-        return self.list_command('whois', {'name': name, 'file': file}, ResultParse.parse_declarations, **backend_args)
+        return self.list_command('whois', {'name': name, 'file': file}, ResultParse.parse_symbols, **backend_args)
+
+    def whoat(self, line, column, file, **backend_args):
+        return self.list_command('whoat', {'line': line, 'column': column, 'file': file}, ResultParse.parse_symbols, **backend_args)
 
     def scope_modules(self, _projcname, file, lookup='', search_type='prefix', **backend_args):
         return self.list_command('scope modules', {'query': {'input': lookup, 'type': search_type}, 'file': file},
-                                 ResultParse.parse_modules_brief, **backend_args)
+                                 ResultParse.parse_module_ids, **backend_args)
 
-    def scope(self, file, lookup='', search_type='prefix', global_scope=False, **backend_args):
+    def scope(self, file, lookup='', search_type='prefix', **backend_args):
         return self.list_command('scope',
                                  {'query': {'input': lookup,
                                             'type': search_type
                                            },
-                                  'global': global_scope,
                                   'file': file
-                                 }, ResultParse.parse_declarations, **backend_args)
+                                 }, ResultParse.parse_symbol_ids, **backend_args)
+
+    def usages(self, qualified_name, **backend_args):
+        return self.list_command('usages', {'name': qualified_name}, **backend_args)
 
     def complete(self, sym, file, wide=False, **backend_args):
         qname = sym.qualified_name() if sym.name is not None else sym.module + '.'
         return self.list_command('complete', {'prefix': qname, 'wide': wide, 'file': file},
-                                 ResultParse.parse_declarations, **backend_args)
+                                 ResultParse.parse_symbols, **backend_args)
 
     def hayoo(self, query, page=None, pages=None, **backend_args):
         return self.list_command('hayoo', {'query': query, 'page': page or 0, 'pages': pages or 1},
-                                 ResultParse.parse_decls, **backend_args)
+                                 ResultParse.parse_symbols, **backend_args)
 
     def cabal_list(self, packages, **backend_args):
         return self.list_command('cabal list', {'packages': packages},
                                  lambda r: [ResultParse.parse_cabal_package(s) for s in r] if r else None,
                                  **backend_args)
+
+    def unresolveds(self, files, **backend_args):
+        return self.list_command('unresolveds', {'files': files}, **backend_args)
 
     def lint(self, files=None, contents=None, hlint=None, wait_complete=False, **backend_args):
         action = self.list_command if wait_complete else self.async_list_command
@@ -526,19 +503,20 @@ class HsDevBackend(Backend.HaskellBackend):
                                            'ghc-opts': ghc_flags or []},
                                  **backend_args)
 
+    def autofixes(self, messages, **backend_args):
+        return self.list_command('autofixes', {'messages': messages}, **backend_args)
+
+    def refactor(self, messages, rest=[], pure=True, **backend_args):
+        return self.list_command('refactor', {'messages': messages, 'rest': rest, 'pure': pure}, **backend_args)
+
+    def rename(self, name, new_name, file, **backend_args):
+        return self.list_command('rename', {'name': name, 'new-name': new_name, 'file': file}, **backend_args)
+
     def langs(self, _projectname, **backend_args):
         return self.command('langs', {}, **backend_args)
 
     def flags(self, _projectname, **backend_args):
         return self.command('flags', {}, **backend_args)
-
-    def autofix_show(self, messages, wait_complete, **backend_args):
-        action = self.list_command if wait_complete else self.async_list_command
-        return action('autofix show', {'messages': messages}, ResultParse.parse_corrections, **backend_args)
-
-    def autofix_fix(self, messages, rest=None, pure=False, **backend_args):
-        return self.list_command('autofix fix', {'messages': messages, 'rest': rest or [], 'pure': pure},
-                                 ResultParse.parse_corrections, **backend_args)
 
     def ghc_eval(self, exprs, file=None, source=None, **backend_args):
         the_file = None

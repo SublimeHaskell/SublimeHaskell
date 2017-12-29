@@ -1,12 +1,93 @@
 
 import SublimeHaskell.symbols as symbols
 
-def parse_decls(decls):
-    return [parse_module_declaration(decl) for decl in decls] if decls is not None else []
+
+def parse_list(fn, xs):
+    return [fn(x) for x in xs] if xs is not None else []
 
 
-def parse_modules_brief(mods):
-    return [parse_module_id(m) for m in mods] if mods is not None else []
+def parse_modules(modules):
+    return parse_list(parse_module, modules)
+
+
+def parse_symbols(symbols):
+    return parse_list(parse_symbol, symbols)
+
+
+def parse_module_ids(module_ids):
+    return parse_list(parse_module_id, module_ids)
+
+
+def parse_symbol_ids(symbol_ids):
+    return parse_list(parse_symbol_id, symbol_ids)
+
+
+def parse_module_id(mod):
+    if not mod:
+        return None
+    return symbols.ModuleId(
+        mod['name'],
+        parse_location(mod.get('location')),
+    )
+
+
+def parse_symbol_id(sym):
+    if not sym:
+        return None
+    return symbols.SymbolId(
+        sym['name'],
+        parse_module_id(sym['module']),
+    )
+
+
+def parse_module(mod):
+    if not mod:
+        return None
+    mid = parse_module_id(mod['id'])
+    return symbols.Module(
+        mid.name,
+        mid.location,
+        exports=parse_symbols(mod.get('exports')),
+    )
+
+
+def parse_symbol(sym):
+    if not sym:
+        return None
+
+    sid = parse_symbol_id(sym['id'])
+    docs = sym.get('docs')
+    pos = parse_position(sym.get('pos'))
+
+    sinfo = sym['info']
+    what = sinfo['what']
+
+    if what == 'function':
+        return symbols.Function(
+            sid.name,
+            sid.module,
+            function_type=sinfo.get('type'),
+            docs=docs,
+            position=pos,
+        )
+    else:
+        ctx = sinfo.get('ctx')
+        args = sinfo.get('args')
+
+        ctors = {
+            'type': symbols.Type,
+            'newtype': symbols.Newtype,
+            'data': symbols.Data,
+            'class': symbols.Class,
+        }
+        return ctors[what](
+            sid.name,
+            sid.module,
+            context=ctx,
+            args=args,
+            docs=docs,
+            position=pos,
+        )
 
 
 def get_value(table, keyvals, defval=None):
@@ -57,93 +138,24 @@ def parse_region(rgn):
 
 
 def parse_location(srclocation):
-    loc = symbols.Location(get_value(srclocation, 'file'), get_value(srclocation, 'project'))
-    if loc.is_null():
-        loc = symbols.InstalledLocation(symbols.parse_package(get_value(srclocation, 'package')),
-                                        parse_package_db(get_value(srclocation, 'db')))
-        if loc.is_null():
-            loc = symbols.OtherLocation(get_value(srclocation, 'source'))
-
-    return loc if not loc.is_null() else None
+    if 'file' in srclocation:
+        return symbols.Location(
+            get_value(srclocation, 'file'),
+            get_value(srclocation, 'project'),
+        )
+    elif 'package' in srclocation:
+        return symbols.InstalledLocation(
+            get_value(srclocation, 'name'),
+            symbols.parse_package(get_value(srclocation, 'package')),
+        )
+    elif 'source' in srclocation:
+        return symbols.OtherLocation(get_value(srclocation, 'source'))
+    else:
+        raise RuntimeError("Can't parse location: {0}".format(srclocation))
 
 
 def parse_import(imp):
     return symbols.Import(imp['name'], imp['qualified'], imp.get('as'), parse_position(imp.get('pos'))) if imp else None
-
-
-def parse_module_id(mod):
-    return symbols.Module(mod['name'], [], [], {}, parse_location(mod.get('location'))) if mod else None
-
-
-def parse_declaration(decl):
-    what = decl['decl']['what']
-    docs = decl.get('docs')
-    name = decl['name']
-    pos = parse_position(decl.get('pos'))
-    imported = []
-    if 'imported' in decl and decl['imported']:
-        imported = [parse_import(d) for d in decl['imported']]
-    defined = None
-    if 'defined' in decl and decl['defined']:
-        defined = parse_module_id(decl['defined'])
-
-    the_decl = decl['decl']
-    decl_info = the_decl.get('info')
-
-    retval = None
-    if what == 'function':
-        ## Most common path
-        retval = symbols.Function(name, the_decl.get('type'), docs, imported, defined, pos)
-    else:
-        decl_ctx = decl_info.get('ctx')
-        decl_args = decl_info.get('args', [])
-        decl_def = decl_info.get('def')
-
-        if what == 'type':
-            retval = symbols.Type(name, decl_ctx, decl_args, decl_def, docs, imported, defined, pos)
-        elif what == 'newtype':
-            retval = symbols.Newtype(name, decl_ctx, decl_args, decl_def, docs, imported, defined, pos)
-        elif what == 'data':
-            retval = symbols.Data(name, decl_ctx, decl_args, decl_def, docs, imported, defined, pos)
-        elif what == 'class':
-            retval = symbols.Class(name, decl_ctx, decl_args, decl_def, docs, imported, defined, pos)
-
-    return retval
-
-def parse_declarations(decls):
-    return list(map(parse_declaration, decls)) if decls is not None else []
-
-
-def parse_module_declaration(mod_decl, parse_module_info=True):
-    try:
-        mod_id = None
-        if 'module-id' in mod_decl and parse_module_info:
-            mod_id = parse_module_id(mod_decl['module-id'])
-
-        # loc = parse_location(d['module-id'].get('location'))
-        decl = parse_declaration(mod_decl['declaration'])
-        if decl:
-            decl.module = mod_id
-            return decl
-
-        return None
-    except AttributeError:
-        return None
-
-
-def parse_module(mod):
-    if mod is None:
-        return None
-
-    the_imports = [parse_import(i) for i in mod['imports']] if 'imports' in mod else []
-    the_decls = dict((decl['name'], parse_declaration(decl)) for decl in mod['declarations']) if 'declarations' in mod else {}
-    return symbols.Module(mod['name'], mod.get('exports'), the_imports, the_decls, parse_location(mod.get('location')))
-
-
-def parse_modules(modules):
-    if modules is None:
-        return None
-    return [parse_module(mod) for mod in modules]
 
 
 def parse_cabal_package(pkg):
@@ -157,12 +169,15 @@ def parse_cabal_package(pkg):
 def parse_corrections(corr):
     return [parse_correction(c) for c in corr] if corr else None
 
+
 def parse_correction(corr):
-    return symbols.Correction(corr['source']['file']
-                              , corr['level']
-                              , corr['note']['message']
-                              , parse_corrector(corr['note']['corrector'])
-                              , parse_region(corr.get('region')))
+    return symbols.Correction(
+        corr['source']['file'],
+        corr['level'],
+        corr['note']['message'],
+        parse_corrector(corr['note']['corrector']),
+        parse_region(corr.get('region')),
+    )
 
 
 def parse_corrector(corr):
