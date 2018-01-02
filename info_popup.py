@@ -111,6 +111,7 @@ class SublimeHaskellHoverPopup(object):
 
     def do_hover(self):
         if self.hover_zone == sublime.HOVER_TEXT:
+            line, column = self.view.rowcol(self.point)
             qsymbol = Common.get_qualified_symbol_at_point(self.view, self.point)
             ## print('hover: qualified symbol {0}'.format(qsymbol))
             module_word = qsymbol.module
@@ -125,16 +126,20 @@ class SublimeHaskellHoverPopup(object):
 
                 # Try get type of hovered symbol
                 typed_expr = None
-                if types.SourceHaskellTypeCache().has(self.filename):
-                    typed_expr = self.get_type(types.SourceHaskellTypeCache().get(self.filename), whois_name)
-                else:
-                    project_name = Common.locate_cabal_project_from_view(self.view)[1]
-                    point_rgn = sublime.Region(self.point, self.point)
-                    typed_expr = self.get_type(types.get_type_view(self.view, project_name, point_rgn), whois_name)
+                # Getting type is slow, disabled for me
+
+                # if types.SourceHaskellTypeCache().has(self.filename):
+                #     typed_expr = self.get_type(types.SourceHaskellTypeCache().get(self.filename), whois_name)
+                # else:
+                #     project_name = Common.locate_cabal_project_from_view(self.view)[1]
+                #     point_rgn = sublime.Region(self.point, self.point)
+                #     typed_expr = self.get_type(types.get_type_view(self.view, project_name, point_rgn), whois_name)
 
                 # Try whois
                 suggest_import = False
-                decl = Utils.head_of(BackendManager.active_backend().whois(whois_name, self.filename))
+                decl = Utils.head_of(BackendManager.active_backend().whoat(line + 1, column + 1, self.filename))
+                if not decl:
+                    decl = Utils.head_of(BackendManager.active_backend().whois(whois_name, self.filename))
                 if not decl:
                     suggest_import = True
                     decl = Utils.head_of(BackendManager.active_backend().lookup(full_name, self.filename))

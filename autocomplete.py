@@ -208,14 +208,14 @@ class AutoCompleter(object):
                                                                    search_type='exact'))
                     if q_module is not None:
                         if q_module.by_source():
-                            proj_module = backend.resolve(file=q_module.location.filename, exports=True)
+                            proj_module = backend.module(None, file=q_module.location.filename)
                             if proj_module:
-                                suggestions = proj_module.declarations.values()
+                                suggestions = proj_module.exports
                         elif q_module.by_cabal():
                             cabal_module = Utils.head_of(backend.module(project_name, lookup=q_module.name, search_type='exact',
                                                                         package=q_module.location.package.name))
                             if cabal_module:
-                                suggestions = cabal_module.declarations.values()
+                                suggestions = cabal_module.exports
             else:
                 if Settings.COMPONENT_DEBUG.completions:
                     print('completions: querying module-specific completions')

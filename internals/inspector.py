@@ -46,6 +46,7 @@ class Inspector(object):
         self.cabal_to_load = Atomics.AtomicList()
         self.dirty_files = Atomics.AtomicDuck()
         self.dirty_paths = Atomics.AtomicList()
+        self.cabal_scanned = False
         self.busy = False
 
     def __enter__(self):
@@ -65,6 +66,10 @@ class Inspector(object):
             files_to_reinspect = []
             projects = []
             files = []
+
+            if not self.cabal_scanned:
+                self.cabal_scanned = True
+                self.inspect_cabal('cabal')
 
             with self.dirty_paths as dirty_paths:
                 scan_paths = dirty_paths[:]
@@ -129,6 +134,8 @@ class Inspector(object):
         '''Scam all open window views, adding actual cabal files  or those indirectly identified by the Haskell sources
         to the list of cabal files to inspect.
         '''
+        self.cabal_scanned = False
+
         with self.cabal_to_load as cand_cabals:
             cand_cabals = []
             for window in sublime.windows():
