@@ -595,11 +595,10 @@ class TypeBase(Symbol):
     def popup_brief(self):
         parts = [u'<span class="keyword">{0}</span>'.format(html.escape(self.what, quote=False))]
         if self.context:
-            ctx = self.context.split(', ')
-            if len(ctx) == 1:
-                parts.append(format_type(u'{0} =>'.format(ctx[0])))
+            if len(self.context) == 1:
+                parts.append(format_type(u'{0} =>'.format(self.context[0])))
             else:
-                parts.append(format_type(u'({0}) =>'.format(', '.join(ctx))))
+                parts.append(format_type(u'({0}) =>'.format(', '.join(self.context))))
 
         name_part = u'<span class="type">{0}</span>'.format(html.escape(self.name, quote=False))
         if self.has_source_location():
