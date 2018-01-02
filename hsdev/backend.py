@@ -489,14 +489,17 @@ class HsDevBackend(Backend.HaskellBackend):
                                            'ghc-opts': ghc_flags or []},
                                  **backend_args)
 
-    def autofixes(self, messages, **backend_args):
-        return self.list_command('autofixes', {'messages': messages}, **backend_args)
+    def autofixes(self, messages, wait_complete=False, **backend_args):
+        action = self.list_command if wait_complete else self.async_list_command
+        return action('autofixes', {'messages': messages}, ResultParse.parse_corrections, **backend_args)
 
-    def refactor(self, messages, rest=[], pure=True, **backend_args):
-        return self.list_command('refactor', {'messages': messages, 'rest': rest, 'pure': pure}, **backend_args)
+    def refactor(self, messages, rest=[], pure=True, wait_complete=False, **backend_args):
+        action = self.list_command if wait_complete else self.async_list_command
+        return action('refactor', {'messages': messages, 'rest': rest, 'pure': pure}, ResultParse.parse_corrections, **backend_args)
 
-    def rename(self, name, new_name, file, **backend_args):
-        return self.list_command('rename', {'name': name, 'new-name': new_name, 'file': file}, **backend_args)
+    def rename(self, name, new_name, file, wait_complete=False, **backend_args):
+        action = self.list_command if wait_complete else self.async_list_command
+        return action('rename', {'name': name, 'new-name': new_name, 'file': file}, ResultParse.parse_corrections, **backend_args)
 
     def langs(self, _projectname, **backend_args):
         return self.command('langs', {}, **backend_args)
@@ -512,6 +515,13 @@ class HsDevBackend(Backend.HaskellBackend):
 
     def exit(self):
         return self.command('exit', {})
+
+    # old names for compatibility
+    def autofix_show(self, messages, wait_complete=False, **backend_args):
+        return self.autofixes(messages, wait_complete=wait_complete, **backend_args)
+
+    def autofix_fix(self, messages, rest=[], pure=True, wait_complete=False, **backend_args):
+        return self.refactor(messages, rest=rest, pure=pure, wait_complete=wait_complete, **backend_args)
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # Advanced features:

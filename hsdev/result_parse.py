@@ -187,7 +187,7 @@ def parse_correction(corr):
         corr['source']['file'],
         corr['level'],
         corr['note']['message'],
-        parse_corrector(corr['note']['corrector']),
+        parse_corrector(corr['note']['action']),
         parse_region(corr.get('region')),
     )
 
