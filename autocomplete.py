@@ -325,16 +325,6 @@ class AutoCompleter(object):
         backend = BackendManager.active_backend()
         if self.current_filename:
             return set([m.name for m in backend.scope_modules(project_name, self.current_filename)])
-        elif current_dir:
-            proj = backend.project(path=current_dir)
-            if proj and 'path' in proj:
-                return set([m.name for m in backend.list_modules(deps=proj['path'])])
-            sbox = backend.sandbox(path=current_dir)
-            if sbox and isinstance(sbox, dict) and 'sandbox' in sbox:
-                sbox = sbox.get('sandbox')
-            if sbox:
-                mods = backend.list_modules(sandbox=sbox) or []
-                return set([m.name for m in mods])
         else:
-            mods = backend.list_modules(cabal=True) or []
+            mods = backend.module(None, installed=True, header=True) or []
             return set([m.name for m in mods])

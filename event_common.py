@@ -150,14 +150,14 @@ class SublimeHaskellEventCommon(object):
         if file_shown_in_view is None:
             return False
 
-        src_module = Utils.head_of(BackendManager.active_backend().module(file=file_shown_in_view))
+        src_module = Utils.head_of(BackendManager.active_backend().module(None, file=file_shown_in_view, header=True))
         return src_module is not None and src_module.location.project is not None
 
 
     def is_scanned_source(self):
         file_shown_in_view = Common.window_view_and_file(self.view)[2]
         return file_shown_in_view is not None and \
-               Utils.head_of(BackendManager.active_backend().module(file=file_shown_in_view)) is not None
+               Utils.head_of(BackendManager.active_backend().module(None, file=file_shown_in_view, header=True)) is not None
 
 
     def assoc_to_project(self, view, filename):

@@ -46,7 +46,6 @@ def show_declaration_info(view, decl):
                 info['filename'] = decl.defined_module().location.filename
             if decl.by_cabal() and decl.defined_module().location.package.name:
                 info['package_name'] = decl.module.location.package.name
-                info['db'] = decl.module.location.db.to_string()
 
         sublime.set_timeout(lambda: view.run_command('sublime_haskell_symbol_info', info), 0)
     else:
@@ -280,7 +279,7 @@ class SublimeHaskellGoToModule(CommandWin.BackendWindowCommand):
         self.window = win
 
     def run(self, **_kwargs):
-        self.modules = BackendManager.active_backend().list_modules(source=True)
+        self.modules = BackendManager.active_backend().module(None, source=True, header=True)
         mod_strings = [[m.name if m.name != 'Main' else 'Main in {0}'.format(m.location.to_string()),
                         m.location.to_string()] for m in self.modules]
         self.window.show_quick_panel(mod_strings, self.on_done, 0, 0, self.on_highlighted)
@@ -336,12 +335,14 @@ class SublimeHaskellGoToHackageModule(CommandWin.BackendTextCommand):
                                                                                         search_type='exact')
                                if m.by_cabal()]
                 else:
-                    modules = [m for m in BackendManager.active_backend().list_modules(symdb=m.location.db)
+                    modules = [m for m in BackendManager.active_backend().module(None, installed=True, header=True)
                                if m.name == qsymbol.module and m.by_cabal()]
             else:  # symbol
                 scope = self.view.file_name()
+                line, column = self.view.rowcol(self.view.sel()[0].a)
                 if scope:
-                    decls = BackendManager.active_backend().whois(qsymbol.qualified_name(), file=scope) or \
+                    decls = BackendManager.active_backend().whoat(line + 1, column + 1, file=scope) or \
+                            BackendManager.active_backend().whois(qsymbol.qualified_name(), file=scope) or \
                             BackendManager.active_backend().lookup(qsymbol.full_name(), file=scope) or \
                             BackendManager.active_backend().symbol(lookup=qsymbol.full_name(), search_type='exact')
                     if not decls:
@@ -460,7 +461,6 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
         filename = kwargs.get('filename')
         module_name = kwargs.get('module_name')
         package_name = kwargs.get('package_name')
-        symdb = kwargs.get('db')
         name = kwargs.get('name')
         qname = kwargs.get('qname')
         no_browse = kwargs.get('no_browse') or False
@@ -469,7 +469,7 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
             self.full_name = qname
             self.current_file_name = self.view.file_name()
             # Try whois it, followed by file symbol and wider module searches
-            self.candidates = self.collect_candidates(qname, name, filename, module_name, package_name, symdb)
+            self.candidates = self.collect_candidates(qname, name, filename, module_name, package_name)
         else:
             self.current_file_name = self.view.file_name()
 
@@ -533,18 +533,16 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
     def is_visible(self):
         return Common.view_is_haskell_source(self.view) or Common.view_is_haskell_repl(self.view)
 
-    def collect_candidates(self, qualified_name, unqualified_name, filename, module_name, package_name, symdb):
+    def collect_candidates(self, qualified_name, unqualified_name, filename, module_name, package_name):
         candidates = BackendManager.active_backend().whois(qualified_name, file=self.current_file_name)
         if not candidates:
             if filename:
                 candidates = BackendManager.active_backend().symbol(lookup=unqualified_name, search_type='exact', file=filename)
             else:
                 if module_name and package_name:
-                    symbol_db = symbols.PackageDb.from_string(symdb) if symdb else None
                     candidates = BackendManager.active_backend().symbol(lookup=unqualified_name,
                                                                         search_type='exact',
                                                                         module=module_name,
-                                                                        symdb=symbol_db,
                                                                         package=package_name)
                 else:
                     candidates = []
@@ -617,7 +615,6 @@ class SublimeHaskellBrowseModule(CommandWin.BackendTextCommand):
     def run(self, _edit, **kwargs):
         module_name = kwargs.get('module_name')
         filename = kwargs.get('filename')
-        symdb = kwargs.get('db')
         scope = kwargs.get('scope')
 
         self.candidates = []
@@ -632,7 +629,7 @@ class SublimeHaskellBrowseModule(CommandWin.BackendTextCommand):
                 Common.sublime_status_message('Module {0} not found'.format(filename))
                 return
         elif module_name:
-            cand_mods = self.candidate_modules(project_name, module_name, scope, symdb)
+            cand_mods = self.candidate_modules(project_name, module_name, scope)
             if not cand_mods:
                 Common.sublime_status_message('Module {0} not found'.format(module_name))
                 return
@@ -646,12 +643,11 @@ class SublimeHaskellBrowseModule(CommandWin.BackendTextCommand):
             if self.current_file_name:
                 cand_mods = BackendManager.active_backend().scope_modules(project_name, self.current_file_name)
             else:
-                symbol_db = symbols.PackageDb.from_string(symdb) if symdb else None
-                cand_mods = BackendManager.active_backend().list_modules(symdb=symbol_db)
+                cand_mods = BackendManager.active_backend().module(None, header=True)
             self.candidates.extend([(m, [m.name, m.location.to_string()]) for m in cand_mods])
 
         if the_module:
-            self.candidates = sorted(list(the_module.declarations.values()), key=lambda d: d.brief())
+            self.candidates = sorted(list(the_module.exports), key=lambda d: d.brief())
             results = [[decl.brief(use_unicode=False),
                         decl.docs.splitlines()[0] if decl.docs else ''] for decl in self.candidates]
             self.view.window().show_quick_panel(results, self.on_symbol_selected)
@@ -669,7 +665,7 @@ class SublimeHaskellBrowseModule(CommandWin.BackendTextCommand):
                 info['filename'] = the_module.location.filename
             if the_module.by_cabal() and the_module.location.package.name:
                 info['package_name'] = the_module.location.package.name
-                info['db'] = the_module.location.db.to_string()
+                info['package_version'] = the_module.location.package.version
 
             sublime.set_timeout(lambda: self.view.window().run_command('sublime_haskell_browse_module', info), 0)
 
@@ -677,7 +673,7 @@ class SublimeHaskellBrowseModule(CommandWin.BackendTextCommand):
         if idx >= 0:
             show_declaration_info(self.view.window().active_view(), self.candidates[idx])
 
-    def candidate_modules(self, project_name, module_name, scope, symdb):
+    def candidate_modules(self, project_name, module_name, scope):
         retval = None
         if scope is not None:
             retval = BackendManager.active_backend().scope_modules(project_name, scope, lookup=module_name, search_type='exact')
@@ -685,8 +681,7 @@ class SublimeHaskellBrowseModule(CommandWin.BackendTextCommand):
             retval = BackendManager.active_backend().scope_modules(project_name, self.current_file_name, lookup=module_name,
                                                                    search_type='exact')
         else:
-            retval = BackendManager.active_backend().list_modules(module=module_name,
-                                                                  symdb=symbols.PackageDb.from_string(symdb) if symdb else None)
+            retval = BackendManager.active_backend().module(None, module=module_name, header=True)
         return retval
 
     def get_module_info(self, project_name, module, module_name):
@@ -694,8 +689,7 @@ class SublimeHaskellBrowseModule(CommandWin.BackendTextCommand):
         if module.by_source():
             args = {'lookup': module_name, 'search_type': 'exact', 'file': module.location.filename}
         elif module.by_cabal():
-            args = {'lookup': module_name, 'search_type': 'exact', 'symdb': module.location.db,
-                    'package': module.location.package.name}
+            args = {'lookup': module_name, 'search_type': 'exact', 'package': module.location.package.name}
         else:
             args = {'lookup': module_name, 'search_type': 'exact'}
 
@@ -707,6 +701,7 @@ class SublimeHaskellGoToDeclaration(CommandWin.BackendTextCommand):
         self.select_candidates = None
 
     def run(self, _edit, **_kwargs):
+        line, column = self.view.rowcol(self.view.sel()[0].a)
         qsymbol = Common.get_qualified_symbol_at_region(self.view, self.view.sel()[0])
 
         if Common.view_is_haskell_symbol_info(self.view):  # Go to within symbol info window
@@ -724,7 +719,9 @@ class SublimeHaskellGoToDeclaration(CommandWin.BackendTextCommand):
             candidates = []
             module_candidates = []
             if not qsymbol.is_module():
-                candidates = [decl for decl in backend.whois(whois_name, current_file_name) if decl.by_source()]
+                candidates = [decl for decl in backend.whoat(line + 1, column + 1, current_file_name) if decl.by_source()]
+                if not candidates:
+                    candidates = [decl for decl in backend.whois(whois_name, current_file_name) if decl.by_source()]
                 if candidates:
                     if candidates[0].has_source_location():
                         self.view.window().open_file(candidates[0].get_source_location(), sublime.ENCODED_POSITION)
@@ -741,7 +738,7 @@ class SublimeHaskellGoToDeclaration(CommandWin.BackendTextCommand):
                 else:
                     candidates = backend.symbol(lookup=qsymbol.name, search_type='exact', source=True)
             else:
-                module_candidates = [m for m in backend.list_modules(source=True, module=full_name) if m.name == full_name]
+                module_candidates = [m for m in backend.module(None, source=True, module=full_name, header=True) if m.name == full_name]
 
             if not candidates and not module_candidates:
                 Common.sublime_status_message('Declaration {0} not found'.format(qsymbol.name))
