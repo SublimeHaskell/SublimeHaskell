@@ -96,6 +96,8 @@ def parse_symbol(sym):
             what,
             sid.name,
             sid.module,
+            docs=docs,
+            position=pos,
             **fields
         )
 
