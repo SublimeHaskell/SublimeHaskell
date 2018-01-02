@@ -371,8 +371,7 @@ class HsDevBackend(Backend.HaskellBackend):
     def list_sandboxes(self, **backend_args):
         return self.list_command('sandboxes', {}, **backend_args)
 
-    def symbol(self, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
-               cabal=False, symdb=None, package=None, source=False, standalone=False, local_names=False, header=False, **backend_args):
+    def symbol(self, lookup="", search_type='prefix', project=None, file=None, module=None, package=None, installed=False, source=False, standalone=False, local_names=False, header=False, **backend_args):
         # search_type is one of: exact, prefix, infix, suffix
         query = {'input': lookup, 'type': search_type}
 
@@ -383,16 +382,10 @@ class HsDevBackend(Backend.HaskellBackend):
             filters.append({'file': file})
         if module:
             filters.append({'module': module})
-        if deps:
-            filters.append({'deps': deps})
-        if sandbox:
-            filters.append({'cabal': {'sandbox': sandbox}})
-        if cabal:
-            filters.append({'cabal': 'cabal'})
-        if symdb:
-            filters.append({'db': ResultParse.encode_package_db(symdb)})
         if package:
             filters.append({'package': package})
+        if installed:
+            filters.append('installed')
         if source:
             filters.append('sourced')
         if standalone:
@@ -401,8 +394,7 @@ class HsDevBackend(Backend.HaskellBackend):
         return self.list_command('symbol', {'query': query, 'filters': filters, 'locals': local_names, 'header': header},
                                  ResultParse.parse_symbol_ids if header else ResultParse.parse_symbols, **backend_args)
 
-    def module(self, _projectname, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None,
-               sandbox=None, cabal=False, symdb=None, package=None, source=False, standalone=False, header=False, **backend_args):
+    def module(self, _projectname, lookup="", search_type='prefix', project=None, file=None, module=None, package=None, installed=False, source=False, standalone=False, header=False, **backend_args):
         query = {'input': lookup, 'type': search_type}
 
         filters = []
@@ -412,16 +404,10 @@ class HsDevBackend(Backend.HaskellBackend):
             filters.append({'file': file})
         if module:
             filters.append({'module': module})
-        if deps:
-            filters.append({'deps': deps})
-        if sandbox:
-            filters.append({'cabal': {'sandbox': sandbox}})
-        if cabal:
-            filters.append({'cabal': 'cabal'})
-        if symdb:
-            filters.append({'db': ResultParse.encode_package_db(symdb)})
         if package:
             filters.append({'package': package})
+        if installed:
+            filters.append('installed')
         if source:
             filters.append('sourced')
         if standalone:

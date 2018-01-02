@@ -62,6 +62,13 @@ def parse_symbol(sym):
     sinfo = sym['info']
     what = sinfo['what']
 
+    type_symbols = {
+        'type': symbols.Type,
+        'newtype': symbols.Newtype,
+        'data': symbols.Data,
+        'class': symbols.Class,
+    }
+
     if what == 'function':
         return symbols.Function(
             sid.name,
@@ -70,23 +77,26 @@ def parse_symbol(sym):
             docs=docs,
             position=pos,
         )
-    else:
+    elif what in type_symbols:
         ctx = sinfo.get('ctx')
         args = sinfo.get('args')
 
-        ctors = {
-            'type': symbols.Type,
-            'newtype': symbols.Newtype,
-            'data': symbols.Data,
-            'class': symbols.Class,
-        }
-        return ctors[what](
+        return type_symbols[what](
             sid.name,
             sid.module,
             context=ctx,
             args=args,
             docs=docs,
             position=pos,
+        )
+    else:
+        sinfo.pop('what')
+        fields = dict((name.replace('-', '_').replace('class', 'parent_class'), value) for name, value in sinfo.items())
+        return symbols.UnknownSymbol(
+            what,
+            sid.name,
+            sid.module,
+            **fields
         )
 
 
@@ -138,6 +148,8 @@ def parse_region(rgn):
 
 
 def parse_location(srclocation):
+    if srclocation is None:
+        return None
     if 'file' in srclocation:
         return symbols.Location(
             get_value(srclocation, 'file'),

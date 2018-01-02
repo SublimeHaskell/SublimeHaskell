@@ -351,6 +351,15 @@ class ModuleId(object):
     def __str__(self):
         return u'ModuleId({0} at {1})'.format(self.name, self.location)
 
+    def by_source(self):
+        return isinstance(self.location, Location)
+
+    def by_cabal(self):
+        return isinstance(self.location, InstalledLocation)
+
+    def by_hayoo(self):
+        return isinstance(self.location, OtherLocation)
+
 
 class SymbolId(object):
     """
@@ -362,6 +371,15 @@ class SymbolId(object):
 
     def __str__(self):
         return u'SymbolId({0} in {1})'.format(self.name, self.module)
+
+    def by_source(self):
+        return self.module.by_source()
+
+    def by_cabal(self):
+        return self.module.by_cabal()
+
+    def by_hayoo(self):
+        return self.module.by_hayoo()
 
 
 class Module(ModuleId):
@@ -389,15 +407,6 @@ class Module(ModuleId):
     def __repr__(self):
         return u'Module({0} (exports {1}, imports {2}))'.format(self.name, len(self.exports), len(self.imports))
 
-    def by_source(self):
-        return isinstance(self.location, Location)
-
-    def by_cabal(self):
-        return isinstance(self.location, InstalledLocation)
-
-    def by_hayoo(self):
-        return isinstance(self.location, OtherLocation)
-
 
 class Symbol(SymbolId):
     """
@@ -411,15 +420,6 @@ class Symbol(SymbolId):
 
     def __str__(self):
         return u'Symbol({0} {1} in {2})'.format(self.what, self.name, self.module)
-
-    def by_source(self):
-        return isinstance(self.defined_module().location, Location)
-
-    def by_cabal(self):
-        return isinstance(self.defined_module().location, InstalledLocation)
-
-    def by_hayoo(self):
-        return isinstance(self.defined_module().location, OtherLocation)
 
     def has_source_location(self):
         return self.by_source() and self.position is not None
@@ -457,7 +457,6 @@ class Symbol(SymbolId):
             if self.module.location.project:
                 parts.append('Project: {0}'.format(self.module.location.project))
         elif self.by_cabal():
-            parts.append('Installed in: {0}'.format(self.module.location.db.to_string()))
             parts.append('Package: {0}'.format(self.module.location.package.package_id()))
 
         if self.has_source_location():
@@ -646,6 +645,38 @@ class Class(TypeBase):
 
     def __repr__(self):
         return u'Class({0})'.format(self.name)
+
+
+class UnknownSymbol(Symbol):
+    def __init__(self, symbol_type, name, module, docs=None, position=None, **kwargs):
+        super().__init__(symbol_type, name, module, docs=docs, position=position)
+        for field in ["type", "parent_class", "parent", "constructors", "args", "ctx", "associate", "pat_type", "constructor"]:
+            kwargs.setdefault(field, None)
+        self.__dict__.update(kwargs)
+
+    def suggest(self):
+        return (
+            UnicodeOpers.use_unicode_operators(
+                u'{0}\t{1}'.format(
+                    wrap_operator(self.name),
+                    self.module.name
+                )
+            ),
+            self.name
+        )
+
+    @unicode_operators
+    def brief(self, short=False):
+        if short:
+            return u'{0}'.format(wrap_operator(self.name))
+        return u'{0} :: {1}'.format(wrap_operator(self.name), self.type if self.type else u'?')
+
+    @unicode_operators
+    def popup_brief(self):
+        info = u'<span class="function">{0}</span>'.format(html.escape(self.name, quote=False))
+        if self.has_source_location():
+            info = u'<a href="{0}">{1}</a>'.format(html.escape(self.get_source_location()), info)
+        return u'{0} <span class="operator">::</span> {1}'.format(info, format_type(self.type if self.type else u'?'))
 
 
 def update_with(left, right, default_value, upd_fn):
