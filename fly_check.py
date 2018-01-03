@@ -109,11 +109,11 @@ class FlyCheckViewEventListener(sublime_plugin.ViewEventListener):
                         print('fly: executing {0}'.format(check_cmd))
 
                     if check_cmd:
-                        CheckLint.SublimeHaskellHsDevChain.reset_chain_flag()
+                        CheckLint.ChainRunner.reset_chain_flag()
                         self.view.run_command(check_cmd, {'fly': True})
                         if Settings.COMPONENT_DEBUG.fly_mode:
                             print('fly: awaiting command completion')
-                        CheckLint.SublimeHaskellHsDevChain.run_chain_flag().wait()
+                        CheckLint.ChainRunner.run_chain_flag().wait()
 
                     delta_t = None
 
