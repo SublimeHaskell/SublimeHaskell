@@ -11,10 +11,15 @@ import threading
 import time
 import traceback
 
-import SublimeHaskell.hsdev.callback as HsCallback
 import SublimeHaskell.internals.atomics as Atomics
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.settings as Settings
+
+def debug_send():
+    return Settings.COMPONENT_DEBUG.all_messages or Settings.COMPONENT_DEBUG.send_messages
+
+def debug_recv():
+    return Settings.COMPONENT_DEBUG.all_messages or Settings.COMPONENT_DEBUG.recv_messages
 
 class HsDevConnection(object):
     MAX_SOCKET_READ = 10240
@@ -48,7 +53,10 @@ class HsDevConnection(object):
             pre, sep, post = self.read_decoded_req().partition('\n')
             pre = ''.join([req_remain, pre])
             while sep and self.rcvr_queue:
-                self.rcvr_queue.put(json.loads(pre))
+                resp = json.loads(pre)
+                self.rcvr_queue.put(resp)
+                if debug_recv():
+                    print(u'{0}.hsconn_receiver: qsize = {1}'.format(type(self).__name__, self.rcvr_queue.qsize()))
                 (pre, sep, post) = post.partition('\n')
             req_remain = pre
 
@@ -61,7 +69,8 @@ class HsDevConnection(object):
             except UnicodeDecodeError:
                 # Couldn't decode the string, so continue reading from the socket, accumulating
                 # into stream_inp until utf-8 decoding succeeds.
-                pass
+                if debug_recv():
+                    print(u'{0}.read_decoded_req: UnicodeDecodeError'.format(type(self).__name__))
             except (OSError, socket.gaierror):
                 # Socket problem. Just bail.
                 self.stop_event.set()
@@ -77,7 +86,6 @@ class HsDevConnection(object):
                     # Socket got closed and set to None in another thread...
                     self.socket.sendall(request)
                 if self.send_queue is not None:
-                    # Paranoia...
                     self.send_queue.task_done()
             except queue.Empty:
                 pass
@@ -131,8 +139,6 @@ class HsDevClient(object):
         self.rcvr_event = threading.Event()
         self.request_q = queue.Queue()
         self.request_map = Atomics.AtomicDuck()
-        self.serial_lock = threading.RLock()
-        self.request_serial = 1
 
     def __del__(self):
         self.close()
@@ -203,10 +209,6 @@ class HsDevClient(object):
     def is_connected(self):
         return len(self.socket_pool) > 0
 
-    def setup_receive_callbacks(self, ident, command, on_response, on_notify, on_error, orig_request):
-        with self.request_map as requests:
-            requests[ident] = (HsCallback.HsDevCallbacks(ident, command, on_response, on_notify, on_error), orig_request)
-
     def verify_connected(self):
         return self.is_connected()
 
@@ -216,11 +218,9 @@ class HsDevClient(object):
 
         # send error to callbacks
         with self.request_map as requests:
-            for (on_msg, _) in requests.values():
-                on_msg.on_error('connection lost', {})
+            for (callbacks, _, _) in requests.values():
+                callbacks.call_on_error('connection lost', {})
             requests.clear()
-
-        self.request_serial = 1
 
     def receiver(self):
         self.rcvr_event.clear()
@@ -228,7 +228,7 @@ class HsDevClient(object):
             try:
                 # Ensure that get() will return when the backend is shutting down.
                 resp = self.request_q.get(True, 5.0)
-                if Settings.COMPONENT_DEBUG.all_messages or Settings.COMPONENT_DEBUG.recv_messages:
+                if debug_recv():
                     print(u'HsDevClient.receiver resp:')
                     pprint.pprint(resp)
 
@@ -241,7 +241,24 @@ class HsDevClient(object):
                             resp_id = orig_req.get('id')
 
                         if resp_id is not None:
-                            self.invoke_callbacks(resp, resp_id, requests)
+                            if debug_recv():
+                                print('{0}.receiver[{1}]: invoking callbacks.'.format(type(self).__name__, resp_id))
+                            reqdata = requests.get(resp_id)
+                            if reqdata:
+                                callbacks, wait_event, _ = reqdata
+                                resp, finished_request = self.invoke_callbacks(resp, resp_id, callbacks)
+
+                                if finished_request:
+                                    if wait_event:
+                                        # Caller is responsible for cleaning up after the request
+                                        requests[resp_id] = (None, None, resp)
+                                        wait_event.set()
+                                    else:
+                                        # Async request: dispose of the request, we're done with it now.
+                                        del requests[resp_id]
+                            else:
+                                msg = 'HsDevClient.receiver: request data expected for {0}, none found.'.format(resp_id)
+                                Logging.log(msg, Logging.LOG_WARNING)
                         elif Logging.is_log_level(Logging.LOG_ERROR):
                             print('HsDevClient.receiver: request w/o id')
                             pprint.pprint(resp)
@@ -251,95 +268,86 @@ class HsDevClient(object):
             except queue.Empty:
                 pass
 
-    def invoke_callbacks(self, response, resp_id, requests):
+    def invoke_callbacks(self, response, resp_id, callbacks):
         reason = None
-        callbacks = requests.get(resp_id)
+        retval = None
+        finished_request = False
         if callbacks is not None:
-            callbacks = callbacks[0]
-            finished_request = False
-            if callbacks is not None:
-                # Unconditionally call the notify callback first:
-                if 'notify' in response:
-                    if Settings.COMPONENT_DEBUG.callbacks:
-                        print('id {0}: notify callback'.format(resp_id))
-                    callbacks.call_notify(response['notify'])
+            # Unconditionally call the notify callback first:
+            if 'notify' in response:
+                if Settings.COMPONENT_DEBUG.callbacks:
+                    print('id {0}: notify callback'.format(resp_id))
+                callbacks.call_notify(response['notify'])
 
-                if 'result' in response:
-                    if Settings.COMPONENT_DEBUG.callbacks:
-                        print('id {0}: result callback'.format(resp_id))
-                    callbacks.call_response(response['result'])
-                    finished_request = True
-                elif 'error' in response:
-                    if Settings.COMPONENT_DEBUG.callbacks:
-                        print('id {0}: error callback'.format(resp_id))
-                    err = response.pop("error")
-                    callbacks.call_error(err, response)
-                    finished_request = True
+            if 'result' in response:
+                retval = callbacks.call_response(response['result'])
+                finished_request = True
+                if Settings.COMPONENT_DEBUG.callbacks:
+                    print('id {0}: result callback returning {1}'.format(resp_id, retval))
+            elif 'error' in response:
+                err = response.pop("error")
+                retval = callbacks.call_error(err, response)
+                finished_request = True
+                if Settings.COMPONENT_DEBUG.callbacks:
+                    print('id {0}: error callback returning {1}'.format(resp_id, retval))
+        else:
+            reason = 'HsDevClient.receiver: No callbacks found for request {0}.'.format(resp_id)
+            Logging.log(reason, Logging.LOG_WARNING)
 
-                if finished_request:
-                    del requests[resp_id]
-            elif Logging.is_log_level(Logging.LOG_WARNING):
-                reason = 'HsDevClient.receiver: No callbacks found for request {0}.'.format(resp_id)
-        elif Logging.is_log_level(Logging.LOG_WARNING):
-            reason = 'HsDevClient.receiver: callbacks expected for request {0}, none found.'.format(resp_id)
+        return (retval, finished_request)
 
-        if reason:
-            print(reason)
-            pprint.pprint(response)
-            del requests[resp_id]
-
-    def call(self, command, opts, on_response, on_notify, on_error, wait, timeout):
-        # log
+    def call(self, command, opts, callbacks, wait, timeout):
         if not self.verify_connected():
             return None if wait else False
 
         opts = opts or {}
-        with self.serial_lock:
-            req_serial = str(self.request_serial)
-            self.request_serial = self.request_serial + 1
-        opts.update({'no-file': True, 'id': req_serial, 'command': command})
+        opts.update({'no-file': True, 'id': callbacks.ident, 'command': command})
 
         wait_receive = threading.Event() if wait else None
-        result_dict = {}
 
-        def client_call_response(resp):
-            result_dict['result'] = resp
-            HsCallback.call_callback(on_response, resp)
-            if wait_receive is not None:
-                wait_receive.set()
+        if debug_recv():
+            def client_call_error(exc, details):
+                print('{0}.client_call_error: exc {1} details {2}'.format(type(self).__name__, exc, details))
 
-        def client_call_error(exc, details):
-            HsCallback.call_callback(on_error, exc, details)
-            if wait_receive is not None:
-                wait_receive.set()
+            callbacks.inject_error_handler(client_call_error)
 
-        args_cmd = 'hsdev {0}'.format(command)
-        self.setup_receive_callbacks(req_serial, args_cmd, client_call_response, on_notify, client_call_error, opts)
+        with self.request_map as requests:
+            requests[callbacks.ident] = (callbacks, wait_receive, None)
 
-        call_cmd = u'HsDevClient.call[{0}] cmd \'{1}\' opts\n{2}'.format(req_serial, command, pprint.pformat(opts))
-        if Settings.COMPONENT_DEBUG.all_messages or Settings.COMPONENT_DEBUG.send_messages:
-            print(call_cmd)
+        if debug_send():
+            print(u'HsDevClient.call[{0}] cmd \'{1}\' opts\n{2}'.format(callbacks.ident, command, pprint.pformat(opts)))
 
         try:
             # Randomly choose a connection from the pool -- even if we end up having a stuck sender, this should minimize
             # the probability of a complete hang.
             random.choice(self.socket_pool).send_request(opts)
 
+            retval = True
             if wait:
+                if debug_send():
+                    print(u'HsDevClient.call: waiting to receive, timeout = {0}.'.format(timeout))
                 wait_receive.wait(timeout)
-                if not wait_receive.is_set():
-                    with self.request_map as requests:
-                        req = pprint.pformat(requests[req_serial][1])
-                        errmsg = 'HsDevClient.call: wait_receive event timed out for id {0}\n{1}'.format(req_serial, req)
+                if debug_send():
+                    print(u'HsDevClient.call: done waiting.')
+
+                with self.request_map as requests:
+                    if wait_receive.is_set():
+                        _, _, retval = requests[callbacks.ident]
+                        if Settings.COMPONENT_DEBUG.callbacks:
+                            print('HsDevClient.call: wait {0} result {1}'.format(callbacks.ident, retval))
+                    else:
+                        req = pprint.pformat(requests[callbacks.ident][1])
+                        errmsg = 'HsDevClient.call: wait_receive event timed out for id {0}\n{1}'.format(callbacks.ident, req)
                         Logging.log(errmsg, Logging.LOG_ERROR)
-                        # Delete the request; result_dict will still have nothing in it (presumably)
-                        del requests[req_serial]
+
+                    del requests[callbacks.ident]
+
 
             if Settings.COMPONENT_DEBUG.socket_pool:
                 with self.request_map as request_map:
-                    print('id {0} request_map {1} queue {2}'.format(req_serial, len(request_map), self.request_q.qsize()))
+                    print('id {0} request_map {1} queue {2}'.format(callbacks.ident, len(request_map), self.request_q.qsize()))
 
-            return result_dict.get('result') if wait else True
+            return retval
 
         except OSError:
             self.connection_lost('call', sys.exc_info()[1])

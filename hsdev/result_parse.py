@@ -127,6 +127,7 @@ def parse_module_declaration(mod_decl, parse_module_info=True):
             return decl
 
         return None
+
     except AttributeError:
         return None
 

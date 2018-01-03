@@ -39,20 +39,14 @@ def is_enabled_haskell_command(view, must_be_project):
 
     if not window or not view:
         return False
-    else:
-        # Note: file_show_in_view is the third element of the window_view_and_file() return tuple.
-        # if must_be_file and not file_shown_in_view:
-        #     return False
 
-        syntax_file_for_view = view.settings().get('syntax')
-        if not syntax_file_for_view or 'haskell' not in syntax_file_for_view.lower():
-            return False
+    # Note: file_show_in_view is the third element of the window_view_and_file() return tuple.
+    # if must_be_file and not file_shown_in_view:
+    #     return False
 
-        if not must_be_project:
-            return True
-
-        cabal_project_dir = get_cabal_project_dir_of_view(view)
-        return cabal_project_dir is not None
+    view_settings = view.settings() or {}
+    syntax_file_for_view = (view_settings.get('syntax') or '').lower()
+    return bool('haskell' in syntax_file_for_view and not must_be_project and get_cabal_project_dir_of_view(view))
 
 
 def window_view_and_file(view=None):

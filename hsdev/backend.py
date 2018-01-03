@@ -85,6 +85,8 @@ class HsDevBackend(Backend.HaskellBackend):
         if self.is_local_hsdev:
             self.hostname = self.HSDEV_DEFAULT_HOST
         self.client = None
+        self.serial_lock = threading.RLock()
+        self.request_serial = 1
 
     @staticmethod
     def backend_name():
@@ -254,9 +256,21 @@ class HsDevBackend(Backend.HaskellBackend):
         retval = [{'file': f, 'contents': contents.get(f)} for f in files] if files else []
         return  retval
 
+    def make_callbacks(self, name, on_response=None, result_convert=result_identity, on_notify=None, on_error=None,
+                       **backend_args):
+        with self.serial_lock:
+            req_serial = str(self.request_serial)
+            self.request_serial += 1
 
-    def hsdev_command(self, name, opts, on_result, async_cmd=False, timeout=HSDEV_CALL_TIMEOUT, is_list=False,
-                      on_response=None, on_notify=None, on_error=None, on_result_part=None, split_result=None):
+        # Clean up backend arguments:
+        for param in ['on_response', 'result_convert', 'on_notify', 'on_error']:
+            if param in backend_args:
+                del backend_args[param]
+
+        return (HsCallback.HsDevCallbacks(req_serial, name, on_response, result_convert, on_notify, on_error), backend_args)
+
+    def hsdev_command(self, name, opts, callbacks, async_cmd=False, timeout=HSDEV_CALL_TIMEOUT, is_list=False,
+                      on_result_part=None, split_result=None):
         if split_result is None:
             split_res = on_result_part is not None
 
@@ -265,61 +279,36 @@ class HsDevBackend(Backend.HaskellBackend):
 
             def hsdev_command_notify(reply):
                 if 'result-part' in reply:
-                    notify_result = on_result([reply['result-part']])[0]
-                    HsCallback.call_callback(on_result_part, notify_result)
+                    notify_result = callbacks.call_result_convert([reply['result-part']])[0]
+                    on_result_part(notify_result)
                     result.append(notify_result)
                 else:
-                    HsCallback.call_callback(on_notify, reply)
+                    callbacks.call_notify(reply)
 
             # FIXME: Is this option still used?
             opts.update({'split-result': None})
-            resp = self.client.call(name,
-                                    opts,
-                                    on_response=on_response,
-                                    on_notify=hsdev_command_notify,
-                                    on_error=on_error,
-                                    wait=not async_cmd,
-                                    timeout=timeout)
+            callbacks.add_notify(hsdev_command_notify)
 
-            return result if not async_cmd else resp
+        resp = self.client.call(name, opts, callbacks, wait=not async_cmd, timeout=timeout)
+        return resp
 
-        def process_response(resp):
-            on_response(on_result(resp))
 
-        resp = self.client.call(name,
-                                opts,
-                                on_response=process_response if on_response else None,
-                                on_notify=on_notify,
-                                on_error=on_error,
-                                wait=not async_cmd,
-                                timeout=timeout)
-
-        return on_result(resp) if not async_cmd else resp
-
-    def command(self, name, opts, on_result=result_identity, timeout=HSDEV_CALL_TIMEOUT, on_response=None,
-                on_notify=None, on_error=None, on_result_part=None, split_result=None):
-        return self.hsdev_command(name, opts, on_result, async_cmd=False, timeout=timeout, is_list=False,
-                                  on_response=on_response, on_notify=on_notify, on_error=on_error,
+    def command(self, name, opts, callbacks, timeout=HSDEV_CALL_TIMEOUT, on_result_part=None, split_result=None):
+        return self.hsdev_command(name, opts, callbacks, async_cmd=False, timeout=timeout, is_list=False,
                                   on_result_part=on_result_part, split_result=split_result)
 
 
-    def async_command(self, name, opts, on_result=result_identity, on_response=None, on_notify=None,
-                      on_error=None, on_result_part=None, split_result=None):
-        return self.hsdev_command(name, opts, on_result, async_cmd=True, timeout=None, is_list=False,
-                                  on_response=on_response, on_notify=on_notify, on_error=on_error,
+    def async_command(self, name, opts, callbacks, on_result_part=None, split_result=None):
+        return self.hsdev_command(name, opts, callbacks, async_cmd=True, timeout=None, is_list=False,
                                   on_result_part=on_result_part, split_result=split_result)
 
 
-    def list_command(self, name, opts, on_result=result_identity, timeout=HSDEV_CALL_TIMEOUT, on_response=None,
-                     on_notify=None, on_error=None, on_result_part=None, split_result=None):
-        return self.hsdev_command(name, opts, on_result, async_cmd=False, timeout=timeout, is_list=True,
-                                  on_response=on_response, on_notify=on_notify, on_error=on_error,
+    def list_command(self, name, opts, callbacks, timeout=HSDEV_CALL_TIMEOUT, on_result_part=None, split_result=None):
+        return self.hsdev_command(name, opts, callbacks, async_cmd=False, timeout=timeout, is_list=True,
                                   on_result_part=on_result_part, split_result=split_result)
 
-    def async_list_command(self, name, opts, on_result=result_identity, on_response=None,
-                           on_notify=None, on_error=None, on_result_part=None, split_result=None):
-        return self.hsdev_command(name, opts, on_result, async_cmd=True, timeout=None, is_list=True,
-                                  on_response=on_response, on_notify=on_notify, on_error=on_error,
+    def async_list_command(self, name, opts, callbacks, on_result_part=None, split_result=None):
+        return self.hsdev_command(name, opts, callbacks, async_cmd=True, timeout=None, is_list=True,
                                   on_result_part=on_result_part, split_result=split_result)
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
@@ -327,14 +316,17 @@ class HsDevBackend(Backend.HaskellBackend):
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
     def link(self, hold=False):
-        return self.command('link', {'hold': hold})
+        return self.command('link', {'hold': hold}, self.make_callbacks('link')[0])
 
     def ping(self):
-        return self.command('ping', {}, lambda r: r and ('message' in r) and (r['message'] == 'pong'))
+        return self.command('ping', {}, lambda r: r and ('message' in r) and (r['message'] == 'pong'),
+                            self.make_callbacks('ping')[0])
 
     def scan(self, cabal=False, sandboxes=None, projects=None, files=None, paths=None, ghc=None, contents=None,
              docs=False, infer=False, wait_complete=False, **backend_args):
         action = self.command if wait_complete else self.async_command
+        callbacks, backend_args = self.make_callbacks('scan', **backend_args)
+
         return action('scan', {'projects': projects or [],
                                'cabal': cabal,
                                'sandboxes': sandboxes or [],
@@ -343,30 +335,34 @@ class HsDevBackend(Backend.HaskellBackend):
                                'ghc-opts': ghc or [],
                                'docs': docs,
                                'infer': infer},
-                      **backend_args)
+                      callbacks, **backend_args)
 
     def docs(self, projects=None, files=None, modules=None, **backend_args):
+        callbacks, backend_args = self.make_callbacks('docs', **backend_args)
         return self.async_command('docs', {'projects': projects or [],
                                            'files': files or [],
                                            'modules': modules or []},
-                                  **backend_args)
+                                  callbacks, **backend_args)
 
     def infer(self, projects=None, files=None, modules=None, **backend_args):
+        callbacks, backend_args = self.make_callbacks('infer', **backend_args)
         return self.async_command('infer', {'projects': projects or [],
                                             'files': files or [],
                                             'modules': modules or []},
-                                  **backend_args)
+                                  callbacks, **backend_args)
 
     def remove(self, cabal=False, sandboxes=None, projects=None, files=None, packages=None, **backend_args):
+        callbacks, backend_args = self.make_callbacks('remove', **backend_args)
         return self.async_list_command('remove', {'projects': projects or [],
                                                   'cabal': cabal,
                                                   'sandboxes': sandboxes or [],
                                                   'files': files or [],
                                                   'packages': packages or []},
-                                       **backend_args)
+                                       callbacks, **backend_args)
 
     def remove_all(self, **backend_args):
-        return self.command('remove-all', {}, **backend_args)
+        callbacks, backend_args = self.make_callbacks('remove-all', **backend_args)
+        return self.command('remove-all', {}, callbacks, **backend_args)
 
     def list_modules(self, project=None, file=None, module=None, deps=None, sandbox=None, cabal=False, symdb=None, package=None,
                      source=False, standalone=False, **backend_args):
@@ -392,13 +388,16 @@ class HsDevBackend(Backend.HaskellBackend):
         if standalone:
             filters.append('standalone')
 
-        return self.list_command('modules', {'filters': filters}, ResultParse.parse_modules_brief, **backend_args)
+        callbacks, backend_args = self.make_callbacks('modules', result_convert=ResultParse.parse_modules_brief, **backend_args)
+        return self.list_command('modules', {'filters': filters}, callbacks, **backend_args)
 
     def list_packages(self, **backend_args):
-        return self.list_command('packages', {}, **backend_args)
+        callbacks, backend_args = self.make_callbacks('packages', **backend_args)
+        return self.list_command('packages', {}, callbacks, **backend_args)
 
     def list_projects(self, **backend_args):
-        return self.list_command('projects', {}, **backend_args)
+        callbacks, backend_args = self.make_callbacks('projects', **backend_args)
+        return self.list_command('projects', {}, callbacks, **backend_args)
 
     def symbol(self, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
                cabal=False, symdb=None, package=None, source=False, standalone=False, local_names=False, **backend_args):
@@ -427,8 +426,9 @@ class HsDevBackend(Backend.HaskellBackend):
         if standalone:
             filters.append('standalone')
 
+        callbacks, backend_args = self.make_callbacks('symbol', result_convert=ResultParse.parse_decls, **backend_args)
         return self.list_command('symbol', {'query': query, 'filters': filters, 'locals': local_names},
-                                 ResultParse.parse_decls, **backend_args)
+                                 callbacks, **backend_args)
 
     def module(self, _projectname, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None,
                sandbox=None, cabal=False, symdb=None, package=None, source=False, standalone=False, **backend_args):
@@ -456,98 +456,121 @@ class HsDevBackend(Backend.HaskellBackend):
         if standalone:
             filters.append('standalone')
 
-        return self.command('module', {'query': query, 'filters': filters}, ResultParse.parse_modules, **backend_args)
+        callbacks, backend_args = self.make_callbacks('module', result_convert=ResultParse.parse_modules, **backend_args)
+        return self.command('module', {'query': query, 'filters': filters}, callbacks, **backend_args)
 
     def resolve(self, file, exports=False, **backend_args):
-        return self.command('resolve', {'file': file, 'exports': exports}, ResultParse.parse_module, **backend_args)
+        callbacks, backend_args = self.make_callbacks('resolve', result_convert=ResultParse.parse_module, **backend_args)
+        return self.command('resolve', {'file': file, 'exports': exports}, callbacks, **backend_args)
 
     def project(self, project=None, path=None, **backend_args):
-        return self.command('project', {'name': project} if project else {'path': path}, **backend_args)
+        callbacks, backend_args = self.make_callbacks('project', **backend_args)
+        return self.command('project', {'name': project} if project else {'path': path}, callbacks, **backend_args)
 
     def sandbox(self, path, **backend_args):
-        return self.command('sandbox', {'path': path}, **backend_args)
+        callbacks, backend_args = self.make_callbacks('sandbox', **backend_args)
+        return self.command('sandbox', {'path': path}, callbacks, **backend_args)
 
     def lookup(self, name, file, **backend_args):
-        return self.list_command('lookup', {'name': name, 'file': file}, ResultParse.parse_decls, **backend_args)
+        callbacks, backend_args = self.make_callbacks('lookup', result_convert=ResultParse.parse_decls, **backend_args)
+        return self.list_command('lookup', {'name': name, 'file': file}, callbacks, **backend_args)
 
     def whois(self, name, file, **backend_args):
-        return self.list_command('whois', {'name': name, 'file': file}, ResultParse.parse_declarations, **backend_args)
+        callbacks, backend_args = self.make_callbacks('whois', result_convert=ResultParse.parse_declarations, **backend_args)
+        return self.list_command('whois', {'name': name, 'file': file}, callbacks, **backend_args)
 
     def scope_modules(self, _projcname, file, lookup='', search_type='prefix', **backend_args):
+        callbacks, backend_args = self.make_callbacks('scope_modules', result_convert=ResultParse.parse_modules_brief,
+                                                      **backend_args)
         return self.list_command('scope modules', {'query': {'input': lookup, 'type': search_type}, 'file': file},
-                                 ResultParse.parse_modules_brief, **backend_args)
+                                 callbacks, **backend_args)
 
     def scope(self, file, lookup='', search_type='prefix', global_scope=False, **backend_args):
+        callbacks, backend_args = self.make_callbacks('scope', result_convert=ResultParse.parse_declarations, **backend_args)
         return self.list_command('scope',
                                  {'query': {'input': lookup,
                                             'type': search_type
                                            },
                                   'global': global_scope,
                                   'file': file
-                                 }, ResultParse.parse_declarations, **backend_args)
+                                 }, callbacks, **backend_args)
 
     def complete(self, sym, file, wide=False, **backend_args):
         qname = sym.qualified_name() if sym.name is not None else sym.module + '.'
-        return self.list_command('complete', {'prefix': qname, 'wide': wide, 'file': file},
-                                 ResultParse.parse_declarations, **backend_args)
+        callbacks, backend_args = self.make_callbacks('complete', result_convert=ResultParse.parse_declarations, **backend_args)
+        return self.list_command('complete', {'prefix': qname, 'wide': wide, 'file': file}, callbacks, **backend_args)
 
     def hayoo(self, query, page=None, pages=None, **backend_args):
-        return self.list_command('hayoo', {'query': query, 'page': page or 0, 'pages': pages or 1},
-                                 ResultParse.parse_decls, **backend_args)
+        callbacks, backend_args = self.make_callbacks('hayoo', result_convert=ResultParse.parse_decls, **backend_args)
+        return self.list_command('hayoo', {'query': query, 'page': page or 0, 'pages': pages or 1}, callbacks, **backend_args)
 
     def cabal_list(self, packages, **backend_args):
-        return self.list_command('cabal list', {'packages': packages},
-                                 lambda r: [ResultParse.parse_cabal_package(s) for s in r] if r else None,
-                                 **backend_args)
+        def convert_to_cabal_packages(pkg_list):
+            return [ResultParse.parse_cabal_package(pkg) for pkg in pkg_list] if pkg_list else None
+
+        callbacks, backend_args = self.make_callbacks('cabal list', result_convert=convert_to_cabal_packages, **backend_args)
+        return self.list_command('cabal list', {'packages': packages}, callbacks, **backend_args)
 
     def lint(self, files=None, contents=None, hlint=None, wait_complete=False, **backend_args):
         action = self.list_command if wait_complete else self.async_list_command
-        backend_args = self.convert_warnings(backend_args)
+        callbacks, backend_args = self.make_callbacks('lint', **backend_args)
+        callbacks.inject_result_convert(self.convert_warnings)
+
         return action('lint', {'files': self.files_and_contents(files, contents),
                                'hlint-opts': hlint or []},
-                      **backend_args)
+                      callbacks, **backend_args)
 
     def check(self, files=None, contents=None, ghc=None, wait_complete=False, **backend_args):
         action = self.list_command if wait_complete else self.async_list_command
+        callbacks, backend_args = self.make_callbacks('check', **backend_args)
         return action('check', {'files': self.files_and_contents(files, contents),
                                 'ghc-opts': ghc or []},
-                      **backend_args)
+                      callbacks, **backend_args)
 
     def check_lint(self, files=None, contents=None, ghc=None, hlint=None, wait_complete=False, **backend_args):
         action = self.list_command if wait_complete else self.async_list_command
-        backend_args = self.convert_warnings(backend_args)
+        callbacks, backend_args = self.make_callbacks('check-lint', **backend_args)
+        callbacks.inject_result_convert(self.convert_warnings)
         return action('check-lint', {'files': self.files_and_contents(files, contents),
                                      'ghc-opts': ghc or [],
                                      'hlint-opts': hlint or []},
-                      **backend_args)
+                      callbacks, **backend_args)
 
     def types(self, _projectname, file, _modulename, _line, _column, ghc_flags=None, contents=None, **backend_args):
+        callbacks, backend_args = self.make_callbacks('types', **backend_args)
         return self.list_command('types', {'files': self.files_and_contents(file, contents),
                                            'ghc-opts': ghc_flags or []},
-                                 **backend_args)
+                                 callbacks, **backend_args)
 
     def langs(self, _projectname, **backend_args):
-        return self.command('langs', {}, **backend_args)
+        callbacks, backend_args = self.make_callbacks('langs', **backend_args)
+        return self.command('langs', {}, callbacks, **backend_args)
 
     def flags(self, _projectname, **backend_args):
-        return self.command('flags', {}, **backend_args)
+        callbacks, backend_args = self.make_callbacks('flags', **backend_args)
+        return self.command('flags', {}, callbacks, **backend_args)
 
     def autofix_show(self, messages, wait_complete, **backend_args):
         action = self.list_command if wait_complete else self.async_list_command
-        return action('autofix show', {'messages': messages}, ResultParse.parse_corrections, **backend_args)
+        callbacks, backend_args = self.make_callbacks('autofix show', result_convert=ResultParse.parse_corrections,
+                                                      **backend_args)
+        return action('autofix show', {'messages': messages}, callbacks, **backend_args)
 
     def autofix_fix(self, messages, rest=None, pure=False, **backend_args):
+        callbacks, backend_args = self.make_callbacks('autofix fix', result_convert=ResultParse.parse_corrections,
+                                                      **backend_args)
         return self.list_command('autofix fix', {'messages': messages, 'rest': rest or [], 'pure': pure},
-                                 ResultParse.parse_corrections, **backend_args)
+                                 callbacks, **backend_args)
 
     def ghc_eval(self, exprs, file=None, source=None, **backend_args):
         the_file = None
         if file is not None:
             the_file = {'file': the_file, 'contents': source}
-        return self.list_command('ghc eval', {'exprs': exprs, 'file': the_file}, **backend_args)
+        callbacks, backend_args = self.make_callbacks('ghc eval', **backend_args)
+        return self.list_command('ghc eval', {'exprs': exprs, 'file': the_file}, callbacks, **backend_args)
 
     def exit(self):
-        return self.command('exit', {})
+        return self.command('exit', {}, self.make_callbacks('exit')[0])
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # Advanced features:
@@ -592,27 +615,12 @@ class HsDevBackend(Backend.HaskellBackend):
     # Utility functions:
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
-    def convert_warnings(self, args):
-        if 'on_response' in args:
-            def chain_resp(on_resp_fn):
-                def convert_resp(resp):
-                    return on_resp_fn(self.do_convert_warnings(resp))
-
-                return convert_resp
-
-            orig_func = args['on_response']
-            args['on_response'] = chain_resp(orig_func)
-        else:
-            args['on_response'] = self.do_convert_warnings
-
-        return args
-
-    def do_convert_warnings(self, resp):
-        for msg in resp:
+    def convert_warnings(self, messages):
+        for msg in messages:
             if msg.get('level', '') == 'warning':
                 msg['level'] = 'hint'
 
-        return resp
+        return messages
 
 
 class HsDevStartupReader(threading.Thread):

@@ -80,3 +80,18 @@ class BackendTextCommand(SublimeHaskellTextCommand):
         # Logging.log('BackendTextCommand.is_enabled: is_live_backend {0}, super {1}'.format(live, cmd_visible),
         #             Logging.LOG_DEBUG)
         return live and cmd_visible
+
+
+class HaskellSourceBackendTextCommand(BackendTextCommand):
+    '''Enable text commands only if the backend is alive and the source in the view is Haskell source.
+    '''
+
+    ## Uncomment if instance attributes added.
+    # def __init__(self, view):
+    #     super().__init__(view)
+
+    def is_enabled(self):
+        return Common.view_is_haskell_source(self.view) and super().is_enabled()
+
+    def is_visible(self):
+        return Common.view_is_haskell_source(self.view) and super().is_visible()
