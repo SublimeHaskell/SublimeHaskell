@@ -215,16 +215,16 @@ class SublimeHaskellSearch(CommandWin.BackendWindowCommand):
 
 
 # General goto command
-class SublimeHaskellGoTo(CommandWin.BackendWindowCommand):
-    def __init__(self, win):
-        super().__init__(win)
-        self.view = win.active_view()
+class SublimeHaskellGoTo(CommandWin.BackendTextCommand):
+    def __init__(self, view):
+        super().__init__(view)
+        self.view = view
         self.decls = []
         self.declarations = []
         self.current_filename = self.view.file_name()
         self.line, self.column = self.view.rowcol(self.view.sel()[0].a)
 
-    def run(self, **kwargs):
+    def run(self, edit, **kwargs):
         project = kwargs.get('project') or False
         decls = []
 
@@ -244,7 +244,7 @@ class SublimeHaskellGoTo(CommandWin.BackendWindowCommand):
         self.decls = decls[:]
 
         if decls:
-            self.window.show_quick_panel(self.declarations,
+            self.view.window().show_quick_panel(self.declarations,
                                          self.on_done, 0,
                                          self.closest_idx(decls),
                                          self.on_highlighted if not project else None)
@@ -268,7 +268,7 @@ class SublimeHaskellGoTo(CommandWin.BackendWindowCommand):
             self.open(self.decls[idx], True)
 
     def open(self, decl, transient=False):
-        self.window.open_file(decl.get_source_location(),
+        self.view.window().open_file(decl.get_source_location(),
                               sublime.ENCODED_POSITION | sublime.TRANSIENT if transient else sublime.ENCODED_POSITION)
 
 
@@ -456,6 +456,8 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
         self.candidates = None
         self.candidate_selected = None
         self.whois_name = None
+        self.line = None
+        self.column = None
 
     def run(self, _edit, **kwargs):
         filename = kwargs.get('filename')
@@ -464,12 +466,14 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
         name = kwargs.get('name')
         qname = kwargs.get('qname')
         no_browse = kwargs.get('no_browse') or False
+        line = kwargs.get('line')
+        column = kwargs.get('column')
 
         if qname:
             self.full_name = qname
             self.current_file_name = self.view.file_name()
             # Try whois it, followed by file symbol and wider module searches
-            self.candidates = self.collect_candidates(qname, name, filename, module_name, package_name)
+            self.candidates = self.collect_candidates(qname, name, filename, module_name, package_name, line=line, column=column)
         else:
             self.current_file_name = self.view.file_name()
 
@@ -533,19 +537,17 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
     def is_visible(self):
         return Common.view_is_haskell_source(self.view) or Common.view_is_haskell_repl(self.view)
 
-    def collect_candidates(self, qualified_name, unqualified_name, filename, module_name, package_name):
-        candidates = BackendManager.active_backend().whois(qualified_name, file=self.current_file_name)
+    def collect_candidates(self, qualified_name, unqualified_name, filename, module_name, package_name, line=None, column=None):
+        candidates = []
+        if line is not None and column is not None:
+            candidates = BackendManager.active_backend().whoat(line + 1, column + 1, file=self.current_file_name)
+        else:
+            candidates = BackendManager.active_backend().whois(qualified_name, file=self.current_file_name)
         if not candidates:
             if filename:
-                candidates = BackendManager.active_backend().symbol(lookup=unqualified_name, search_type='exact', file=filename)
+                candidates = BackendManager.active_backend().lookup(lookup=unqualified_name, file=self.current_file_name)
             else:
-                if module_name and package_name:
-                    candidates = BackendManager.active_backend().symbol(lookup=unqualified_name,
-                                                                        search_type='exact',
-                                                                        module=module_name,
-                                                                        package=package_name)
-                else:
-                    candidates = []
+                candidates = BackendManager.active_backend().symbol(lookup=unqualified_name, search_type='exact', module=module_name, package=package_name)
 
         return candidates
 
