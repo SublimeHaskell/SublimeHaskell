@@ -35,18 +35,14 @@ IMPORT_SYMBOL_RE = re.compile(r'import(\s+qualified)?\s+(?P<module>[A-Z][\w\d\']
 def is_enabled_haskell_command(view, must_be_project):
     '''Returns True if command for Haskell source can be invoked.
     '''
-    window, view = window_view_and_file(view)[0:2]
+    window, view, _file = window_view_and_file(view)
 
     if not window or not view:
         return False
 
-    # Note: file_show_in_view is the third element of the window_view_and_file() return tuple.
-    # if must_be_file and not file_shown_in_view:
-    #     return False
-
     view_settings = view.settings() or {}
     syntax_file_for_view = (view_settings.get('syntax') or '').lower()
-    return bool('haskell' in syntax_file_for_view and not must_be_project and get_cabal_project_dir_of_view(view))
+    return bool('haskell' in syntax_file_for_view and (not must_be_project or get_cabal_project_dir_of_view(view)))
 
 
 def window_view_and_file(view=None):
