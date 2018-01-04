@@ -1,6 +1,5 @@
 # -*- coding: UTF-8 -*-
 
-import pprint
 import threading
 
 import sublime
@@ -30,10 +29,6 @@ def messages_as_hints(cmd):
 
 
 class ChainRunner(object):
-    RUN_CHAIN_FLAG = threading.Event()
-    '''Event flag used to signal that a command chain has run to completion.
-    '''
-
     def __init__(self, view):
         super().__init__()
         self.view = view
@@ -48,33 +43,30 @@ class ChainRunner(object):
 
     def run_chain(self, cmds, msg, fly_mode=False):
         retval = False
-        try:
-            self.filename = self.view.file_name()
-            if self.filename:
-                self.msgs = []
-                self.corrections = []
-                self.fly_mode = fly_mode
-                self.contents = {}
-                if self.view.is_dirty():
-                    self.contents[self.filename] = self.view.substr(sublime.Region(0, self.view.size()))
-                if not self.fly_mode:
-                    ParseOutput.hide_output(self.view)
-                if cmds:
-                    ParseOutput.MARKER_MANAGER.clear_error_marks()
+        self.filename = self.view.file_name()
+        if self.filename:
+            self.msgs = []
+            self.corrections = []
+            self.fly_mode = fly_mode
+            self.contents = {}
+            if self.view.is_dirty():
+                self.contents[self.filename] = self.view.substr(sublime.Region(0, self.view.size()))
+            if not self.fly_mode:
+                ParseOutput.hide_output(self.view)
+            if cmds:
+                ParseOutput.MARKER_MANAGER.clear_error_marks()
 
-                    self.status_msg = Common.status_message_process(msg + ': ' + self.filename)
-                    self.status_msg.start()
-                    _, retval = self.go_chain(cmds)
-                    if retval:
-                        self.status_msg.result_ok()
-                    else:
-                        self.status_msg.result_fail()
+                self.status_msg = Common.status_message_process(msg + ': ' + self.filename)
+                self.status_msg.start()
+                _, retval = self.go_chain(cmds)
+                if retval:
+                    self.status_msg.result_ok()
                 else:
-                    sublime.error_message('Empty command chain (check_lint.run_chain)')
+                    self.status_msg.result_fail()
             else:
-                print('run_chain: no file name? {0}'.format(self.filename))
-        finally:
-            self.RUN_CHAIN_FLAG.set()
+                sublime.error_message('Empty command chain (check_lint.run_chain)')
+        else:
+            print('run_chain: no file name? {0}'.format(self.filename))
 
         return retval
 
@@ -103,16 +95,6 @@ class ChainRunner(object):
     def show_autofixes(self):
         corrections = BackendMgr.active_backend().autofix_show(self.msgs, True)
         ParseOutput.MARKER_MANAGER.mark_response(self.view, self.msgs, corrections, self.fly_mode)
-
-
-    @staticmethod
-    def reset_chain_flag():
-        ChainRunner.RUN_CHAIN_FLAG.clear()
-
-
-    @staticmethod
-    def run_chain_flag():
-        return ChainRunner.RUN_CHAIN_FLAG
 
 
 def exec_check(view, fly_mode=False):
