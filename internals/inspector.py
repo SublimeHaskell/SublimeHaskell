@@ -73,7 +73,7 @@ class Inspector(object):
                     print('do_inspection: dirty_paths: {0}'.format(dirty_paths))
 
                 scan_paths = dirty_paths[:]
-                dirty_paths = []
+                del dirty_paths[:]
 
             with self.dirty_files as dirty_files:
                 if Settings.COMPONENT_DEBUG.inspection:
@@ -92,14 +92,14 @@ class Inspector(object):
                 files = list(set(files))
 
                 file_contents = dict([(file, content) for file, content in dirty_files.items() if content])
-                dirty_files = {}
+                dirty_files.clear()
 
                 self.inspect(scan_paths, projects, files, file_contents)
 
             cand_cabals = []
             with self.cabal_to_load as cabals_to_load:
                 cand_cabals = cabals_to_load
-                cabals_to_load = []
+                del cabals_to_load[:]
 
             for cabal in cand_cabals:
                 Utils.run_async('inspect cabal {0}'.format(cabal), self.inspect_cabal, cabal)
