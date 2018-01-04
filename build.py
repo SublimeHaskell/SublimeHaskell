@@ -14,7 +14,6 @@ import SublimeHaskell.internals.backend_mgr as BackendMgr
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.output_collector as OutputCollector
 import SublimeHaskell.internals.proc_helper as ProcHelper
-import SublimeHaskell.internals.regexes as Regexes
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.parseoutput as ParseOutput
