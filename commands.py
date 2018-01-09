@@ -410,15 +410,15 @@ class SublimeHaskellInferDocs(CommandWin.BackendTextCommand):
     """
     Infer types and scan docs for current module
     """
-    def __init__(self, view, docs=True, infer=True):
+    def __init__(self, view):
         super().__init__(view)
         self.current_file_name = None
         self.status_msg = None
-        self.docs = docs
-        self.infer = infer
 
     def run(self, _edit, **kwargs):
         self.current_file_name = kwargs.get('filename') or self.view.file_name()
+        self.docs = kwargs.pop('docs', True)
+        self.infer = kwargs.pop('infer', True)
         self.scan_docs()
 
     def scan_docs(self):
