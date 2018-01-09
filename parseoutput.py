@@ -85,6 +85,9 @@ class OutputMessage(object):
         if self.correction and self.correction.corrector:
             self.correction.corrector.region.erase()
 
+    def updated(self):
+        self.update_region()
+        return self
 
 class MarkerManager(object):
     '''Convert and display errors, warnings and autofix/hint markers produced by the SublimeHaskell backend and build
@@ -285,7 +288,7 @@ class MarkerManager(object):
 
 
     def marks_for_view(self, view):
-        return sorted([mark for mark in self.error_marks if mark.view == view], key=lambda e: e.region)
+        return sorted([mark.updated() for mark in self.error_marks if mark.view == view], key=lambda e: e.region)
 
 
     def apply_autocorrect(self, view, rgn):
