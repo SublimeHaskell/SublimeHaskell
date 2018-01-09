@@ -405,43 +405,56 @@ class SublimeHaskellReinspectAll(CommandWin.BackendWindowCommand):
         with BackendManager.inspector() as insp:
             insp.start_inspect()
 
+
 class SublimeHaskellInferDocs(CommandWin.BackendTextCommand):
     """
     Infer types and scan docs for current module
     """
-    def __init__(self, view):
+    def __init__(self, view, docs=True, infer=True):
         super().__init__(view)
         self.current_file_name = None
         self.status_msg = None
+        self.docs = docs
+        self.infer = infer
 
     def run(self, _edit, **kwargs):
         self.current_file_name = kwargs.get('filename') or self.view.file_name()
+        self.scan_docs()
+
+    def scan_docs(self):
+        if not self.docs:
+            self.infer_types()
+
         self.status_msg = Common.status_message_process("Scanning docs for {0}".format(self.current_file_name), priority=3)
         self.status_msg.start()
 
-        def run_infer():
-            self.status_msg = Common.status_message_process("Inferring types for {0}".format(self.current_file_name),
-                                                            priority=3)
-            self.status_msg.start()
-
-            def infer_on_resp(_resp):
-                self.status_msg.result_ok()
-
-            def infer_on_err(_err, _details):
-                self.status_msg.result_fail()
-
-            BackendManager.active_backend().infer(files=[self.current_file_name], on_response=infer_on_resp,
-                                                  on_error=infer_on_err)
-
         def on_resp(_resp):
             self.status_msg.result_ok()
-            run_infer()
+            self.infer_types()
 
         def on_err(_err, _details):
             self.status_msg.result_fail()
-            run_infer()
+            self.infer_types()
 
         BackendManager.active_backend().docs(files=[self.current_file_name], on_response=on_resp, on_error=on_err)
+
+    def infer_types(self):
+        if not self.infer:
+            return
+
+        self.status_msg = Common.status_message_process("Inferring types for {0}".format(self.current_file_name),
+                                                        priority=3)
+        self.status_msg.start()
+
+        def infer_on_resp(_resp):
+            self.status_msg.result_ok()
+
+        def infer_on_err(_err, _details):
+            self.status_msg.result_fail()
+
+        BackendManager.active_backend().infer(files=[self.current_file_name], on_response=infer_on_resp,
+                                              on_error=infer_on_err)
+
 
 
 class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):

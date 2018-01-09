@@ -170,6 +170,16 @@
         "command": "sublime_haskell_infer_docs"
     },
     {
+        "caption": "SublimeHaskell: Scan docs in current view",
+        "command": "sublime_haskell_infer_docs",
+        "args": { "docs": true, "infer": false }
+    },
+    {
+        "caption": "SublimeHaskell: Infer types in current module",
+        "command": "sublime_haskell_infer_docs",
+        "args": { "docs": false, "infer": true }
+    },
+    {
         "caption": "SublimeHaskell: Go to next error",
         "command": "sublime_haskell_next_error"
     },

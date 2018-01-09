@@ -797,7 +797,7 @@ class Corrector(object):
 class Correction(object):
     def __init__(self, file, level, message, corrector, message_region=None):
         self.file = file
-        self.level = level
+        self.level = level or 'hint'
         self.message = message
         # source messages region, used to match corrector and outputmessage
         self.message_region = message_region
