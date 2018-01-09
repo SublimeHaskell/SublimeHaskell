@@ -134,7 +134,7 @@ class AutoCompleter(object):
                 print('preparing completions for {0} ({1})'.format(project_name, file_name))
 
             backend = BackendManager.active_backend()
-            comps = make_completions(backend.complete(Common.QualifiedSymbol(''), file_name, contents=contents))
+            comps = make_completions(backend.complete(Common.QualifiedSymbol(''), file_name))
             current_module = Utils.head_of(backend.module(project_name, file_name))
 
             if Settings.COMPONENT_DEBUG.completions:

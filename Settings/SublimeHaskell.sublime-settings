@@ -25,6 +25,9 @@
     // Enable auto lint on save (as hints when building)
     "enable_auto_lint": true,
 
+    // Enable infer types on save
+    "enable_infer_types": true,
+
     // Show only: Limit what compiler or backend messages get marked or displayed
     "show_only": {
         "errors": true,

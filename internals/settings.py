@@ -85,6 +85,7 @@ class SettingsContainer(object):
         self._enable_auto_build = False
         self._enable_auto_check = True
         self._enable_auto_lint = True
+        self._enable_infer_types = True
         self._enable_hdocs = False
         self._ghc_opts = []
         self._ghci_opts = []
@@ -130,6 +131,7 @@ class SettingsContainer(object):
     enable_auto_build = make_config_property('enable_auto_build')
     enable_auto_check = make_config_property('enable_auto_check')
     enable_auto_lint = make_config_property('enable_auto_lint')
+    enable_infer_types = make_config_property('enable_infer_types')
     enable_hdocs = make_config_property('enable_hdocs')
     ghc_opts = make_config_property('ghc_opts')
     ghci_opts = make_config_property('ghci_opts')
