@@ -9,7 +9,7 @@ import sublime
 
 import SublimeHaskell.internals.backend as Backend
 import SublimeHaskell.hsdev.backend as HsDev
-import SublimeHaskell.ghcimod.backend as GHCIMod
+import SublimeHaskell.ghcmod.backend as GHCMod
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.inspector as Inspector
@@ -22,7 +22,7 @@ class BackendManager(object, metaclass=Utils.Singleton):
     # Known backends and mapping to metadata
     BACKEND_META = {
         HsDev.HsDevBackend.backend_name(): HsDev.HsDevBackend,
-        GHCIMod.GHCModBackend.backend_name(): GHCIMod.GHCModBackend,
+        GHCMod.GHCModBackend.backend_name(): GHCMod.GHCModBackend,
         Backend.NullHaskellBackend.backend_name(): Backend.NullHaskellBackend
     }
     '''Backend name (*type* in the settings) to backend class mapping.'''

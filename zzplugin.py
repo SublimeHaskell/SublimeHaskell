@@ -5,7 +5,6 @@ import sublime
 import sublime_plugin
 
 import SublimeHaskell.autocomplete as Autocomplete
-import SublimeHaskell.check_lint as CheckAndLint
 import SublimeHaskell.info_popup as InfoPop
 import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.event_common as EventCommon
@@ -125,7 +124,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             return
 
         if Settings.COMPONENT_DEBUG.event_viewer:
-            print('{0} invoked.'.format(type(self).__name__ + ".on_new"))
+            print('{0}.on_new invoked.'.format(type(self).__name__))
 
         EventCommon.assoc_to_project(view, self.backend_mgr, filename)
         _project_dir, project_name = Common.locate_cabal_project_from_view(view)
@@ -140,7 +139,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             return
 
         if Settings.COMPONENT_DEBUG.event_viewer:
-            print('{0} {1}.'.format(type(self).__name__ + ".on_load", filename))
+            print('{0}.on_load {1}.'.format(type(self).__name__, filename))
 
         EventCommon.assoc_to_project(view, self.backend_mgr, filename)
         _project_dir, project_name = Common.locate_cabal_project_from_view(view)
@@ -168,36 +167,29 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             successful_build = True
             if Settings.PLUGIN.enable_auto_build:
                 view.window().run_command('sublime_haskell_build_auto')
-            elif Settings.PLUGIN.enable_auto_check and Settings.PLUGIN.enable_auto_lint:
-                successful_build = CheckAndLint.exec_check_and_lint(view)
-                Types.refresh_view_types(view)
-            elif Settings.PLUGIN.enable_auto_check:
-                successful_build = CheckAndLint.exec_check(view)
-                Types.refresh_view_types(view)
-            elif Settings.PLUGIN.enable_auto_lint:
-                successful_build = CheckAndLint.exec_lint(view)
+            else:
+                successful_build = EventCommon.do_check_lint(view)
+                if successful_build:
+                    Types.refresh_view_types(view)
 
             if Settings.COMPONENT_DEBUG.event_viewer:
                 print('{0}.on_post_save: successful_build {1}'.format(type(self).__name__, successful_build))
 
-            if successful_build:
-                if Settings.PLUGIN.prettify_on_save:
-                    if Settings.COMPONENT_DEBUG.event_viewer:
-                        print('{0}.build_and_prettify: prettify on save'.format(type(self).__name__))
-                    if Settings.PLUGIN.prettify_executable == 'stylish-haskell':
-                        view.run_command('sublime_haskell_stylish')
-                    elif Settings.PLUGIN.prettify_executable == 'hindent':
-                        view.run_command('sublime_haskell_hindent')
+            if successful_build and Settings.PLUGIN.prettify_on_save:
+                if Settings.COMPONENT_DEBUG.event_viewer:
+                    print('{0}.build_and_prettify: prettify on save'.format(type(self).__name__))
+                if Settings.PLUGIN.prettify_executable == 'stylish-haskell':
+                    view.run_command('sublime_haskell_stylish')
+                elif Settings.PLUGIN.prettify_executable == 'hindent':
+                    view.run_command('sublime_haskell_hindent')
 
-                Utils.run_async('rescan source', self.rescan_source, project_name, filename, False)
-        else:
-            Utils.run_async('rescan source {0}/{1}'.format(project_name, filename), self.rescan_source, project_name, filename,
-                            {'drop_all': False})
+        Utils.run_async('rescan source {0}/{1}'.format(project_name, filename), self.rescan_source, project_name,
+                        filename, False)
 
 
     def on_query_context(self, view, key, operator, operand, matchall):
         if Settings.COMPONENT_DEBUG.event_viewer:
-            print('{0} key = {1}.'.format(type(self).__name__ + '.on_query_context', key))
+            print('{0}.on_query_context key = {1}.'.format(type(self).__name__, key))
 
         dispatch = self.CONTEXT_DISPATCH.get(key)
         if dispatch:
@@ -212,7 +204,10 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             print('{0}.rescan_source: {1}/{2}'.format(type(self).__name__, project_name, filename))
         with self.backend_mgr:
             with self.backend_mgr.inspector() as insp:
-                insp.mark_file_dirty(filename)
+                if not filename.endswith('.cabal'):
+                    insp.mark_file_dirty(filename)
+                else:
+                    insp.mark_cabal_dirty(filename)
 
         EventCommon.update_completions_async(self.autocompleter, project_name, [filename], drop_all)
 
@@ -257,7 +252,7 @@ class HaskellSourceViewEventListener(sublime_plugin.ViewEventListener):
         filename = self.view.file_name()
         if filename:
             if Settings.COMPONENT_DEBUG.event_viewer:
-                print('{0} invoked.'.format(type(self).__name__ + ".on_activated"))
+                print('{0}.on_activated invoked.'.format(type(self).__name__))
             Utils.run_async('on_activated', self.activated_worker, self.view, filename)
 
 

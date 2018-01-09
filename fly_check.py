@@ -125,15 +125,7 @@ class FlyCheckViewEventListener(sublime_plugin.ViewEventListener):
 
     def do_fly(self, done_check):
         ## Do the flycheck...
-        successful_build = True
-        if Settings.PLUGIN.enable_auto_check and Settings.PLUGIN.enable_auto_lint:
-            successful_build = CheckAndLint.exec_check_and_lint(self.view)
-        elif Settings.PLUGIN.enable_auto_check:
-            successful_build = CheckAndLint.exec_check(self.view)
-        elif Settings.PLUGIN.enable_auto_lint:
-            CheckAndLint.exec_lint(self.view)
-            successful_build = False
-
+        successful_build = EventCommon.do_check_lint(self.view)
         if successful_build:
             Types.refresh_view_types(self.view)
             self.scan_contents()

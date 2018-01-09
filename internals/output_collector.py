@@ -111,7 +111,7 @@ class DescriptorDrain(threading.Thread):
             line = self.fobject.readline()
             if not isinstance(line, ''.__class__):
                 line = Utils.decode_bytes(line)
-            if line != '':
+            if line:
                 line = line.rstrip()
                 print('<{0}> {1}'.format(self.label, line))
             else:

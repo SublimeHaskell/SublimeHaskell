@@ -126,9 +126,15 @@ class Inspector(object):
 
     @use_inspect_modules
     def mark_file_dirty(self, filename, contents=None):
-        if filename is not None:
+        if filename:
             with self.dirty_files as dirty_files:
                 dirty_files[filename] = contents
+
+    @use_inspect_modules
+    def mark_cabal_dirty(self, cabal):
+        if cabal:
+            with self.cabal_to_load as cand_cabals:
+                cand_cabals.append(os.path.dirname(cabal))
 
     @use_inspect_modules
     def mark_cabal(self):

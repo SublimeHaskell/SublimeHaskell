@@ -96,7 +96,7 @@ class GHCModBackend(Backend.HaskellBackend):
         '''
         super().add_project_file(filename, project, project_dir)
 
-        # print('{0}.add_project_file: {1} {2} {3}'.format(type(self).__name__, filename, project, project_dir))
+        print('{0}.add_project_file: {1} {2} {3}'.format(type(self).__name__, filename, project, project_dir))
         if project not in self.project_backends:
             opt_args = self.get_ghc_opts_args(filename, add_package_db=True, cabal=project_dir)
             self.project_backends[project] = GHCModClient(project, project_dir, opt_args)
@@ -272,17 +272,17 @@ class GHCModBackend(Backend.HaskellBackend):
     def lint(self, files=None, contents=None, hlint=None, wait_complete=False, **backend_args):
         lint_cmd = ' '.join(['lint'] + (hlint or []))
         lint_output = self.translate_regex_output(lint_cmd, files, contents, GHC_LINT_REGEX, self.translate_lint)
-        return self.dispatch_callbacks(lint_output, None, **backend_args)
+        return self.dispatch_callbacks((lint_output, True), None, **backend_args)
 
     def check(self, files=None, contents=None, ghc=None, wait_complete=False, **backend_args):
         check_cmd = 'check '
         check_output = self.translate_regex_output(check_cmd, files, contents, GHC_CHECK_REGEX, self.translate_check)
-        return self.dispatch_callbacks(check_output, None, **backend_args)
+        return self.dispatch_callbacks((check_output, True), None, **backend_args)
 
     def check_lint(self, files=None, contents=None, ghc=None, hlint=None, wait_complete=False, **backend_args):
         '''ghc-mod cannot generate corrections to autofix. Returns an empty list.
         '''
-        return self.dispatch_callbacks([], None, **backend_args)
+        return self.dispatch_callbacks(([], True), None, **backend_args)
 
     def types(self, project_name, file, module_name, line, column, ghc_flags=None, contents=None, **backend_args):
         type_output = []
@@ -516,7 +516,7 @@ class GHCModBackend(Backend.HaskellBackend):
 
         modname, is_qualified, qualname = modinfo
         mod_imported = [symbols.Import(modname, is_qualified, qualname)]
-        syms, err = backend.command_backend('browse -d -o ' + modname) if backend is not None else []
+        syms, err = backend.command_backend('browse -d -o ' + modname) if backend is not None else ([], [])
 
         Logging.log('ghc-mod collect_completions: syms {0}'.format(syms), Logging.LOG_DEBUG)
         retval = []
