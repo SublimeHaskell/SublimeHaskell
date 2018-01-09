@@ -8,75 +8,66 @@ import SublimeHaskell.cmdwin_types as CommandWin
 import SublimeHaskell.internals.proc_helper as ProcHelper
 import SublimeHaskell.internals.settings as Settings
 
-class SublimeHaskellFilterCommand(CommandWin.SublimeHaskellTextCommand):
-    '''Utility class to run prettyfier commands, for example, 'stylish-haskell' and 'hindent'. Error/diagnostic
-    output is sent to the Haskell Run Output window.'''
-    OUTPUT_PANEL_NAME = 'haskell_run_output'
+FILTER_OUTPUT_PANEL_NAME = 'haskell_run_output'
 
-    def __init__(self, view, indenter=None, indenter_options=None):
-        super().__init__(view)
-        if indenter:
-            if not isinstance(indenter, list):
-                indenter = list(indenter)
-            indenter.extend(indenter_options or [])
-        self.indenter = indenter
+def do_prettify(view, edit, indenter, indenter_options):
+    try:
+        window = view.window()
+        window.run_command('hide_panel', {'panel': 'output.' + FILTER_OUTPUT_PANEL_NAME})
+        regions = []
+        for region in view.sel():
+            regions.append(sublime.Region(region.a, region.b))
+            selection = region if not region.empty() else sublime.Region(0, view.size())
 
-    def run(self, edit, **_kwargs):
-        try:
-            window = self.view.window()
-            window.run_command('hide_panel', {'panel': 'output.' + SublimeHaskellFilterCommand.OUTPUT_PANEL_NAME})
-            regions = []
-            for region in self.view.sel():
-                regions.append(sublime.Region(region.a, region.b))
-                if region.empty():
-                    selection = sublime.Region(0, self.view.size())
-                else:
-                    selection = region
+            # Newline conversion seems dubious here, but... leave it alone for the time being.
+            sel_str = view.substr(selection).replace('\r\n', '\n')
 
-                # Newline conversion seems dubious here, but... leave it alone for the time being.
-                sel_str = self.view.substr(selection).replace('\r\n', '\n')
-
-                with ProcHelper.ProcHelper(self.indenter) as proc:
-                    if proc.process is not None:
-                        _, out, err = proc.wait(sel_str)
-                        # stylish-haskell does not have a non-zero exit code if it errors out! (Surprise!)
-                        # Not sure about hindent, but this seems like a safe enough test.
-                        #
-                        # Also test if the contents actually changed so break the save-indent-save-indent-... loop if
-                        # the user enabled prettify_on_save.
-                        if not err:
-                            if out not in [selection, sel_str]:
-                                self.view.replace(edit, selection, out)
-                        else:
-                            indent_err = ' '.join(self.indenter)
-                            stderr_out = '\n'.join(["{0} failed, stderr contents:".format(indent_err), "-" * 40, ""]) + err
-                            self.report_error(stderr_out)
+            with ProcHelper.ProcHelper(indenter + indenter_options) as proc:
+                if proc.process is not None:
+                    _, out, err = proc.wait(sel_str)
+                    # stylish-haskell does not have a non-zero exit code if it errors out! (Surprise!)
+                    # Not sure about hindent, but this seems like a safe enough test.
+                    #
+                    # Also test if the contents actually changed so break the save-indent-save-indent-... loop if
+                    # the user enabled prettify_on_save.
+                    if not err:
+                        if out not in [selection, sel_str]:
+                            view.replace(edit, selection, out)
                     else:
-                        self.report_error(proc.process_err)
+                        indent_err = ' '.join(indenter)
+                        stderr_out = '\n'.join(["{0} failed, stderr contents:".format(indent_err), "-" * 40, ""]) + err
+                        report_error(view, stderr_out)
+                else:
+                    report_error(view, proc.process_err)
 
 
-            # Questionable whether regions should be re-activated: stylish-haskell usually adds whitespace, which makes
-            # the selection nonsensical.
-            self.view.sel().clear()
-            for region in regions:
-                self.view.sel().add(region)
+        view.sel().clear()
+        # Questionable whether regions should be re-activated: stylish-haskell usually adds whitespace, which makes
+        # the selection nonsensical.
+        #
+        # However, there are other plugins that get fired after SublimeHaskell that don't like it when you kill all of the
+        # selection regions from underneath their feet.
+        for region in regions:
+            view.sel().add(region)
 
-        except OSError:
-            self.report_error('Exception executing {0}'.format(' '.join(self.indenter)))
-            traceback.print_exc()
+    except OSError:
+        report_error(view, 'Exception executing {0}'.format(' '.join(indenter)))
+        traceback.print_exc()
 
-    def report_error(self, errmsg):
-        window = self.view.window()
-        output_view = window.get_output_panel(SublimeHaskellFilterCommand.OUTPUT_PANEL_NAME)
-        output_view.run_command('sublime_haskell_output_text', {'text': errmsg, 'clear': 'yes'})
-        output_view.sel().clear()
-        output_view.sel().add(sublime.Region(0, 0))
-        window.run_command('show_panel', {'panel': ('output.' + SublimeHaskellFilterCommand.OUTPUT_PANEL_NAME)})
+def report_error(view, errmsg):
+    window = view.window()
+    output_view = window.get_output_panel(FILTER_OUTPUT_PANEL_NAME)
+    output_view.run_command('sublime_haskell_output_text', {'text': errmsg, 'clear': 'yes'})
+    window.run_command('show_panel', {'panel': ('output.' + FILTER_OUTPUT_PANEL_NAME)})
+    output_view.sel().clear()
+    output_view.sel().add(sublime.Region(0, 0))
 
-class SublimeHaskellStylish(SublimeHaskellFilterCommand):
-    def __init__(self, view):
-        super().__init__(view, indenter=['stylish-haskell'], indenter_options=Settings.PLUGIN.stylish_options)
+class SublimeHaskellStylish(CommandWin.SublimeHaskellTextCommand):
+    def run(self, edit, **_kwargs):
+        stylish_options = Settings.get_project_setting(self.view, 'stylish_options', Settings.PLUGIN.stylish_options)
+        do_prettify(self.view, edit, ['stylish-haskell'], stylish_options)
 
-class SublimeHaskellHindent(SublimeHaskellFilterCommand):
-    def __init__(self, view):
-        super().__init__(view, indenter=['hindent'], indenter_options=Settings.PLUGIN.hindent_options)
+class SublimeHaskellHindent(CommandWin.SublimeHaskellTextCommand):
+    def run(self, edit, **_kwargs):
+        hindent_options = Settings.get_project_setting(self.view, 'hindent_options', Settings.PLUGIN.hindent_options)
+        do_prettify(self.view, edit, ['hindent'], hindent_options)

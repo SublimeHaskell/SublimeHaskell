@@ -24,7 +24,6 @@ class ScanStatus(object):
             statuses.append(smsg)
         smsg = ' / '.join(statuses)
         self.status_message.change_message('Inspecting {0}'.format(smsg))
-        Logging.log("inspector: " + smsg, Logging.LOG_DEBUG)
 
 
 def use_inspect_modules(inspect_fn):
@@ -33,7 +32,7 @@ def use_inspect_modules(inspect_fn):
     return wrapped
 
 
-# You know, Barn... it's very tempting to name this "InspectorFish" (if you grew up with "Barney Miller." :-)
+# You know, Bawwwn... it's very tempting to name this "InspectorFish" (if you grew up with "Barney Miller." :-)
 class Inspector(object):
     '''The source inspector.
     '''
@@ -53,9 +52,12 @@ class Inspector(object):
         return self
 
     def __exit__(self, exc_type, _exc_val, _exc_tb):
+        if Settings.COMPONENT_DEBUG.inspection:
+            print('{0}.__exit__: exc {1}'.format(type(self).__name__, exc_type))
         if exc_type is None:
             self.do_inspection()
-        # Propagate the exception
+
+        # Propagate the exception, if we have one.
         return False
 
 
@@ -72,35 +74,39 @@ class Inspector(object):
                 self.inspect_cabal('cabal')
 
             with self.dirty_paths as dirty_paths:
+                if Settings.COMPONENT_DEBUG.inspection:
+                    print('do_inspection: dirty_paths: {0}'.format(dirty_paths))
+
                 scan_paths = dirty_paths[:]
-                dirty_paths = []
+                del dirty_paths[:]
 
             with self.dirty_files as dirty_files:
-                files_to_reinspect = dirty_files.keys()
+                if Settings.COMPONENT_DEBUG.inspection:
+                    print('do_inspection: dirty_files: {0}'.format(dirty_files))
 
                 projects = []
                 files = []
-                for finspect in files_to_reinspect or []:
+                for finspect in dirty_files.keys() or []:
                     projdir = Common.get_cabal_project_dir_of_file(finspect)
                     if projdir is not None:
                         projects.append(projdir)
-                    else:
-                        files.append(finspect)
+
+                    files.append(finspect)
 
                 projects = list(set(projects))
                 files = list(set(files))
 
                 file_contents = dict([(file, content) for file, content in dirty_files.items() if content])
-                dirty_files = {}
+                dirty_files.clear()
 
                 self.inspect(scan_paths, projects, files, file_contents)
 
-            load_cabal = []
-            with self.cabal_to_load as cabal_to_load:
-                load_cabal = cabal_to_load[:]
-                cabal_to_load[:] = []
+            cand_cabals = []
+            with self.cabal_to_load as cabals_to_load:
+                cand_cabals = cabals_to_load
+                del cabals_to_load[:]
 
-            for cabal in load_cabal:
+            for cabal in cand_cabals:
                 Utils.run_async('inspect cabal {0}'.format(cabal), self.inspect_cabal, cabal)
 
             if files_to_reinspect and Settings.PLUGIN.enable_hdocs:
@@ -125,9 +131,15 @@ class Inspector(object):
 
     @use_inspect_modules
     def mark_file_dirty(self, filename, contents=None):
-        if filename is not None:
+        if filename:
             with self.dirty_files as dirty_files:
                 dirty_files[filename] = contents
+
+    @use_inspect_modules
+    def mark_cabal_dirty(self, cabal):
+        if cabal:
+            with self.cabal_to_load as cand_cabals:
+                cand_cabals.append(os.path.dirname(cabal))
 
     @use_inspect_modules
     def mark_cabal(self):
@@ -164,6 +176,12 @@ class Inspector(object):
     @use_inspect_modules
     def inspect(self, paths, projects, files, contents):
         if paths or projects or files:
+            if Settings.COMPONENT_DEBUG.inspection:
+                print('{0}.inspect:'.format(type(self).__name__))
+                print('  :: paths: {0}'.format(paths))
+                print('  :: projects: {0}'.format(projects))
+                print('  :: files: {0}'.format(files))
+
             with Common.status_message_process('Inspecting', priority=1) as smgr:
                 self.backend.scan(paths=paths,
                                   projects=projects,
@@ -174,7 +192,7 @@ class Inspector(object):
                                   timeout=None,
                                   ghc=Settings.PLUGIN.ghc_opts,
                                   docs=Settings.PLUGIN.enable_hdocs)
-            smgr.result_ok()
+                smgr.result_ok()
 
     @use_inspect_modules
     def inspect_path(self, path):

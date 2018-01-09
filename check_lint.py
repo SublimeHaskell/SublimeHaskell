@@ -7,7 +7,6 @@ import sublime
 import SublimeHaskell.cmdwin_types as CommandWin
 import SublimeHaskell.internals.backend_mgr as BackendMgr
 import SublimeHaskell.internals.settings as Settings
-import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.parseoutput as ParseOutput
 import SublimeHaskell.sublime_haskell_common as Common
 
@@ -29,13 +28,10 @@ def messages_as_hints(cmd):
     return (cmd[0], cmd[1], lambda ms: [dict(m, level='hint') for m in ms], cmd[3])
 
 
-class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
-    RUN_CHAIN_FLAG = threading.Event()
-    '''Event flag used to signal that a command chain has run to completion.
-    '''
-
+class ChainRunner(object):
     def __init__(self, view):
-        super().__init__(view)
+        super().__init__()
+        self.view = view
         self.contents = {}
         self.corrections = []
         self.corrections_dict = {}
@@ -45,112 +41,98 @@ class SublimeHaskellHsDevChain(CommandWin.BackendTextCommand):
         self.status_msg = None
 
 
-    def run(self, edit, **_args):
-        print('SublimeHaskellHsDevChain.run??')
-        raise NotImplementedError("SublimeHaskellDevChain.run needs an implementation.")
-
-
     def run_chain(self, cmds, msg, fly_mode=False):
-        try:
-            self.filename = self.view.file_name()
-            if self.filename:
-                self.msgs = []
-                self.corrections = []
-                self.fly_mode = fly_mode
-                self.contents = {}
-                if self.view.is_dirty():
-                    self.contents[self.filename] = self.view.substr(sublime.Region(0, self.view.size()))
-                if not self.fly_mode:
-                    ParseOutput.hide_output(self.view)
-                if cmds:
-                    self.status_msg = Common.status_message_process(msg + ': ' + self.filename)
-                    self.status_msg.start()
-                    ParseOutput.MARKER_MANAGER.clear_error_marks()
-                    self.go_chain(cmds)
+        retval = False
+        self.filename = self.view.file_name()
+        if self.filename:
+            self.msgs = []
+            self.corrections = []
+            self.fly_mode = fly_mode
+            self.contents = {}
+            if self.view.is_dirty():
+                self.contents[self.filename] = self.view.substr(sublime.Region(0, self.view.size()))
+            if not self.fly_mode:
+                ParseOutput.hide_output(self.view)
+            if cmds:
+                ParseOutput.MARKER_MANAGER.clear_error_marks()
+
+                self.status_msg = Common.status_message_process(msg + ': ' + self.filename)
+                self.status_msg.start()
+                _, retval = self.go_chain(cmds)
+                if retval:
+                    self.status_msg.result_ok()
                 else:
-                    sublime.error_message('Empty command chain (check_lint.run_chain)')
+                    self.status_msg.result_fail()
             else:
-                print('run_chain: no file name? {0}'.format(self.filename))
-        finally:
-            self.RUN_CHAIN_FLAG.set()
+                sublime.error_message('Empty command chain (check_lint.run_chain)')
+        else:
+            print('run_chain: no file name? {0}'.format(self.filename))
+
+        return retval
 
 
     def go_chain(self, cmds):
-        if cmds:
-            cmd, tail_cmds = cmds[0], cmds[1:]
-            agent_func, modify_args, kwargs = cmd
+        retval = ([], True)
 
-            def go_chain_resp(msgs):
-                self.msgs.extend(msgs)
-                self.go_chain(tail_cmds)
+        while cmds and retval[1]:
+            agent_func, modify_args, kwargs = cmds[0]
+            retval = agent_func(modify_args(self.filename), contents=self.contents, wait_complete=True,
+                                result_convert=self.chain_result, on_error=self.chain_error, **kwargs)
+            resp, status = retval
+            if status:
+                self.msgs.extend(resp)
+                cmds = cmds[1:]
 
-            def go_chain_err(_err, _details):
-                self.status_msg.result_fail()
-                self.go_chain([])
+        return retval
 
-            agent_func(modify_args(self.filename), contents=self.contents, wait_complete=False,
-                       on_response=go_chain_resp, on_error=go_chain_err, **kwargs)
-        else:
-            self.status_msg.result_ok()
-            BackendMgr.active_backend().autofix_show(self.msgs, False, on_response=self.on_autofix)
+    def chain_error(self, _exc, _details):
+        return ([], False)
+
+    def chain_result(self, resp):
+        return (resp, True)
 
 
-    def on_autofix(self, corrections):
+    def show_autofixes(self):
+        corrections = BackendMgr.active_backend().autofix_show(self.msgs, True)
         ParseOutput.MARKER_MANAGER.mark_response(self.view, self.msgs, corrections, self.fly_mode)
 
-    def is_enabled(self):
-        return Common.view_is_haskell_source(None) and super().is_enabled()
+
+def exec_check(view, fly_mode=False):
+    chain_runner = ChainRunner(view)
+    successful = chain_runner.run_chain([hsdev_check()], 'Checking', fly_mode=fly_mode)
+    chain_runner.show_autofixes()
+    return successful
 
 
-    @staticmethod
-    def reset_chain_flag():
-        SublimeHaskellHsDevChain.RUN_CHAIN_FLAG.clear()
-
-
-    @staticmethod
-    def run_chain_flag():
-        return SublimeHaskellHsDevChain.RUN_CHAIN_FLAG
-
-
-class SublimeHaskellCheck(SublimeHaskellHsDevChain):
-    ## Uncomment if instance variables are needed.
-    # def __init__(self, view):
-    #     super().__init__(view)
-
-    def run(self, _edit, **kwargs):
-        Utils.run_async('SublimeHaskellCheck', self.run_chain, [hsdev_check()], 'Checking', fly_mode=kwargs.get('fly', False))
-
-
-def exec_check_process(view, fly=False):
-    return SublimeHaskellCheck(view).run(None, fly=fly)
-
-
-class SublimeHaskellLint(SublimeHaskellHsDevChain):
-    ## Uncomment if instance variables are needed.
-    # def __init__(self, view):
-    #     super().__init__(view)
-
-    def run(self, _edit, **kwargs):
-        Utils.run_async('SublimeHaskellLint', self.run_chain, [hsdev_lint()], 'Linting', fly_mode=kwargs.get('fly', False))
-
-
-def exec_lint_process(view, fly=False):
+def exec_lint(view, fly_mode=False,):
     '''Utility function to unconditionally execute `SublimeHaskellLint.run()` without worrying about the command's status.
     '''
-    return SublimeHaskellLint(view).run(None, fly=fly)
+    chain_runner = ChainRunner(view)
+    successful = chain_runner.run_chain([hsdev_lint()], 'Linting', fly_mode=fly_mode)
+    chain_runner.show_autofixes()
+    return successful
 
 
-class SublimeHaskellCheckAndLint(SublimeHaskellHsDevChain):
-    ## Uncomment if instance variables are needed.
-    # def __init__(self, view):
-    #     super().__init__(view)
-
-    def run(self, _edit, **kwargs):
-        Utils.run_async('SublimeHaskellCheckAndLint', self.run_chain, [hsdev_check(), hsdev_lint()], 'Checking and Linting',
-                        fly_mode=kwargs.get('fly', False))
-
-def exec_check_and_lint_process(view, fly=False):
+def exec_check_and_lint(view, fly_mode=False,):
     '''Utility function to unconditionally execute 'SublimeHaskellCHeckAndLint.run()' without worrying
     about the command's status.
     '''
-    return SublimeHaskellCheckAndLint(view).run(None, fly=fly)
+    chain_runner = ChainRunner(view)
+    successful = chain_runner.run_chain([hsdev_check(), hsdev_lint()], 'Checking and Linting', fly_mode=fly_mode)
+    chain_runner.show_autofixes()
+    return successful
+
+
+class SublimeHaskellCheck(CommandWin.HaskellSourceBackendTextCommand):
+    def run(self, _edit, **kwargs):
+        exec_check(self.view, fly_mode=kwargs.get('fly', False))
+
+
+class SublimeHaskellLint(CommandWin.BackendTextCommand):
+    def run(self, _edit, **kwargs):
+        exec_lint(self.view, fly_mode=kwargs.get('fly', False))
+
+
+class SublimeHaskellCheckAndLint(CommandWin.BackendTextCommand):
+    def run(self, _edit, **kwargs):
+        exec_check_and_lint(self.view, fly_mode=kwargs.get('fly', False))

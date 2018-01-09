@@ -329,6 +329,7 @@ class ComponentDebug(object):
         self.completions = False
         self.event_viewer = False
         self.fly_mode = False
+        self.inspection = False
         self.recv_messages = False
         self.send_messages = False
         self.socket_pool = False
@@ -339,6 +340,7 @@ class ComponentDebug(object):
         self.completions = 'completions' in backend_settings
         self.event_viewer = 'event_viewer' in backend_settings
         self.fly_mode = 'fly_mode' in backend_settings
+        self.inspection = 'inspection' in backend_settings
         self.recv_messages = 'recv_messages' in backend_settings
         self.send_messages = 'send_messages' in backend_settings
         self.socket_pool = 'socket_pool' in backend_settings

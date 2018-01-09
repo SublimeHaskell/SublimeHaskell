@@ -101,7 +101,7 @@ class AutoCompleter(object):
     def keyword_completions(self, query):
         return [(k + '\tkeyword', k) for k in self.keywords if k.startswith(query)] if isinstance(query, ''.__class__) else []
 
-    def generate_completions_cache(self, project_name, file_name):
+    def generate_completions_cache(self, project_name, file_name, contents=None):
         def log_result(result):
             retval = result or []
             if Settings.COMPONENT_DEBUG.completions:
@@ -133,8 +133,9 @@ class AutoCompleter(object):
             if Settings.COMPONENT_DEBUG.completions:
                 print('preparing completions for {0} ({1})'.format(project_name, file_name))
 
-            comps = make_completions(BackendManager.active_backend().complete(Common.QualifiedSymbol(''), file_name))
-            current_module = Utils.head_of(BackendManager.active_backend().module(project_name, file_name))
+            backend = BackendManager.active_backend()
+            comps = make_completions(backend.complete(Common.QualifiedSymbol(''), file_name, contents=contents))
+            current_module = Utils.head_of(backend.module(project_name, file_name))
 
             if Settings.COMPONENT_DEBUG.completions:
                 print('current_module {0}'.format(current_module))

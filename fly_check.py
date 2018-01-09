@@ -4,14 +4,16 @@ import time
 import sublime
 import sublime_plugin
 
-import SublimeHaskell.check_lint as CheckLint
+import SublimeHaskell.autocomplete as Autocomplete
+import SublimeHaskell.check_lint as CheckAndLint
 import SublimeHaskell.event_common as EventCommon
 import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.types as Types
 
-
-class FlyCheckViewEventListener(EventCommon.SublimeHaskellEventCommon, sublime_plugin.ViewEventListener):
+class FlyCheckViewEventListener(sublime_plugin.ViewEventListener):
     '''The heart of fly-check support. As a view event listener, there will be an instance of this view listener
     attached to each Haskell source view.
     '''
@@ -28,6 +30,7 @@ class FlyCheckViewEventListener(EventCommon.SublimeHaskellEventCommon, sublime_p
 
     def __init__(self, view):
         super().__init__(view)
+        self.autocompleter = Autocomplete.AutoCompleter()
         self.fly_lock = threading.RLock()
         self.fly_check_loop = threading.Event()
         self.fly_check_flag = threading.Event()
@@ -89,46 +92,43 @@ class FlyCheckViewEventListener(EventCommon.SublimeHaskellEventCommon, sublime_p
                     print('fly: delta_t = {0}'.format(delta_t))
 
                 if delta_t <= 0:
-                    ## Do the flycheck...
-                    auto_check_enabled = Settings.PLUGIN.enable_auto_check
-                    auto_lint_enabled = Settings.PLUGIN.enable_auto_lint
-                    sublime.set_timeout(lambda: self.scan_contents(self.view), 0)
-
-                    if auto_check_enabled and auto_lint_enabled:
-                        check_cmd = 'sublime_haskell_check_and_lint'
-                    elif auto_check_enabled:
-                        check_cmd = 'sublime_haskell_check'
-                    elif auto_lint_enabled:
-                        check_cmd = 'sublime_haskell_lint'
-                    else:
-                        check_cmd = None
-
-                    if Settings.COMPONENT_DEBUG.fly_mode:
-                        print('fly: executing {0}'.format(check_cmd))
-
-                    if check_cmd:
-                        CheckLint.SublimeHaskellHsDevChain.reset_chain_flag()
-                        self.view.run_command(check_cmd, {'fly': True})
-                        if Settings.COMPONENT_DEBUG.fly_mode:
-                            print('fly: awaiting command completion')
-                        CheckLint.SublimeHaskellHsDevChain.run_chain_flag().wait()
-
+                    done_check = threading.Event()
+                    done_check.clear()
+                    Utils.run_async('fly-check', self.do_fly, done_check)
+                    done_check.wait()
                     delta_t = None
 
                 self.fly_check_flag.clear()
 
-    def scan_contents(self, view):
-        current_file_name = view.file_name()
-        view_contents = {current_file_name: view.substr(sublime.Region(0, view.size()))}
+    def scan_contents(self):
+        current_file_name = self.view.file_name()
+        view_contents = {current_file_name: self.view.substr(sublime.Region(0, self.view.size()))}
 
         status_msg = Common.status_message_process("Scanning {0}".format(current_file_name))
         status_msg.start()
 
         def scan_resp(_resp):
             status_msg.result_ok()
-            self.update_completions_async([current_file_name])
+            return True
 
         def scan_err(_err, _details):
             status_msg.result_fail()
+            return False
 
-        BackendManager.active_backend().scan(contents=view_contents, on_response=scan_resp, on_error=scan_err)
+        good_scan = BackendManager.active_backend().scan(files=[current_file_name], contents=view_contents,
+                                                         on_response=scan_resp, on_error=scan_err)
+        if good_scan:
+            _project_dir, project_name = Common.locate_cabal_project_from_view(self.view)
+            self.autocompleter.drop_completions_async(current_file_name)
+            self.autocompleter.generate_completions_cache(project_name, current_file_name, contents=view_contents)
+
+
+    def do_fly(self, done_check):
+        ## Do the flycheck...
+        successful_build = EventCommon.do_check_lint(self.view)
+        if successful_build:
+            Types.refresh_view_types(self.view)
+            self.scan_contents()
+
+        if done_check:
+            done_check.set()

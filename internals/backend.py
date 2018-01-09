@@ -435,13 +435,13 @@ class NullHaskellBackend(HaskellBackend):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def lint(self, files=None, contents=None, hlint=None, wait_complete=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
+        return self.dispatch_callbacks(([], True), None, **backend_args)
 
     def check(self, files=None, contents=None, ghc=None, wait_complete=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
+        return self.dispatch_callbacks(([], True), None, **backend_args)
 
     def check_lint(self, files=None, contents=None, ghc=None, hlint=None, wait_complete=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
+        return self.dispatch_callbacks(([], True), None, **backend_args)
 
     def types(self, project_name, file, module_name, line, column, ghc_flags=None, contents=None, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
