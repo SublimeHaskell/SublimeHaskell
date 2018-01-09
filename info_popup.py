@@ -107,6 +107,7 @@ class SublimeHaskellHoverPopup(object):
         self.point = point
         self.hover_zone = hover_zone
         self.line = view.rowcol(point)[0]
+        self.shown = False
 
 
     def do_hover(self):
@@ -159,6 +160,7 @@ class SublimeHaskellHoverPopup(object):
                     if err.correction is not None:
                         popup_parts.append(err.correction.popup())
                 popup_text = u''.join(popup_parts)
+                self.shown = True
                 self.view.show_popup(popup_text, sublime.HIDE_ON_MOUSE_MOVE_AWAY, self.point, 600, 600,
                                      self.on_navigate, self.on_hide)
 
@@ -176,7 +178,8 @@ class SublimeHaskellHoverPopup(object):
                 popup_parts.append(decl.popup(popup_msg))
 
             popup_text = u''.join(popup_parts)
-            if not self.view.is_popup_visible():
+            if not self.shown:
+                self.shown = True
                 self.view.show_popup(popup_text, sublime.HIDE_ON_MOUSE_MOVE_AWAY, self.point, 600, 600,
                                      self.on_navigate, self.on_hide)
             else:
@@ -206,4 +209,4 @@ class SublimeHaskellHoverPopup(object):
                 self.view.window().open_file(url, sublime.ENCODED_POSITION | sublime.TRANSIENT)
 
     def on_hide(self):
-        pass
+        self.shown = False
