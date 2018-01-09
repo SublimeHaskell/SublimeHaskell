@@ -172,9 +172,11 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             if Settings.PLUGIN.enable_auto_build:
                 view.window().run_command('sublime_haskell_build_auto')
             else:
-                successful_build = EventCommon.do_check_lint(view)
-                if successful_build:
-                    Types.refresh_view_types(view)
+                def on_done(successful_build):
+                    if successful_build:
+                        sublime.set_timeout(lambda: Types.refresh_view_types(view), 0)
+
+                EventCommon.do_check_lint(view)
 
             if Settings.PLUGIN.enable_infer_types:
                 BackendManager.active_backend().infer(files=[filename])

@@ -29,7 +29,7 @@ def messages_as_hints(cmd):
 
 
 class ChainRunner(object):
-    def __init__(self, view):
+    def __init__(self, view, on_done=None):
         super().__init__()
         self.view = view
         self.contents = {}
@@ -39,10 +39,10 @@ class ChainRunner(object):
         self.fly_mode = False
         self.msgs = []
         self.status_msg = None
+        self.on_done_callback = on_done
 
 
     def run_chain(self, cmds, msg, fly_mode=False):
-        retval = False
         self.filename = self.view.file_name()
         if self.filename:
             self.msgs = []
@@ -58,69 +58,68 @@ class ChainRunner(object):
 
                 self.status_msg = Common.status_message_process(msg + ': ' + self.filename)
                 self.status_msg.start()
-                _, retval = self.go_chain(cmds)
-                if retval:
-                    self.status_msg.result_ok()
-                else:
-                    self.status_msg.result_fail()
+                self.go_chain(cmds)
             else:
                 sublime.error_message('Empty command chain (check_lint.run_chain)')
         else:
             print('run_chain: no file name? {0}'.format(self.filename))
 
-        return retval
-
 
     def go_chain(self, cmds):
-        retval = ([], True)
+        if not cmds:
+            self.on_done()
+        else:
+            def on_error(_exc, _details):
+                self.on_error()
 
-        while cmds and retval[1]:
-            agent_func, modify_args, kwargs = cmds[0]
-            retval = agent_func(modify_args(self.filename), contents=self.contents, wait_complete=True,
-                                result_convert=self.chain_result, on_error=self.chain_error, **kwargs)
-            resp, status = retval
-            if status:
+            def on_response(resp):
                 self.msgs.extend(resp)
-                cmds = cmds[1:]
+                self.go_chain(cmds)
 
-        return retval
+            agent_func, modify_args, kwargs = cmds.pop(0)
+            agent_func(
+                modify_args(self.filename),
+                contents=self.contents,
+                wait_complete=False,
+                on_error=on_error,
+                on_response=on_response,
+                **kwargs
+            )
 
-    def chain_error(self, _exc, _details):
-        return ([], False)
+    def on_error(self):
+        self.status_msg.result_fail()
+        if self.on_done_callback:
+            self.on_done_callback(False)
 
-    def chain_result(self, resp):
-        return (resp, True)
-
+    def on_done(self):
+        self.status_msg.result_ok()
+        if self.on_done_callback:
+            self.on_done_callback(True)
+        sublime.set_timeout(self.show_autofixes, 0)
 
     def show_autofixes(self):
         corrections = BackendMgr.active_backend().autofix_show(self.msgs, True)
         ParseOutput.MARKER_MANAGER.mark_response(self.view, self.msgs, corrections, self.fly_mode)
 
 
-def exec_check(view, fly_mode=False):
-    chain_runner = ChainRunner(view)
-    successful = chain_runner.run_chain([hsdev_check()], 'Checking', fly_mode=fly_mode)
-    chain_runner.show_autofixes()
-    return successful
+def exec_check(view, fly_mode=False, on_done=None):
+    chain_runner = ChainRunner(view, on_done=on_done)
+    chain_runner.run_chain([hsdev_check()], 'Checking', fly_mode=fly_mode)
 
 
-def exec_lint(view, fly_mode=False,):
+def exec_lint(view, fly_mode=False, on_done=None):
     '''Utility function to unconditionally execute `SublimeHaskellLint.run()` without worrying about the command's status.
     '''
-    chain_runner = ChainRunner(view)
-    successful = chain_runner.run_chain([hsdev_lint()], 'Linting', fly_mode=fly_mode)
-    chain_runner.show_autofixes()
-    return successful
+    chain_runner = ChainRunner(view, on_done=on_done)
+    chain_runner.run_chain([hsdev_lint()], 'Linting', fly_mode=fly_mode)
 
 
-def exec_check_and_lint(view, fly_mode=False,):
+def exec_check_and_lint(view, fly_mode=False, on_done=None):
     '''Utility function to unconditionally execute 'SublimeHaskellCHeckAndLint.run()' without worrying
     about the command's status.
     '''
-    chain_runner = ChainRunner(view)
-    successful = chain_runner.run_chain([hsdev_check(), hsdev_lint()], 'Checking and Linting', fly_mode=fly_mode)
-    chain_runner.show_autofixes()
-    return successful
+    chain_runner = ChainRunner(view, on_done=on_done)
+    chain_runner.run_chain([hsdev_check(), hsdev_lint()], 'Checking and Linting', fly_mode=fly_mode)
 
 
 class SublimeHaskellCheck(CommandWin.HaskellSourceBackendTextCommand):
