@@ -424,6 +424,7 @@ class SublimeHaskellInferDocs(CommandWin.BackendTextCommand):
     def scan_docs(self):
         if not self.docs:
             self.infer_types()
+            return
 
         self.status_msg = Common.status_message_process("Scanning docs for {0}".format(self.current_file_name), priority=3)
         self.status_msg.start()
