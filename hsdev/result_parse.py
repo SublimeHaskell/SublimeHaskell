@@ -22,6 +22,10 @@ def parse_symbol_ids(symbol_ids):
     return parse_list(parse_symbol_id, symbol_ids)
 
 
+def parse_symbol_usages(syms):
+    return parse_list(parse_symbol_usage, syms)
+
+
 def parse_module_id(mod):
     if not mod:
         return None
@@ -100,6 +104,16 @@ def parse_symbol(sym):
             position=pos,
             **fields
         )
+
+
+def parse_symbol_usage(sym):
+    if sym is None:
+        return None
+    return symbols.SymbolUsage(
+        parse_symbol(get_value(sym, 'symbol')),
+        parse_module_id(get_value(sym, 'in')),
+        parse_position(get_value(sym, 'at')),
+    )
 
 
 def get_value(table, keyvals, defval=None):

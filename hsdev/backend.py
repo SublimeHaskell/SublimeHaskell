@@ -459,7 +459,7 @@ class HsDevBackend(Backend.HaskellBackend):
                                  }, callbacks, **backend_args)
 
     def usages(self, qualified_name, **backend_args):
-        callbacks, backend_args = self.make_callbacks('usages', **backend_args)
+        callbacks, backend_args = self.make_callbacks('usages', result_convert=ResultParse.parse_symbol_usages, **backend_args)
         return self.list_command('usages', {'name': qualified_name}, callbacks, **backend_args)
 
     def complete(self, sym, file, wide=False, **backend_args):

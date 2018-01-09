@@ -767,6 +767,19 @@ class CabalPackage(object):
         return '\n'.join(info)
 
 
+class SymbolUsage(object):
+    def __init__(self, symbol, used_in, position):
+        self.symbol = symbol
+        self.used_in = used_in
+        self.position = position
+
+    def __str__(self):
+        return u'{0}: {1}'.format(
+            source_location(self.used_in.location, self.position),
+            self.symbol.name
+        )
+
+
 class Corrector(object):
     def __init__(self, region, contents):
         self.region = region

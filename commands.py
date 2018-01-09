@@ -18,6 +18,7 @@ import SublimeHaskell.symbols as symbols
 
 # Extract the filename, line, column from symbol info
 SYMBOL_FILE_REGEX = r'^Defined at: (.*):(\d+):(\d+)$'
+FILE_REGEX = r'^(.*):(\d+):(\d+)'
 
 
 def show_declaration_info_panel(view, decl):
@@ -456,6 +457,34 @@ class SublimeHaskellInferDocs(CommandWin.BackendTextCommand):
         BackendManager.active_backend().infer(files=[self.current_file_name], on_response=infer_on_resp,
                                               on_error=infer_on_err)
 
+
+class SublimeHaskellSymbolUsages(CommandWin.BackendTextCommand):
+    """
+    Show where symbol is used
+    """
+    def __init__(self, view):
+        super().__init__(view)
+        self.current_file_name = None
+
+    def run(self, _edit, **kwargs):
+        self.current_file_name = kwargs.get('filename') or self.view.file_name()
+        self.line, self.column = self.view.rowcol(self.view.sel()[0].a)
+
+        candidates = BackendManager.active_backend().whoat(self.line + 1, self.column + 1, self.current_file_name)
+        if not candidates:
+            Common.sublime_status_message("Don't know about this symbol")
+            return
+
+        qname = candidates[0].qualified_name()
+        usages = BackendManager.active_backend().usages(qname)
+        if not usages:
+            Common.sublime_status_message("No usages found")
+            return
+
+        usages_msg = u'\n'.join([str(u) for u in usages])
+
+        panel = Common.output_panel(self.view.window(), usages_msg, 'sublime_haskell_symbol_usages_panel')
+        panel.settings().set('result_file_regex', FILE_REGEX)
 
 
 class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
