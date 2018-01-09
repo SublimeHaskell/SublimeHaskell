@@ -13,6 +13,10 @@ import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.types as Types
 
+
+WAIT_TIMEOUT = 30.0  # secs
+
+
 class FlyCheckViewEventListener(sublime_plugin.ViewEventListener):
     '''The heart of fly-check support. As a view event listener, there will be an instance of this view listener
     attached to each Haskell source view.
@@ -95,7 +99,7 @@ class FlyCheckViewEventListener(sublime_plugin.ViewEventListener):
                     done_check = threading.Event()
                     done_check.clear()
                     Utils.run_async('fly-check', self.do_fly, done_check)
-                    done_check.wait()
+                    done_check.wait(WAIT_TIMEOUT)
                     delta_t = None
 
                 self.fly_check_flag.clear()
@@ -122,13 +126,14 @@ class FlyCheckViewEventListener(sublime_plugin.ViewEventListener):
             self.autocompleter.drop_completions_async(current_file_name)
             self.autocompleter.generate_completions_cache(project_name, current_file_name, contents=view_contents)
 
-
     def do_fly(self, done_check):
         ## Do the flycheck...
-        successful_build = EventCommon.do_check_lint(self.view)
-        if successful_build:
-            Types.refresh_view_types(self.view)
-            self.scan_contents()
+        def on_done(successful_build):
+            if done_check:
+                done_check.set()
 
-        if done_check:
-            done_check.set()
+            if successful_build:
+                sublime.set_timeout(self.scan_contents, 0)
+                sublime.set_timeout(lambda: Types.refresh_view_types(self.view), 0)
+
+        EventCommon.do_check_lint(self.view, fly_mode=True, on_done=on_done)

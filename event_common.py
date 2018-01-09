@@ -27,12 +27,10 @@ def assoc_to_project(view, backend_mgr, filename):
     BackendCmds.cabal_project_status(view, backend_mgr)
 
 
-def do_check_lint(view):
+def do_check_lint(view, fly_mode=False, on_done=None):
     if Settings.PLUGIN.enable_auto_check and Settings.PLUGIN.enable_auto_lint:
-        return CheckAndLint.exec_check_and_lint(view)
+        return CheckAndLint.exec_check_and_lint(view, fly_mode=fly_mode, on_done=on_done)
     elif Settings.PLUGIN.enable_auto_check:
-        return CheckAndLint.exec_check(view)
+        return CheckAndLint.exec_check(view, fly_mode=fly_mode, on_done=on_done)
     elif Settings.PLUGIN.enable_auto_lint:
-        return CheckAndLint.exec_lint(view)
-
-    return False
+        return CheckAndLint.exec_lint(view, fly_mode=fly_mode, on_done=on_done)
