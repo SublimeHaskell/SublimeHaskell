@@ -211,7 +211,7 @@ class SublimeHaskellHoverPopup(object):
                                       {'filename': self.view.file_name(),
                                        'decl': decl_name})
             else:
-                self.view.window().open_file(url, sublime.ENCODED_POSITION | sublime.TRANSIENT)
+                self.view.window().open_file(url, sublime.ENCODED_POSITION)
 
     def on_hide(self):
         self.shown = False
