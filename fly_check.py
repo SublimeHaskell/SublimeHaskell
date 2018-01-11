@@ -5,7 +5,6 @@ import sublime
 import sublime_plugin
 
 import SublimeHaskell.autocomplete as Autocomplete
-import SublimeHaskell.check_lint as CheckAndLint
 import SublimeHaskell.event_common as EventCommon
 import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.internals.settings as Settings

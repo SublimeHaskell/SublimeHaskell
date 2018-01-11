@@ -1058,7 +1058,7 @@ class SublimeHaskellAutoFix(CommandWin.BackendWindowCommand):
                                                        on_error=on_err)
 
     def on_got_messages(self, msgs):
-        fixes = BackendManager.active_backend().autofix_show(msgs, True)
+        fixes = BackendManager.active_backend().autofix_show(msgs, wait_complete=True)
         corrections = [corr for corr in fixes if os.path.samefile(corr.file, self.window.active_view().file_name())]
         if corrections:
             AUTOFIX_STATE.set(self.window.active_view(), corrections)

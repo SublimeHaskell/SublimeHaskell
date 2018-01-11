@@ -338,7 +338,8 @@ class GHCModBackend(Backend.HaskellBackend):
 
         return self.dispatch_callbacks(flags, err, **backend_args)
 
-    def autofix_show(self, messages, wait_complete, **backend_args):
+    def autofix_show(self, messages, **backend_args):
+        backend_args.pop('wait_complete', None)
         return self.dispatch_callbacks([], None, **backend_args)
 
     def autofix_fix(self, messages, rest=None, pure=False, **backend_args):

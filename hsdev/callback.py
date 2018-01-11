@@ -18,19 +18,31 @@ class HsDevCallbacks(object):
         self.command = command
         self.start_time = time.clock()
         # The actual internals.
-        self.on_response = []
+        self.response = []
         self.result_convert = []
         self.on_notify = []
         self.on_error = []
 
         if on_response:
-            self.on_response.append(on_response)
+            if not isinstance(on_response, list):
+                self.response.append(on_response)
+            else:
+                self.response.extend(on_response)
         if result_convert:
-            self.result_convert.append(result_convert)
+            if not isinstance(result_convert, list):
+                self.result_convert.append(result_convert)
+            else:
+                self.result_convert.extend(result_convert)
         if on_notify:
-            self.on_notify.append(on_notify)
+            if not isinstance(on_notify, list):
+                self.on_notify.append(on_notify)
+            else:
+                self.on_notify.extend(on_notify)
         if on_error:
-            self.on_error.append(on_error)
+            if not isinstance(on_error, list):
+                self.on_error.append(on_error)
+            else:
+                self.on_error.extend(on_error)
 
     @property
     def ident(self):
@@ -53,49 +65,19 @@ class HsDevCallbacks(object):
 
         return ret_resp
 
-    def add_result_convert(self, result_converter):
-        '''Add a response function to the on_response function list.
-        '''
-        self.result_convert.insert(0, result_converter)
-
-    def inject_result_convert(self, result_converter):
-        '''Inject a response function onto the end of the on_response chain of functions
-        '''
-        self.result_convert.append(result_converter)
-
     def call_response(self, resp):
         self.log_time()
 
         resp = self.call_result_convert(resp)
-        for resp_func in reversed(self.on_response):
+        for resp_func in reversed(self.response):
             resp_func(resp)
 
         return resp
-
-    def add_response(self, response_func):
-        '''Add a response function to the on_response function list.
-        '''
-        self.on_response.insert(0, response_func)
-
-    def inject_response(self, response_func):
-        '''Inject a response function onto the end of the on_response chain of functions so that it is invoked before
-        any of the subsequent functions.
-        '''
-        self.on_response.append(response_func)
 
     def call_notify(self, notify_msg):
         for notify_func in reversed(self.on_notify):
             notify_func(notify_msg)
 
-    def add_notify(self, notify_func):
-        '''Add a response function to the on_response function list.
-        '''
-        self.on_response.insert(0, notify_func)
-
-    def inject_notify(self, notify_func):
-        '''Inject a response function onto the end of the on_response chain of functions
-        '''
-        self.on_response.append(notify_func)
 
     def call_error(self, err, details):
         self.log_time()
@@ -107,13 +89,3 @@ class HsDevCallbacks(object):
             retval = err_func(err, details)
 
         return retval
-
-    def add_error_handler(self, error_func):
-        '''Add a response function to the on_response function list.
-        '''
-        self.on_error.insert(0, error_func)
-
-    def inject_error_handler(self, error_func):
-        '''Inject a response function onto the end of the on_response chain of functions
-        '''
-        self.on_error.append(error_func)
