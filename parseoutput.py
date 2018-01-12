@@ -63,10 +63,9 @@ class OutputMessage(object):
         return self.__unicode__()
 
     def __repr__(self):
-        return '<OutputMessage {0}:{1}-{2}: {3}>'.format(filename_of_path(self.view.file_name()),
-                                                         self.region.start.__repr__(),
-                                                         self.region.end.__repr__(),
-                                                         self.message[:10] + '..')
+        fname = self.view.file_name() if self.view else '<no path>'
+        return '<OutputMessage {0}:{1}-{2}: \'{3}\'>'.format(fname, self.region.start, self.region.end,
+                                                             self.message[:12] + '\u2026')
 
     def to_region(self, view):
         "Return the Region referred to by this error message."
@@ -171,30 +170,32 @@ class MarkerManager(object):
 
         def to_error(errmsg):
             filename, line, column, messy_details = errmsg.groups()
+            filename = os.path.normpath(os.path.join(base_dir, filename))
             line, column = int(line), int(column)
+
+            ## print('filename {0} line {1} column {2} messy_details {3}'.format(filename, line, column, messy_details))
 
             column = ghc_column_to_sublime_column(view, line, column)
             line = line - 1
             # Record the absolute, normalized path.
             return OutputMessage(view.window().find_open_file(filename),
-                                 os.path.normpath(os.path.join(base_dir, filename)),
+                                 filename,
                                  Symbols.Region(Symbols.Position(line, column)),
                                  messy_details.strip(),
                                  'warning' if 'warning' in messy_details.lower() else 'error')
 
-        self.messages = [to_error(err) for err in Regexes.OUTPUT_REGEX.finditer(text)]
+        self.clear_error_marks()
+        self.messages = [to_error(err) for err in Regexes.GHC_DIAGNOSTIC_REGEX.finditer(text)]
         self.limit_messages(view)
+        self.error_marks.extend(self.messages)
 
-        output_text = self.format_output_messages()
-        unparsed = Regexes.OUTPUT_REGEX.sub('', text).strip()
+        output_text = u'{0} {1}\n\n{2}'.format(banner, u'SUCCEEDED' if exit_code == 0 else u'FAILED',
+                                               self.format_output_messages())
+        unparsed = Regexes.GHC_DIAGNOSTIC_REGEX.sub('', text).strip()
         if unparsed:
             output_text += '\n\nAdditional output:\n------------------\n' + unparsed
 
-        self.clear_error_marks()
-        self.error_marks.extend(self.messages)
-
         if Settings.PLUGIN.show_error_window and self.messages:
-            output_text = u'{0} {1}\n\n{2}'.format(banner, u'SUCCEEDED' if exit_code == 0 else u'FAILED', output_text)
             sublime.set_timeout(lambda: self.make_message_panel(view, output_text, base_dir, True), 0)
 
         sublime.set_timeout(self.update_markers_across_views, 0)
@@ -204,7 +205,7 @@ class MarkerManager(object):
         """Formats list of messages"""
         summary = {'error': 0, 'warning': 0, 'hint': 0, 'uncategorized': 0}
         for msg in self.messages:
-            summary[msg.level] = summary[msg.level] + 1
+            summary[msg.level] += 1
         summary_line = 'Errors: {0}, Warnings: {1}, Hints: {2}, Uncategorized {3}'.format(summary['error'],
                                                                                           summary['warning'],
                                                                                           summary['hint'],
@@ -213,7 +214,7 @@ class MarkerManager(object):
         def messages_level(name, level):
             if summary[level]:
                 count = '{0}: {1}'.format(name, summary[level])
-                msgs = '\n'.join(str(m) for m in self.messages if m.level == level)
+                msgs = '\n'.join([str(m) for m in self.messages if m.level == level])
                 return '{0}\n\n{1}'.format(count, msgs)
 
             return ''
@@ -232,15 +233,15 @@ class MarkerManager(object):
         show_warnings = show_only.get('warnings', True)
         show_hints = show_only.get('hints', True)
 
-        if not show_errors or not show_warnings or not show_hints:
-            self.messages = [msg for msg in self.messages if (msg.level == 'error' and show_errors) or \
-                                                             (msg.level == 'warning' and show_warnings) or \
-                                                             (msg.level == 'hint' and show_hints)]
+        self.messages = [msg for msg in self.messages if (msg.level == 'error' and show_errors) or \
+                                                         (msg.level == 'warning' and show_warnings) or \
+                                                         (msg.level == 'hint' and show_hints) or \
+                                                         msg.level == 'uncategorized']
 
     def clear_error_marks(self):
         for err in self.error_marks:
             err.erase_from_view()
-        self.error_marks = []
+        del self.error_marks[:]
 
 
     def update_markers_across_views(self):

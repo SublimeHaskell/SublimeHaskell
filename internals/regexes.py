@@ -7,7 +7,7 @@ import re
 # indented, non-empty lines.
 # It also eats whitespace before the first line.
 # The first line is divided into a filename, a line number, and a column.
-OUTPUT_REGEX = re.compile(r'\s*^(\S*):(\d+):(\d+):(.*$(?:\n^[ \t].*$)*)', re.MULTILINE)
+GHC_DIAGNOSTIC_REGEX = re.compile(r'\s*^(\S*):(\d+):(\d+):(.*$(?:\n^(?:[ \t]+|\d+ \|).*$)*)', re.MULTILINE)
 
 # Extract the filename, line, column, and description from an error message:
 RESULT_FILE_REGEX = r'^\s{2}(\S*?): line (\d+), column (\d+):$'
