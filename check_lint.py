@@ -1,7 +1,5 @@
 # -*- coding: UTF-8 -*-
 
-import threading
-
 import sublime
 
 import SublimeHaskell.cmdwin_types as CommandWin
@@ -29,7 +27,7 @@ def messages_as_hints(cmd):
 
 
 class ChainRunner(object):
-    def __init__(self, view, caption):
+    def __init__(self, view, caption, continue_success):
         super().__init__()
         self.view = view
         self.contents = {}
@@ -39,48 +37,43 @@ class ChainRunner(object):
         self.caption = caption
         self.fly_mode = False
         self.msgs = []
+        self.commands = []
+        self.continue_success = continue_success
         self.status_msg = None
         if view.is_dirty() and self.filename:
             self.contents[self.filename] = self.view.substr(sublime.Region(0, self.view.size()))
 
 
     def run_chain(self, cmds, fly_mode=False):
-        retval = False
+        ParseOutput.MARKER_MANAGER.clear_error_marks()
         if self.filename:
             self.fly_mode = fly_mode
             if not self.fly_mode:
                 ParseOutput.hide_output(self.view)
             if cmds:
-                ParseOutput.MARKER_MANAGER.clear_error_marks()
-
                 self.status_msg = Common.status_message_process(self.caption + ': ' + self.filename)
                 self.status_msg.start()
-                _, retval = self.go_chain(cmds)
-                if retval:
-                    self.status_msg.result_ok()
-                else:
-                    self.status_msg.result_fail()
+                self.commands = cmds
+                self.go_chain()
             else:
                 sublime.error_message('Empty command chain (check_lint.run_chain)')
         else:
             print('run_chain: no file name? {0}'.format(self.filename))
 
-        return retval
+
+    def go_chain(self):
+        if self.commands:
+            agent_func, modify_args, kwargs = self.commands.pop()
+            agent_func(modify_args(self.filename), contents=self.contents, wait_complete=False,
+                       on_response=self.next_in_chain, on_error=self.chain_error, **kwargs)
+        else:
+            self.status_msg.result_ok()
+            BackendMgr.active_backend().autofix_show(self.msgs, wait_complete=False, on_response=self.show_autofixes)
 
 
-    def go_chain(self, cmds):
-        retval = ([], True)
-
-        while cmds and retval[1]:
-            agent_func, modify_args, kwargs = cmds.pop()
-            retval = agent_func(modify_args(self.filename), contents=self.contents, wait_complete=True,
-                                result_convert=self.chain_result, on_error=self.chain_error, **kwargs)
-            resp, status = retval
-            if status:
-                self.msgs.extend(resp)
-
-        return retval
-
+    def next_in_chain(self, resp):
+        self.msgs.extend(resp)
+        self.go_chain()
 
     def chain_error(self, exc, details):
         # Fabricate an uncategorized error.
@@ -91,42 +84,33 @@ class ChainRunner(object):
                           'level': 'uncategorized',
                           'note': {'suggestion': None,
                                    'message': 'Backend error encountered during \'{0}\': {1}'.format(self.caption, exc)}})
-        return ([], False)
+        self.status_msg.result_fail()
+        ParseOutput.MARKER_MANAGER.mark_response(self.view, self.msgs, [], self.fly_mode)
 
 
-    def chain_result(self, resp):
-        return (resp, True)
-
-
-    def get_autofixes(self):
-        corrections = BackendMgr.active_backend().autofix_show(self.msgs, wait_complete=True)
+    def show_autofixes(self, corrections):
         ParseOutput.MARKER_MANAGER.mark_response(self.view, self.msgs, corrections, self.fly_mode)
+        if self.continue_success:
+            self.continue_success(self.view)
+
+def exec_check(view, fly_mode=False, continue_success=None):
+    chain_runner = ChainRunner(view, 'Checking', continue_success)
+    chain_runner.run_chain([hsdev_check()], fly_mode=fly_mode)
 
 
-def exec_check(view, fly_mode=False):
-    chain_runner = ChainRunner(view, 'Checking')
-    successful = chain_runner.run_chain([hsdev_check()], fly_mode=fly_mode)
-    chain_runner.get_autofixes()
-    return successful
-
-
-def exec_lint(view, fly_mode=False,):
+def exec_lint(view, fly_mode=False, continue_success=None):
     '''Utility function to unconditionally execute `SublimeHaskellLint.run()` without worrying about the command's status.
     '''
-    chain_runner = ChainRunner(view, 'Linting')
-    successful = chain_runner.run_chain([hsdev_lint()], fly_mode=fly_mode)
-    chain_runner.get_autofixes()
-    return successful
+    chain_runner = ChainRunner(view, 'Linting', continue_success)
+    chain_runner.run_chain([hsdev_lint()], fly_mode=fly_mode)
 
 
-def exec_check_and_lint(view, fly_mode=False,):
+def exec_check_and_lint(view, fly_mode=False, continue_success=None):
     '''Utility function to unconditionally execute 'SublimeHaskellCHeckAndLint.run()' without worrying
     about the command's status.
     '''
-    chain_runner = ChainRunner(view, 'Checking and Linting')
-    successful = chain_runner.run_chain([hsdev_check(), hsdev_lint()], fly_mode=fly_mode)
-    chain_runner.get_autofixes()
-    return successful
+    chain_runner = ChainRunner(view, 'Checking and Linting', continue_success)
+    chain_runner.run_chain([hsdev_check(), hsdev_lint()], fly_mode=fly_mode)
 
 
 class SublimeHaskellCheck(CommandWin.HaskellSourceBackendTextCommand):

@@ -152,7 +152,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             return
 
         if Settings.COMPONENT_DEBUG.event_viewer:
-            print('{0} invoked.'.format(type(self).__name__ + ".on_post_save"))
+            print('{0}.on_post_save invoked.'.format(type(self).__name__))
 
         filename = view.file_name()
         if not filename:
@@ -164,28 +164,13 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         if Common.view_is_haskell_source(view):
             self.type_cache.remove(filename)
 
-            successful_build = True
             if Settings.PLUGIN.enable_auto_build:
                 view.window().run_command('sublime_haskell_build_auto')
             else:
-                successful_build = EventCommon.do_check_lint(view)
-                if successful_build:
-                    Types.refresh_view_types(view)
-
-            if Settings.COMPONENT_DEBUG.event_viewer:
-                print('{0}.on_post_save: successful_build {1}'.format(type(self).__name__, successful_build))
-
-            if successful_build and Settings.PLUGIN.prettify_on_save:
-                if Settings.COMPONENT_DEBUG.event_viewer:
-                    print('{0}.build_and_prettify: prettify on save'.format(type(self).__name__))
-                if Settings.PLUGIN.prettify_executable == 'stylish-haskell':
-                    view.run_command('sublime_haskell_stylish')
-                elif Settings.PLUGIN.prettify_executable == 'hindent':
-                    view.run_command('sublime_haskell_hindent')
+                EventCommon.do_check_lint(view, continue_success=self.post_successful_check)
 
         Utils.run_async('rescan source {0}/{1}'.format(project_name, filename), self.rescan_source, project_name,
                         filename, False)
-
 
     def on_query_context(self, view, key, operator, operand, matchall):
         if Settings.COMPONENT_DEBUG.event_viewer:
@@ -225,6 +210,21 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         file_shown_in_view = Common.window_view_and_file(view)[2]
         return file_shown_in_view is not None and \
                Utils.head_of(BackendManager.active_backend().module(file=file_shown_in_view)) is not None
+
+    def post_successful_check(self, view):
+        if Settings.COMPONENT_DEBUG.event_viewer:
+            print('{0}.post_successful_check invoked.'.format(type(self).__name__))
+
+        Types.refresh_view_types(view)
+
+        if Settings.COMPONENT_DEBUG.event_viewer:
+            print('{0}.post_successful_check: prettify_on_save {0}'.format(Settings.PLUGIN.prettify_on_save))
+
+        if Settings.PLUGIN.prettify_on_save:
+            if Settings.PLUGIN.prettify_executable == 'stylish-haskell':
+                view.run_command('sublime_haskell_stylish')
+            elif Settings.PLUGIN.prettify_executable == 'hindent':
+                view.run_command('sublime_haskell_hindent')
 
 
 class HaskellSourceViewEventListener(sublime_plugin.ViewEventListener):
