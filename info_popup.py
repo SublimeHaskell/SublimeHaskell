@@ -10,6 +10,7 @@ import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.internals.unicode_opers as UnicodeOpers
 import SublimeHaskell.symbols as symbols
 import SublimeHaskell.internals.backend_mgr as BackendManager
+import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.parseoutput as ParseOutput
 import SublimeHaskell.types as types
 
@@ -124,6 +125,10 @@ class SublimeHaskellHoverPopup(object):
             elif ident is not None:
                 whois_name = qsymbol.qualified_name()
                 full_name = qsymbol.full_name()
+
+                # Infer types in backgroup (if not any)
+                if Settings.PLUGIN.enable_infer_types:
+                    BackendManager.active_backend().infer(files=[self.filename])
 
                 # Try get type of hovered symbol
                 typed_expr = None
