@@ -588,7 +588,7 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
             candidates = BackendManager.active_backend().whois(qualified_name, file=self.current_file_name)
         if not candidates:
             if filename:
-                candidates = BackendManager.active_backend().lookup(lookup=unqualified_name, file=self.current_file_name)
+                candidates = BackendManager.active_backend().lookup(name=unqualified_name, file=self.current_file_name)
             else:
                 candidates = BackendManager.active_backend().symbol(lookup=unqualified_name, search_type='exact', module=module_name, package=package_name)
 
