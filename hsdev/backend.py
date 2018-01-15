@@ -498,14 +498,13 @@ class HsDevBackend(Backend.HaskellBackend):
     def complete(self, sym, file, wide=False, **backend_args):
         qname = sym.qualified_name() if sym.name is not None else sym.module + '.'
         if 'contents' in backend_args:
-            contents = backend_args['contents']
+            ## contents = backend_args['contents']
             del backend_args['contents']
         callbacks, backend_args = self.make_callbacks('complete', result_convert=ResultParse.parse_declarations, **backend_args)
         return self.list_command('complete',
                                  {'prefix': qname,
                                   'wide': wide,
-                                  'file': file,
-                                  'files': self.files_and_contents([file], contents)},
+                                  'file': file},
                                  callbacks, **backend_args)
 
     def hayoo(self, query, page=None, pages=None, **backend_args):

@@ -157,7 +157,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         filename = view.file_name()
         if not filename:
             if Settings.COMPONENT_DEBUG.event_viewer:
-                print('{0}: no file name.'.format(type(self).__name__ + ".on_post_save"))
+                print('{0}.on_post_save: no file name.'.format(type(self).__name__))
             return
 
         _project_dir, project_name = Common.locate_cabal_project_from_view(view)

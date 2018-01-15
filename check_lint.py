@@ -68,7 +68,8 @@ class ChainRunner(object):
                        on_response=self.next_in_chain, on_error=self.chain_error, **kwargs)
         else:
             self.status_msg.result_ok()
-            BackendMgr.active_backend().autofix_show(self.msgs, wait_complete=False, on_response=self.show_autofixes)
+            BackendMgr.active_backend().autofix_show(self.msgs, wait_complete=False,
+                                                     on_response=lambda corr: sublime.set_timeout(self.show_autofixes(corr), 0))
 
 
     def next_in_chain(self, resp):
@@ -85,7 +86,8 @@ class ChainRunner(object):
                           'note': {'suggestion': None,
                                    'message': 'Backend error encountered during \'{0}\': {1}'.format(self.caption, exc)}})
         self.status_msg.result_fail()
-        ParseOutput.MARKER_MANAGER.mark_response(self.view, self.msgs, [], self.fly_mode)
+        ## Paranoia: Ensure that mark_response() executes in the UI thread
+        sublime.set_timeout(lambda: ParseOutput.MARKER_MANAGER.mark_response(self.view, self.msgs, [], self.fly_mode), 0)
 
 
     def show_autofixes(self, corrections):
