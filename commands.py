@@ -108,7 +108,7 @@ class SublimeHaskellFindDeclarations(CommandWin.BackendWindowCommand):
         self.window.show_input_panel("Search string", "", self.on_done, self.on_change, self.on_cancel)
 
     def on_done(self, sym):
-        self.decls = BackendManager.active_backend().symbol(lookup=sym, search_type='regex')
+        self.decls = BackendManager.active_backend().symbol(lookup=sym, search_type='infix')
         self.decls.sort(key=lambda d: d.module.name)
         if self.decls:
             module_decls = [['{0}: {1}'.format(decl.module.name, decl.brief(use_unicode=True)),
@@ -860,6 +860,34 @@ def ghc_eval_x(resps):
 def ghc_eval_merge_results(left, right):
     # Prefer result in 'l', but if there's 'fail' - use result from 'r'
     return [x or y for x, y in zip(left, right)]
+
+
+class SublimeHaskellEvalExpressionCommand(CommandWin.BackendTextCommand):
+    def __init__(self, view):
+        super().__init__(view)
+        self.args = []
+        self.results = None
+
+    def run(self, _edit, **_kwargs):
+        self.view.window().show_input_panel('Expression', '', self.on_done, None, self.on_cancel)
+
+    def on_done(self, expr):
+        self.results = BackendManager.active_backend().ghc_eval([expr], file=self.view.file_name())
+        if self.results is not None and len(self.results) > 0:
+            res = self.results[0]
+
+            if isinstance(res, dict):
+                if 'fail' in res:
+                    msg = '\n'.join(['Error', '', res['fail']])
+                else:
+                    msg = str(res)
+            else:
+                msg = res
+
+            Common.output_panel(self.view.window(), msg, 'sublime_haskell_eval_expression_panel')
+
+    def on_cancel(self):
+        pass
 
 
 class SublimeHaskellEvalSelectionCommand(CommandWin.BackendTextCommand):

@@ -541,7 +541,7 @@ class HsDevBackend(Backend.HaskellBackend):
     def ghc_eval(self, exprs, file=None, source=None, **backend_args):
         the_file = None
         if file is not None:
-            the_file = {'file': the_file, 'contents': source}
+            the_file = {'file': file, 'contents': source}
         callbacks, backend_args = self.make_callbacks('ghc eval', **backend_args)
         return self.list_command('ghc eval', {'exprs': exprs, 'file': the_file}, callbacks, **backend_args)
 

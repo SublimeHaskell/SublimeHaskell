@@ -126,6 +126,10 @@
         "command": "sublime_haskell_go_to_module"
     },
     {
+        "caption": "SublimeHaskell: Eval expression",
+        "command": "sublime_haskell_eval_expression"
+    },
+    {
         "caption": "SublimeHaskell: Eval selection",
         "command": "sublime_haskell_eval_selection"
     },
