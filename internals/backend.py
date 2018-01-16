@@ -247,7 +247,7 @@ class HaskellBackend(object):
     def flags(self, project_name, **backend_args):
         raise NotImplementedError("HaskellBackend.flags needs an implementation.")
 
-    def autofix_show(self, messages, wait_complete, **backend_args):
+    def autofix_show(self, messages, **backend_args):
         '''Show autofixes for errors, when possible. Can be used synchrnously or asynchronously.
 
         :param list(str) messages: A list of error messages
@@ -443,13 +443,13 @@ class NullHaskellBackend(HaskellBackend):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def lint(self, files=None, contents=None, hlint=None, wait_complete=False, **backend_args):
-        return self.dispatch_callbacks(([], True), None, **backend_args)
+        return self.dispatch_callbacks([], None, **backend_args)
 
     def check(self, files=None, contents=None, ghc=None, wait_complete=False, **backend_args):
-        return self.dispatch_callbacks(([], True), None, **backend_args)
+        return self.dispatch_callbacks([], None, **backend_args)
 
     def check_lint(self, files=None, contents=None, ghc=None, hlint=None, wait_complete=False, **backend_args):
-        return self.dispatch_callbacks(([], True), None, **backend_args)
+        return self.dispatch_callbacks([], None, **backend_args)
 
     def types(self, project_name, file, module_name, line, column, ghc_flags=None, contents=None, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
@@ -460,7 +460,8 @@ class NullHaskellBackend(HaskellBackend):
     def flags(self, _projectname, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
-    def autofix_show(self, messages, wait_complete, **backend_args):
+    def autofix_show(self, messages, **backend_args):
+        backend_args.pop('wait_complete', None)
         return self.dispatch_callbacks([], None, **backend_args)
 
     def autofix_fix(self, messages, rest=None, pure=False, **backend_args):
