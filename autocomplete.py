@@ -248,12 +248,12 @@ class AutoCompleter(object):
             mods = backend.scope_modules(project_name, filename, lookup=module, search_type='exact') if filename else []
 
             mod_file = mods[0].location.filename if mods and mods[0].by_source() else None
-            cache_db = mods[0].location.db if mods and mods[0].by_cabal() else None
             package = mods[0].location.package.name if mods and mods[0].by_cabal() else None
+            mod_id = mods[0] if mods else None
 
-            mod_decls = Utils.head_of(backend.module(project_name, lookup=module, search_type='exact', file=mod_file,
-                                                     symdb=cache_db, package=package))
-            retval = make_completions(mod_decls.declarations.values()) if mod_decls else []
+            mod_decls = Utils.head_of(list(filter(lambda m: mod_id == m, backend.module(project_name, lookup=module, search_type='exact', file=mod_file,
+                                                     package=package))))
+            retval = make_completions(mod_decls.exports) if mod_decls else []
 
         return retval
 

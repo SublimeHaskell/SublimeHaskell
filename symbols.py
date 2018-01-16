@@ -162,6 +162,11 @@ class Location(object):
     def get_id(self):
         return self.filename
 
+    def __eq__(self, other):
+        if isinstance(other, Location):
+            return self.filename == other.filename and self.project == other.project
+        return False
+
 
 def source_location(loc, pos):
     """ Returns filename:line:column """
@@ -177,6 +182,11 @@ class Package(object):
 
     def package_id(self):
         return '{0}-{1}'.format(self.name, self.version) if self.version is not None else self.name
+
+    def __eq__(self, other):
+        if isinstance(other, Package):
+            return self.name == other.name and self.version == other.version
+        return False
 
 
 def parse_package(package_id):
@@ -218,6 +228,11 @@ class PackageDb(object):
         if self.package_db:
             return self.package_db
 
+    def __eq__(self, other):
+        if isinstance(other, PackageDb):
+            return self.global_db == other.global_db and self.user_db == other.user_db and self.package_db == other.package_db
+        return False
+
     @staticmethod
     def from_string(pkgdb_str):
         if pkgdb_str == 'global-db':
@@ -247,6 +262,11 @@ class InstalledLocation(object):
     def get_id(self):
         return '{0}:{1}'.format(self.name, self.package.package_id())
 
+    def __eq__(self, other):
+        if isinstance(other, InstalledLocation):
+            return self.name == other.name and self.package == other.package
+        return False
+
 
 class OtherLocation(object):
     """
@@ -266,6 +286,11 @@ class OtherLocation(object):
 
     def get_id(self):
         return '[{0}]'.format(self.source)
+
+    def __eq__(self, other):
+        if isinstance(other, OtherLocation):
+            return self.source == other.source
+        return False
 
 
 def location_package_name(loc):
@@ -360,6 +385,11 @@ class ModuleId(object):
     def by_hayoo(self):
         return isinstance(self.location, OtherLocation)
 
+    def __eq__(self, other):
+        if isinstance(other, ModuleId):
+            return self.name == other.name and self.location == other.location
+        return False
+
 
 class SymbolId(object):
     """
@@ -380,6 +410,11 @@ class SymbolId(object):
 
     def by_hayoo(self):
         return self.module.by_hayoo()
+
+    def __eq__(self, other):
+        if isinstance(other, SymbolId):
+            return self.name == other.name and self.module == other.module
+        return False
 
 
 class Module(ModuleId):
