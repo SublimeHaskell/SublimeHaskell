@@ -661,6 +661,8 @@ class SublimeHaskellBrowseModule(CommandWin.BackendTextCommand):
         module_name = kwargs.get('module_name')
         filename = kwargs.get('filename')
         scope = kwargs.get('scope')
+        package_name = kwargs.get('package_name')
+        package_version = kwargs.get('package_version')
 
         self.candidates = []
         self.current_file_name = self.view.window().active_view().file_name()
@@ -674,7 +676,7 @@ class SublimeHaskellBrowseModule(CommandWin.BackendTextCommand):
                 Common.sublime_status_message('Module {0} not found'.format(filename))
                 return
         elif module_name:
-            cand_mods = self.candidate_modules(project_name, module_name, scope)
+            cand_mods = self.candidate_modules(project_name, module_name, scope, package_name, package_version)
             if not cand_mods:
                 Common.sublime_status_message('Module {0} not found'.format(module_name))
                 return
@@ -718,15 +720,20 @@ class SublimeHaskellBrowseModule(CommandWin.BackendTextCommand):
         if idx >= 0:
             show_declaration_info(self.view.window().active_view(), self.candidates[idx])
 
-    def candidate_modules(self, project_name, module_name, scope):
+    def candidate_modules(self, project_name, module_name, scope, package_name=None, package_version=None):
         retval = None
+        package = symbols.Package(package_name, package_version) if package_name is not None else None
+
         if scope is not None:
             retval = BackendManager.active_backend().scope_modules(project_name, scope, lookup=module_name, search_type='exact')
         elif self.current_file_name is not None:
             retval = BackendManager.active_backend().scope_modules(project_name, self.current_file_name, lookup=module_name,
                                                                    search_type='exact')
         else:
-            retval = BackendManager.active_backend().module(None, module=module_name, header=True)
+            package_id = package.package_id() if package is not None else None
+            retval = BackendManager.active_backend().module(None, module=module_name, package=package_id, header=True)
+        if package is not None:
+            retval = list(filter(lambda m: package.match(symbols.location_package(m.location)), retval))
         return retval
 
     def get_module_info(self, project_name, module, module_name):

@@ -28,6 +28,10 @@ def assoc_to_project(view, backend_mgr, filename):
 
 
 def do_check_lint(view, fly_mode=False, on_done=None):
+    Utils.run_async('{0}: do-check-lint'.format(view.file_name()), run_check_lint, view, fly_mode=fly_mode, on_done=on_done)
+
+
+def run_check_lint(view, fly_mode=False, on_done=None):
     if Settings.PLUGIN.enable_auto_check and Settings.PLUGIN.enable_auto_lint:
         return CheckAndLint.exec_check_and_lint(view, fly_mode=fly_mode, on_done=on_done)
     elif Settings.PLUGIN.enable_auto_check:

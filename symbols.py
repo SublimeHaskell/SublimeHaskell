@@ -183,6 +183,11 @@ class Package(object):
     def package_id(self):
         return '{0}-{1}'.format(self.name, self.version) if self.version is not None else self.name
 
+    def match(self, other):
+        if isinstance(other, Package):
+            return self.name == other.name and (self.version is None or self.version == other.version)
+        return False
+
     def __eq__(self, other):
         if isinstance(other, Package):
             return self.name == other.name and self.version == other.version
@@ -291,6 +296,10 @@ class OtherLocation(object):
         if isinstance(other, OtherLocation):
             return self.source == other.source
         return False
+
+
+def location_package(loc):
+    return loc.package if isinstance(loc, InstalledLocation) else None
 
 
 def location_package_name(loc):

@@ -106,7 +106,6 @@ class FlyCheckViewEventListener(sublime_plugin.ViewEventListener):
 
     def scan_contents(self):
         current_file_name = self.view.file_name()
-        view_contents = {current_file_name: self.view.substr(sublime.Region(0, self.view.size()))}
 
         status_msg = Common.status_message_process("Scanning {0}".format(current_file_name))
         status_msg.start()
@@ -119,12 +118,10 @@ class FlyCheckViewEventListener(sublime_plugin.ViewEventListener):
             status_msg.result_fail()
             return False
 
-        good_scan = BackendManager.active_backend().scan(files=[current_file_name], contents=view_contents,
-                                                         on_response=scan_resp, on_error=scan_err)
+        good_scan = BackendManager.active_backend().scan(files=[current_file_name], on_response=scan_resp, on_error=scan_err)
         if good_scan:
             _project_dir, project_name = Common.locate_cabal_project_from_view(self.view)
-            self.autocompleter.drop_completions_async(current_file_name)
-            self.autocompleter.generate_completions_cache(project_name, current_file_name, contents=view_contents)
+            EventCommon.update_completions_async(self.autocompleter, project_name, files=[current_file_name])
 
     def do_fly(self, done_check):
         ## Do the flycheck...
@@ -134,6 +131,9 @@ class FlyCheckViewEventListener(sublime_plugin.ViewEventListener):
 
             if successful_build:
                 sublime.set_timeout(self.scan_contents, 0)
-                sublime.set_timeout(lambda: Types.refresh_view_types(self.view), 0)
+                # Types.refresh_view_types(self.view)
 
+        if self.view.is_dirty():
+            current_file_name = self.view.file_name()
+            BackendManager.active_backend().set_file_contents(file=current_file_name, contents=self.view.substr(sublime.Region(0, self.view.size())))
         EventCommon.do_check_lint(self.view, fly_mode=True, on_done=on_done)

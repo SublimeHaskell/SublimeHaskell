@@ -50,7 +50,7 @@ class ChainRunner(object):
             self.fly_mode = fly_mode
             self.contents = {}
             if self.view.is_dirty():
-                self.contents[self.filename] = self.view.substr(sublime.Region(0, self.view.size()))
+                BackendMgr.active_backend().set_file_contents(file=self.filename, contents=self.view.substr(sublime.Region(0, self.view.size())))
             if not self.fly_mode:
                 ParseOutput.hide_output(self.view)
             if cmds:

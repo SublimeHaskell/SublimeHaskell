@@ -341,6 +341,10 @@ class HsDevBackend(Backend.HaskellBackend):
                                'infer': infer},
                       callbacks, **backend_args)
 
+    def set_file_contents(self, file, contents=None, **backend_args):
+        callbacks, backend_args = self.make_callbacks('set-file-contents', **backend_args)
+        return self.command('set-file-contents', {'file': file, 'contents': contents}, callbacks, **backend_args)
+
     def docs(self, projects=None, files=None, **backend_args):
         callbacks, backend_args = self.make_callbacks('docs', **backend_args)
         return self.async_command('docs', {'projects': projects or [],
