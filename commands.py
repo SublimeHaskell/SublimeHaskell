@@ -470,13 +470,7 @@ class SublimeHaskellSymbolUsages(CommandWin.BackendTextCommand):
         self.current_file_name = kwargs.get('filename') or self.view.file_name()
         self.line, self.column = self.view.rowcol(self.view.sel()[0].a)
 
-        candidates = BackendManager.active_backend().whoat(self.line + 1, self.column + 1, self.current_file_name)
-        if not candidates:
-            Common.sublime_status_message("Don't know about this symbol")
-            return
-
-        qname = candidates[0].qualified_name()
-        usages = BackendManager.active_backend().usages(qname)
+        usages = BackendManager.active_backend().usages(self.line + 1, self.column + 1, self.current_file_name)
         if not usages:
             Common.sublime_status_message("No usages found")
             return
