@@ -272,17 +272,17 @@ class GHCModBackend(Backend.HaskellBackend):
     def lint(self, files=None, contents=None, hlint=None, wait_complete=False, **backend_args):
         lint_cmd = ' '.join(['lint'] + (hlint or []))
         lint_output = self.translate_regex_output(lint_cmd, files, contents, GHC_LINT_REGEX, self.translate_lint)
-        return self.dispatch_callbacks((lint_output, True), None, **backend_args)
+        return self.dispatch_callbacks(lint_output, None, **backend_args)
 
     def check(self, files=None, contents=None, ghc=None, wait_complete=False, **backend_args):
         check_cmd = 'check '
         check_output = self.translate_regex_output(check_cmd, files, contents, GHC_CHECK_REGEX, self.translate_check)
-        return self.dispatch_callbacks((check_output, True), None, **backend_args)
+        return self.dispatch_callbacks(check_output, None, **backend_args)
 
     def check_lint(self, files=None, contents=None, ghc=None, hlint=None, wait_complete=False, **backend_args):
         '''ghc-mod cannot generate corrections to autofix. Returns an empty list.
         '''
-        return self.dispatch_callbacks(([], True), None, **backend_args)
+        return self.dispatch_callbacks([], None, **backend_args)
 
     def types(self, project_name, file, module_name, line, column, ghc_flags=None, contents=None, **backend_args):
         type_output = []
@@ -338,7 +338,8 @@ class GHCModBackend(Backend.HaskellBackend):
 
         return self.dispatch_callbacks(flags, err, **backend_args)
 
-    def autofix_show(self, messages, wait_complete, **backend_args):
+    def autofix_show(self, messages, **backend_args):
+        backend_args.pop('wait_complete', None)
         return self.dispatch_callbacks([], None, **backend_args)
 
     def autofix_fix(self, messages, rest=None, pure=False, **backend_args):

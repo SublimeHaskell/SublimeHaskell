@@ -289,18 +289,15 @@ class SublimeHaskellBuildCommand(CommandWin.SublimeHaskellWindowCommand):
 
         Logging.log('running build commands: {0}'.format(commands), Logging.LOG_TRACE)
 
-        def done_callback():
-            # Set project as done being built so that it can be built again
-            self.PROJECTS_BEING_BUILT.remove(project_name)
-
         # Run them
-        msg = '{0} {1} with {2}\ncommands:\n{3}'.format(action_title, project_name, tool_title, commands)
-        Logging.log(msg, Logging.LOG_DEBUG)
-        Utils.run_async('wait_for_chain_to_complete', self.wait_for_chain_to_complete, view, project_dir, msg, commands,
-                        on_done=done_callback)
+        ## banner = '{0} {1} with {2}\ncommands:\n{3}'.format(action_title, project_name, tool_title, commands)
+        banner = '{0} {1} with {2}'.format(action_title, project_name, tool_title)
+        Logging.log(banner, Logging.LOG_DEBUG)
+        Utils.run_async('wait_for_chain_to_complete', self.wait_for_chain_to_complete, view, project_name, project_dir,
+                        banner, commands)
 
 
-    def wait_for_chain_to_complete(self, view, cabal_project_dir, banner, cmds, on_done):
+    def wait_for_chain_to_complete(self, view, cabal_project_name, cabal_project_dir, banner, cmds):
         '''Chains several commands, wait for them to complete, then parse and display
         the resulting errors.'''
 
@@ -316,7 +313,7 @@ class SublimeHaskellBuildCommand(CommandWin.SublimeHaskellWindowCommand):
                                          panel_display=Settings.PLUGIN.show_output_window)
         for cmd in cmds:
             if isinstance(cmd, list):
-                Common.output_text(output_log, ' '.join(cmd) + '...\n')
+                Common.output_text(output_log, ' '.join(cmd) + '\u2026\n')
 
                 # Don't tie stderr to stdout, since we're interested in the error messages
                 out = OutputCollector.OutputCollector(output_log, cmd, cwd=cabal_project_dir)
@@ -338,8 +335,8 @@ class SublimeHaskellBuildCommand(CommandWin.SublimeHaskellWindowCommand):
             Common.hide_panel(view.window(), panel_name=BUILD_LOG_PANEL_NAME)
 
         # Notify UI thread that commands are done
-        sublime.set_timeout(on_done, 0)
-        ParseOutput.MARKER_MANAGER.mark_compiler_output(view, cabal_project_dir, banner, ''.join(collected_out), exit_code)
+        self.PROJECTS_BEING_BUILT.remove(cabal_project_name)
+        ParseOutput.MARKER_MANAGER.mark_compiler_output(view, banner, cabal_project_dir, ''.join(collected_out), exit_code)
 
 
     def project_dist_path(self, project_dir):
