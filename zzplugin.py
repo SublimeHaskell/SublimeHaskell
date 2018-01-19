@@ -5,6 +5,7 @@ import sublime
 import sublime_plugin
 
 import SublimeHaskell.autocomplete as Autocomplete
+import SublimeHaskell.build as Builder
 import SublimeHaskell.info_popup as InfoPop
 import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.event_common as EventCommon
@@ -165,7 +166,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
             self.type_cache.remove(filename)
 
             if Settings.PLUGIN.enable_auto_build:
-                view.window().run_command('sublime_haskell_build_auto')
+                Builder.Builder(view, continue_success=self.post_successful_check).auto_build()
             else:
                 EventCommon.do_check_lint(view, continue_success=self.post_successful_check)
 
