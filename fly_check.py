@@ -98,6 +98,7 @@ class FlyCheckViewEventListener(sublime_plugin.ViewEventListener):
                     done_check = threading.Event()
                     done_check.clear()
                     Utils.run_async('fly-check', self.do_fly, done_check)
+                    # Timeout shouldn't be needed... but paranoia is a good thing.
                     done_check.wait(WAIT_TIMEOUT)
                     delta_t = None
 
@@ -111,16 +112,13 @@ class FlyCheckViewEventListener(sublime_plugin.ViewEventListener):
 
         def scan_resp(_resp):
             status_msg.result_ok()
-            return True
+            _project_dir, project_name = Common.locate_cabal_project_from_view(self.view)
+            EventCommon.update_completions_async(self.autocompleter, project_name, files=[current_file_name])
 
         def scan_err(_err, _details):
             status_msg.result_fail()
-            return False
 
-        good_scan = BackendManager.active_backend().scan(files=[current_file_name], on_response=scan_resp, on_error=scan_err)
-        if good_scan:
-            _project_dir, project_name = Common.locate_cabal_project_from_view(self.view)
-            EventCommon.update_completions_async(self.autocompleter, project_name, files=[current_file_name])
+        BackendManager.active_backend().scan(files=[current_file_name], on_response=scan_resp, on_error=scan_err)
 
     def do_fly(self, done_check):
         ## Do the flycheck...
@@ -128,11 +126,12 @@ class FlyCheckViewEventListener(sublime_plugin.ViewEventListener):
             if done_check:
                 done_check.set()
 
-            if successful_build:
-                sublime.set_timeout(self.scan_contents, 0)
-                # Types.refresh_view_types(self.view)
+            sublime.set_timeout(self.scan_contents, 0)
+            # Types.refresh_view_types(self.view)
 
         if self.view.is_dirty():
             current_file_name = self.view.file_name()
-            BackendManager.active_backend().set_file_contents(file=current_file_name, contents=self.view.substr(sublime.Region(0, self.view.size())))
-        EventCommon.do_check_lint(self.view, fly_mode=True, on_done=on_done)
+            BackendManager.active_backend().set_file_contents(file=current_file_name,
+                                                              contents=self.view.substr(sublime.Region(0, self.view.size())))
+
+        EventCommon.do_check_lint(self.view, fly_mode=True, continue_success=on_done)
