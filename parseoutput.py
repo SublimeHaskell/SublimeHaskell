@@ -1,5 +1,6 @@
 # -*- coding: UTF-8 -*-
 
+import functools
 import os
 import os.path
 import re
@@ -159,7 +160,7 @@ class MarkerManager(object):
             cabal_proj_dir = Common.get_cabal_project_dir_of_file(filename) or os.path.dirname(filename)
             show_panel = not fly_mode and self.messages
             output_text = self.format_output_messages()
-            sublime.set_timeout(lambda: self.make_message_panel(view, output_text, cabal_proj_dir, show_panel), 0)
+            sublime.set_timeout(functools.partial(self.make_message_panel, view, output_text, cabal_proj_dir, show_panel), 0)
 
         sublime.set_timeout(self.update_markers_across_views, 0)
 
@@ -196,7 +197,7 @@ class MarkerManager(object):
             output_text += '\n\nAdditional output:\n------------------\n' + unparsed
 
         if Settings.PLUGIN.show_error_window and self.messages:
-            sublime.set_timeout(lambda: self.make_message_panel(view, output_text, base_dir, True), 0)
+            sublime.set_timeout(functools.partial(self.make_message_panel, view, output_text, base_dir, True), 0)
 
         sublime.set_timeout(self.update_markers_across_views, 0)
 
@@ -308,7 +309,7 @@ class MarkerManager(object):
                          'begin': err_rgn.begin(),
                          'end': err_rgn.end()}
 
-            sublime.set_timeout(lambda: view.run_command('sublime_haskell_replace_text', repl_text), 0)
+            view.run_command('sublime_haskell_replace_text', repl_text)
 
 
     def make_message_panel(self, view, text, cabal_project_dir, panel_out):

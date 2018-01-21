@@ -129,9 +129,14 @@ class FlyCheckViewEventListener(sublime_plugin.ViewEventListener):
             sublime.set_timeout(self.scan_contents, 0)
             # Types.refresh_view_types(self.view)
 
+        def on_error(_view):
+            # Make sure to release the event, even if an error happens.
+            if done_check:
+                done_check.set()
+
         if self.view.is_dirty():
             current_file_name = self.view.file_name()
             BackendManager.active_backend().set_file_contents(file=current_file_name,
                                                               contents=self.view.substr(sublime.Region(0, self.view.size())))
 
-        EventCommon.do_check_lint(self.view, fly_mode=True, continue_success=on_done)
+        EventCommon.do_check_lint(self.view, fly_mode=True, continue_success=on_done, error_handler=on_error)

@@ -1,6 +1,7 @@
 # -*- coding: UTF-8 -*-
 # pylinee: disable=fixme
 
+import functools
 import os
 import os.path
 import pprint
@@ -341,7 +342,7 @@ class Builder(object):
         the resulting errors.'''
 
         # First hide error panel to show that something is going on
-        sublime.set_timeout(lambda: hide_output(view), 0)
+        sublime.set_timeout(functools.partial(hide_output, view), 0)
 
         # run and wait commands, fail on first fail
         # exit_code has scope outside of the loop
@@ -377,7 +378,7 @@ class Builder(object):
             self.PROJECTS_BEING_BUILT.remove(cabal_project_name)
 
         # Execute post-build steps in the UI thread (paranoia)
-        sublime.set_timeout(lambda: self.post_build(banner, cabal_project_dir, collected_out, exit_code), 0)
+        sublime.set_timeout(functools.partial(self.post_build, banner, cabal_project_dir, collected_out, exit_code), 0)
 
 
     def post_build(self, banner, cabal_project_dir, collected_out, exit_code):
