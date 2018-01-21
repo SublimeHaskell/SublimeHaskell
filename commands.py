@@ -1,6 +1,6 @@
+import functools
 import json
 import os.path
-# import pprint
 import webbrowser
 
 import sublime
@@ -48,7 +48,7 @@ def show_declaration_info(view, decl):
                 info['package_name'] = decl.module.location.package.name
                 info['db'] = decl.module.location.db.to_string()
 
-        sublime.set_timeout(lambda: view.run_command('sublime_haskell_symbol_info', info), 0)
+        view.run_command('sublime_haskell_symbol_info', info)
     else:
         show_declaration_info_panel(view, decl)
 
@@ -518,7 +518,7 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
     def on_import_selected(self, idx):
         if idx == 0:  # Yes, select imported module
             results = ['{0}.{1}'.format(i[0], i[1]) for i in self.candidates]
-            sublime.set_timeout(lambda: self.view.window().show_quick_panel(results, self.on_candidate_selected), 0)
+            sublime.set_timeout(functools.partial(self.view.window().show_quick_panel, results, self.on_candidate_selected), 0)
 
     def on_candidate_selected(self, idx):
         if idx >= 0:
@@ -674,7 +674,7 @@ class SublimeHaskellBrowseModule(CommandWin.BackendTextCommand):
                 info['package_name'] = the_module.location.package.name
                 info['db'] = the_module.location.db.to_string()
 
-            sublime.set_timeout(lambda: self.view.window().run_command('sublime_haskell_browse_module', info), 0)
+            self.view.window().run_command('sublime_haskell_browse_module', info)
 
     def on_symbol_selected(self, idx):
         if idx >= 0:
@@ -1043,8 +1043,8 @@ class SublimeHaskellAutoFix(CommandWin.BackendWindowCommand):
         if self.window.active_view().file_name():
             def on_resp(msgs):
                 self.status_msg.result_ok()
-                if msgs is not None:
-                    sublime.set_timeout(lambda: self.on_got_messages(msgs), 0)
+                if msgs:
+                    sublime.set_timeout(functools.partial(self.on_got_messages, msgs), 0)
 
             def on_err(err, _details):
                 self.status_msg.result_fail()
