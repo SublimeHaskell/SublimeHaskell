@@ -267,8 +267,8 @@ class Builder(object):
                 if idx != -1:
                     run_selected(projs[idx])
 
-            modlist = [(m[0], m[1].get('path', '??')) for m in projs]
-            self.view.window().show_quick_panel(modlist, on_done, 0, current_project_idx)
+            self.view.window().show_quick_panel([[m[0], m[1].get('path', '??')] for m in projs], on_done, 0,
+                                                current_project_idx)
 
 
     # Retrieve projects as dictionary that refers to this app instance
