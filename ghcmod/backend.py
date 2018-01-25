@@ -31,6 +31,15 @@ GHC_CHECK_REGEX = re.compile(FILE_LINE_COL_REGEX + r'(?P<details>.*$(\n?^(?!' + 
 GHC_LINT_REGEX = re.compile(FILE_LINE_COL_REGEX + r'(?P<msg>.*$)(?P<details>(\n?((?!' + NONCAPTURE_FLC_REGEX + r').*$))+)',
                             re.MULTILINE)
 
+def debug_send():
+    return Settings.COMPONENT_DEBUG.all_messages or Settings.COMPONENT_DEBUG.send_messages
+
+def debug_recv():
+    return Settings.COMPONENT_DEBUG.all_messages or Settings.COMPONENT_DEBUG.recv_messages
+
+def debug_any():
+    return debug_send() or debug_recv()
+
 class GHCModBackend(Backend.HaskellBackend):
     '''This class encapsulates all of the functions that interact with the `ghc-mod` backend.
     '''
@@ -119,7 +128,7 @@ class GHCModBackend(Backend.HaskellBackend):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def infer(self, projects=None, files=None, modules=None, **backend_args):
-        return self.dispatch_callbacks([], **backend_args)
+        return self.dispatch_callbacks([], None, **backend_args)
 
     def remove(self, cabal=False, sandboxes=None, projects=None, files=None, packages=None, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
@@ -145,23 +154,21 @@ class GHCModBackend(Backend.HaskellBackend):
     def module(self, project_name, lookup='', search_type='prefix', project=None, file=None, module=None, deps=None,
                sandbox=None, cabal=False, symdb=None, package=None, source=False, standalone=False, **backend_args):
         modsyms = None
-        errdiag = None
 
         if search_type == 'exact' and re.match(r'\w+(\.\w+)+', lookup):
             backend = self.project_backends.get(project_name)
-            modinfo, errdiag = backend.command_backend('browse -d -o ' + lookup) if backend is not None else []
+            modinfo = backend.command_backend('browse -d -o ' + lookup) if backend is not None else []
             if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
                 print('ghc-mod modules: resp =\n{0}'.format(pprint.pformat(modinfo)))
 
-            if not errdiag or 'EXCEPTION' not in ' '.join(errdiag):
-                impinfo = [symbols.Module(lookup)]
-                moddecls = dict([(decl.name, decl) for decl in [self.parse_syminfo(mdecl, impinfo) for mdecl in modinfo]])
-                if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
-                    print('ghc-mod modules: moddecls =\n{0}'.format(pprint.pformat(moddecls)))
+            impinfo = [symbols.Module(lookup)]
+            moddecls = dict([(decl.name, decl) for decl in [self.parse_syminfo(mdecl, impinfo) for mdecl in modinfo]])
+            if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
+                print('ghc-mod modules: moddecls =\n{0}'.format(pprint.pformat(moddecls)))
 
                 modsyms = symbols.Module(lookup, [], [], moddecls, symbols.PackageDb(global_db=True))
 
-        return self.dispatch_callbacks([modsyms] if modsyms else [], errdiag, **backend_args)
+        return self.dispatch_callbacks([modsyms] if modsyms else [], None, **backend_args)
 
     def resolve(self, file, exports=False, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
@@ -191,19 +198,18 @@ class GHCModBackend(Backend.HaskellBackend):
             return symbols.Package(pkg_name, pkg_ver)
 
         backend = self.project_backends.get(project_name)
-        modules, err = backend.command_backend('list -d') if backend is not None else ([], [])
+        modules = backend.command_backend('list -d') if backend is not None else ([], [])
         if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
             print('ghc-mod scope_modules: resp =\n{0}'.format(modules))
 
-        if not err:
-            filtered_mods = [symbols.Module(mod[1], [], [], {},
-                                            symbols.InstalledLocation(make_pkg(mod[0]), symbols.PackageDb(global_db=True)))
-                             for mod in (m.split() for m in modules if self.lookup_match(m[1], lookup, search_type))]
+        filtered_mods = [symbols.Module(mod[1], [], [], {},
+                                        symbols.InstalledLocation(make_pkg(mod[0]), symbols.PackageDb(global_db=True)))
+                         for mod in (m.split() for m in modules if self.lookup_match(m[1], lookup, search_type))]
 
         if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
             print('ghc-mod scope_modules: filtered_mods\n{0}'.format(pprint.pformat(filtered_mods)))
 
-        return self.dispatch_callbacks(filtered_mods, err, **backend_args)
+        return self.dispatch_callbacks(filtered_mods, None, **backend_args)
 
     def scope(self, file, lookup='', search_type='prefix', global_scope=False, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
@@ -302,41 +308,40 @@ class GHCModBackend(Backend.HaskellBackend):
         if Settings.COMPONENT_DEBUG.send_messages or Settings.COMPONENT_DEBUG.all_messages:
             print('ghc-mod types: type_cmd \'{0}\''.format(type_cmd))
 
-        result, errdiag = self.command_backend(file[0], type_cmd, map_file, file[0], fcontent)
+        result = self.command_backend(file[0], type_cmd, map_file, file[0], fcontent)
 
         if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
             print('ghc-mod types: type_output\n{0}'.format(pprint.pformat(result)))
 
-        if not errdiag:
-            for tyline in result:
-                line = tyline.split(maxsplit=4)
-                type_output.append({'note': {'expr': '',
-                                             'type': line[4].replace('"', '')},
-                                    'source': {},
-                                    'region': {'from': {'line': int(line[0]),
-                                                        'column': int(line[1])},
-                                               'to': {'line': int(line[2]),
-                                                      'column': int(line[3])}},
-                                    'level': None})
+        for tyline in result:
+            line = tyline.split(maxsplit=4)
+            type_output.append({'note': {'expr': '',
+                                         'type': line[4].replace('"', '')},
+                                'source': {},
+                                'region': {'from': {'line': int(line[0]),
+                                                    'column': int(line[1])},
+                                           'to': {'line': int(line[2]),
+                                                  'column': int(line[3])}},
+                                'level': None})
 
-        return self.dispatch_callbacks(type_output, errdiag, **backend_args)
+        return self.dispatch_callbacks(type_output, None, **backend_args)
 
     def langs(self, project_name, **backend_args):
         backend = self.project_backends.get(project_name)
-        langs, err = backend.command_backend('lang') if backend is not None else []
+        langs = backend.command_backend('lang') if backend is not None else []
 
         if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
             print('ghc-mod langs: resp =\n{0}'.format(langs))
 
-        return self.dispatch_callbacks(langs, err, **backend_args)
+        return self.dispatch_callbacks(langs, None, **backend_args)
 
     def flags(self, project_name, **backend_args):
         backend = self.project_backends.get(project_name)
-        flags, err = backend.command_backend('flag') if backend is not None else []
+        flags = backend.command_backend('flag') if backend is not None else []
         if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
             print('ghc-mod flags: resp =\n{0}'.format(flags))
 
-        return self.dispatch_callbacks(flags, err, **backend_args)
+        return self.dispatch_callbacks(flags, None, **backend_args)
 
     def autofix_show(self, messages, **backend_args):
         backend_args.pop('wait_complete', None)
@@ -390,7 +395,7 @@ class GHCModBackend(Backend.HaskellBackend):
         if backend is not None:
             return backend.command_backend(cmd, do_map, file, contents)
 
-        return ([], [])
+        return []
 
     def translate_regex_output(self, cmd, files, contents, regex, xlat_func):
         retval = []
@@ -399,15 +404,12 @@ class GHCModBackend(Backend.HaskellBackend):
             map_file = contents is not None and file in contents
             fcontent = contents[file] if map_file else None
 
-            resp, backend_err = self.command_backend(file, cmd + ' ' + file, map_file, file, fcontent)
+            resp = self.command_backend(file, cmd + ' ' + file, map_file, file, fcontent)
 
             if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
                 print('ghc-mod: {0}: map_file {1}, resp =\n{2}'.format(cmd, map_file, pprint.pformat(resp)))
 
-            if not backend_err:
-                retval.extend([xlat_func(project_dir, m) for m in regex.finditer('\n'.join(resp))])
-            else:
-                print('-----:\n{0}\n-----'.format('\n'.join(backend_err)))
+            retval.extend([xlat_func(project_dir, m) for m in regex.finditer('\n'.join(resp))])
 
         if Settings.COMPONENT_DEBUG.recv_messages or Settings.COMPONENT_DEBUG.all_messages:
             print('ghc-mod: {0}:\n{1}'.format(cmd, pprint.pformat(retval)))
@@ -517,16 +519,9 @@ class GHCModBackend(Backend.HaskellBackend):
 
         modname, is_qualified, qualname = modinfo
         mod_imported = [symbols.Import(modname, is_qualified, qualname)]
-        syms, err = backend.command_backend('browse -d -o ' + modname) if backend is not None else ([], [])
-
+        syms = backend.command_backend('browse -d -o ' + modname) if backend is not None else []
         Logging.log('ghc-mod collect_completions: syms {0}'.format(syms), Logging.LOG_DEBUG)
-        retval = []
-        if not err:
-            retval = [self.parse_syminfo(sym, mod_imported) for sym in syms if sym.startswith(lookup)]
-        else:
-            Logging.log('backend error: {0}'.format(err))
-
-        return retval
+        return [self.parse_syminfo(sym, mod_imported) for sym in syms if sym.startswith(lookup)]
 
 
     def parse_syminfo(self, syminfo, mod_imported):
@@ -576,13 +571,25 @@ class GHCModClient(object):
     GHCMOD_ERROR_MARKER = 'X: '
 
     def __init__(self, project, project_dir, opt_args):
-        Logging.log('Starting \'ghc-mod\' for project {0}'.format(project), Logging.LOG_INFO)
+        if debug_any():
+            print('Starting \'ghc-mod\' for project {0}'.format(project))
 
         self.ghcmod = None
         self.action_lock = None
         self.stderr_drain = None
         self.cmd = []
-        self.diag_prefix = 'ghc-mod ' + project
+        self.diag_prefix = 'ghc-mod: project ' + project
+
+        win = sublime.active_window()
+        self.output_panel = win.create_output_panel(self.diag_prefix)
+        win.run_command('show_panel', {'panel': 'output.' + self.diag_prefix})
+        self.output_panel.settings().set("auto_indent", False)
+        self.output_panel.settings().set("smart_indent", False)
+        self.output_panel.run_command('selectAll')
+        self.output_panel.run_command('leftDeleteCharacters')
+        msg = 'Error output from ' + self.diag_prefix
+        banner = '~' * len(msg)
+        self.output_panel.run_command('insert', {'characters': '\n'.join([banner, msg, banner, '', ''])})
 
         # if self.exec_with is not None:
         #     if self.exec_with == 'cabal':
@@ -599,7 +606,8 @@ class GHCModClient(object):
         self.cmd += opt_args
         self.cmd += ['legacy-interactive']
 
-        Logging.log('ghc-mod command: {0}'.format(self.cmd), Logging.LOG_DEBUG)
+        if debug_any():
+            print('ghc-mod command: {0}'.format(self.cmd))
 
         self.ghcmod = ProcHelper.ProcHelper(self.cmd, cwd=project_dir)
         if self.ghcmod.process is not None:
@@ -609,7 +617,7 @@ class GHCModClient(object):
             self.stderr_drain = OutputCollector.DescriptorDrain(self.diag_prefix, self.ghcmod.process.stderr)
             self.stderr_drain.start()
         else:
-            Logging.log('Did not start ghc-mod successfully.')
+            Logging.log('Did not start ghc-mod ({0}) successfully.'.format(self.diag_prefix))
 
     def shutdown(self):
         if self.ghcmod is not None:
@@ -617,7 +625,7 @@ class GHCModClient(object):
                 print('', file=self.ghcmod.process.stdin, flush=True)
             except OSError:
                 pass
-        if self.stderr_drain is not None and self.stderr_drain.is_alive():
+        if self.stderr_drain and self.stderr_drain.is_alive():
             self.stderr_drain.stop()
             self.stderr_drain.join()
 
@@ -627,7 +635,6 @@ class GHCModClient(object):
 
     def read_response(self):
         resp_stdout = []
-        resp_stderr = []
         try:
             got_reply = False
             while not got_reply:
@@ -644,10 +651,10 @@ class GHCModClient(object):
                         else:
                             resp_stdout.append(resp.rstrip())
                     elif prefix == self.GHCMOD_ERROR_MARKER:
-                        Logging.log('{0}: {1}'.format(self.diag_prefix, resp))
-                        resp_stderr.append(resp)
+                        # Just log the error output, just like the Emacs version
+                        self.output_panel.run_command('insert', {'characters': resp + '\n'})
                     elif prefix == 'NG ':
-                        sys.stdout.write('Error response: ' + resp)
+                        sys.stdout.write('{0} malformed command or error response: {1}'.format(self.diag_prefix, resp))
                         got_reply = True
                     else:
                         sys.stdout.write('Unexpected reply from ghc-mod client: ' + resp)
@@ -655,27 +662,43 @@ class GHCModClient(object):
         except OSError:
             self.shutdown()
 
-        return (resp_stdout, resp_stderr)
+        return resp_stdout
 
     def command_backend(self, cmd, do_map=False, file=None, contents=None):
+        if not self.action_lock:
+            return ([], ['No ghc-mod backend for {0}'.format(self.diag_prefix)])
+
         with self.action_lock:
             try:
                 if do_map:
+                    if debug_send():
+                        print('{0}.command_backend: mapping file {1}'.format(type(self).__name__, file))
                     print('map-file ' + file, file=self.ghcmod.process.stdin)
                     self.ghcmod.process.stdin.write(contents)
                     self.ghcmod.process.stdin.write('\n' + chr(4) + '\n')
                     self.ghcmod.process.stdin.flush()
-                    self.read_response()
+                    resp = self.read_response()
+                    if debug_recv():
+                        print('{0}.command_backend: map-file received {1}'.format(type(self).__name__, resp))
                 try:
+                    if debug_send():
+                        print('{0}.command_backend: sending {1}'.format(type(self).__name__, cmd))
                     print(cmd, file=self.ghcmod.process.stdin, flush=True)
-                    return self.read_response()
+                    resp = self.read_response()
+                    if debug_recv():
+                        print('{0}.command_backend: received {1}'.format(type(self).__name__, resp))
+                    return resp
                 except OSError:
                     self.shutdown()
-                    return ([], [])
+                    return []
                 finally:
                     if do_map:
+                        if debug_send():
+                            print('{0}.command_backend: mapping file {1}'.format(type(self).__name__, file))
                         print('unmap-file ' + file, file=self.ghcmod.process.stdin, flush=True)
-                        self.read_response()
+                        unmap_resp = self.read_response()
+                        if debug_recv():
+                            print('{0}.command_backend: unmap-file received {1}'.format(type(self).__name__, unmap_resp))
             except OSError:
                 self.shutdown()
-                return ([], [])
+                return []
