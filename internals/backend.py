@@ -303,7 +303,6 @@ class HaskellBackend(object):
                 on_error(self.backend_name(), errmsg)
             else:
                 print('--- dispatching callbacks: error info:\n{0}\n-----'.format(errmsg))
-            ## return on_error(errmsg) if on_error is not None else errmsg
 
 
 class NullHaskellBackend(HaskellBackend):

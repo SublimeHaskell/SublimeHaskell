@@ -287,13 +287,14 @@
     // inspired by hacking on the hsdev backend.
     //
     // "all_messages": Emit all messages (send and receive)
-    // "send_messages": Emit all sent messages
-    // "recv_messages": Emit all received messages
-    // "socket_pool": Keep track of the socket pool avail/used sizes.
     // "callbacks": Show interesting information about 'hsdev' callbacks
-    // "event_viewer": Event handling dignostics and debug
     // "completions": Completion generator diagnostics and debug
+    // "event_viewer": Event handling dignostics and debug
     // "fly_mode": Fly mode debugging
+    // "inspection": Source inspection debugging
+    // "recv_messages": Emit all received messages
+    // "send_messages": Emit all sent messages
+    // "socket_pool": Keep track of the socket pool avail/used sizes.
     "component_debug": []
 
     // SublimeHaskell per-project settings (or "things you can put in your .sublime-project file")
