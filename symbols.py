@@ -162,6 +162,9 @@ class Location(object):
     def get_id(self):
         return self.filename
 
+    def project_path(self):
+        return os.path.dirname(self.project) if self.project is not None else None
+
     def __eq__(self, other):
         if isinstance(other, Location):
             return self.filename == other.filename and self.project == other.project
@@ -822,6 +825,13 @@ class SymbolUsage(object):
             source_location(self.used_in.location, self.position),
             self.symbol.name
         )
+
+    def internal_usage(self):
+        """ Used in same module, where defined """
+        return self.symbol.module.location == self.used_in.location
+
+    def definition_usage(self):
+        return self.internal_usage() and self.position == self.symbol.position
 
 
 class Corrector(object):

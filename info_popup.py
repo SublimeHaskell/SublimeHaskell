@@ -118,6 +118,7 @@ class SublimeHaskellHoverPopup(object):
             ## print('hover: qualified symbol {0}'.format(qsymbol))
             module_word = qsymbol.module
             ident = qsymbol.name
+            project_dir = Common.locate_cabal_project_from_view(self.view)[0]
 
             if module_word is not None and ident is None:
                 # TODO: Any ideas for popup about module?
@@ -144,13 +145,19 @@ class SublimeHaskellHoverPopup(object):
                 # Try whois
                 suggest_import = False
                 decl = Utils.head_of(BackendManager.active_backend().whoat(line + 1, column + 1, self.filename))
+                usages = BackendManager.active_backend().usages(line + 1, column + 1, self.filename) if decl else None
+                if usages:
+                    usages = [
+                        u for u in usages
+                        if not u.definition_usage() and (u.used_in.location.filename == self.filename or u.used_in.location.project_path() == project_dir)
+                    ]
                 if not decl:
                     decl = Utils.head_of(BackendManager.active_backend().whois(whois_name, self.filename))
                 if not decl:
                     suggest_import = True
                     decl = Utils.head_of(BackendManager.active_backend().lookup(full_name, self.filename))
 
-                self.create_symbol_popup(typed_expr, decl, suggest_import)
+                self.create_symbol_popup(typed_expr, decl, suggest_import, usages=usages)
 
         elif self.hover_zone == sublime.HOVER_GUTTER:
             errs = [err for err in ParseOutput.MARKER_MANAGER.marks_for_view(self.view) if err.region.start.line == self.line]
@@ -175,7 +182,7 @@ class SublimeHaskellHoverPopup(object):
                                      self.on_navigate, self.on_hide)
 
 
-    def create_symbol_popup(self, typed_expr, decl, suggest_import):
+    def create_symbol_popup(self, typed_expr, decl, suggest_import, usages=None):
         if typed_expr or decl:
             popup_parts = [self.STYLES.gen_style(self.view.settings().get('color_scheme'))]
             if typed_expr:
@@ -186,6 +193,25 @@ class SublimeHaskellHoverPopup(object):
                 popup_msg = [u'<a href="import:{0}">Add import</a>'.format(urllib.parse.quote_plus(decl.name))] \
                             if suggest_import else []
                 popup_parts.append(decl.popup(popup_msg))
+            if usages is not None:
+                source_symbol = decl.by_source()
+                used_total = len(usages)
+                used_here = len([u for u in usages if u.used_in.location.filename == self.filename])
+                used_defm = len([u for u in usages if u.internal_usage()])
+
+                if used_total == 0:
+                    usages_tpl = 'Not used'
+                elif not source_symbol:
+                    usages_tpl = 'Usages: {total} ({here} in this file)'
+                else:
+                    if decl.module.location.filename == self.filename:
+                        usages_tpl = 'Usages: {total} ({here} in this file)'
+                    else:
+                        usages_tpl = 'Usages: {total} ({here} in this file, {defm} in def file)'
+                usages_msg = usages_tpl.format(total=used_total, here=used_here, defm=used_defm)
+                print(usages_msg)
+
+                popup_parts.append(u'<span class="comment">{0}</span>'.format(usages_msg))
 
             popup_text = u''.join(popup_parts)
             if not self.shown:
