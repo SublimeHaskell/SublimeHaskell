@@ -170,7 +170,10 @@ class MarkerManager(object):
         '''
 
         def to_error(errmsg):
-            filename, line, column, messy_details = errmsg.groups()
+            filename = errmsg.group('filename')
+            line = errmsg.group('line')
+            column = errmsg.group('col')
+            messy_details = errmsg.group('details')
             filename = os.path.normpath(os.path.join(base_dir, filename))
             line, column = int(line), int(column)
 
@@ -215,7 +218,7 @@ class MarkerManager(object):
         def messages_level(name, level):
             if summary[level]:
                 count = '{0}: {1}'.format(name, summary[level])
-                msgs = '\n'.join([str(m) for m in self.messages if m.level == level])
+                msgs = '\n'.join([str(m) + '\n' for m in self.messages if m.level == level])
                 return '{0}\n\n{1}'.format(count, msgs)
 
             return ''
