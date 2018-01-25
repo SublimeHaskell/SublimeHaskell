@@ -468,7 +468,10 @@ class SublimeHaskellSymbolUsages(CommandWin.BackendTextCommand):
 
     def run(self, _edit, **kwargs):
         self.current_file_name = kwargs.get('filename') or self.view.file_name()
-        self.line, self.column = self.view.rowcol(self.view.sel()[0].a)
+        self.line = kwargs.get('line')
+        self.column = kwargs.get('column')
+        if self.line is None or self.column is None:
+            self.line, self.column = self.view.rowcol(self.view.sel()[0].a)
 
         usages = BackendManager.active_backend().usages(self.line + 1, self.column + 1, self.current_file_name)
         if not usages:
