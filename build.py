@@ -342,7 +342,7 @@ class Builder(object):
         the resulting errors.'''
 
         # First hide error panel to show that something is going on
-        sublime.set_timeout(functools.partial(hide_output, view), 0)
+        Common.hide_panel(view.window(), panel_name=OUTPUT_PANEL_NAME)
 
         # run and wait commands, fail on first fail
         # exit_code has scope outside of the loop
@@ -371,8 +371,8 @@ class Builder(object):
                 if exit_code != 0:
                     break
 
-            if exit_code != 0:
-                # We're going to show the errors in the output panel, so hide the build output
+            if exit_code == 0:
+                # Hide the build panel if successful
                 Common.hide_panel(view.window(), panel_name=BUILD_LOG_PANEL_NAME)
         finally:
             self.PROJECTS_BEING_BUILT.remove(cabal_project_name)
@@ -443,7 +443,7 @@ class SublimeHaskellRunCommand(SublimeHaskellBuildCommand):
     def run(self, **_args):
         self.executables = []
         projs = []
-        builder = Builder(self.window)
+        builder = Builder(self.window.active_view())
         projects = builder.get_projects()
         for proj, info in projects.items():
             if 'description' in info:
@@ -494,7 +494,7 @@ class SublimeHaskellRunCommand(SublimeHaskellBuildCommand):
         project_builder = Settings.get_project_setting(view, 'haskell_build_tool', Settings.PLUGIN.haskell_build_tool)
         cmd_list = ProcHelper.exec_wrapper_cmd(project_builder, [self.exec_name] + shlex.split(args))
 
-        hide_output(self.window)
+        Common.hide_panel(self.window, panel_name=OUTPUT_PANEL_NAME)
         outview = Common.output_panel(self.window, panel_name=OUTPUT_PANEL_NAME)
 
         pretty_cmdargs = 'Running \'{0}\' in {1}'.format(' '.join(cmd_list), self.exec_base_dir)
@@ -509,7 +509,3 @@ class SublimeHaskellRunCommand(SublimeHaskellBuildCommand):
 
         def run(self):
             self.the_proc.wait()
-
-
-def hide_output(window):
-    window.run_command('hide_panel', {'panel': 'output.' + OUTPUT_PANEL_NAME})

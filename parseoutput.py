@@ -336,7 +336,7 @@ def goto_error(view, mark):
     line = mark.region.start.line + 1
     column = mark.region.start.column + 1
 
-    show_output(view)
+    Common.show_panel(view.window(), OUTPUT_PANEL_NAME)
     msg_panel = MARKER_MANAGER.message_panel
     # error_region = msg_panel.find('{0}: line {1}, column \\d+:(\\n\\s+.*)*'.format(re.escape(mark.filename), line), 0)
     error_region = msg_panel.find(re.escape(str(mark)), 0)
@@ -385,15 +385,6 @@ class SublimeHaskellPreviousError(CommandWin.SublimeHaskellTextCommand):
             self.view.sel().clear()
             self.view.sel().add(prev_err.region.to_region(self.view))
             goto_error(self.view, prev_err)
-
-
-def hide_output(view, panel_name=OUTPUT_PANEL_NAME):
-    view.window().run_command('hide_panel', {'panel': 'output.' + panel_name})
-
-
-def show_output(view, panel_name=OUTPUT_PANEL_NAME):
-    ## view.set_read_only(True)
-    view.window().run_command('show_panel', {'panel': 'output.' + panel_name})
 
 
 def tabs_offset(view, point):

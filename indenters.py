@@ -7,13 +7,13 @@ import sublime
 import SublimeHaskell.cmdwin_types as CommandWin
 import SublimeHaskell.internals.proc_helper as ProcHelper
 import SublimeHaskell.internals.settings as Settings
+import SublimeHaskell.sublime_haskell_common as Common
 
 FILTER_OUTPUT_PANEL_NAME = 'haskell_run_output'
 
 def do_prettify(view, edit, indenter, indenter_options):
     try:
-        window = view.window()
-        window.run_command('hide_panel', {'panel': 'output.' + FILTER_OUTPUT_PANEL_NAME})
+        Common.hide_panel(view.window(), panel_name=FILTER_OUTPUT_PANEL_NAME)
         regions = []
         for region in view.sel():
             regions.append(sublime.Region(region.a, region.b))
@@ -56,9 +56,9 @@ def do_prettify(view, edit, indenter, indenter_options):
 
 def report_error(view, errmsg):
     window = view.window()
-    output_view = window.get_output_panel(FILTER_OUTPUT_PANEL_NAME)
+    output_view = Common.output_panel(window, FILTER_OUTPUT_PANEL_NAME)
     output_view.run_command('sublime_haskell_output_text', {'text': errmsg, 'clear': 'yes'})
-    window.run_command('show_panel', {'panel': ('output.' + FILTER_OUTPUT_PANEL_NAME)})
+    Common.show_panel(window, FILTER_OUTPUT_PANEL_NAME)
     output_view.sel().clear()
     output_view.sel().add(sublime.Region(0, 0))
 
