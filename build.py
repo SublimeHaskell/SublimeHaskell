@@ -371,7 +371,7 @@ class Builder(object):
                 if exit_code != 0:
                     break
 
-            if collected_out and exit_code != 0:
+            if exit_code != 0:
                 # We're going to show the errors in the output panel, so hide the build output
                 Common.hide_panel(view.window(), panel_name=BUILD_LOG_PANEL_NAME)
         finally:
