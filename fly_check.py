@@ -139,4 +139,4 @@ class FlyCheckViewEventListener(sublime_plugin.ViewEventListener):
             BackendManager.active_backend().set_file_contents(file=current_file_name,
                                                               contents=self.view.substr(sublime.Region(0, self.view.size())))
 
-        EventCommon.do_check_lint(self.view, fly_mode=True, continue_success=on_done, error_handler=on_error)
+        EventCommon.do_check_lint(self.view, continue_success=on_done, error_handler=on_error)
