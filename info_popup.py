@@ -203,17 +203,19 @@ class SublimeHaskellHoverPopup(object):
                 if used_total == 0:
                     usages_tpl = 'Not used'
                 elif not source_symbol:
-                    usages_tpl = '{usages_ref}: {total} ({here} in this file)'
+                    usages_tpl = '{usages_ref}: {total} (<a href="select:{line}:{column}">{here} in this file</a>)'
                 else:
                     if decl.module.location.filename == self.filename:
-                        usages_tpl = '{usages_ref}: {total} ({here} in this file)'
+                        usages_tpl = '{usages_ref}: {total} (<a href="select:{line}:{column}">{here} in this file</a>)'
                     else:
-                        usages_tpl = '{usages_ref}: {total} ({here} in this file, {defm} in def file)'
+                        usages_tpl = '{usages_ref}: {total} (<a href="select:{line}:{column}">{here} in this file</a>, {defm} in def file)'
                 usages_msg = usages_tpl.format(
                     usages_ref=usages_ref,
                     total=used_total,
                     here=used_here,
                     defm=used_defm,
+                    line=self.line,
+                    column=self.column,
                 )
 
                 popup_parts.append(u'<span class="comment">{0}</span>'.format(usages_msg))
@@ -252,6 +254,15 @@ class SublimeHaskellHoverPopup(object):
                     'sublime_haskell_symbol_usages',
                     {
                         'filename': self.view.file_name(),
+                        'line': line,
+                        'column': column,
+                    }
+                )
+            elif url[0:7] == "select:":
+                line, column = tuple(map(int, url.split(':')[1:]))
+                self.view.run_command(
+                    'sublime_haskell_select_symbol_occurrences',
+                    {
                         'line': line,
                         'column': column,
                     }

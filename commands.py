@@ -484,6 +484,40 @@ class SublimeHaskellSymbolUsages(CommandWin.BackendTextCommand):
         panel.settings().set('result_file_regex', FILE_REGEX)
 
 
+class SublimeHaskellSelectSymbolOccurrences(CommandWin.BackendTextCommand):
+    """
+    Select all occurrences of symbol in current view
+    """
+    def __init__(self, view):
+        super().__init__(view)
+        self.current_file_name = None
+
+    def run(self, _edit, **kwargs):
+        self.current_file_name = kwargs.get('filename') or self.view.file_name()
+        self.line = kwargs.get('line')
+        self.column = kwargs.get('column')
+        if self.line is None or self.column is None:
+            self.line, self.column = self.view.rowcol(self.view.sel()[0].a)
+
+        usages = BackendManager.active_backend().usages(self.line + 1, self.column + 1, self.current_file_name)
+        if usages is not None:
+            usages = [u for u in usages if u.used_in.location == symbols.Location(self.current_file_name)]
+            for u in usages:
+                u.region.to_zero_based()
+        if not usages:
+            Common.sublime_status_message("No usages found")
+            return
+
+        self.view.sel().clear()
+        self.view.sel().add_all([
+            sublime.Region(
+                self.view.text_point(u.region.start.line, u.region.start.column),
+                self.view.text_point(u.region.end.line, u.region.end.column)
+            )
+            for u in usages
+        ])
+
+
 class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
     """
     Show information about selected symbol

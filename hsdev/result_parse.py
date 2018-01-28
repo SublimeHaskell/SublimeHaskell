@@ -111,8 +111,9 @@ def parse_symbol_usage(sym):
         return None
     return symbols.SymbolUsage(
         parse_symbol(get_value(sym, 'symbol')),
+        get_value(sym, 'qualifier'),
         parse_module_id(get_value(sym, 'in')),
-        parse_position(get_value(sym, 'at')),
+        parse_region(get_value(sym, 'at')),
     )
 
 
