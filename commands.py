@@ -478,7 +478,7 @@ class SublimeHaskellSymbolUsages(CommandWin.BackendTextCommand):
             Common.sublime_status_message("No usages found")
             return
 
-        usages_msg = u'\n'.join([str(u) for u in usages])
+        usages_msg = u'\n'.join([str(u) for u in sorted(usages, key=lambda u: (u.used_in.location.filename, u.region.start))])
 
         panel = Common.output_panel(self.view.window(), usages_msg, 'sublime_haskell_symbol_usages_panel')
         panel.settings().set('result_file_regex', FILE_REGEX)
