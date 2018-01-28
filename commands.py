@@ -917,10 +917,17 @@ class SublimeHaskellEvalExpressionCommand(CommandWin.BackendTextCommand):
         self.eval_exprs([expr])
 
     def eval_expr(self, exprs):
-        self.results = BackendManager.active_backend().ghc_eval(exprs, file=self.view.file_name())
+        self.exprs = exprs
+        BackendManager.active_backend().ghc_eval(
+            self.exprs, file=self.view.file_name(),
+            on_response=self.on_respone, on_error=self.on_error
+        )
+
+    def on_response(self, results):
+        self.results = results
         if self.results is not None and len(self.results) > 0:
             msgs = []
-            for expr, res in zip(exprs, self.results):
+            for expr, res in zip(self.exprs, self.results):
                 msgs.append(u'\n'.join([
                     u'\u03BB> {0}'.format(expr),
                     '⇒ {0}'.format('Error' if res.failure() else 'Ok'),
@@ -928,7 +935,10 @@ class SublimeHaskellEvalExpressionCommand(CommandWin.BackendTextCommand):
                 ]))
             output_message = '\n\n'.join(msgs)
 
-            Common.output_panel(self.view.window(), output_message, 'sublime_haskell_eval_expression_panel')
+            sublime.set_timeout(lambda: Common.output_panel(self.view.window(), output_message, 'sublime_haskell_eval_expression_panel'), 0)
+
+    def on_error(self, error, _details):
+        sublime.set_timeout(lambda: Common.output_panel(self.view.window(), error, 'sublime_haskell_eval_expression_panel'), 0)
 
     def on_cancel(self):
         pass
@@ -951,17 +961,27 @@ class SublimeHaskellExpressionTypeCommand(CommandWin.BackendTextCommand):
         self.type_exprs([expr])
 
     def type_exprs(self, exprs):
-        self.results = BackendManager.active_backend().ghc_type(exprs, file=self.view.file_name())
+        self.exprs = exprs
+        BackendManager.active_backend().ghc_type(
+            self.exprs, file=self.view.file_name(),
+            on_response=self.on_response, on_error=self.on_error
+        )
+
+    def on_response(self, results):
+        self.results = results
         if self.results is not None and len(self.results) > 0:
             msgs = []
-            for expr, res in zip(exprs, self.results):
+            for expr, res in zip(self.exprs, self.results):
                 msgs.append(u'\n'.join([
                     u'\u03BB> {0}'.format(expr),
                     res.result if res.success() else 'Error: {0}'.format(res.error),
                 ]))
             output_message = '\n\n'.join(msgs)
 
-            Common.output_panel(self.view.window(), output_message, 'sublime_haskell_type_expression_panel')
+            sublime.set_timeout(lambda: Common.output_panel(self.view.window(), output_message, 'sublime_haskell_type_expression_panel'), 0)
+
+    def on_error(self, error, _details):
+        sublime.set_timeout(lambda: Common.output_panel(self.view.window(), error, 'sublime_haskell_type_expression_panel'), 0)
 
     def on_cancel(self):
         pass
@@ -975,7 +995,7 @@ class SublimeHaskellEvalSelectionCommand(CommandWin.BackendTextCommand):
 
     def run(self, _edit, **_kwargs):
         self.args = [self.view.substr(s) for s in self.view.sel()]
-        self.results = ghc_eval_x(BackendManager.active_backend().ghc_eval(self.args))
+        self.results = ghc_eval_x(BackendManager.active_backend().ghc_eval(self.args, wait_complete=True))
 
         self.view.run_command('sublime_haskell_eval_replace', {'results': self.results})
 
@@ -1006,9 +1026,9 @@ class SublimeHaskellApplyToSelectionCommand(CommandWin.BackendTextCommand):
         return True
 
     def on_done(self, fname):
-        self.results = ghc_eval_x(BackendManager.active_backend().ghc_eval(["({0}) ({1})".format(fname, a) for a in self.args]))
+        self.results = ghc_eval_x(BackendManager.active_backend().ghc_eval(["({0}) ({1})".format(fname, a) for a in self.args], wait_complete=True))
         ghc_eval_expr = ["({0}) ({1})".format(fname, json.dumps(a)) for a in self.args]
-        self.string_results = ghc_eval_x(BackendManager.active_backend().ghc_eval(ghc_eval_expr))
+        self.string_results = ghc_eval_x(BackendManager.active_backend().ghc_eval(ghc_eval_expr, wait_complete=True))
 
         self.view.run_command('sublime_haskell_eval_replace',
                               {'results': ghc_eval_merge_results(self.results, self.string_results)})
@@ -1041,8 +1061,8 @@ class SublimeHaskellApplyToSelectionListCommand(CommandWin.BackendTextCommand):
         comma_delim_args = ", ".join(self.args)
         json_args = ", ".join([json.dumps(a) for a in self.args])
 
-        self.results = ghc_eval_x(BackendManager.active_backend().ghc_eval(['({0}) [{1}]'.format(fname, comma_delim_args)]))
-        self.string_results = ghc_eval_x(BackendManager.active_backend().ghc_eval(['({0}) [{1}]'.format(fname, json_args)]))
+        self.results = ghc_eval_x(BackendManager.active_backend().ghc_eval(['({0}) [{1}]'.format(fname, comma_delim_args)], wait_complete=True))
+        self.string_results = ghc_eval_x(BackendManager.active_backend().ghc_eval(['({0}) [{1}]'.format(fname, json_args)], wait_complete=True))
         self.res = ghc_eval_merge_results(self.results, self.string_results)
 
         if self.res[0] is None:
