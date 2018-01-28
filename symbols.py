@@ -927,3 +927,15 @@ def restore_corrections_regions(views, corrs):
 
         for rgn, corr in zip(rgns, corrs):
             corr.corrector.from_region(view, rgn)
+
+
+class ReplResult(object):
+    def __init__(self, result, error=None):
+        self.result = result
+        self.error = error
+
+    def success(self):
+        return self.result is not None
+
+    def failure(self):
+        return self.error is not None

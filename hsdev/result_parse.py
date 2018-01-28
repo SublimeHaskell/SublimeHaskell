@@ -209,6 +209,17 @@ def parse_correction(corr):
     )
 
 
+def parse_repl_results(rs):
+    return parse_list(parse_repl_result, rs)
+
+
+def parse_repl_result(result):
+    return symbols.ReplResult(
+        result=get_value(result, 'ok'),
+        error=get_value(result, 'error'),
+    )
+
+
 def parse_corrector(corr):
     return symbols.Corrector(parse_region(corr['region']), corr['contents'])
 

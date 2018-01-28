@@ -553,8 +553,15 @@ class HsDevBackend(Backend.HaskellBackend):
         the_file = None
         if file is not None:
             the_file = {'file': file, 'contents': source}
-        callbacks, backend_args = self.make_callbacks('ghc eval', **backend_args)
+        callbacks, backend_args = self.make_callbacks('ghc eval', result_convert=ResultParse.parse_repl_results, **backend_args)
         return self.list_command('ghc eval', {'exprs': exprs, 'file': the_file}, callbacks, **backend_args)
+
+    def ghc_type(self, exprs, file=None, source=None, **backend_args):
+        the_file = None
+        if file is not None:
+            the_file = {'file': file, 'contents': source}
+        callbacks, backend_args = self.make_callbacks('ghc type', result_convert=ResultParse.parse_repl_results, **backend_args)
+        return self.list_command('ghc type', {'exprs': exprs, 'file': the_file}, callbacks, **backend_args)
 
     def exit(self):
         return self.command('exit', {}, self.make_callbacks('exit')[0])

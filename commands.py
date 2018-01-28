@@ -882,16 +882,16 @@ def ghc_eval_x(resps):
     # Drop 'fail' to be 'None' and unwrap strings
     # No idea how to call this function
     def process(i):
-        if isinstance(i, dict):
+        if i.failure():
             return None
         try:
-            resp_str = json.loads(i)
+            resp_str = json.loads(i.result)
             if isinstance(resp_str, str):
                 return resp_str
         except ValueError:
             pass
 
-        return i
+        return i.result
     return list(map(process, resps))
 
 
@@ -907,22 +907,61 @@ class SublimeHaskellEvalExpressionCommand(CommandWin.BackendTextCommand):
         self.results = None
 
     def run(self, _edit, **_kwargs):
-        self.view.window().show_input_panel('Expression', '', self.on_done, None, self.on_cancel)
+        exprs = [self.view.substr(s) for s in self.view.sel() if not s.empty()]
+        if not exprs:
+            self.view.window().show_input_panel('Expression', '', self.on_done, None, self.on_cancel)
+        else:
+            self.eval_exprs(exprs)
 
     def on_done(self, expr):
-        self.results = BackendManager.active_backend().ghc_eval([expr], file=self.view.file_name())
+        self.eval_exprs([expr])
+
+    def eval_expr(self, exprs):
+        self.results = BackendManager.active_backend().ghc_eval(exprs, file=self.view.file_name())
         if self.results is not None and len(self.results) > 0:
-            res = self.results[0]
+            msgs = []
+            for expr, res in zip(exprs, self.results):
+                msgs.append(u'\n'.join([
+                    u'\u03BB> {0}'.format(expr),
+                    '⇒ {0}'.format('Error' if res.failure() else 'Ok'),
+                    '{0}'.format(res.result or res.error)
+                ]))
+            output_message = '\n\n'.join(msgs)
 
-            if isinstance(res, dict):
-                if 'fail' in res:
-                    msg = '\n'.join(['Error', '', res['fail']])
-                else:
-                    msg = str(res)
-            else:
-                msg = res
+            Common.output_panel(self.view.window(), output_message, 'sublime_haskell_eval_expression_panel')
 
-            Common.output_panel(self.view.window(), msg, 'sublime_haskell_eval_expression_panel')
+    def on_cancel(self):
+        pass
+
+
+class SublimeHaskellExpressionTypeCommand(CommandWin.BackendTextCommand):
+    def __init__(self, view):
+        super().__init__(view)
+        self.args = []
+        self.results = None
+
+    def run(self, _edit, **_kwargs):
+        exprs = [self.view.substr(s) for s in self.view.sel() if not s.empty()]
+        if not exprs:
+            self.view.window().show_input_panel('Expression', '', self.on_done, None, self.on_cancel)
+        else:
+            self.type_exprs(exprs)
+
+    def on_done(self, expr):
+        self.type_exprs([expr])
+
+    def type_exprs(self, exprs):
+        self.results = BackendManager.active_backend().ghc_type(exprs, file=self.view.file_name())
+        if self.results is not None and len(self.results) > 0:
+            msgs = []
+            for expr, res in zip(exprs, self.results):
+                msgs.append(u'\n'.join([
+                    u'\u03BB> {0}'.format(expr),
+                    res.result if res.success() else 'Error: {0}'.format(res.error),
+                ]))
+            output_message = '\n\n'.join(msgs)
+
+            Common.output_panel(self.view.window(), output_message, 'sublime_haskell_type_expression_panel')
 
     def on_cancel(self):
         pass
