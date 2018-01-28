@@ -215,7 +215,6 @@ class SublimeHaskellHoverPopup(object):
                     here=used_here,
                     defm=used_defm,
                 )
-                print(usages_msg)
 
                 popup_parts.append(u'<span class="comment">{0}</span>'.format(usages_msg))
 
