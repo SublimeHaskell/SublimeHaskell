@@ -1159,6 +1159,7 @@ class AutoFixState(object):
         (cur, corrs) = self.get_corrections()
         self.corrections = BackendManager.active_backend().autofix_fix(HsDevResultParse.encode_corrections([cur]),
                                                                        rest=HsDevResultParse.encode_corrections(corrs),
+                                                                       wait_complete=True,
                                                                        pure=True)
         if not self.corrections:
             self.selected = 0

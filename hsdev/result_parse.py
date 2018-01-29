@@ -235,7 +235,7 @@ def encode_correction(corr):
             'file': corr.file},
         'level': corr.level,
         'note': {
-            'corrector': encode_corrector(corr.corrector),
+            'action': encode_corrector(corr.corrector),
             'message': corr.message},
         'region': {
             'from': encode_position(corr.corrector.region.start.from_zero_based()),
