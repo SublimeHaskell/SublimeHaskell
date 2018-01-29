@@ -38,8 +38,8 @@ class HsDevBackend(Backend.HaskellBackend):
 
     HSDEV_DEFAULT_PORT = 4567
     HSDEV_DEFAULT_HOST = 'localhost'
-    HSDEV_MIN_VER = [0, 3, 0, 0]  # minimum hsdev version
-    HSDEV_MAX_VER = [0, 3, 1, 0]  # maximum hsdev version
+    HSDEV_MIN_VER = [0, 3, 1, 0]  # minimum hsdev version
+    HSDEV_MAX_VER = [0, 3, 2, 0]  # maximum hsdev version
     HSDEV_CALL_TIMEOUT = 300.0 # second timeout for synchronous requests (5 minutes should be enough, no?)
 
     def __init__(self, backend_mgr, local=True, port=HSDEV_DEFAULT_PORT, host=HSDEV_DEFAULT_HOST, **kwargs):
