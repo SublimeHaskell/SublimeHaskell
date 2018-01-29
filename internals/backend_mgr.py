@@ -205,7 +205,9 @@ class BackendManager(object, metaclass=Utils.Singleton):
             ubackend = user_backends.get(ubname)
             if ubackend is not None:
                 ubclazz = BackendManager.BACKEND_META.get(ubackend.get('backend'))
-                if ubclazz is not None and ubclazz.is_available(**ubackend.get('options', {})):
+                backend_options = dict(ubackend.get('options', {}))
+                backend_options['backend_name'] = ubname
+                if ubclazz is not None and ubclazz.is_available(**backend_options):
                     retval[ubname] = ubackend
 
         return retval

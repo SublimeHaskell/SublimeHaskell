@@ -38,6 +38,7 @@ class HsDevBackend(Backend.HaskellBackend):
 
     HSDEV_DEFAULT_PORT = 4567
     HSDEV_DEFAULT_HOST = 'localhost'
+    HSDEV_NOT_FOUND = [0, 0, 0, 0]
     HSDEV_MIN_VER = [0, 2, 0, 0]  # minimum hsdev version
     HSDEV_MAX_VER = [0, 3, 0, 0]  # maximum hsdev version
     HSDEV_CALL_TIMEOUT = 300.0 # second timeout for synchronous requests (5 minutes should be enough, no?)
@@ -100,14 +101,31 @@ class HsDevBackend(Backend.HaskellBackend):
         install_dir = kwargs.get('install-dir')
         local = kwargs.get('local', False)
         exec_install_set = not bool(exec_with) ^ bool(install_dir)
+        backend_name = kwargs.get('backend_name', 'not specified.')
         if exec_install_set or local:
             if not exec_install_set:
                 # Either exec-with or install-dir isn't set, so the corresponding configuration target is unavailable.
                 return False
 
             hsdev_ver = HsDevBackend.hsdev_version(exec_with, install_dir)
-            Logging.log('hsdev version: {0}'.format('.'.join(map(str, hsdev_ver))), Logging.LOG_INFO)
-            return hsdev_ver >= HsDevBackend.HSDEV_MIN_VER and hsdev_ver < HsDevBackend.HSDEV_MAX_VER
+            str_version = '.'.join([str(v) for v in hsdev_ver])
+            Logging.log('hsdev version: {0}'.format(str_version), Logging.LOG_INFO)
+            retval = hsdev_ver >= HsDevBackend.HSDEV_MIN_VER and hsdev_ver < HsDevBackend.HSDEV_MAX_VER
+            if not retval:
+                if retval != HsDevBackend.HSDEV_NOT_FOUND:
+                    min_version = '.'.join([str(v) for v in HsDevBackend.HSDEV_MIN_VER])
+                    max_version = '.'.join([str(v) for v in HsDevBackend.HSDEV_MAX_VER])
+                    msg = '\n'.join(['Backend configuration: "{0}"'.format(backend_name),
+                                     '',
+                                     'Incompatible hsdev, detected version ' + str_version,
+                                     'Version should be \u2265 ' + min_version + ' and < ' + max_version])
+                else:
+                    msg = '\n'.join(['Backend configuration: "{0}"'.format(backend_name),
+                                     '',
+                                     'Tried executing hsdev to get a version number, not successful.',
+                                     'Is hsdev installed (or built, if using stack or cabal exec wrappers)?'])
+                sublime.message_dialog(msg)
+            return retval
 
         # Assume that a remote backend is actually available. Ultimately, we might not connect to it, but
         # it is available to us as a backend.
