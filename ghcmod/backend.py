@@ -581,15 +581,13 @@ class GHCModClient(object):
         self.diag_prefix = 'ghc-mod: project ' + project
 
         win = sublime.active_window()
-        self.output_panel = win.create_output_panel(self.diag_prefix)
-        win.run_command('show_panel', {'panel': 'output.' + self.diag_prefix})
-        self.output_panel.settings().set("auto_indent", False)
-        self.output_panel.settings().set("smart_indent", False)
-        self.output_panel.run_command('selectAll')
-        self.output_panel.run_command('leftDeleteCharacters')
-        msg = 'Error output from ' + self.diag_prefix
+        msg = 'Error and diagnostic output from ' + self.diag_prefix
         banner = '~' * len(msg)
-        self.output_panel.run_command('insert', {'characters': '\n'.join([banner, msg, banner, '', ''])})
+        self.output_panel = Common.output_panel(win, panel_name=self.diag_prefix,
+                                                text='\n'.join([banner, msg, banner, '', '']))
+        panel_settings = self.output_panel.settings()
+        panel_settings.set("auto_indent", False)
+        panel_settings.set("smart_indent", False)
 
         # if self.exec_with is not None:
         #     if self.exec_with == 'cabal':

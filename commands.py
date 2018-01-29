@@ -1044,8 +1044,7 @@ class AutoFixState(object):
         self.view.erase_regions('autofix')
         self.view.erase_regions('autofix_current')
         window = self.view.window()
-        if window is not None:
-            window.run_command('hide_panel', {'panel': 'output.' + 'sublime_haskell_auto_fix'})
+        Common.hide_panel(window, panel_name='sublime_haskell_auto_fix')
 
     def count(self):
         return len(self.corrections)
