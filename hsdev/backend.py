@@ -39,8 +39,8 @@ class HsDevBackend(Backend.HaskellBackend):
     HSDEV_DEFAULT_PORT = 4567
     HSDEV_DEFAULT_HOST = 'localhost'
     HSDEV_NOT_FOUND = [0, 0, 0, 0]
-    HSDEV_MIN_VER = [0, 3, 0, 0]  # minimum hsdev version
-    HSDEV_MAX_VER = [0, 3, 1, 0]  # maximum hsdev version
+    HSDEV_MIN_VER = [0, 3, 1, 0]  # minimum hsdev version
+    HSDEV_MAX_VER = [0, 3, 2, 0]  # maximum hsdev version
     HSDEV_CALL_TIMEOUT = 300.0 # second timeout for synchronous requests (5 minutes should be enough, no?)
 
     def __init__(self, backend_mgr, local=True, port=HSDEV_DEFAULT_PORT, host=HSDEV_DEFAULT_HOST, **kwargs):
@@ -567,12 +567,21 @@ class HsDevBackend(Backend.HaskellBackend):
         callbacks, backend_args = self.make_callbacks('flags', **backend_args)
         return self.command('flags', {}, callbacks, **backend_args)
 
-    def ghc_eval(self, exprs, file=None, source=None, **backend_args):
+    def ghc_eval(self, exprs, file=None, source=None, wait_complete=False, **backend_args):
         the_file = None
         if file is not None:
             the_file = {'file': file, 'contents': source}
-        callbacks, backend_args = self.make_callbacks('ghc eval', **backend_args)
-        return self.list_command('ghc eval', {'exprs': exprs, 'file': the_file}, callbacks, **backend_args)
+        callbacks, backend_args = self.make_callbacks('ghc eval', result_convert=ResultParse.parse_repl_results, **backend_args)
+        action = self.list_command if wait_complete else self.async_list_command
+        return action('ghc eval', {'exprs': exprs, 'file': the_file}, callbacks, **backend_args)
+
+    def ghc_type(self, exprs, file=None, source=None, wait_complete=False, **backend_args):
+        the_file = None
+        if file is not None:
+            the_file = {'file': file, 'contents': source}
+        callbacks, backend_args = self.make_callbacks('ghc type', result_convert=ResultParse.parse_repl_results, **backend_args)
+        action = self.list_command if wait_complete else self.async_list_command
+        return action('ghc type', {'exprs': exprs, 'file': the_file}, callbacks, **backend_args)
 
     def exit(self):
         return self.command('exit', {}, self.make_callbacks('exit')[0])

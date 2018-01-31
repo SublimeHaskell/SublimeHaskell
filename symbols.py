@@ -167,7 +167,7 @@ class Location(object):
 
     def __eq__(self, other):
         if isinstance(other, Location):
-            return self.filename == other.filename and self.project == other.project
+            return self.filename == other.filename
         return False
 
 
@@ -815,14 +815,15 @@ class CabalPackage(object):
 
 
 class SymbolUsage(object):
-    def __init__(self, symbol, used_in, position):
+    def __init__(self, symbol, qualifier, used_in, region):
         self.symbol = symbol
+        self.qualifier = qualifier
         self.used_in = used_in
-        self.position = position
+        self.region = region
 
     def __str__(self):
         return u'{0}: {1}'.format(
-            source_location(self.used_in.location, self.position),
+            source_location(self.used_in.location, self.region),
             self.symbol.name
         )
 
@@ -831,7 +832,7 @@ class SymbolUsage(object):
         return self.symbol.module.location == self.used_in.location
 
     def definition_usage(self):
-        return self.internal_usage() and self.position == self.symbol.position
+        return self.internal_usage() and self.region.start == self.symbol.position
 
 
 class Corrector(object):
@@ -926,3 +927,15 @@ def restore_corrections_regions(views, corrs):
 
         for rgn, corr in zip(rgns, corrs):
             corr.corrector.from_region(view, rgn)
+
+
+class ReplResult(object):
+    def __init__(self, result, error=None):
+        self.result = result
+        self.error = error
+
+    def success(self):
+        return self.result is not None
+
+    def failure(self):
+        return self.error is not None

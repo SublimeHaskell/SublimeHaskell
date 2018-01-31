@@ -111,8 +111,9 @@ def parse_symbol_usage(sym):
         return None
     return symbols.SymbolUsage(
         parse_symbol(get_value(sym, 'symbol')),
+        get_value(sym, 'qualifier'),
         parse_module_id(get_value(sym, 'in')),
-        parse_position(get_value(sym, 'at')),
+        parse_region(get_value(sym, 'at')),
     )
 
 
@@ -208,6 +209,17 @@ def parse_correction(corr):
     )
 
 
+def parse_repl_results(rs):
+    return parse_list(parse_repl_result, rs)
+
+
+def parse_repl_result(result):
+    return symbols.ReplResult(
+        result=get_value(result, 'ok'),
+        error=get_value(result, 'error'),
+    )
+
+
 def parse_corrector(corr):
     return symbols.Corrector(parse_region(corr['region']), corr['contents'])
 
@@ -223,7 +235,7 @@ def encode_correction(corr):
             'file': corr.file},
         'level': corr.level,
         'note': {
-            'corrector': encode_corrector(corr.corrector),
+            'action': encode_corrector(corr.corrector),
             'message': corr.message},
         'region': {
             'from': encode_position(corr.corrector.region.start.from_zero_based()),

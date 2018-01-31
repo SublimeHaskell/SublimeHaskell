@@ -107,13 +107,12 @@ class SublimeHaskellHoverPopup(object):
         self.filename = filename
         self.point = point
         self.hover_zone = hover_zone
-        self.line = view.rowcol(point)[0]
+        self.line, self.column = view.rowcol(point)
         self.shown = False
 
 
     def do_hover(self):
         if self.hover_zone == sublime.HOVER_TEXT:
-            line, column = self.view.rowcol(self.point)
             qsymbol = Common.get_qualified_symbol_at_point(self.view, self.point)
             ## print('hover: qualified symbol {0}'.format(qsymbol))
             module_word = qsymbol.module
@@ -144,8 +143,8 @@ class SublimeHaskellHoverPopup(object):
 
                 # Try whois
                 suggest_import = False
-                decl = Utils.head_of(BackendManager.active_backend().whoat(line + 1, column + 1, self.filename))
-                usages = BackendManager.active_backend().usages(line + 1, column + 1, self.filename) if decl else None
+                decl = Utils.head_of(BackendManager.active_backend().whoat(self.line + 1, self.column + 1, self.filename))
+                usages = BackendManager.active_backend().usages(self.line + 1, self.column + 1, self.filename) if decl else None
                 if usages:
                     usages = [
                         u for u in usages
@@ -199,17 +198,25 @@ class SublimeHaskellHoverPopup(object):
                 used_here = len([u for u in usages if u.used_in.location.filename == self.filename])
                 used_defm = len([u for u in usages if u.internal_usage()])
 
+                usages_ref = '<a href="usages:{0}:{1}">Usages</a>'.format(self.line, self.column)
+
                 if used_total == 0:
                     usages_tpl = 'Not used'
                 elif not source_symbol:
-                    usages_tpl = 'Usages: {total} ({here} in this file)'
+                    usages_tpl = '{usages_ref}: {total} (<a href="select:{line}:{column}">{here} in this file</a>)'
                 else:
                     if decl.module.location.filename == self.filename:
-                        usages_tpl = 'Usages: {total} ({here} in this file)'
+                        usages_tpl = '{usages_ref}: {total} (<a href="select:{line}:{column}">{here} in this file</a>)'
                     else:
-                        usages_tpl = 'Usages: {total} ({here} in this file, {defm} in def file)'
-                usages_msg = usages_tpl.format(total=used_total, here=used_here, defm=used_defm)
-                print(usages_msg)
+                        usages_tpl = '{usages_ref}: {total} (<a href="select:{line}:{column}">{here} in this file</a>, {defm} in def file)'
+                usages_msg = usages_tpl.format(
+                    usages_ref=usages_ref,
+                    total=used_total,
+                    here=used_here,
+                    defm=used_defm,
+                    line=self.line,
+                    column=self.column,
+                )
 
                 popup_parts.append(u'<span class="comment">{0}</span>'.format(usages_msg))
 
@@ -241,6 +248,25 @@ class SublimeHaskellHoverPopup(object):
                 self.view.run_command('sublime_haskell_insert_import_for_symbol',
                                       {'filename': self.view.file_name(),
                                        'decl': decl_name})
+            elif url[0:7] == "usages:":
+                line, column = tuple(map(int, url.split(':')[1:]))
+                self.view.run_command(
+                    'sublime_haskell_symbol_usages',
+                    {
+                        'filename': self.view.file_name(),
+                        'line': line,
+                        'column': column,
+                    }
+                )
+            elif url[0:7] == "select:":
+                line, column = tuple(map(int, url.split(':')[1:]))
+                self.view.run_command(
+                    'sublime_haskell_select_symbol_occurrences',
+                    {
+                        'line': line,
+                        'column': column,
+                    }
+                )
             else:
                 self.view.window().open_file(url, sublime.ENCODED_POSITION)
 

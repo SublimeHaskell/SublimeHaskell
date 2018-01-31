@@ -130,6 +130,10 @@
         "command": "sublime_haskell_eval_expression"
     },
     {
+        "caption": "SublimeHaskell: Expression type",
+        "command": "sublime_haskell_expression_type"
+    },
+    {
         "caption": "SublimeHaskell: Eval selection",
         "command": "sublime_haskell_eval_selection"
     },
