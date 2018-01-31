@@ -238,7 +238,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
 
 
 class HaskellSourceViewEventListener(sublime_plugin.ViewEventListener):
-    IMPROVED_SYNTAX_FILE = 'Packages/SublimeHaskell/Syntaxes/Haskell-SublimeHaskell.tmLanguage'
+    IMPROVED_SYNTAX_FILE = 'Packages/SublimeHaskell/Syntaxes/Haskell-SublimeHaskell.sublime-syntax'
     '''The improved syntax module/file.
     '''
 

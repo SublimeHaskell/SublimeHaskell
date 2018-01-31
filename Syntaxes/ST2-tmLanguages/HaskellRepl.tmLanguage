@@ -5,7 +5,7 @@
 	<key>keyEquivalent</key>
 	<string>^~G</string>
 	<key>name</key>
-	<string>Haskell Repl</string>
+	<string>ST2 Haskell Repl</string>
 	<key>patterns</key>
 	<array>
 		<dict>
