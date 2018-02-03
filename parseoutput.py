@@ -387,14 +387,6 @@ class SublimeHaskellPreviousError(CommandWin.SublimeHaskellTextCommand):
             goto_error(self.view, prev_err)
 
 
-def hide_output(view, panel_name = OUTPUT_PANEL_NAME):
-    view.window().run_command('hide_panel', {'panel': 'output.' + panel_name})
-
-
-def show_output(view, panel_name = OUTPUT_PANEL_NAME):
-    view.window().run_command('show_panel', {'panel': 'output.' + panel_name})
-
-
 def tabs_offset(view, point):
     """
     Returns count of '\t' before point in line multiplied by 7

@@ -53,7 +53,7 @@ class ChainRunner(object):
         if self.filename:
             self.fly_mode = fly_mode
             if not self.fly_mode:
-                ParseOutput.hide_output(self.view)
+                Common.hide_panel(self.view)
             if cmds:
                 self.status_msg = Common.status_message_process(self.caption + ': ' + self.filename)
                 self.status_msg.start()
