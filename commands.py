@@ -916,11 +916,11 @@ class SublimeHaskellEvalExpressionCommand(CommandWin.BackendTextCommand):
     def on_done(self, expr):
         self.eval_exprs([expr])
 
-    def eval_expr(self, exprs):
+    def eval_exprs(self, exprs):
         self.exprs = exprs
         BackendManager.active_backend().ghc_eval(
             self.exprs, file=self.view.file_name(),
-            on_response=self.on_respone, on_error=self.on_error
+            on_response=self.on_response, on_error=self.on_error
         )
 
     def on_response(self, results):
