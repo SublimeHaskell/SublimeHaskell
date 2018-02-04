@@ -601,24 +601,16 @@ class HsDevBackend(Backend.HaskellBackend):
         if self.whois(symname, filename):
             return (False, ['Symbol {0} already in scope'.format(symname)])
 
-        candidates = self.lookup(symname, filename)
+        candidates = list(filter(
+            lambda c: c.imported_from is not None,
+            self.lookup(symname, filename),
+        ))
         return (True, candidates) if candidates else (False, ['Symbol {0} not found'.format(symname)])
 
-    def contents_to_module(self, contents):
-        imp_module = None
-        hsinspect_proc = ProcHelper.exec_with_wrapper(self.exec_with, self.install_dir, ['hsinspect'])
-        if hsinspect_proc.process is not None:
-            exit_code, result, _ = hsinspect_proc.wait(input_str=contents)
-            if exit_code == 0:
-                pyresult = json.loads(result).get('result')
-                if pyresult is not None:
-                    if Logging.is_log_level(Logging.LOG_DEBUG):
-                        pprint.pprint(pyresult, width=127)
-                    modinfo = pyresult.get('module')
-                    if modinfo is not None:
-                        imp_module = ResultParse.parse_module(modinfo)
-
-        return imp_module
+    def contents_to_module(self, file, contents):
+        self.set_file_contents(file, contents)
+        self.scan(files=[file], wait_complete=True)
+        return Utils.head_of(self.module(None, file=file))
 
     def clean_imports(self, filename):
         cmd = ['hsclearimports', filename, '--max-import-list', '64']

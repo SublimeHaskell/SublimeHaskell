@@ -142,6 +142,13 @@ class Region(object):
         return self.start == self.end
 
 
+def lt_impl(x, y, t):
+    if isinstance(y, t):
+        return x.as_tuple() < y.as_tuple()
+    raise RuntimeError('Incomparable types: {0} and {1}'.format(x, y))
+
+
+@total_ordering
 class Location(object):
     """
     Location in file at line
@@ -165,10 +172,19 @@ class Location(object):
     def project_path(self):
         return os.path.dirname(self.project) if self.project is not None else None
 
+    def as_tuple(self):
+        return (self.filename,)
+
     def __eq__(self, other):
         if isinstance(other, Location):
-            return self.filename == other.filename
+            return self.as_tuple() == other.as_tuple()
         return False
+
+    def __hash__(self):
+        return hash(self.as_tuple())
+
+    def __lt__(self, other):
+        return lt_impl(self, other, Location)
 
 
 def source_location(loc, pos):
@@ -178,6 +194,7 @@ def source_location(loc, pos):
     return ':'.join([str(loc), str(pos)])
 
 
+@total_ordering
 class Package(object):
     def __init__(self, name, version=None):
         self.name = name
@@ -191,10 +208,19 @@ class Package(object):
             return self.name == other.name and (self.version is None or self.version == other.version)
         return False
 
+    def as_tuple(self):
+        return (self.name, self.version)
+
     def __eq__(self, other):
         if isinstance(other, Package):
             return self.name == other.name and self.version == other.version
         return False
+
+    def __hash__(self):
+        return hash((self.name, self.version))
+
+    def __lt__(self, other):
+        return lt_impl(self, other, Package)
 
 
 def parse_package(package_id):
@@ -250,6 +276,7 @@ class PackageDb(object):
         return PackageDb(package_db=pkgdb_str)
 
 
+@total_ordering
 class InstalledLocation(object):
     """
     Module location in cabal
@@ -270,12 +297,22 @@ class InstalledLocation(object):
     def get_id(self):
         return '{0}:{1}'.format(self.name, self.package.package_id())
 
+    def as_tuple(self):
+        return (self.name, self.package)
+
     def __eq__(self, other):
         if isinstance(other, InstalledLocation):
             return self.name == other.name and self.package == other.package
         return False
 
+    def __hash__(self):
+        return hash((self.name, self.package))
 
+    def __lt__(self, other):
+        return lt_impl(self, other, InstalledLocation)
+
+
+@total_ordering
 class OtherLocation(object):
     """
     Other module location
@@ -295,10 +332,19 @@ class OtherLocation(object):
     def get_id(self):
         return '[{0}]'.format(self.source)
 
+    def as_tuple(self):
+        return (self.source,)
+
     def __eq__(self, other):
         if isinstance(other, OtherLocation):
             return self.source == other.source
         return False
+
+    def __hash__(self):
+        return hash(self.source)
+
+    def __lt__(self, other):
+        return lt_impl(self, other, OtherLocation)
 
 
 def location_package(loc):
@@ -377,13 +423,15 @@ def format_type(expr):
         return html.escape(expr, quote=False)
 
 
+@total_ordering
 class ModuleId(object):
     """
     Base for Haskell module
     """
-    def __init__(self, name, location):
+    def __init__(self, name, location, exposed=True):
         self.name = name
         self.location = location
+        self.exposed = exposed
 
     def __str__(self):
         return u'ModuleId({0} at {1})'.format(self.name, self.location)
@@ -397,12 +445,28 @@ class ModuleId(object):
     def by_hayoo(self):
         return isinstance(self.location, OtherLocation)
 
+    def visible(self):
+        return self.exposed
+
+    def hidden(self):
+        return not self.exposed
+
+    def as_tuple(self):
+        return (self.name, self.location)
+
     def __eq__(self, other):
         if isinstance(other, ModuleId):
             return self.name == other.name and self.location == other.location
         return False
 
+    def __hash__(self):
+        return hash((self.name, self.location))
 
+    def __lt__(self, other):
+        return lt_impl(self, other, ModuleId)
+
+
+@total_ordering
 class SymbolId(object):
     """
     Base for Haskell symbols, name with module its defined in
@@ -423,18 +487,27 @@ class SymbolId(object):
     def by_hayoo(self):
         return self.module.by_hayoo()
 
+    def as_tuple(self):
+        return (self.name, self.module)
+
     def __eq__(self, other):
         if isinstance(other, SymbolId):
             return self.name == other.name and self.module == other.module
         return False
+
+    def __hash__(self):
+        return hash((self.name, self.module))
+
+    def __lt__(self, other):
+        return lt_impl(self, other, SymbolId)
 
 
 class Module(ModuleId):
     """
     Haskell module
     """
-    def __init__(self, name, location=None, exports=None, imports=None, last_inspection_time=0):
-        super().__init__(name, location)
+    def __init__(self, name, location=None, exports=None, imports=None, exposed=True, last_inspection_time=0):
+        super().__init__(name, location, exposed=exposed)
         self.location = location
         # List of strings
         self.exports = exports[:] if exports is not None else []
@@ -455,18 +528,34 @@ class Module(ModuleId):
         return u'Module({0} (exports {1}, imports {2}))'.format(self.name, len(self.exports), len(self.imports))
 
 
+@total_ordering
 class Symbol(SymbolId):
     """
     Haskell symbol: function, data, class etc.
     """
-    def __init__(self, symbol_type, name, module, docs=None, position=None):
+    def __init__(self, symbol_type, name, module, docs=None, position=None, imported_from=None):
         super().__init__(name, module)
         self.what = symbol_type
         self.docs = docs
         self.position = position
+        self.imported_from = imported_from
 
     def __str__(self):
         return u'Symbol({0} {1} in {2})'.format(self.what, self.name, self.module)
+
+    def as_tuple(self):
+        return (self.name, self.module, self.what)
+
+    def __eq__(self, other):
+        if isinstance(other, Symbol):
+            return self.name == other.name and self.module == other.module and self.what == other.what
+        return False
+
+    def __hash__(self):
+        return hash((self.name, self.module, self.what))
+
+    def __lt__(self, other):
+        return lt_impl(self, other, Symbol)
 
     def has_source_location(self):
         return self.by_source() and self.position is not None
@@ -575,8 +664,8 @@ class Function(Symbol):
     """
     Haskell function declaration
     """
-    def __init__(self, name, module, function_type, docs=None, position=None):
-        super().__init__('function', name, module, docs=docs, position=position)
+    def __init__(self, name, module, function_type, docs=None, position=None, imported_from=None):
+        super().__init__('function', name, module, docs=docs, position=position, imported_from=imported_from)
         self.type = function_type
 
     def __repr__(self):
@@ -606,8 +695,8 @@ class TypeBase(Symbol):
     """
     Haskell type, data or class
     """
-    def __init__(self, decl_type, name, module, context, args, docs=None, position=None):
-        super().__init__(decl_type, name, module, docs=docs, position=position)
+    def __init__(self, decl_type, name, module, context, args, docs=None, position=None, imported_from=None):
+        super().__init__(decl_type, name, module, docs=docs, position=position, imported_from=imported_from)
         self.context = context
         self.args = args
 
@@ -662,40 +751,40 @@ class Type(TypeBase):
     """
     Haskell type synonym
     """
-    def __init__(self, name, module, context, args, docs=None, position=None):
-        super().__init__('type', name, module, context, args, docs=docs, position=position)
+    def __init__(self, name, module, context, args, docs=None, position=None, imported_from=None):
+        super().__init__('type', name, module, context, args, docs=docs, position=position, imported_from=imported_from)
 
 
 class Newtype(TypeBase):
     """
     Haskell newtype synonym
     """
-    def __init__(self, name, module, context, args, docs=None, position=None):
-        super().__init__('newtype', name, module, context, args, docs=docs, position=position)
+    def __init__(self, name, module, context, args, docs=None, position=None, imported_from=None):
+        super().__init__('newtype', name, module, context, args, docs=docs, position=position, imported_from=imported_from)
 
 
 class Data(TypeBase):
     """
     Haskell data declaration
     """
-    def __init__(self, name, module, context, args, docs=None, position=None):
-        super().__init__('data', name, module, context, args, docs=docs, position=position)
+    def __init__(self, name, module, context, args, docs=None, position=None, imported_from=None):
+        super().__init__('data', name, module, context, args, docs=docs, position=position, imported_from=imported_from)
 
 
 class Class(TypeBase):
     """
     Haskell class declaration
     """
-    def __init__(self, name, module, context, args, docs=None, position=None):
-        super().__init__('class', name, module, context, args, docs=docs, position=position)
+    def __init__(self, name, module, context, args, docs=None, position=None, imported_from=None):
+        super().__init__('class', name, module, context, args, docs=docs, position=position, imported_from=imported_from)
 
     def __repr__(self):
         return u'Class({0})'.format(self.name)
 
 
 class UnknownSymbol(Symbol):
-    def __init__(self, symbol_type, name, module, docs=None, position=None, **kwargs):
-        super().__init__(symbol_type, name, module, docs=docs, position=position)
+    def __init__(self, symbol_type, name, module, docs=None, position=None, imported_from=None, **kwargs):
+        super().__init__(symbol_type, name, module, docs=docs, position=position, imported_from=imported_from)
         for field in ["type", "parent_class", "parent", "constructors", "args", "ctx", "associate", "pat_type", "constructor"]:
             kwargs.setdefault(field, None)
         self.__dict__.update(kwargs)

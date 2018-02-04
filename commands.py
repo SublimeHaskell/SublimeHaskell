@@ -1218,6 +1218,7 @@ class SublimeHaskellAutoFix(CommandWin.BackendWindowCommand):
             self.status_msg.start()
             BackendManager.active_backend().check_lint(files=[self.window.active_view().file_name()],
                                                        ghc=Settings.PLUGIN.ghc_opts,
+                                                       hlint=Settings.PLUGIN.lint_opts,
                                                        on_response=on_resp,
                                                        on_error=on_err)
 

@@ -10,6 +10,9 @@ def parse_modules(modules):
     return parse_list(parse_module, modules)
 
 
+def parse_imports(imports):
+    return parse_list(parse_import, imports)
+
 def parse_symbols(symbols):
     return parse_list(parse_symbol, symbols)
 
@@ -32,6 +35,7 @@ def parse_module_id(mod):
     return symbols.ModuleId(
         mod['name'],
         parse_location(mod.get('location')),
+        exposed=get_value(mod, 'exposed', True),
     )
 
 
@@ -52,6 +56,7 @@ def parse_module(mod):
         mid.name,
         mid.location,
         exports=parse_symbols(mod.get('exports')),
+        imports=parse_imports(mod.get('imports')),
     )
 
 
@@ -62,6 +67,7 @@ def parse_symbol(sym):
     sid = parse_symbol_id(sym['id'])
     docs = sym.get('docs')
     pos = parse_position(sym.get('pos'))
+    imported = parse_module_id(sym.get('imported'))
 
     sinfo = sym['info']
     what = sinfo['what']
@@ -80,6 +86,7 @@ def parse_symbol(sym):
             function_type=sinfo.get('type'),
             docs=docs,
             position=pos,
+            imported_from=imported,
         )
     elif what in type_symbols:
         ctx = sinfo.get('ctx')
@@ -92,6 +99,7 @@ def parse_symbol(sym):
             args=args,
             docs=docs,
             position=pos,
+            imported_from=imported,
         )
     else:
         sinfo.pop('what')
@@ -102,6 +110,7 @@ def parse_symbol(sym):
             sid.module,
             docs=docs,
             position=pos,
+            imported_from=imported,
             **fields
         )
 
@@ -184,7 +193,16 @@ def parse_location(srclocation):
 
 
 def parse_import(imp):
-    return symbols.Import(imp['name'], imp['qualified'], imp.get('as'), parse_position(imp.get('pos'))) if imp else None
+    return symbols.Import(
+        get_value(imp, 'name'),
+        is_qualified=get_value(imp, 'qualified'),
+        import_as=get_value(imp, 'as'),
+        position=parse_position(imp.get('pos')),
+    ) if imp else None
+
+
+# def parse_import(imp):
+#     return symbols.Import(imp['name'], imp['qualified'], imp.get('as'), parse_position(imp.get('pos'))) if imp else None
 
 
 def parse_cabal_package(pkg):
