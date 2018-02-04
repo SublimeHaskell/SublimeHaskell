@@ -125,6 +125,9 @@
     // Additional ghc options for use in ghc-mod and ModuleInspector, for example "-package ghc"
     "ghc_opts": [],
 
+    // Additional options for lint
+    "lint_opts": [],
+
     // ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
     // Backend selection:
     // ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
@@ -229,6 +232,12 @@
     // ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
     // User interaction settings:
     // ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
+
+    // reinspect modified & unsaved source
+    "inspect_modified": false,
+
+    // idle time in seconds before inspection modified & unsaved file
+    "inspect_modified_idle": 1,
 
     // lint & check on the fly
     "lint_check_fly": false,

@@ -51,11 +51,14 @@ class SettingsContainer(object):
         same_property_pref('enable_hdocs'),
         same_property_pref('ghc_opts'),
         same_property_pref('ghci_opts'),
+        same_property_pref('lint_opts'),
         same_property_pref('haskell_build_tool'),
         same_property_pref('hindent_options'),
         same_property_pref('hsdev_log_config'),
         same_property_pref('hsdev_log_level'),
         same_property_pref('inspect_modules'),
+        same_property_pref('inspect_modified'),
+        same_property_pref('inspect_modified_idle'),
         same_property_pref('lint_check_fly'),
         same_property_pref('lint_check_fly_idle'),
         same_property_pref('log'),
@@ -89,11 +92,14 @@ class SettingsContainer(object):
         self._enable_hdocs = False
         self._ghc_opts = []
         self._ghci_opts = []
+        self._lint_opts = []
         self._haskell_build_tool = 'stack'
         self._hindent_options = []
         self._hsdev_log_config = 'use silent'
         self._hsdev_log_level = 'warning'
         self._inspect_modules = True
+        self._inspect_modified = False
+        self._inspect_modified_idle = 1
         self._lint_check_fly = False
         self._lint_check_fly_idle = 5
         self._log = 1
@@ -135,11 +141,14 @@ class SettingsContainer(object):
     enable_hdocs = make_config_property('enable_hdocs')
     ghc_opts = make_config_property('ghc_opts')
     ghci_opts = make_config_property('ghci_opts')
+    lint_opts = make_config_property('lint_opts')
     haskell_build_tool = make_config_property('haskell_build_tool')
     hindent_options = make_config_property('hindent_options')
     hsdev_log_config = make_config_property('hsdev_log_config')
     hsdev_log_level = make_config_property('hsdev_log_level')
     inspect_modules = make_config_property('inspect_modules')
+    inspect_modified = make_config_property('inspect_modified')
+    inspect_modified_idle = make_config_property('inspect_modified_idle')
     lint_check_fly = make_config_property('lint_check_fly')
     lint_check_fly_idle = make_config_property('lint_check_fly_idle')
 

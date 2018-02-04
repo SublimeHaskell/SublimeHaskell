@@ -21,7 +21,7 @@ def hsdev_check():
 
 
 def hsdev_lint():
-    return (BackendMgr.active_backend().lint, file_as_file_list, {})
+    return (BackendMgr.active_backend().lint, file_as_file_list, {'hlint': Settings.PLUGIN.lint_opts})
 
 
 def messages_as_hints(cmd):

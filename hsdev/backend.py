@@ -515,7 +515,7 @@ class HsDevBackend(Backend.HaskellBackend):
 
         callbacks, backend_args = self.make_callbacks('lint', result_convert=result_convert, **backend_args)
         return action('lint', {'files': self.files_and_contents(files, contents),
-                               'hlint-opts': hlint or []},
+                               'lint-opts': hlint or []},
                       callbacks, **backend_args)
 
     def check(self, files=None, contents=None, ghc=None, wait_complete=False, **backend_args):
@@ -535,7 +535,7 @@ class HsDevBackend(Backend.HaskellBackend):
         callbacks, backend_args = self.make_callbacks('check-lint', result_convert=result_convert, **backend_args)
         return action('check-lint', {'files': self.files_and_contents(files, contents),
                                      'ghc-opts': ghc or [],
-                                     'hlint-opts': hlint or []},
+                                     'lint-opts': hlint or []},
                       callbacks, **backend_args)
 
     def types(self, _projectname, file, _modulename, _line, _column, ghc_flags=None, contents=None, **backend_args):
