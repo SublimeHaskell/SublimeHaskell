@@ -92,22 +92,22 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
 
             if after:
                 # Insert before after[0]
-                insert_line = after[0].position.line - 1
+                insert_line = after[0].position.line - 2  # Convert to zero-based
             elif imports:
                 # Insert after all imports
-                insert_line = imports[-1].position.line
+                insert_line = imports[-1].position.line - 1
             else:
                 declarations = self.backend.symbol(file=self.view.file_name())
                 if declarations:
                     # Insert before first declaration
-                    insert_line = min([d.position.line for d in declarations]) - 1
+                    insert_line = min([d.position.line for d in declarations]) - 2
                     insert_gap = True
                 else:
                     # Try to add the import just after the "where" of the module declaration
                     contents = self.view.substr(sublime.Region(0, self.view.size()))
                     mod_decl = re.search('module.*where', contents, re.MULTILINE)
                     if mod_decl is not None:
-                        insert_line = mod_decl.end()
+                        insert_line = self.view.rowcol(mod_decl.end())[0]
                         insert_gap = True
                     else:
                         # Punt! Insert at the end of the file
