@@ -68,6 +68,7 @@ def parse_symbol(sym):
     docs = sym.get('docs')
     pos = parse_position(sym.get('pos'))
     imported = parse_module_id(sym.get('imported'))
+    qualifier = sym.get('qualifier')
 
     sinfo = sym['info']
     what = sinfo['what']
@@ -87,6 +88,7 @@ def parse_symbol(sym):
             docs=docs,
             position=pos,
             imported_from=imported,
+            qualifier=qualifier,
         )
     elif what in type_symbols:
         ctx = sinfo.get('ctx')
@@ -100,6 +102,7 @@ def parse_symbol(sym):
             docs=docs,
             position=pos,
             imported_from=imported,
+            qualifier=qualifier,
         )
     else:
         sinfo.pop('what')
@@ -111,6 +114,7 @@ def parse_symbol(sym):
             docs=docs,
             position=pos,
             imported_from=imported,
+            qualifier=qualifier,
             **fields
         )
 

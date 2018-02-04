@@ -92,14 +92,15 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
 
             if after:
                 # Insert before after[0]
-                insert_line = after[0].position.line - 2  # Convert to zero-based
+                insert_line = after[0].position.line - 1
             elif imports:
                 # Insert after all imports
-                insert_line = imports[-1].position.line - 1
+                insert_line = imports[-1].position.line
             else:
                 declarations = self.backend.symbol(file=self.view.file_name())
                 if declarations:
                     # Insert before first declaration
+                    # HOWTO: Detect signature?
                     insert_line = min([d.position.line for d in declarations]) - 2
                     insert_gap = True
                 else:

@@ -533,12 +533,13 @@ class Symbol(SymbolId):
     """
     Haskell symbol: function, data, class etc.
     """
-    def __init__(self, symbol_type, name, module, docs=None, position=None, imported_from=None):
+    def __init__(self, symbol_type, name, module, docs=None, position=None, imported_from=None, qualifier=None):
         super().__init__(name, module)
         self.what = symbol_type
         self.docs = docs
         self.position = position
         self.imported_from = imported_from
+        self.qualifier = qualifier
 
     def __str__(self):
         return u'Symbol({0} {1} in {2})'.format(self.what, self.name, self.module)
@@ -571,9 +572,12 @@ class Symbol(SymbolId):
     def qualified_name(self):
         return '.'.join([self.module.name, self.name])
 
+    def scope_name(self):
+        return '.'.join([self.qualifier, self.name]) if self.qualifier else self.name
+
     def suggest(self):
         """ Returns suggestion for this declaration """
-        return ('{0}\t{1}'.format(self.name, self.module.name), self.name)
+        return ('{0}\t{1}'.format(self.scope_name(), self.module.name), self.scope_name())
 
     def brief(self, _short=False):
         """ Brief information, just a name by default """
@@ -664,18 +668,22 @@ class Function(Symbol):
     """
     Haskell function declaration
     """
-    def __init__(self, name, module, function_type, docs=None, position=None, imported_from=None):
-        super().__init__('function', name, module, docs=docs, position=position, imported_from=imported_from)
+    def __init__(self, name, module, function_type, docs=None, position=None, imported_from=None, qualifier=None):
+        super().__init__('function', name, module, docs=docs, position=position, imported_from=imported_from, qualifier=qualifier)
         self.type = function_type
 
     def __repr__(self):
         return u'Function({0} :: {1} [{2}])'.format(wrap_operator(self.name), self.type, self.module.name)
 
     def suggest(self):
-        return (UnicodeOpers.use_unicode_operators(u'{0} :: {1}\t{2}'.format(wrap_operator(self.name),
-                                                                             self.type,
-                                                                             self.module.name)),
-                self.name)
+        return (
+            UnicodeOpers.use_unicode_operators(u'{0} :: {1}\t{2}'.format(
+                wrap_operator(self.scope_name()),
+                self.type,
+                self.module.name
+            )),
+            self.scope_name()
+        )
 
     @unicode_operators
     def brief(self, short=False):
@@ -695,16 +703,20 @@ class TypeBase(Symbol):
     """
     Haskell type, data or class
     """
-    def __init__(self, decl_type, name, module, context, args, docs=None, position=None, imported_from=None):
-        super().__init__(decl_type, name, module, docs=docs, position=position, imported_from=imported_from)
+    def __init__(self, decl_type, name, module, context, args, docs=None, position=None, imported_from=None, qualifier=None):
+        super().__init__(decl_type, name, module, docs=docs, position=position, imported_from=imported_from, qualifier=qualifier)
         self.context = context
         self.args = args
 
     def suggest(self):
-        return (UnicodeOpers.use_unicode_operators(u'{0} {1}\t{2}'.format(self.name,
-                                                                          ' '.join(self.args),
-                                                                          self.module.name)),
-                self.name)
+        return (
+            UnicodeOpers.use_unicode_operators(u'{0} {1}\t{2}'.format(
+                self.scope_name(),
+                ' '.join(self.args),
+                self.module.name
+            )),
+            self.scope_name()
+        )
 
     @unicode_operators
     def brief(self, short=False):
@@ -751,40 +763,40 @@ class Type(TypeBase):
     """
     Haskell type synonym
     """
-    def __init__(self, name, module, context, args, docs=None, position=None, imported_from=None):
-        super().__init__('type', name, module, context, args, docs=docs, position=position, imported_from=imported_from)
+    def __init__(self, name, module, context, args, docs=None, position=None, imported_from=None, qualifier=None):
+        super().__init__('type', name, module, context, args, docs=docs, position=position, imported_from=imported_from, qualifier=qualifier)
 
 
 class Newtype(TypeBase):
     """
     Haskell newtype synonym
     """
-    def __init__(self, name, module, context, args, docs=None, position=None, imported_from=None):
-        super().__init__('newtype', name, module, context, args, docs=docs, position=position, imported_from=imported_from)
+    def __init__(self, name, module, context, args, docs=None, position=None, imported_from=None, qualifier=None):
+        super().__init__('newtype', name, module, context, args, docs=docs, position=position, imported_from=imported_from, qualifier=qualifier)
 
 
 class Data(TypeBase):
     """
     Haskell data declaration
     """
-    def __init__(self, name, module, context, args, docs=None, position=None, imported_from=None):
-        super().__init__('data', name, module, context, args, docs=docs, position=position, imported_from=imported_from)
+    def __init__(self, name, module, context, args, docs=None, position=None, imported_from=None, qualifier=None):
+        super().__init__('data', name, module, context, args, docs=docs, position=position, imported_from=imported_from, qualifier=qualifier)
 
 
 class Class(TypeBase):
     """
     Haskell class declaration
     """
-    def __init__(self, name, module, context, args, docs=None, position=None, imported_from=None):
-        super().__init__('class', name, module, context, args, docs=docs, position=position, imported_from=imported_from)
+    def __init__(self, name, module, context, args, docs=None, position=None, imported_from=None, qualifier=None):
+        super().__init__('class', name, module, context, args, docs=docs, position=position, imported_from=imported_from, qualifier=qualifier)
 
     def __repr__(self):
         return u'Class({0})'.format(self.name)
 
 
 class UnknownSymbol(Symbol):
-    def __init__(self, symbol_type, name, module, docs=None, position=None, imported_from=None, **kwargs):
-        super().__init__(symbol_type, name, module, docs=docs, position=position, imported_from=imported_from)
+    def __init__(self, symbol_type, name, module, docs=None, position=None, imported_from=None, qualifier=None, **kwargs):
+        super().__init__(symbol_type, name, module, docs=docs, position=position, imported_from=imported_from, qualifier=qualifier)
         for field in ["type", "parent_class", "parent", "constructors", "args", "ctx", "associate", "pat_type", "constructor"]:
             kwargs.setdefault(field, None)
         self.__dict__.update(kwargs)
@@ -793,11 +805,11 @@ class UnknownSymbol(Symbol):
         return (
             UnicodeOpers.use_unicode_operators(
                 u'{0}\t{1}'.format(
-                    wrap_operator(self.name),
+                    wrap_operator(self.scope_name()),
                     self.module.name
                 )
             ),
-            self.name
+            self.scope_name()
         )
 
     @unicode_operators
