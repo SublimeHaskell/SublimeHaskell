@@ -577,7 +577,7 @@ class Symbol(SymbolId):
 
     def suggest(self):
         """ Returns suggestion for this declaration """
-        return ('{0}\t{1}'.format(self.scope_name(), self.module.name), self.scope_name())
+        return ('{0}\t{1}'.format(self.scope_name(), self.module.name), self.name)
 
     def brief(self, _short=False):
         """ Brief information, just a name by default """
@@ -682,7 +682,7 @@ class Function(Symbol):
                 self.type,
                 self.module.name
             )),
-            self.scope_name()
+            self.name
         )
 
     @unicode_operators
@@ -715,7 +715,7 @@ class TypeBase(Symbol):
                 ' '.join(self.args),
                 self.module.name
             )),
-            self.scope_name()
+            self.name
         )
 
     @unicode_operators
@@ -809,7 +809,7 @@ class UnknownSymbol(Symbol):
                     self.module.name
                 )
             ),
-            self.scope_name()
+            self.name
         )
 
     @unicode_operators
