@@ -142,7 +142,7 @@ class SublimeHaskellReplCabalCommand(CommandWin.SublimeHaskellWindowCommand):
         ':': '-',
         ';': '_',
         '=': '-',
-        '?': '-'
+        '?': '-',
         '[': '_',
         '\\': '_',
         ']': '_',
