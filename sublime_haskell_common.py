@@ -520,20 +520,20 @@ def view_has_syntax(view, syntax):
         view = window_view_and_file(view)[1]
         if not view:
             return False
-
     return settings_has_syntax(view.settings(), syntax)
 
 
 def view_is_cabal_source(view):
-    return view_has_syntax(view, "Cabal.tmLanguage")
+    return view_has_syntax(view, 'Cabal.tmLanguage')
 
 
 def settings_has_cabal_source(settings):
     return settings_has_syntax(settings, "Cabal.tmLanguage")
 
-HASKELL_SYNTAXES = ["Haskell.tmLanguage",
-                    "Haskell.sublime-syntax",
-                    'Haskell-SublimeHaskell.sublime-syntax']
+HASKELL_SYNTAXES = ['Haskell-SublimeHaskell.sublime-syntax',
+                    'Haskell-SublimeHaskell.tmLanguage',
+                    'Haskell.tmLanguage',
+                    'Haskell.sublime-syntax']
 
 
 def view_is_haskell_source(view):

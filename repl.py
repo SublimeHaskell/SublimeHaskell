@@ -134,6 +134,21 @@ class SublimeHaskellReplGhciCurrentFileCommand(CommandWin.SublimeHaskellWindowCo
 
 
 class SublimeHaskellReplCabalCommand(CommandWin.SublimeHaskellWindowCommand):
+    FILE_NAME_TRANS = str.maketrans({
+        '"': '_',
+        '*': '_',
+        ',': '-',
+        '/': '_',
+        ':': '-',
+        ';': '_',
+        '=': '-',
+        '?': '-'
+        '[': '_',
+        '\\': '_',
+        ']': '_',
+        '|': '_',
+        })
+
     def __init__(self, window):
         super().__init__(window)
         self.view = None
@@ -195,7 +210,7 @@ class SublimeHaskellReplCabalCommand(CommandWin.SublimeHaskellWindowCommand):
             elif project_builder in ['stack']:
                 repl_target = ':'.join([pkg, comp, target] if comp != 'lib' else [pkg, comp])
 
-            external_id = 'Haskell {0} repl {1}'.format(project_builder, repl_target)
+            external_id = 'Haskell_{0}_repl_{1}'.format(project_builder, repl_target).translate(self.FILE_NAME_TRANS)
             repl_views = list(sublimerepl.manager.find_repl(external_id))
             if not repl_views:
                 repl_cmd_args = []
