@@ -120,7 +120,7 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
     if HAS_VIEWEV_API:
         @classmethod
         def is_applicable(cls, settings):
-            return True
+            return Common.settings_has_haskell_source(settings)
 
         @classmethod
         def applies_to_primary_view_only(cls):
@@ -296,119 +296,6 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
                 view.run_command('sublime_haskell_stylish')
             elif Settings.PLUGIN.prettify_executable == 'hindent':
                 view.run_command('sublime_haskell_hindent')
-
-
-class HaskellSourceViewEventListener(sublime_plugin.ViewEventListener):
-    IMPROVED_SYNTAX_FILE = 'Packages/SublimeHaskell/Syntaxes/Haskell-SublimeHaskell.sublime-syntax'
-    '''The improved syntax module/file.
-    '''
-
-    @classmethod
-    def is_applicable(cls, settings):
-        return Common.settings_has_haskell_source(settings)
-
-
-    @classmethod
-    def applies_to_primary_view_only(cls):
-        return False
-
-    def __init__(self, view):
-        super().__init__(view)
-        self.autocompleter = Autocomplete.AutoCompleter()
-        self.backend_mgr = BackendManager.BackendManager()
-        self.type_cache = Types.SourceHaskellTypeCache()
-
-
-    def on_activated(self):
-        filename = self.view.file_name()
-        if filename:
-            if Settings.COMPONENT_DEBUG.event_viewer:
-                print('{0}.on_activated invoked.'.format(type(self).__name__))
-            Utils.run_async('on_activated', self.activated_worker, self.view, filename)
-
-
-    def on_modified(self):
-        filename = self.view.file_name()
-        if not filename:
-            return
-
-        if Settings.COMPONENT_DEBUG.event_viewer:
-            print('{0} invoked.'.format(type(self).__name__ + ".on_modified"))
-
-        self.type_cache.remove(filename)
-
-
-    def on_hover(self, point, hover_zone):
-        # Note: view.file_name() is not set in certain views, such as the "Haskell Show Types Panel". Avoid
-        # generating lookup errors, which are logged in the console window (for better or worse.)
-        if self.view.file_name():
-            # Ensure that we never block the Python main thread.
-            info_pop = InfoPop.SublimeHaskellHoverPopup(self.view, self.view.file_name(), point, hover_zone)
-            Utils.run_async('SublimeHaskellPopup.on_hover', info_pop.do_hover)
-
-
-    def on_query_completions(self, prefix, locations):
-        # Defer starting the backend until as late as possible...
-        if Settings.COMPONENT_DEBUG.event_viewer or Settings.COMPONENT_DEBUG.completions:
-            print('{0} invoked (prefix: {1}).'.format(type(self).__name__ + '.on_query_completions', prefix))
-
-        completions = None
-        with self.backend_mgr:
-            begin_time = time.clock()
-
-            # Only suggest symbols if the current file is part of a Cabal project.
-            filename = self.view.file_name()
-            line_contents = Common.get_line_contents(self.view, locations[0])
-            project_name = Common.locate_cabal_project_from_view(self.view)[1]
-            completion_flags = 0
-            if not Settings.PLUGIN.add_word_completions:
-                completion_flags = completion_flags | sublime.INHIBIT_WORD_COMPLETIONS
-            if not Settings.PLUGIN.add_default_completions:
-                completion_flags = completion_flags | sublime.INHIBIT_EXPLICIT_COMPLETIONS
-
-            curselector = self.view.scope_name(locations[0])
-            if Regexs.LANGUAGE_RE.search(line_contents):
-                completions = self.autocompleter.get_lang_completions(project_name)
-            elif Regexs.OPTIONS_GHC_RE.search(line_contents):
-                completions = self.autocompleter.get_flag_completions(project_name)
-            elif 'meta.import.haskell' in curselector:
-                # Inside an import: Complete the imported module name:
-                completions = self.autocompleter.get_import_completions(project_name, filename, locations, line_contents)
-            elif 'meta.declaration.exports.haskell' in curselector:
-                # Export list
-                export_module = Autocomplete.EXPORT_MODULE_RE.search(line_contents)
-                if export_module:
-                    # qsymbol = Common.get_qualified_symbol_at_region(view, view.sel()[0])
-                    # TODO: Implement
-                    pass
-            else:
-                # Add current file's completions:
-                completions = self.autocompleter.get_completions(self.view, locations)
-
-            end_time = time.clock()
-            if Settings.COMPONENT_DEBUG.event_viewer or Settings.COMPONENT_DEBUG.completions:
-                print('time to get completions: {0} seconds'.format(end_time - begin_time))
-                print('completion flag: {0}'.format(completion_flags))
-
-        # Don't put completions with special characters (?, !, ==, etc.)
-        # into completion because that wipes all default Sublime completions:
-        # See http://www.sublimetext.com/forum/viewtopic.php?t=8659
-        # TODO: work around this
-        # comp = [c for c in completions if NO_SPECIAL_CHARS_RE.match(c[0].split('\t')[0])]
-        # if Settings.PLUGIN.inhibit_completions and len(comp) != 0:
-        #     return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
-        # return comp
-
-        return (completions, completion_flags) # if completions else None
-
-
-    def activated_worker(self, view, filename):
-        with self.backend_mgr:
-            EventCommon.assoc_to_project(view, self.backend_mgr, filename)
-            _, project_name = Common.locate_cabal_project_from_view(view)
-            if Common.view_is_haskell_source(view):
-                self.autocompleter.generate_completions_cache(project_name, filename)
-
 
 ## Not needed at present.
 ##
