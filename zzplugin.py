@@ -43,8 +43,14 @@ def plugin_unloaded():
     ParseOutput.MARKER_MANAGER.clear_error_marks()
     BackendManager.BackendManager().shutdown_backend()
 
+HAS_VIEWEV_API = int(sublime.version()) >= 3155
+if HAS_VIEWEV_API:
+    EV_SUBCLASS = sublime_plugin.ViewEventListener
+else:
+    EV_SUBCLASS = sublime_plugin.EventListener
 
-class SublimeHaskellEventListener(sublime_plugin.EventListener):
+
+class SublimeHaskellEventListener(EV_SUBCLASS):
     COMPLETION_CHARS = {'is_module_completion': '.',
                         'is_import_completion': '('}
 
@@ -111,19 +117,62 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
     incurred by testing against each key.
     '''
 
+    if HAS_VIEWEV_API:
+        @classmethod
+        def is_applicable(cls, settings):
+            return True
 
-    def __init__(self):
-        super().__init__()
-        self.autocompleter = Autocomplete.AutoCompleter()
-        self.backend_mgr = BackendManager.BackendManager()
-        self.type_cache = Types.SourceHaskellTypeCache()
-        # I get two calls of `on_post_save` after saving file
-        # To prevent extra calls to check/infer etc., we store here last updated time
-        # view => (view.update_count(), time.clock())
-        self.update_cache = {}
+        @classmethod
+        def applies_to_primary_view_only(cls):
+            return False
 
+        ## I hate this duplication! But the ST3 developers changed the ViewEventListener and EventListener APIs
+        ## within a major version.
+        def __init__(self, view):
+            super().__init__(view)
+            self.autocompleter = Autocomplete.AutoCompleter()
+            self.backend_mgr = BackendManager.BackendManager()
+            self.type_cache = Types.SourceHaskellTypeCache()
+            # I get two calls of `on_post_save` after saving file
+            # To prevent extra calls to check/infer etc., we store here last updated time
+            # view => (view.update_count(), time.clock())
+            self.update_cache = {}
 
-    def on_new(self, view):
+        def on_new(self):
+            self.do_new(self.view)
+
+        def on_load(self):
+            self.do_load(self.view)
+
+        def on_post_save(self):
+            self.do_post_save(self.view)
+
+        def on_query_context(self, key, operator, operand, matchall):
+            self.do_query_context(self.view, key, operator, operand, matchall)
+    else:
+        def __init__(self):
+            super().__init__()
+            self.autocompleter = Autocomplete.AutoCompleter()
+            self.backend_mgr = BackendManager.BackendManager()
+            self.type_cache = Types.SourceHaskellTypeCache()
+            # I get two calls of `on_post_save` after saving file
+            # To prevent extra calls to check/infer etc., we store here last updated time
+            # view => (view.update_count(), time.clock())
+            self.update_cache = {}
+
+        def on_new(self, view):
+            self.do_new(view)
+
+        def on_load(self, view):
+            self.do_load(view)
+
+        def on_post_save(self, view):
+            self.do_post_save(view)
+
+        def on_query_context(self, view, key, operator, operand, matchall):
+            self.do_query_context(view, key, operator, operand, matchall)
+
+    def do_new(self, view):
         filename = view.file_name()
         if not Common.view_is_haskell_source(view) or not filename:
             return
@@ -138,7 +187,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         view.settings().set('translate_tabs_to_spaces', True)
 
 
-    def on_load(self, view):
+    def do_load(self, view):
         filename = view.file_name()
         if not Common.view_is_haskell_source(view) or not filename:
             return
@@ -156,7 +205,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
                         {'drop_all': False})
 
 
-    def on_post_save(self, view):
+    def do_post_save(self, view):
         if not Common.view_is_inspected_source(view):
             return
 
@@ -165,6 +214,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         if last_update is not None and last_update[0] == view.change_count() and (current_time - last_update[1]) < 0.2:
             # view contents equals
             # and last update was in less then 0.2s before, skipping
+            print('SublimeHaskellEventListener: duplicate save detected.')
             return
         self.update_cache[view.file_name()] = (view.change_count(), current_time)
 
@@ -189,7 +239,7 @@ class SublimeHaskellEventListener(sublime_plugin.EventListener):
         Utils.run_async('rescan source {0}/{1}'.format(project_name, filename), self.rescan_source, project_name,
                         filename, False)
 
-    def on_query_context(self, view, key, operator, operand, matchall):
+    def do_query_context(self, view, key, operator, operand, matchall):
         if Settings.COMPONENT_DEBUG.event_viewer:
             print('{0}.on_query_context key = {1}.'.format(type(self).__name__, key))
 

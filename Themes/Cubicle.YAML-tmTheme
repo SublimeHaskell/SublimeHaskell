@@ -1,0 +1,92 @@
+%YAML 1.2
+---
+name: Cubicle
+settings:
+- settings: {
+    activeGuide: '#9D550FB0',
+    background: '#FFFFFF',
+    bracketContentsForeground: '#F8F8F2A5',
+    bracketContentsOptions: underline,
+    bracketsForeground: '#F8F8F2A5',
+    bracketsOptions: underline,
+    caret: '#000000',
+    findHighlight: '#FFE792',
+    findHighlightForeground: '#000000',
+    foreground: '#000000',
+    highlight: '#4B0082',
+    invisibles: '#3B3A32',
+    lineHighlight: '#CCCCCC',
+    selection: '#ADD6FF',
+    selectionBorder: '#FFFFFF00',
+    tagsOptions: stippled_underline
+  }
+- name: Comment
+  scope: comment
+  settings: {foreground: '#008800'}
+- name: String
+  scope: string
+  settings: {foreground: '#A31515'}
+- name: Number
+  scope: constant.numeric
+  settings: {foreground: '#A31515'}
+- name: Built-in constant
+  scope: constant.language
+  settings: {foreground: '#A31515'}
+- name: User-defined constant
+  scope: constant.character, constant.other
+  settings: {foreground: '#2B91AF'}
+- name: Variable
+  scope: variable
+  settings: {fontStyle: ''}
+- name: Keyword
+  scope: keyword
+  settings: {foreground: '#0000FF'}
+- name: Storage
+  scope: storage
+  settings: {fontStyle: '', foreground: '#0000FF'}
+- name: Storage type
+  scope: storage.type
+  settings: {foreground: '#2B91AF'}
+- name: Class name
+  scope: entity.name.class
+  settings: {fontStyle: underline, foreground: '#2B91AF'}
+- name: Inherited class
+  scope: entity.other.inherited-class
+  settings: {foreground: '#2B91AF'}
+- name: Function name
+  scope: entity.name.function
+  settings: {fontStyle: '', foreground: '#000000'}
+- name: Function argument
+  scope: variable.parameter
+  settings: {foreground: '#000000'}
+- name: Library function
+  scope: support.function
+  settings: {fontStyle: '', foreground: '#000000'}
+- name: Library constant
+  scope: support.constant
+  settings: {fontStyle: '', foreground: '#A31515'}
+- name: Library class/type
+  scope: support.type, support.class
+  settings: {foreground: '#2B91AF'}
+- name: Library variable
+  scope: support.other.variable
+  settings: {fontStyle: ''}
+- name: Invalid
+  scope: invalid
+  settings: {background: '#FF0000', foreground: '#000000'}
+- name: Invalid warning
+  scope: invalid.warning
+  settings: {background: '#008800', foreground: '#000000'}
+- name: Invalid deprecated
+  scope: invalid.deprecated
+  settings: {background: '#FF0000', foreground: '#000000'}
+- name: Mark error
+  scope: sublimehaskell.mark.error
+  settings: {foreground: '#d80027'}
+- name: Mark warning
+  scope: sublimehaskell.mark.warning
+  settings: {foreground: '#ffda44'}
+- name: Mark hint
+  scope: sublimehaskell.mark.hint
+  settings: {foreground: '#91dc5a'}
+  uuid: 3795D3D0-64BA-11E1-8D3B-ECD74824019B
