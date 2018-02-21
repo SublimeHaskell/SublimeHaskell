@@ -195,6 +195,11 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
         if Settings.COMPONENT_DEBUG.event_viewer:
             print('{0}.on_load {1}.'.format(type(self).__name__, filename))
 
+        view_settings = view.settings() or {}
+        if (Settings.PLUGIN.use_improved_syntax and (name.endswith(".hs") or name.endswith(".hsc"))) or \
+           view_settings.get('syntax', '').endswith('.tmLanguage'):
+            view_settings.set('syntax', 'Packages/SublimeHaskell/Syntaxes/Haskell-SublimeHaskell.sublime-syntax')
+
         EventCommon.assoc_to_project(view, self.backend_mgr, filename)
         _project_dir, project_name = Common.locate_cabal_project_from_view(view)
 
