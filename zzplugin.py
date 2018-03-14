@@ -156,7 +156,7 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
             self.do_hover(self.view, point, hover_zone)
 
         def on_query_completions(self, prefix, locations):
-            self.do_completions(self.view, prefix, locations)
+            self.do_query_completions(self.view, prefix, locations)
     else:
         def __init__(self):
             super().__init__()
