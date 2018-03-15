@@ -262,18 +262,16 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
 
     def do_activated(self, view, filename):
         if Settings.COMPONENT_DEBUG.event_viewer:
-            print('{0}.on_activated invoked.'.format(type(self).__name__))
-        Utils.run_async('on_activated', self.activated_worker, view, filename)
+            print('{0}.on_activated file: {1}.'.format(type(self).__name__, filename))
+        if view and filename:
+            Utils.run_async('on_activated', self.activated_worker, view, filename)
 
 
     def do_modified(self, _view, filename):
-        if not filename:
-            return
-
-        if Settings.COMPONENT_DEBUG.event_viewer:
-            print('{0} invoked.'.format(type(self).__name__ + ".on_modified"))
-
-        self.type_cache.remove(filename)
+        if filename:
+            if Settings.COMPONENT_DEBUG.event_viewer:
+                print('{0} invoked.'.format(type(self).__name__ + ".on_modified"))
+            self.type_cache.remove(filename)
 
 
     def do_hover(self, view, point, hover_zone):
