@@ -1,6 +1,7 @@
 import urllib.parse
 
 import webbrowser
+import json
 from xml.etree import ElementTree
 
 import sublime
@@ -50,11 +51,14 @@ class Styles(object):
             scheme_res = sublime.load_resource(scheme_path)
             if scheme_res:
                 # Go through all styles and collect scope/foreground/fontStyle etc.
-                self.schemes[scheme_path] = self.collect_scheme(ElementTree.fromstring(scheme_res))
+                # Prefer ST3 'sublime-color-scheme' JSON over older TextMate XML.
+                self.schemes[scheme_path] = self.collect_sublime_scheme(json.loads(scheme_res)) \
+                    if scheme_path.endswith('.sublime-color-scheme') \
+                    else self.collect_textmate_scheme(ElementTree.fromstring(scheme_res))
 
         return self.schemes.get(scheme_path, {})
 
-    def collect_scheme(self, scheme_tree):
+    def collect_textmate_scheme(self, scheme_tree):
         scheme = {}
         for style in scheme_tree.findall(".//dict[key='scope']"):
             try:
@@ -72,6 +76,15 @@ class Styles(object):
                 pass
         return scheme
 
+    def collect_sublime_scheme(self, scheme_dict):
+        scheme = {}
+        for rule in scheme_dict.get('rules', []):
+            scope = rule.get('scope', '')
+            if scope:
+                scheme[scope] = rule
+
+        return scheme
+
     def gen_style(self, scheme_path):
         scheme = self.load_scheme(scheme_path)
 
@@ -82,14 +95,15 @@ class Styles(object):
         for cls, scope in self.CSS_CLASSES.items():
             # find scope or its parent in scheme
             scope_parts = scope.split('.')
-            scopes = ['.'.join(scope_parts[0:i+1]) for i in range(0, len(scope_parts))]
-            for css_scope in reversed(scopes):
+            for css_scope in reversed(['.'.join(scope_parts[0:i+1]) for i in range(0, len(scope_parts))]):
                 if css_scope in scheme:  # Found some scope, fill style class
                     style_parts = []
                     if 'foreground' in scheme[css_scope]:
                         style_parts.append("color: {0}".format(scheme[css_scope]['foreground']))
-                    if 'fontStyle' in scheme[css_scope]:
-                        style_parts.append("font-style: {0}".format(scheme[css_scope]['fontStyle']))
+                    # Prefer ST3 'sublime-color-scheme' JSON attribute over the older TextMate-ish name
+                    font_style = scheme[css_scope].get('font_style', scheme[css_scope].get('fontStyle', ''))
+                    if font_style:
+                        style_parts.append("font-style: {0}".format(font_style))
                     parts.append(".{0} {{ {1} }}".format(cls, "; ".join(style_parts)))
                     break
         parts.append("</style>")
