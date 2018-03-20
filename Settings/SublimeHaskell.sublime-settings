@@ -122,6 +122,9 @@
     // Additional ghc options for use in ghc-mod and ModuleInspector, for example "-package ghc"
     "ghc_opts": [],
 
+    // Additional HLint options, usually to specify a customi[sz]ed 'hlint.yaml' rule spec.
+    "hlint_opts:": [],
+
     // ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
     // Backend selection:
     // ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=

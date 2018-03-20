@@ -53,6 +53,7 @@ class SettingsContainer(object):
         same_property_pref('ghci_opts'),
         same_property_pref('haskell_build_tool'),
         same_property_pref('hindent_options'),
+        same_property_pref('hlint_opts'),
         same_property_pref('hsdev_log_config'),
         same_property_pref('hsdev_log_level'),
         same_property_pref('inspect_modules'),
@@ -90,6 +91,7 @@ class SettingsContainer(object):
         self._ghci_opts = []
         self._haskell_build_tool = 'stack'
         self._hindent_options = []
+        self._hlint_opts = []
         self._hsdev_log_config = 'use silent'
         self._hsdev_log_level = 'warning'
         self._inspect_modules = True
@@ -135,6 +137,7 @@ class SettingsContainer(object):
     ghci_opts = make_config_property('ghci_opts')
     haskell_build_tool = make_config_property('haskell_build_tool')
     hindent_options = make_config_property('hindent_options')
+    hlint_opts = make_config_property('hlint_opts')
     hsdev_log_config = make_config_property('hsdev_log_config')
     hsdev_log_level = make_config_property('hsdev_log_level')
     inspect_modules = make_config_property('inspect_modules')

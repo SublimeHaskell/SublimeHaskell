@@ -16,12 +16,14 @@ def file_as_file_list(file):
     '''
     return [file]
 
-def hsdev_check():
-    return (BackendMgr.active_backend().check, file_as_file_list, {'ghc': Settings.PLUGIN.ghc_opts})
+def hsdev_check(view):
+    ghc_options = Settings.get_project_setting(view, 'ghc_opts', Settings.PLUGIN.ghc_opts)
+    return (BackendMgr.active_backend().check, file_as_file_list, {'ghc': ghc_options})
 
 
-def hsdev_lint():
-    return (BackendMgr.active_backend().lint, file_as_file_list, {})
+def hsdev_lint(view):
+    hlint_options = Settings.get_project_setting(view, 'hlint_opts', Settings.PLUGIN.hlint_opts)
+    return (BackendMgr.active_backend().lint, file_as_file_list, {'hlint': hlint_options})
 
 
 def messages_as_hints(cmd):
@@ -118,14 +120,14 @@ class ChainRunner(object):
 
 def exec_check(view, fly_mode=False, continue_success=None, error_handler=None):
     chain_runner = ChainRunner(view, 'Checking', continue_success, error_handler)
-    chain_runner.run_chain([hsdev_check()], fly_mode=fly_mode)
+    chain_runner.run_chain([hsdev_check(view)], fly_mode=fly_mode)
 
 
 def exec_lint(view, fly_mode=False, continue_success=None, error_handler=None):
     '''Utility function to unconditionally execute `SublimeHaskellLint.run()` without worrying about the command's status.
     '''
     chain_runner = ChainRunner(view, 'Linting', continue_success, error_handler)
-    chain_runner.run_chain([hsdev_lint()], fly_mode=fly_mode)
+    chain_runner.run_chain([hsdev_lint(view)], fly_mode=fly_mode)
 
 
 def exec_check_and_lint(view, fly_mode=False, continue_success=None, error_handler=None):
@@ -133,7 +135,7 @@ def exec_check_and_lint(view, fly_mode=False, continue_success=None, error_handl
     about the command's status.
     '''
     chain_runner = ChainRunner(view, 'Checking and Linting', continue_success, error_handler)
-    chain_runner.run_chain([hsdev_check(), hsdev_lint()], fly_mode=fly_mode)
+    chain_runner.run_chain([hsdev_check(view), hsdev_lint(view)], fly_mode=fly_mode)
 
 
 class SublimeHaskellCheck(CommandWin.HaskellSourceBackendTextCommand):
