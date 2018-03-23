@@ -22,8 +22,8 @@ def hsdev_check(view):
 
 
 def hsdev_lint(view):
-    hlint_options = Settings.get_project_setting(view, 'hlint_opts', Settings.PLUGIN.hlint_opts)
-    return (BackendMgr.active_backend().lint, file_as_file_list, {'hlint': hlint_options})
+    lint_options = Settings.get_project_setting(view, 'lint_opts', Settings.PLUGIN.lint_opts)
+    return (BackendMgr.active_backend().lint, file_as_file_list, {'hlint': lint_options})
 
 
 def messages_as_hints(cmd):

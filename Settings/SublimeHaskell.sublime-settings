@@ -123,7 +123,7 @@
     "ghc_opts": [],
 
     // Additional HLint options, usually to specify a customi[sz]ed 'hlint.yaml' rule spec.
-    "hlint_opts:": [],
+    "lint_opts:": [],
 
     // ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
     // Backend selection:
