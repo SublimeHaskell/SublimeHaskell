@@ -143,7 +143,8 @@ class HsDevBackend(Backend.HaskellBackend):
                                     (self.port, ["--port", str(self.port)]),
                                     (self.cache, ["--db", self.cache]),
                                     (self.log_file, ["--log", self.log_file]),
-                                    (True, ["--log-level", log_level])])
+                                    (True, ["--log-level", log_level]),
+                                    (True, ["--no-color"])])
 
             hsdev_proc = ProcHelper.exec_with_wrapper(self.exec_with, self.install_dir, cmd)
             if hsdev_proc.process is not None:

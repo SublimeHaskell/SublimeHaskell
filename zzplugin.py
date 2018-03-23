@@ -148,7 +148,7 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
             self.do_post_save(self.view)
 
         def on_query_context(self, key, operator, operand, matchall):
-            self.do_query_context(self.view, key, operator, operand, matchall)
+            return self.do_query_context(self.view, key, operator, operand, matchall)
 
         def on_activated(self):
             self.do_activated(self.view, self.view.file_name())
@@ -182,7 +182,7 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
             self.do_post_save(view)
 
         def on_query_context(self, view, key, operator, operand, matchall):
-            self.do_query_context(view, key, operator, operand, matchall)
+            return self.do_query_context(view, key, operator, operand, matchall)
 
         def on_activated(self, view):
             self.do_activated(view, view.file_name())
