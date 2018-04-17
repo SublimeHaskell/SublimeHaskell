@@ -175,6 +175,9 @@ class HaskellBackend(object):
     def whois(self, name, file, **backend_args):
         raise NotImplementedError("HaskellBackend.whois needs an implementation.")
 
+    def whoat(self, line, column, file, **backend_args):
+        raise NotImplementedError("HaskellBackend.whoat needs an implementation.")
+
     def scope_modules(self, project_name, file, lookup='', search_type='prefix', **backend_args):
         '''Get modules accessible from a module (source file) or within a project.
 
@@ -194,11 +197,17 @@ class HaskellBackend(object):
         '''
         raise NotImplementedError("HaskellBackend.complete needs an implementation.")
 
+    def usages(self, line, column, file, **backend_args):
+        raise NotImplementedError("HaskellBackend.usages needs an implementation.")
+
     def hayoo(self, query, page=None, pages=None, **backend_args):
         raise NotImplementedError("HaskellBackend.hayoo needs an implementation.")
 
     def cabal_list(self, packages, **backend_args):
         raise NotImplementedError("HaskellBackend.cabal_list needs an implementation.")
+
+    def unresolveds(self, files, **backend_args):
+        raise NotImplementedError("HaskellBackend.unresolveds needs an implementation.")
 
     def lint(self, files=None, contents=None, hlint=None, wait_complete=True, **backend_args):
         '''Runs 'hlint' over a file (or its contents, if provided) and returns a list of suggestions with their
@@ -241,26 +250,26 @@ class HaskellBackend(object):
     def types(self, project_name, file, module_name, line, column, ghc_flags=None, contents=None, **backend_args):
         raise NotImplementedError("HaskellBackend.types needs an implementation.")
 
+    def autofixes(self, messages, wait_complete=False, **backend_args):
+        raise NotImplementedError("HaskellBackend.autofixes needs an implementation.")
+
+    def refactor(self, messages, rest=[], pure=True, wait_complete=False, **backend_args):
+        raise NotImplementedError("HaskellBackend.refactor needs an implementation.")
+
+    def rename(self, name, new_name, file, wait_complete=False, **backend_args):
+        raise NotImplementedError("HaskellBackend.rename needs an implementation.")
+
     def langs(self, project_name, **backend_args):
         raise NotImplementedError("HaskellBackend.langs needs an implementation.")
 
     def flags(self, project_name, **backend_args):
         raise NotImplementedError("HaskellBackend.flags needs an implementation.")
 
-    def autofix_show(self, messages, **backend_args):
-        '''Show autofixes for errors, when possible. Can be used synchrnously or asynchronously.
-
-        :param list(str) messages: A list of error messages
-        :param bool wait_complete: If True, wait to receive a response from the backend.
-        :return: The JSON autofix response from the backend, if :py:param:`wait_complete` is True, or None.
-        '''
-        raise NotImplementedError("HaskellBackend.autofix_show needs an implementation.")
-
-    def autofix_fix(self, messages, rest=None, pure=False, **backend_args):
-        raise NotImplementedError("HaskellBackend.autofix_fix needs an implementation.")
-
     def ghc_eval(self, exprs, file=None, source=None, **backend_args):
         raise NotImplementedError("HaskellBackend.ghc_eval needs an implementation.")
+
+    def ghc_type(self, exprs, file=None, source=None, wait_complete=False, **backend_args):
+        raise NotImplementedError("HaskellBackend.ghc_type needs an implementation.")
 
     def exit(self):
         raise NotImplementedError("HaskellBackend.exit needs an implementation.")
@@ -426,10 +435,16 @@ class NullHaskellBackend(HaskellBackend):
     def whois(self, name, file, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
+    def whoat(self, line, column, file, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
     def scope_modules(self, project_name, file, lookup='', search_type='prefix', **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def scope(self, file, lookup='', search_type='prefix', global_scope=False, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def usages(self, line, column, file, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def complete(self, _sym, _file, wide=False, **backend_args):
@@ -439,6 +454,9 @@ class NullHaskellBackend(HaskellBackend):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def cabal_list(self, packages, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def unresolveds(self, files, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def lint(self, files=None, contents=None, hlint=None, wait_complete=False, **backend_args):
@@ -453,20 +471,25 @@ class NullHaskellBackend(HaskellBackend):
     def types(self, project_name, file, module_name, line, column, ghc_flags=None, contents=None, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
+    def autofixes(self, messages, wait_complete=False, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def refactor(self, messages, rest=[], pure=True, wait_complete=False, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def rename(self, name, new_name, file, wait_complete=False, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
     def langs(self, _projectname, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def flags(self, _projectname, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
-    def autofix_show(self, messages, **backend_args):
-        backend_args.pop('wait_complete', None)
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def autofix_fix(self, messages, rest=None, pure=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
     def ghc_eval(self, exprs, file=None, source=None, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def ghc_type(self, exprs, file=None, source=None, wait_complete=False, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def exit(self):

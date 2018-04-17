@@ -133,10 +133,6 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
             self.autocompleter = Autocomplete.AutoCompleter()
             self.backend_mgr = BackendManager.BackendManager()
             self.type_cache = Types.SourceHaskellTypeCache()
-            # I get two calls of `on_post_save` after saving file
-            # To prevent extra calls to check/infer etc., we store here last updated time
-            # view => (view.update_count(), time.clock())
-            self.update_cache = {}
 
         def on_new(self):
             self.do_new(self.view)
@@ -167,10 +163,6 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
             self.autocompleter = Autocomplete.AutoCompleter()
             self.backend_mgr = BackendManager.BackendManager()
             self.type_cache = Types.SourceHaskellTypeCache()
-            # I get two calls of `on_post_save` after saving file
-            # To prevent extra calls to check/infer etc., we store here last updated time
-            # view => (view.update_count(), time.clock())
-            self.update_cache = {}
 
         def on_new(self, view):
             self.do_new(view)
@@ -239,15 +231,6 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
         if not Common.view_is_inspected_source(view):
             return
 
-        current_time = time.clock()
-        last_update = self.update_cache.get(view.file_name())
-        if last_update is not None and last_update[0] == view.change_count() and (current_time - last_update[1]) < 0.2:
-            # view contents equals
-            # and last update was in less then 0.2s before, skipping
-            print('SublimeHaskellEventListener: duplicate save detected.')
-            return
-        self.update_cache[view.file_name()] = (view.change_count(), current_time)
-
         if Settings.COMPONENT_DEBUG.event_viewer:
             print('{0}.on_post_save invoked.'.format(type(self).__name__))
 
@@ -282,9 +265,9 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
 
 
     def do_activated(self, view, filename):
-        if Settings.COMPONENT_DEBUG.event_viewer:
-            print('{0}.on_activated file: {1}.'.format(type(self).__name__, filename))
         if view and filename:
+            if Settings.COMPONENT_DEBUG.event_viewer:
+                print('{0}.on_activated file: {1}.'.format(type(self).__name__, filename))
             Utils.run_async('on_activated', self.activated_worker, view, filename)
 
 
@@ -408,11 +391,24 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
 
 
     def activated_worker(self, view, filename):
+        if not Common.view_is_haskell_source(view):
+            return
+
+        if Settings.COMPONENT_DEBUG.event_viewer:
+            print('{0}.activated_worker {1}, acquiring backend manager.'.format(type(self).__name__, filename))
+
         with self.backend_mgr:
+            if Settings.COMPONENT_DEBUG.event_viewer:
+                print('{0}.activated_worker {1}, acquired backend manager.'.format(type(self).__name__, filename))
+
             EventCommon.assoc_to_project(view, self.backend_mgr, filename)
+
             _, project_name = Common.locate_cabal_project_from_view(view)
-            if Common.view_is_haskell_source(view):
-                self.autocompleter.generate_completions_cache(project_name, filename)
+            if Settings.COMPONENT_DEBUG.event_viewer:
+                print('{0}.activated_worker generating completions'.format(type(self).__name__))
+            self.autocompleter.generate_completions_cache(project_name, filename)
+            if Settings.COMPONENT_DEBUG.event_viewer:
+                print('{0}.activated_worker received completions'.format(type(self).__name__))
 
 
 ## Not needed at present.

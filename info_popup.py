@@ -13,7 +13,6 @@ import SublimeHaskell.symbols as symbols
 import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.parseoutput as ParseOutput
-import SublimeHaskell.types as types
 
 
 # Unused module variable:
@@ -157,7 +156,9 @@ class SublimeHaskellHoverPopup(object):
 
                 # Try whois
                 suggest_import = False
-                decl = Utils.head_of(BackendManager.active_backend().whoat(self.line + 1, self.column + 1, self.filename))
+                whoat = BackendManager.active_backend().whoat(self.line + 1, self.column + 1, self.filename)
+                print('whoat resp: {0}'.format(whoat))
+                decl = Utils.head_of(whoat)
                 usages = BackendManager.active_backend().usages(self.line + 1, self.column + 1, self.filename) if decl else None
                 if usages:
                     usages = [

@@ -341,6 +341,8 @@ class Builder(object):
         '''Chains several commands, wait for them to complete, then parse and display
         the resulting errors.'''
 
+        Logging.log('wait_for_chain_to_complete: starting', Logging.LOG_TRACE)
+
         # First hide error panel to show that something is going on
         Common.hide_panel(view.window(), panel_name=OUTPUT_PANEL_NAME)
 
@@ -348,6 +350,7 @@ class Builder(object):
         # exit_code has scope outside of the loop
         collected_out = []
         exit_code = 0
+        Logging.log('wait_for_chain_to_complete: Creating output window', Logging.LOG_TRACE)
         output_log = Common.output_panel(view.window(), '',
                                          panel_name=BUILD_LOG_PANEL_NAME,
                                          panel_display=Settings.PLUGIN.show_output_window)
@@ -492,7 +495,7 @@ class SublimeHaskellRunCommand(SublimeHaskellBuildCommand):
         run_args[self.exec_name] = args
         view_settings.set('subhask_run_args', run_args)
         project_builder = Settings.get_project_setting(view, 'haskell_build_tool', Settings.PLUGIN.haskell_build_tool)
-        cmd_list = ProcHelper.exec_wrapper_cmd(project_builder, [self.exec_name] + shlex.split(args))
+        cmd_list = ProcHelper.exec_wrapper_cmd([], project_builder, [self.exec_name] + shlex.split(args))
 
         Common.hide_panel(self.window, panel_name=OUTPUT_PANEL_NAME)
         outview = Common.output_panel(self.window, panel_name=OUTPUT_PANEL_NAME)

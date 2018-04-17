@@ -52,7 +52,7 @@ class Worker(object, metaclass=Singleton):
     def __init__(self):
         super().__init__()
         self.jobs = queue.Queue()
-        self.inner_thread = threading.Thread(target=self.worker_run)
+        self.inner_thread = threading.Thread(name='utils.Worker', target=self.worker_run)
         self.inner_thread.start()
 
     def worker_run(self):

@@ -73,10 +73,11 @@ class HsDevBackend(Backend.HaskellBackend):
         self.hsdev_process = None
         self.cache = os.path.join(Common.sublime_haskell_cache_path(), 'hsdev', 'hsdev.db')
         self.log_file = os.path.join(Common.sublime_haskell_cache_path(), 'hsdev', 'hsdev.log')
+        self.exec_args = kwargs.get('wrapper-args', [])
         self.exec_with = exec_with
         self.install_dir = Utils.normalize_path(install_dir) if install_dir is not None else None
         # Keep track of the hsdev version early. Needed to patch command line arguments later.
-        self.version = HsDevBackend.hsdev_version(self.exec_with, self.install_dir)
+        self.version = HsDevBackend.hsdev_version(self.exec_args, self.exec_with, self.install_dir)
 
         self.drain_stdout = None
         self.drain_stderr = None
@@ -97,6 +98,7 @@ class HsDevBackend(Backend.HaskellBackend):
     def is_available(**kwargs):
         # Yes, this is slightly redundant because eventually __init__ does the same thing for a class
         # instance.
+        exec_args = kwargs.get('wrapper-args', [])
         exec_with = kwargs.get('exec-with')
         install_dir = kwargs.get('install-dir')
         local = kwargs.get('local', False)
@@ -107,7 +109,7 @@ class HsDevBackend(Backend.HaskellBackend):
                 # Either exec-with or install-dir isn't set, so the corresponding configuration target is unavailable.
                 return False
 
-            hsdev_ver = HsDevBackend.hsdev_version(exec_with, install_dir)
+            hsdev_ver = HsDevBackend.hsdev_version(exec_args, exec_with, install_dir)
             str_version = '.'.join([str(v) for v in hsdev_ver])
             Logging.log('hsdev version: {0}'.format(str_version), Logging.LOG_INFO)
             retval = hsdev_ver >= HsDevBackend.HSDEV_MIN_VER and hsdev_ver < HsDevBackend.HSDEV_MAX_VER
@@ -146,7 +148,7 @@ class HsDevBackend(Backend.HaskellBackend):
                                     (True, ["--log-level", log_level]),
                                     (True, ["--no-color"])])
 
-            hsdev_proc = ProcHelper.exec_with_wrapper(self.exec_with, self.install_dir, cmd)
+            hsdev_proc = ProcHelper.exec_with_wrapper(self.exec_args, self.exec_with, self.install_dir, cmd)
             if hsdev_proc.process is not None:
                 # Use TextIOWrapper here because it combines decoding with newline handling,
                 # which means less to maintain.
@@ -245,9 +247,9 @@ class HsDevBackend(Backend.HaskellBackend):
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
     @staticmethod
-    def hsdev_version(exec_with, install_dir):
+    def hsdev_version(exec_args, exec_with, install_dir):
         retval = [0, 0, 0, 0]
-        hsdev_proc = ProcHelper.exec_with_wrapper(exec_with, install_dir, ['hsdev', 'version'])
+        hsdev_proc = ProcHelper.exec_with_wrapper(exec_args, exec_with, install_dir, ['hsdev', 'version'])
         if hsdev_proc.process is not None:
             exit_code, out, _ = hsdev_proc.wait()
             if exit_code == 0:
@@ -587,13 +589,6 @@ class HsDevBackend(Backend.HaskellBackend):
     def exit(self):
         return self.command('exit', {}, self.make_callbacks('exit')[0])
 
-    # old names for compatibility
-    def autofix_show(self, messages, wait_complete=False, **backend_args):
-        return self.autofixes(messages, wait_complete=wait_complete, **backend_args)
-
-    def autofix_fix(self, messages, rest=[], pure=True, wait_complete=False, **backend_args):
-        return self.refactor(messages, rest=rest, pure=pure, wait_complete=wait_complete, **backend_args)
-
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # Advanced features:
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
@@ -615,7 +610,7 @@ class HsDevBackend(Backend.HaskellBackend):
 
     def clean_imports(self, filename):
         cmd = ['hsclearimports', filename, '--max-import-list', '64']
-        hsclean_proc = ProcHelper.exec_with_wrapper(self.exec_with, self.install_dir, cmd)
+        hsclean_proc = ProcHelper.exec_with_wrapper(self.exec_args, self.exec_with, self.install_dir, cmd)
         if hsclean_proc.process is not None:
             exit_code, result, err = hsclean_proc.wait()
             if exit_code == 0:
