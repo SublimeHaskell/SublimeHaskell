@@ -322,6 +322,13 @@ class HaskellBackend(object):
                 print('--- dispatching callbacks: error info:\n{0}\n-----'.format(errmsg))
 
 
+def default_method_implementation():
+    def inner(self, *_args, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    return inner
+
+
 class NullHaskellBackend(HaskellBackend):
     ''' For Haskellers: The Identity Backend. For ordinary mortals, this is the null, do-nothing Haskell backend. It does
     something sensible for all functions. The primary use case is to provide something sensible when no other backend is
@@ -385,112 +392,44 @@ class NullHaskellBackend(HaskellBackend):
     def ping(self):
         return True
 
-    def scan(self, cabal=False, sandboxes=None, projects=None, files=None, paths=None, ghc=None, contents=None,
-             docs=False, infer=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def docs(self, projects=None, files=None, modules=None, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def infer(self, projects=None, files=None, modules=None, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def remove(self, cabal=False, sandboxes=None, projects=None, files=None, packages=None, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def remove_all(self, **backend_args):
-        return self.dispatch_callbacks(None, None, **backend_args)
-
-    def list_modules(self, project=None, file=None, module=None, deps=None, sandbox=None, cabal=False, symdb=None, package=None,
-                     source=False, standalone=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def list_packages(self, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
+    ## The internal method implementations are all the same...
+    scan = default_method_implementation()
+    docs = default_method_implementation()
+    infer = default_method_implementation()
+    remove = default_method_implementation()
+    remove_all = default_method_implementation()
+    list_modules = default_method_implementation()
+    list_packages = default_method_implementation()
+    symbol = default_method_implementation()
+    module = default_method_implementation()
+    resolve = default_method_implementation()
+    project = default_method_implementation()
+    sandbox = default_method_implementation()
+    lookup = default_method_implementation()
+    whois = default_method_implementation()
+    whoat = default_method_implementation()
+    scope_modules = default_method_implementation()
+    scope = default_method_implementation()
+    usages = default_method_implementation()
+    complete = default_method_implementation()
+    hayoo = default_method_implementation()
+    cabal_list = default_method_implementation()
+    unresolveds = default_method_implementation()
+    lint = default_method_implementation()
+    check = default_method_implementation()
+    check_lint = default_method_implementation()
+    types = default_method_implementation()
+    autofixes = default_method_implementation()
+    refactor = default_method_implementation()
+    rename = default_method_implementation()
+    langs = default_method_implementation()
+    flags = default_method_implementation()
+    ghc_eval = default_method_implementation()
+    ghc_type = default_method_implementation()
 
     ## Uncomment if we do more than just super delegation.
     # def list_projects(self, **backend_args):
     #     return super().list_projects(**backend_args)
-
-    def symbol(self, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
-               cabal=False, symdb=None, package=None, source=False, standalone=False, local_names=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def module(self, project_name, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None,
-               sandbox=None, cabal=False, symdb=None, package=None, source=False, standalone=False, **backend_args):
-        return self.dispatch_callbacks(None, None, **backend_args)
-
-    def resolve(self, file, exports=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def project(self, project=None, path=None, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def sandbox(self, path, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def lookup(self, name, file, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def whois(self, name, file, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def whoat(self, line, column, file, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def scope_modules(self, project_name, file, lookup='', search_type='prefix', **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def scope(self, file, lookup='', search_type='prefix', global_scope=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def usages(self, line, column, file, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def complete(self, _sym, _file, wide=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def hayoo(self, query, page=None, pages=None, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def cabal_list(self, packages, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def unresolveds(self, files, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def lint(self, files=None, contents=None, hlint=None, wait_complete=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def check(self, files=None, contents=None, ghc=None, wait_complete=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def check_lint(self, files=None, contents=None, ghc=None, hlint=None, wait_complete=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def types(self, project_name, file, module_name, line, column, ghc_flags=None, contents=None, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def autofixes(self, messages, wait_complete=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def refactor(self, messages, rest=[], pure=True, wait_complete=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def rename(self, name, new_name, file, wait_complete=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def langs(self, _projectname, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def flags(self, _projectname, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def ghc_eval(self, exprs, file=None, source=None, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def ghc_type(self, exprs, file=None, source=None, wait_complete=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
 
     def exit(self):
         return True

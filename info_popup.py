@@ -157,7 +157,6 @@ class SublimeHaskellHoverPopup(object):
                 # Try whois
                 suggest_import = False
                 whoat = BackendManager.active_backend().whoat(self.line + 1, self.column + 1, self.filename)
-                print('whoat resp: {0}'.format(whoat))
                 decl = Utils.head_of(whoat)
                 usages = BackendManager.active_backend().usages(self.line + 1, self.column + 1, self.filename) if decl else None
                 if usages:

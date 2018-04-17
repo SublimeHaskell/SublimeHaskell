@@ -1156,10 +1156,10 @@ class AutoFixState(object):
         self.undo_history.append((self.corrections[:], self.selected))
         self.redo_history.clear()
         (cur, corrs) = self.get_corrections()
-        self.corrections = BackendManager.active_backend().autofix_fix(HsDevResultParse.encode_corrections([cur]),
-                                                                       rest=HsDevResultParse.encode_corrections(corrs),
-                                                                       wait_complete=True,
-                                                                       pure=True)
+        self.corrections = BackendManager.active_backend().refactor(HsDevResultParse.encode_corrections([cur]),
+                                                                    rest=HsDevResultParse.encode_corrections(corrs),
+                                                                    wait_complete=True,
+                                                                    pure=True)
         if not self.corrections:
             self.selected = 0
             self.clear()
@@ -1223,7 +1223,7 @@ class SublimeHaskellAutoFix(CommandWin.BackendWindowCommand):
                                                        on_error=on_err)
 
     def on_got_messages(self, msgs):
-        fixes = BackendManager.active_backend().autofix_show(msgs, wait_complete=True)
+        fixes = BackendManager.active_backend().autofixes(msgs, wait_complete=True)
         corrections = [corr for corr in fixes if os.path.samefile(corr.file, self.window.active_view().file_name())]
         if corrections:
             AUTOFIX_STATE.set(self.window.active_view(), corrections)
