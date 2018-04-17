@@ -336,6 +336,7 @@ class ComponentDebug(object):
     '''
     def __init__(self):
         self.all_messages = False
+        self.build_system = False
         self.callbacks = False
         self.completions = False
         self.event_viewer = False
@@ -344,17 +345,20 @@ class ComponentDebug(object):
         self.recv_messages = False
         self.send_messages = False
         self.socket_pool = False
+        self.util_worker = False
 
-    def load(self, backend_settings):
-        self.all_messages = 'all_messages' in backend_settings
-        self.callbacks = 'callbacks' in backend_settings
-        self.completions = 'completions' in backend_settings
-        self.event_viewer = 'event_viewer' in backend_settings
-        self.fly_mode = 'fly_mode' in backend_settings
-        self.inspection = 'inspection' in backend_settings
-        self.recv_messages = 'recv_messages' in backend_settings
-        self.send_messages = 'send_messages' in backend_settings
-        self.socket_pool = 'socket_pool' in backend_settings
+    def load(self, component_debug):
+        self.all_messages = 'all_messages' in component_debug
+        self.build_system = 'build_system' in component_debug
+        self.callbacks = 'callbacks' in component_debug
+        self.completions = 'completions' in component_debug
+        self.event_viewer = 'event_viewer' in component_debug
+        self.fly_mode = 'fly_mode' in component_debug
+        self.inspection = 'inspection' in component_debug
+        self.recv_messages = 'recv_messages' in component_debug
+        self.send_messages = 'send_messages' in component_debug
+        self.socket_pool = 'socket_pool' in component_debug
+        self.util_worker = 'util_worker' in component_debug
 
 
 PLUGIN = SettingsContainer()

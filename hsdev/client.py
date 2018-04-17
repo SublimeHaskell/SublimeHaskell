@@ -279,7 +279,7 @@ class HsDevClient(object):
             retval = True
             if wait:
                 if debug_send():
-                    print(u'HsDevClient.call: waiting to receive, timeout = {0}.'.format(timeout))
+                    print(u'HsDevClient.call: waiting to receive {1}, timeout = {0}.'.format(timeout, callbacks.ident))
                 wait_receive.wait(timeout)
                 if debug_send():
                     print(u'HsDevClient.call: done waiting.')

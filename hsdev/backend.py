@@ -398,7 +398,8 @@ class HsDevBackend(Backend.HaskellBackend):
         return self.list_command('projects', {}, callbacks, **backend_args)
 
     def list_sandboxes(self, **backend_args):
-        return self.list_command('sandboxes', {}, **backend_args)
+        callbacks, backend_args = self.make_callbacks('list_sandboxes', **backend_args)
+        return self.list_command('sandboxes', {}, callbacks, **backend_args)
 
     def symbol(self, lookup='', search_type='prefix', project=None, file=None, module=None, package=None, installed=False,
                source=False, standalone=False, local_names=False, header=False, **backend_args):

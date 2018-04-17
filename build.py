@@ -247,6 +247,8 @@ class Builder(object):
                  if not filter_project or filter_project(name, info)]
 
         def run_selected(psel):
+            if Settings.COMPONENT_DEBUG.build_system:
+                print('run_selected: {0}'.format(psel[0]))
             on_selected(psel[0], psel[1]['path'])
 
         if not projs:
@@ -300,9 +302,9 @@ class Builder(object):
         # Set project as building
         self.PROJECTS_BEING_BUILT.add(project_name)
 
-        Logging.log('project build tool: {0}'.format(Settings.get_project_setting(self.view, 'haskell_build_tool')),
-                    Logging.LOG_DEBUG)
-        Logging.log('settings build tool: {0}'.format(Settings.PLUGIN.haskell_build_tool), Logging.LOG_DEBUG)
+        if Settings.COMPONENT_DEBUG.build_system:
+            print('project build tool: {0}'.format(Settings.get_project_setting(self.view, 'haskell_build_tool')))
+            print('settings build tool: {0}'.format(Settings.PLUGIN.haskell_build_tool))
 
         build_tool_name = Settings.get_project_setting(self.view, 'haskell_build_tool', Settings.PLUGIN.haskell_build_tool)
         if build_tool_name == 'stack' and not self.is_stack_project(project_dir):  # rollback to cabal
@@ -332,7 +334,8 @@ class Builder(object):
         # Run them
         ## banner = '{0} {1} with {2}\ncommands:\n{3}'.format(action_title, project_name, tool_title, commands)
         banner = '{0} {1} with {2}'.format(action_title, project_name, tool_title)
-        Logging.log(banner, Logging.LOG_DEBUG)
+        if Settings.COMPONENT_DEBUG.build_system:
+            print(banner)
         Utils.run_async('wait_for_chain_to_complete', self.wait_for_chain_to_complete, self.view, project_name, project_dir,
                         banner, commands)
 
@@ -341,7 +344,8 @@ class Builder(object):
         '''Chains several commands, wait for them to complete, then parse and display
         the resulting errors.'''
 
-        Logging.log('wait_for_chain_to_complete: starting', Logging.LOG_TRACE)
+        if Settings.COMPONENT_DEBUG.build_system:
+            print('wait_for_chain_to_complete: starting')
 
         # First hide error panel to show that something is going on
         Common.hide_panel(view.window(), panel_name=OUTPUT_PANEL_NAME)
@@ -350,18 +354,21 @@ class Builder(object):
         # exit_code has scope outside of the loop
         collected_out = []
         exit_code = 0
-        Logging.log('wait_for_chain_to_complete: Creating output window', Logging.LOG_TRACE)
         output_log = Common.output_panel(view.window(), '',
                                          panel_name=BUILD_LOG_PANEL_NAME,
                                          panel_display=Settings.PLUGIN.show_output_window)
         try:
             for cmd in cmds:
                 if isinstance(cmd, list):
+                    if Settings.COMPONENT_DEBUG.build_system:
+                        print('wait_for_chain_to_complete: Executing {0}'.format(' '.join(cmd)))
+
                     Common.output_text(output_log, ' '.join(cmd) + '\u2026\n')
 
                     # Don't tie stderr to stdout, since we're interested in the error messages
                     out = OutputCollector.OutputCollector(output_log, cmd, cwd=cabal_project_dir)
                     exit_code, cmd_out = out.wait()
+                    print('wait_for_chain_to_complete: {0} returns {1}'.format(' '.join(cmd), exit_code))
                 elif callable(cmd):
                     Common.output_text(output_log, 'Function/method {0}\n'.format(cmd.__name__))
                     exit_code, cmd_out = cmd(cabal_project_dir)
