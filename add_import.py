@@ -35,7 +35,7 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
             (status, self.candidates) = self.backend.query_import(kw_decl, current_file_name)
 
             if status:
-                self.unique_candidates = set(self.candidates)
+                self.candidates = sorted(set(self.candidates))
                 self.select_candidate()
             else:
                 if len(self.candidates) == 1:
@@ -46,20 +46,20 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
             self.add_import(edit, kw_module)
 
     def select_candidate(self):
-        self.unique_candidates = sorted(set(self.candidates))
-        if len(self.unique_candidates) == 1:
+        if len(self.candidates) == 1:
             self.on_selected_candidate(0)
         else:
-            self.view.window().show_quick_panel([[c.module.name + ': ' + c.brief()] for c in self.unique_candidates], self.on_selected_candidate)
+            self.view.window().show_quick_panel([[c.module.name + ': ' + c.brief()] for c in self.candidates],
+                                                self.on_selected_candidate)
 
     def on_selected_candidate(self, idx):
         if idx >= 0:
-            def proj_or_pkg(c):
-                proj = Symbols.location_project(c)
-                pkg = Symbols.location_package(c)
+            def proj_or_pkg(cand_import):
+                proj = Symbols.location_project(cand_import)
+                pkg = Symbols.location_package(cand_import)
                 return proj or (pkg.name if pkg is not None else None)
 
-            selected_candidate = self.unique_candidates[idx]
+            selected_candidate = self.candidates[idx]
             self.candidates = sorted(
                 filter(lambda c: c == selected_candidate, self.candidates),
                 key=lambda c: (proj_or_pkg(c.imported_from.location) != proj_or_pkg(c.module.location), c.imported_from.name),
@@ -70,13 +70,15 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
         if len(self.candidates) == 1:
             self.on_selected_import(0)
         else:
-            self.view.window().show_quick_panel([[c.imported_from.name, str(c.imported_from.location)] for c in self.candidates], self.on_selected_import)
+            candidate_info = [[c.imported_from.name, str(c.imported_from.location)] for c in self.candidates]
+            self.view.window().show_quick_panel(candidate_info, self.on_selected_import)
 
     def on_selected_import(self, idx):
         if idx >= 0:
             # By this point, the `run` method has exited, so the `edit` is no longer valid. Reinvoke the command
             # with the module name so that a fresh `edit` is created.
-            self.view.run_command('sublime_haskell_insert_import_for_symbol', {'module': self.candidates[idx].imported_from.name})
+            self.view.run_command('sublime_haskell_insert_import_for_symbol',
+                                  {'module': self.candidates[idx].imported_from.name})
 
     def add_import(self, edit, module_name):
         contents = self.view.substr(sublime.Region(0, self.view.size()))

@@ -121,20 +121,21 @@ class GHCModBackend(Backend.HaskellBackend):
         return True
 
     scan = Backend.default_method_implementation()
+    set_file_contents = Backend.default_method_implementation()
     docs = Backend.default_method_implementation()
     infer = Backend.default_method_implementation()
     remove = Backend.default_method_implementation()
     remove_all = Backend.default_method_implementation()
-    list_modules = Backend.default_method_implementation()
     list_packages = Backend.default_method_implementation()
+    list_sandboxes = Backend.default_method_implementation()
     symbol = Backend.default_method_implementation()
 
     # Probably a little too explicit... useless call to super()
     # def list_projects(self, **backend_args):
     #     return super().list_projects(**backend_args)
 
-    def module(self, project_name, lookup='', search_type='prefix', project=None, file=None, module=None, deps=None,
-               sandbox=None, cabal=False, symdb=None, package=None, source=False, standalone=False, **backend_args):
+    def module(self, project_name, lookup='', search_type='prefix', _project=None, _file=None, _module=None, _package=None,
+               _installed=False, _source=False, _standalone=False, _header=False, **backend_args):
         modsyms = None
 
         if search_type == 'exact' and re.match(r'\w+(\.\w+)+', lookup):
@@ -152,7 +153,6 @@ class GHCModBackend(Backend.HaskellBackend):
 
         return self.dispatch_callbacks([modsyms] if modsyms else [], None, **backend_args)
 
-    resolve = Backend.default_method_implementation()
     project = Backend.default_method_implementation()
     sandbox = Backend.default_method_implementation()
     lookup = Backend.default_method_implementation()
@@ -330,7 +330,7 @@ class GHCModBackend(Backend.HaskellBackend):
     def query_import(self, _symbol, _filename):
         return (False, ['ghc-mod does not support query_import used by \'Add Import\''])
 
-    def contents_to_module(self, contents):
+    def contents_to_module(self, file, contents):
         return None
 
     def clean_imports(self, filename):
@@ -503,19 +503,19 @@ class GHCModBackend(Backend.HaskellBackend):
         decl = None
         if declinfo.startswith('class '):
             ctx, args = self.split_context_args(name, declinfo[len('class '):])
-            decl = symbols.Class(name, ctx, args, imported=mod_imported)
+            decl = symbols.Class(name, mod_imported.module, ctx, args)
         elif declinfo.startswith('data '):
             ctx, args = self.split_context_args(name, declinfo[len('data '):])
-            decl = symbols.Data(name, ctx, args, imported=mod_imported)
+            decl = symbols.Data(name, mod_imported.module, ctx, args)
         elif declinfo.startswith('newtype '):
             ctx, args = self.split_context_args(name, declinfo[len('newtype '):])
-            decl = symbols.Newtype(name, ctx, args, imported=mod_imported)
+            decl = symbols.Newtype(name, mod_imported.module, ctx, args)
         elif declinfo.startswith('type '):
             ctx, args = self.split_context_args(name, declinfo[len('type '):])
-            decl = symbols.Type(name, ctx, args, imported=mod_imported)
+            decl = symbols.Type(name, mod_imported.module, ctx, args)
         else:
             # Default to function
-            decl = symbols.Function(name, declinfo, imported=mod_imported)
+            decl = symbols.Function(name, mod_imported.module, declinfo)
 
         return decl
 

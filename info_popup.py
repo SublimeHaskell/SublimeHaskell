@@ -160,10 +160,10 @@ class SublimeHaskellHoverPopup(object):
                 decl = Utils.head_of(whoat)
                 usages = BackendManager.active_backend().usages(self.line + 1, self.column + 1, self.filename) if decl else None
                 if usages:
-                    usages = [
-                        u for u in usages
-                        if not u.definition_usage() and (u.used_in.location.filename == self.filename or u.used_in.location.project_path() == project_dir)
-                    ]
+                    usages = [u for u in usages
+                              if not u.definition_usage() and \
+                              (u.used_in.location.filename == self.filename or u.used_in.location.project_path() == project_dir)
+                             ]
                 if not decl:
                     decl = Utils.head_of(BackendManager.active_backend().whois(whois_name, self.filename))
                 if not decl:

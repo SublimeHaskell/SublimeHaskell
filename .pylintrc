@@ -12,6 +12,6 @@ ignored-modules: functools, traceback
 max-args = 15
 max-locals = 20
 # Settings.PLUGIN has a really large set of attributes.
-max-attributes = 35
+max-attributes = 40
 # SublimeHaskell has a couple of classes with a lot of public methods.
-max-public-methods = 55
+max-public-methods = 60

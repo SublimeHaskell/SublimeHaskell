@@ -4,10 +4,10 @@ The `hsdev` backend.
 
 from functools import reduce
 import io
-import json
+## import json
 import os
 import os.path
-import pprint
+## import pprint
 import re
 import subprocess
 import threading
@@ -366,19 +366,18 @@ class HsDevBackend(Backend.HaskellBackend):
         callbacks, backend_args = self.make_callbacks('set-file-contents', **backend_args)
         return self.command('set-file-contents', {'file': file, 'contents': contents}, callbacks, **backend_args)
 
-    def docs(self, projects=None, files=None, **backend_args):
+    def docs(self, projects=None, files=None, modules=None, **backend_args):
         callbacks, backend_args = self.make_callbacks('docs', **backend_args)
         return self.async_command('docs', {'projects': projects or [],
                                            'files': files or []},
                                   callbacks, **backend_args)
 
-    def infer(self, projects=None, files=None, **backend_args):
+    def infer(self, projects=None, files=None, modules=None, **backend_args):
         callbacks, backend_args = self.make_callbacks('infer', **backend_args)
         return self.async_command('infer', {'projects': projects or [],
                                             'files': files or []},
                                   callbacks, **backend_args)
-
-    def remove(self, cabal=False, sandboxes=None, projects=None, files=None, **backend_args):
+    def remove(self, cabal=False, sandboxes=None, projects=None, files=None, packages=None, **backend_args):
         callbacks, backend_args = self.make_callbacks('remove', **backend_args)
         return self.async_list_command('remove', {'projects': projects or [],
                                                   'cabal': cabal,
@@ -401,7 +400,8 @@ class HsDevBackend(Backend.HaskellBackend):
     def list_sandboxes(self, **backend_args):
         return self.list_command('sandboxes', {}, **backend_args)
 
-    def symbol(self, lookup="", search_type='prefix', project=None, file=None, module=None, package=None, installed=False, source=False, standalone=False, local_names=False, header=False, **backend_args):
+    def symbol(self, lookup='', search_type='prefix', project=None, file=None, module=None, package=None, installed=False,
+               source=False, standalone=False, local_names=False, header=False, **backend_args):
         # search_type is one of: exact, prefix, infix, suffix
         query = {'input': lookup, 'type': search_type}
 
@@ -421,11 +421,13 @@ class HsDevBackend(Backend.HaskellBackend):
         if standalone:
             filters.append('standalone')
 
-        callbacks, backend_args = self.make_callbacks('symbol', result_convert=ResultParse.parse_symbol_ids if header else ResultParse.parse_symbols, **backend_args)
+        result_cvt = ResultParse.parse_symbol_ids if header else ResultParse.parse_symbols
+        callbacks, backend_args = self.make_callbacks('symbol', result_convert=result_cvt, **backend_args)
         return self.list_command('symbol', {'query': query, 'filters': filters, 'locals': local_names, 'header': header},
                                  callbacks, **backend_args)
 
-    def module(self, _projectname, lookup="", search_type='prefix', project=None, file=None, module=None, package=None, installed=False, source=False, standalone=False, header=False, **backend_args):
+    def module(self, _project_name, lookup="", search_type='prefix', project=None, file=None, module=None, package=None,
+               installed=False, source=False, standalone=False, header=False, **backend_args):
         query = {'input': lookup, 'type': search_type}
 
         filters = []
@@ -444,7 +446,8 @@ class HsDevBackend(Backend.HaskellBackend):
         if standalone:
             filters.append('standalone')
 
-        callbacks, backend_args = self.make_callbacks('module', result_convert=ResultParse.parse_module_ids if header else ResultParse.parse_modules, **backend_args)
+        result_cvt = ResultParse.parse_module_ids if header else ResultParse.parse_modules
+        callbacks, backend_args = self.make_callbacks('module', result_convert=result_cvt, **backend_args)
         return self.command('module', {'query': query, 'filters': filters, 'header': header, 'inspection': False},
                             callbacks, **backend_args)
 

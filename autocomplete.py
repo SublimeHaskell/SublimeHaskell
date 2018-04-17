@@ -101,7 +101,7 @@ class AutoCompleter(object):
     def keyword_completions(self, query):
         return [(k + '\tkeyword', k) for k in self.keywords if k.startswith(query)] if isinstance(query, ''.__class__) else []
 
-    def generate_completions_cache(self, project_name, file_name, contents=None):
+    def generate_completions_cache(self, project_name, file_name, _contents=None):
         def log_result(result):
             retval = result or []
             if Settings.COMPONENT_DEBUG.completions:
@@ -251,8 +251,8 @@ class AutoCompleter(object):
             package = mods[0].location.package.name if mods and mods[0].by_cabal() else None
             mod_id = mods[0] if mods else None
 
-            mod_decls = Utils.head_of(list(filter(lambda m: mod_id == m, backend.module(project_name, lookup=module, search_type='exact', file=mod_file,
-                                                     package=package))))
+            mod_decls = Utils.head_of([m for m in backend.module(project_name, lookup=module, search_type='exact',
+                                                                 file=mod_file, package=package) if mod_id == m])
             retval = make_completions(mod_decls.exports) if mod_decls else []
 
         return retval
@@ -315,7 +315,7 @@ class AutoCompleter(object):
         return list(set((module_next_name(m) + '\tmodule', module_next_name(m))
                         for m in module_list if m.startswith(qualified_prefix)))
 
-    def get_current_module_completions(self, project_name, current_dir):
+    def get_current_module_completions(self, project_name, _current_dir):
         """
         Get modules, that are in scope of file/project
         In case of file we just return 'scope modules' result
@@ -326,6 +326,6 @@ class AutoCompleter(object):
         backend = BackendManager.active_backend()
         if self.current_filename:
             return set([m.name for m in backend.scope_modules(project_name, self.current_filename)])
-        else:
-            mods = backend.module(None, installed=True, header=True) or []
-            return set([m.name for m in mods])
+
+        mods = backend.module(None, installed=True, header=True) or []
+        return set([m.name for m in mods])

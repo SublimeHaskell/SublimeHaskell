@@ -97,8 +97,11 @@ class HaskellBackend(object):
         return False
 
     def scan(self, cabal=False, sandboxes=None, projects=None, files=None, paths=None, ghc=None, contents=None,
-             docs=False, infer=False, **backend_args):
+             docs=False, infer=False, wait_complete=False, **backend_args):
         raise NotImplementedError("HaskellBackend.scan needs an implementation.")
+
+    def set_file_contents(self, file, contents=None, **backend_args):
+        raise NotImplementedError("HaskellBackend.set_file_contents needs an implementation.")
 
     def docs(self, projects=None, files=None, modules=None, **backend_args):
         raise NotImplementedError("HaskellBackend.docs needs an implementation.")
@@ -111,10 +114,6 @@ class HaskellBackend(object):
 
     def remove_all(self, **backend_args):
         raise NotImplementedError("HaskellBackend.remove_all needs an implementation.")
-
-    def list_modules(self, project=None, file=None, module=None, deps=None, sandbox=None, cabal=False, symdb=None, package=None,
-                     source=False, standalone=False, **backend_args):
-        raise NotImplementedError("HaskellBackend.list_modules needs an implementation.")
 
     def list_packages(self, **backend_args):
         raise NotImplementedError("HaskellBackend.list_packages needs an implementation.")
@@ -152,16 +151,16 @@ class HaskellBackend(object):
         project_list = [dict([('name', pinfo[0]), ('path', pinfo[1])]) for pinfo in project_info]
         return self.dispatch_callbacks(project_list, None, **backend_args)
 
-    def symbol(self, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
-               cabal=False, symdb=None, package=None, source=False, standalone=False, local_names=False, **backend_args):
+    def list_sandboxes(self, **backend_args):
+        raise NotImplementedError("HaskellBackend.list_sandboxes needs an implementation.")
+
+    def symbol(self, lookup='', search_type='prefix', project=None, file=None, module=None, package=None, installed=False,
+               source=False, standalone=False, local_names=False, header=False, **backend_args):
         raise NotImplementedError("HaskellBackend.symbol needs an implementation.")
 
-    def module(self, project_name, lookup="", search_type='prefix', project=None, file=None, module=None, deps=None,
-               sandbox=None, cabal=False, symdb=None, package=None, source=False, standalone=False, **backend_args):
+    def module(self, project_name, lookup="", search_type='prefix', project=None, file=None, module=None, package=None,
+               installed=False, source=False, standalone=False, header=False, **backend_args):
         raise NotImplementedError("HaskellBackend.module needs an implementation.")
-
-    def resolve(self, file, exports=False, **backend_args):
-        raise NotImplementedError("HaskellBackend.resolve needs an implementation.")
 
     def project(self, project=None, path=None, **backend_args):
         raise NotImplementedError("HaskellBackend.project needs an implementation.")
@@ -265,7 +264,7 @@ class HaskellBackend(object):
     def flags(self, project_name, **backend_args):
         raise NotImplementedError("HaskellBackend.flags needs an implementation.")
 
-    def ghc_eval(self, exprs, file=None, source=None, **backend_args):
+    def ghc_eval(self, exprs, file=None, source=None, wait_complete=False, **backend_args):
         raise NotImplementedError("HaskellBackend.ghc_eval needs an implementation.")
 
     def ghc_type(self, exprs, file=None, source=None, wait_complete=False, **backend_args):
@@ -287,7 +286,7 @@ class HaskellBackend(object):
         '''
         raise NotImplementedError("HaskellBackend.add_import needs an implementation")
 
-    def contents_to_module(self, contents):
+    def contents_to_module(self, file, contents):
         '''Convert Haskell source to a :py:class:`Module` object. This method is currently used to
         extract the imports when adding a missing import.
 
@@ -394,15 +393,15 @@ class NullHaskellBackend(HaskellBackend):
 
     ## The internal method implementations are all the same...
     scan = default_method_implementation()
+    set_file_contents = default_method_implementation()
     docs = default_method_implementation()
     infer = default_method_implementation()
     remove = default_method_implementation()
     remove_all = default_method_implementation()
-    list_modules = default_method_implementation()
     list_packages = default_method_implementation()
+    list_sandboxes = default_method_implementation()
     symbol = default_method_implementation()
     module = default_method_implementation()
-    resolve = default_method_implementation()
     project = default_method_implementation()
     sandbox = default_method_implementation()
     lookup = default_method_implementation()
@@ -447,7 +446,7 @@ class NullHaskellBackend(HaskellBackend):
         '''
         return (False, ['NullBackend doe not support query_import used by \'Add Import\''])
 
-    def contents_to_module(self, contents):
+    def contents_to_module(self, file, contents):
         return None
 
     def clean_imports(self, filename):

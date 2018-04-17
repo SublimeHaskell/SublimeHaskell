@@ -246,9 +246,9 @@ class SublimeHaskellGoTo(CommandWin.BackendTextCommand):
 
         if decls:
             self.view.window().show_quick_panel(self.declarations,
-                                         self.on_done, 0,
-                                         self.closest_idx(decls),
-                                         self.on_highlighted if not project else None)
+                                                self.on_done, 0,
+                                                self.closest_idx(decls),
+                                                self.on_highlighted if not project else None)
 
     def sorted_decls_name(self, decls):
         return list(sorted(decls, key=lambda d: d.name))
@@ -269,8 +269,8 @@ class SublimeHaskellGoTo(CommandWin.BackendTextCommand):
             self.open(self.decls[idx], True)
 
     def open(self, decl, transient=False):
-        self.view.window().open_file(decl.get_source_location(),
-                              sublime.ENCODED_POSITION | sublime.TRANSIENT if transient else sublime.ENCODED_POSITION)
+        posn = sublime.ENCODED_POSITION | sublime.TRANSIENT if transient else sublime.ENCODED_POSITION
+        self.view.window().open_file(decl.get_source_location(), posn)
 
 
 class SublimeHaskellGoToModule(CommandWin.BackendWindowCommand):
@@ -415,6 +415,8 @@ class SublimeHaskellInferDocs(CommandWin.BackendTextCommand):
         super().__init__(view)
         self.current_file_name = None
         self.status_msg = None
+        self.docs = None
+        self.infer = None
 
     def run(self, _edit, **kwargs):
         self.current_file_name = kwargs.get('filename') or self.view.file_name()
@@ -465,6 +467,8 @@ class SublimeHaskellSymbolUsages(CommandWin.BackendTextCommand):
     def __init__(self, view):
         super().__init__(view)
         self.current_file_name = None
+        self.line = -1
+        self.column = -1
 
     def run(self, _edit, **kwargs):
         self.current_file_name = kwargs.get('filename') or self.view.file_name()
@@ -491,6 +495,8 @@ class SublimeHaskellSelectSymbolOccurrences(CommandWin.BackendTextCommand):
     def __init__(self, view):
         super().__init__(view)
         self.current_file_name = None
+        self.line = -1
+        self.column = -1
 
     def run(self, _edit, **kwargs):
         self.current_file_name = kwargs.get('filename') or self.view.file_name()
@@ -500,11 +506,11 @@ class SublimeHaskellSelectSymbolOccurrences(CommandWin.BackendTextCommand):
             self.line, self.column = self.view.rowcol(self.view.sel()[0].a)
 
         usages = BackendManager.active_backend().usages(self.line + 1, self.column + 1, self.current_file_name)
-        if usages is not None:
+        if usages:
             usages = [u for u in usages if u.used_in.location == symbols.Location(self.current_file_name)]
-            for u in usages:
-                u.region.to_zero_based()
-        if not usages:
+            for usg in usages:
+                usg.region.to_zero_based()
+        else:
             Common.sublime_status_message("No usages found")
             return
 
@@ -547,7 +553,8 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
             self.full_name = qname
             self.current_file_name = self.view.file_name()
             # Try whois it, followed by file symbol and wider module searches
-            self.candidates = self.collect_candidates(qname, name, filename, module_name, package_name, line=line, column=column)
+            self.candidates = self.collect_candidates(qname, name, filename, module_name, package_name,
+                                                      line=line, column=column)
         else:
             self.current_file_name = self.view.file_name()
 
@@ -621,7 +628,8 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
             if filename:
                 candidates = BackendManager.active_backend().lookup(name=unqualified_name, file=self.current_file_name)
             else:
-                candidates = BackendManager.active_backend().symbol(lookup=unqualified_name, search_type='exact', module=module_name, package=package_name)
+                candidates = BackendManager.active_backend().symbol(lookup=unqualified_name, search_type='exact',
+                                                                    module=module_name, package=package_name)
 
         return candidates
 
@@ -821,7 +829,8 @@ class SublimeHaskellGoToDeclaration(CommandWin.BackendTextCommand):
                 else:
                     candidates = backend.symbol(lookup=qsymbol.name, search_type='exact', source=True)
             else:
-                module_candidates = [m for m in backend.module(None, source=True, module=full_name, header=True) if m.name == full_name]
+                module_candidates = [m for m in backend.module(None, source=True, module=full_name, header=True)
+                                     if m.name == full_name]
 
             if not candidates and not module_candidates:
                 Common.sublime_status_message('Declaration {0} not found'.format(qsymbol.name))
@@ -904,6 +913,7 @@ class SublimeHaskellEvalExpressionCommand(CommandWin.BackendTextCommand):
     def __init__(self, view):
         super().__init__(view)
         self.args = []
+        self.exprs = None
         self.results = None
 
     def run(self, _edit, **_kwargs):
@@ -918,14 +928,12 @@ class SublimeHaskellEvalExpressionCommand(CommandWin.BackendTextCommand):
 
     def eval_exprs(self, exprs):
         self.exprs = exprs
-        BackendManager.active_backend().ghc_eval(
-            self.exprs, file=self.view.file_name(),
-            on_response=self.on_response, on_error=self.on_error
-        )
+        BackendManager.active_backend().ghc_eval(self.exprs, file=self.view.file_name(),
+                                                 on_response=self.on_response, on_error=self.on_error)
 
     def on_response(self, results):
         self.results = results
-        if self.results is not None and len(self.results) > 0:
+        if self.results:
             msgs = []
             for expr, res in zip(self.exprs, self.results):
                 msgs.append(u'\n'.join([
@@ -935,7 +943,8 @@ class SublimeHaskellEvalExpressionCommand(CommandWin.BackendTextCommand):
                 ]))
             output_message = '\n\n'.join(msgs)
 
-            sublime.set_timeout(lambda: Common.output_panel(self.view.window(), output_message, 'sublime_haskell_eval_expression_panel'), 0)
+            sublime.set_timeout(lambda: Common.output_panel(self.view.window(), output_message,
+                                                            'sublime_haskell_eval_expression_panel'), 0)
 
     def on_error(self, error, _details):
         sublime.set_timeout(lambda: Common.output_panel(self.view.window(), error, 'sublime_haskell_eval_expression_panel'), 0)
@@ -948,6 +957,7 @@ class SublimeHaskellExpressionTypeCommand(CommandWin.BackendTextCommand):
     def __init__(self, view):
         super().__init__(view)
         self.args = []
+        self.exprs = []
         self.results = None
 
     def run(self, _edit, **_kwargs):
@@ -962,14 +972,12 @@ class SublimeHaskellExpressionTypeCommand(CommandWin.BackendTextCommand):
 
     def type_exprs(self, exprs):
         self.exprs = exprs
-        BackendManager.active_backend().ghc_type(
-            self.exprs, file=self.view.file_name(),
-            on_response=self.on_response, on_error=self.on_error
-        )
+        BackendManager.active_backend().ghc_type(self.exprs, file=self.view.file_name(),
+                                                 on_response=self.on_response, on_error=self.on_error)
 
     def on_response(self, results):
         self.results = results
-        if self.results is not None and len(self.results) > 0:
+        if self.results:
             msgs = []
             for expr, res in zip(self.exprs, self.results):
                 msgs.append(u'\n'.join([
@@ -978,7 +986,8 @@ class SublimeHaskellExpressionTypeCommand(CommandWin.BackendTextCommand):
                 ]))
             output_message = '\n\n'.join(msgs)
 
-            sublime.set_timeout(lambda: Common.output_panel(self.view.window(), output_message, 'sublime_haskell_type_expression_panel'), 0)
+            sublime.set_timeout(lambda: Common.output_panel(self.view.window(), output_message,
+                                                            'sublime_haskell_type_expression_panel'), 0)
 
     def on_error(self, error, _details):
         sublime.set_timeout(lambda: Common.output_panel(self.view.window(), error, 'sublime_haskell_type_expression_panel'), 0)
@@ -1026,7 +1035,8 @@ class SublimeHaskellApplyToSelectionCommand(CommandWin.BackendTextCommand):
         return True
 
     def on_done(self, fname):
-        self.results = ghc_eval_x(BackendManager.active_backend().ghc_eval(["({0}) ({1})".format(fname, a) for a in self.args], wait_complete=True))
+        self.results = ghc_eval_x(BackendManager.active_backend().ghc_eval(["({0}) ({1})".format(fname, a) for a in self.args],
+                                                                           wait_complete=True))
         ghc_eval_expr = ["({0}) ({1})".format(fname, json.dumps(a)) for a in self.args]
         self.string_results = ghc_eval_x(BackendManager.active_backend().ghc_eval(ghc_eval_expr, wait_complete=True))
 
@@ -1061,8 +1071,10 @@ class SublimeHaskellApplyToSelectionListCommand(CommandWin.BackendTextCommand):
         comma_delim_args = ", ".join(self.args)
         json_args = ", ".join([json.dumps(a) for a in self.args])
 
-        self.results = ghc_eval_x(BackendManager.active_backend().ghc_eval(['({0}) [{1}]'.format(fname, comma_delim_args)], wait_complete=True))
-        self.string_results = ghc_eval_x(BackendManager.active_backend().ghc_eval(['({0}) [{1}]'.format(fname, json_args)], wait_complete=True))
+        self.results = ghc_eval_x(BackendManager.active_backend().ghc_eval(['({0}) [{1}]'.format(fname, comma_delim_args)],
+                                                                           wait_complete=True))
+        self.string_results = ghc_eval_x(BackendManager.active_backend().ghc_eval(['({0}) [{1}]'.format(fname, json_args)],
+                                                                                  wait_complete=True))
         self.res = ghc_eval_merge_results(self.results, self.string_results)
 
         if self.res[0] is None:

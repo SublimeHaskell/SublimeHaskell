@@ -2,8 +2,10 @@
 import SublimeHaskell.symbols as symbols
 
 
-def parse_list(fn, xs):
-    return [fn(x) for x in xs] if xs is not None else []
+def parse_list(list_fn, elems):
+    '''Safe map over a list.
+    '''
+    return [list_fn(x) for x in elems] if elems is not None else []
 
 
 def parse_modules(modules):
@@ -13,8 +15,8 @@ def parse_modules(modules):
 def parse_imports(imports):
     return parse_list(parse_import, imports)
 
-def parse_symbols(symbols):
-    return parse_list(parse_symbol, symbols)
+def parse_symbols(syms):
+    return parse_list(parse_symbol, syms)
 
 
 def parse_module_ids(module_ids):
@@ -90,7 +92,8 @@ def parse_symbol(sym):
             imported_from=imported,
             qualifier=qualifier,
         )
-    elif what in type_symbols:
+
+    if what in type_symbols:
         ctx = sinfo.get('ctx')
         args = sinfo.get('args')
 
@@ -104,19 +107,19 @@ def parse_symbol(sym):
             imported_from=imported,
             qualifier=qualifier,
         )
-    else:
-        sinfo.pop('what')
-        fields = dict((name.replace('-', '_').replace('class', 'parent_class'), value) for name, value in sinfo.items())
-        return symbols.UnknownSymbol(
-            what,
-            sid.name,
-            sid.module,
-            docs=docs,
-            position=pos,
-            imported_from=imported,
-            qualifier=qualifier,
-            **fields
-        )
+
+    sinfo.pop('what')
+    fields = dict((name.replace('-', '_').replace('class', 'parent_class'), value) for name, value in sinfo.items())
+    return symbols.UnknownSymbol(
+        what,
+        sid.name,
+        sid.module,
+        docs=docs,
+        position=pos,
+        imported_from=imported,
+        qualifier=qualifier,
+        **fields
+    )
 
 
 def parse_symbol_usage(sym):

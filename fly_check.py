@@ -10,7 +10,7 @@ import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.sublime_haskell_common as Common
-import SublimeHaskell.types as Types
+# import SublimeHaskell.types as Types
 
 
 WAIT_TIMEOUT = 30.0  # secs
@@ -188,7 +188,8 @@ class FlyCheckViewEventListener(sublime_plugin.ViewEventListener):
             if done_check:
                 done_check.set()
 
-            sublime.set_timeout(self.scan_contents, 0)
+            if successful_build:
+                sublime.set_timeout(self.scan_contents, 0)
             # Types.refresh_view_types(self.view)
 
         def on_error(_view):

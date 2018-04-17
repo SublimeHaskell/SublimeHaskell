@@ -198,12 +198,11 @@ def get_type(view, project_name, filename, module_name, line, column):
             rgn = resp['region']
             return RegionType(resp['note']['type'], to_file_pos(rgn['from']), to_file_pos(rgn['to']))
 
-        contents = {}
+        backend = BackendManager.active_backend()
         if view.is_dirty():
-            BackendManager.active_backend().set_file_contents(file=filename, contents=view.substr(sublime.Region(0, view.size())))
+            backend.set_file_contents(file=filename, contents=view.substr(sublime.Region(0, view.size())))
 
-        res = BackendManager.active_backend().types(project_name, [filename], module_name, line, column,
-                                                    ghc_flags=Settings.PLUGIN.ghc_opts)
+        res = backend.types(project_name, [filename], module_name, line, column, ghc_flags=Settings.PLUGIN.ghc_opts)
         if res is not None:
             types = [to_region_type(r) for r in res]
         #     SourceHaskellTypeCache().set(filename, types, False)

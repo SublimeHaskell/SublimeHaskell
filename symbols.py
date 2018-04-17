@@ -142,10 +142,10 @@ class Region(object):
         return self.start == self.end
 
 
-def lt_impl(x, y, t):
-    if isinstance(y, t):
-        return x.as_tuple() < y.as_tuple()
-    raise RuntimeError('Incomparable types: {0} and {1}'.format(x, y))
+def lt_impl(lhs, rhs, base_type):
+    if isinstance(lhs, base_type):
+        return lhs.as_tuple() < rhs.as_tuple()
+    raise RuntimeError('Incomparable types: {0} and {1}'.format(lhs, rhs))
 
 
 @total_ordering
@@ -669,7 +669,8 @@ class Function(Symbol):
     Haskell function declaration
     """
     def __init__(self, name, module, function_type, docs=None, position=None, imported_from=None, qualifier=None):
-        super().__init__('function', name, module, docs=docs, position=position, imported_from=imported_from, qualifier=qualifier)
+        super().__init__('function', name, module, docs=docs, position=position, imported_from=imported_from,
+                         qualifier=qualifier)
         self.type = function_type
 
     def __repr__(self):
@@ -704,7 +705,8 @@ class TypeBase(Symbol):
     Haskell type, data or class
     """
     def __init__(self, decl_type, name, module, context, args, docs=None, position=None, imported_from=None, qualifier=None):
-        super().__init__(decl_type, name, module, docs=docs, position=position, imported_from=imported_from, qualifier=qualifier)
+        super().__init__(decl_type, name, module, docs=docs, position=position, imported_from=imported_from,
+                         qualifier=qualifier)
         self.context = context
         self.args = args
 
@@ -764,7 +766,8 @@ class Type(TypeBase):
     Haskell type synonym
     """
     def __init__(self, name, module, context, args, docs=None, position=None, imported_from=None, qualifier=None):
-        super().__init__('type', name, module, context, args, docs=docs, position=position, imported_from=imported_from, qualifier=qualifier)
+        super().__init__('type', name, module, context, args, docs=docs, position=position, imported_from=imported_from,
+                         qualifier=qualifier)
 
 
 class Newtype(TypeBase):
@@ -772,7 +775,8 @@ class Newtype(TypeBase):
     Haskell newtype synonym
     """
     def __init__(self, name, module, context, args, docs=None, position=None, imported_from=None, qualifier=None):
-        super().__init__('newtype', name, module, context, args, docs=docs, position=position, imported_from=imported_from, qualifier=qualifier)
+        super().__init__('newtype', name, module, context, args, docs=docs, position=position, imported_from=imported_from,
+                         qualifier=qualifier)
 
 
 class Data(TypeBase):
@@ -780,7 +784,8 @@ class Data(TypeBase):
     Haskell data declaration
     """
     def __init__(self, name, module, context, args, docs=None, position=None, imported_from=None, qualifier=None):
-        super().__init__('data', name, module, context, args, docs=docs, position=position, imported_from=imported_from, qualifier=qualifier)
+        super().__init__('data', name, module, context, args, docs=docs, position=position, imported_from=imported_from,
+                         qualifier=qualifier)
 
 
 class Class(TypeBase):
@@ -788,7 +793,8 @@ class Class(TypeBase):
     Haskell class declaration
     """
     def __init__(self, name, module, context, args, docs=None, position=None, imported_from=None, qualifier=None):
-        super().__init__('class', name, module, context, args, docs=docs, position=position, imported_from=imported_from, qualifier=qualifier)
+        super().__init__('class', name, module, context, args, docs=docs, position=position, imported_from=imported_from,
+                         qualifier=qualifier)
 
     def __repr__(self):
         return u'Class({0})'.format(self.name)
@@ -796,7 +802,8 @@ class Class(TypeBase):
 
 class UnknownSymbol(Symbol):
     def __init__(self, symbol_type, name, module, docs=None, position=None, imported_from=None, qualifier=None, **kwargs):
-        super().__init__(symbol_type, name, module, docs=docs, position=position, imported_from=imported_from, qualifier=qualifier)
+        super().__init__(symbol_type, name, module, docs=docs, position=position, imported_from=imported_from,
+                         qualifier=qualifier)
         for field in ["type", "parent_class", "parent", "constructors", "args", "ctx", "associate", "pat_type", "constructor"]:
             kwargs.setdefault(field, None)
         self.__dict__.update(kwargs)
@@ -816,14 +823,14 @@ class UnknownSymbol(Symbol):
     def brief(self, short=False):
         if short:
             return u'{0}'.format(wrap_operator(self.name))
-        return u'{0} :: {1}'.format(wrap_operator(self.name), self.type if self.type else u'?')
+        return u'{0} :: {1}'.format(wrap_operator(self.name), self.what if self.what else u'?')
 
     @unicode_operators
     def popup_brief(self):
         info = u'<span class="function">{0}</span>'.format(html.escape(self.name, quote=False))
         if self.has_source_location():
             info = u'<a href="{0}">{1}</a>'.format(html.escape(self.get_source_location()), info)
-        return u'{0} <span class="operator">::</span> {1}'.format(info, format_type(self.type if self.type else u'?'))
+        return u'{0} <span class="operator">::</span> {1}'.format(info, format_type(self.what if self.what else u'?'))
 
 
 def update_with(left, right, default_value, upd_fn):
