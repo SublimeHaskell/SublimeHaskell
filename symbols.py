@@ -940,7 +940,8 @@ class SymbolUsage(object):
         return self.symbol.module.location == self.used_in.location
 
     def definition_usage(self):
-        return self.internal_usage() and self.region.start == self.symbol.position
+        return self.region and self.symbol and self.symbol.position and self.internal_usage() and \
+               self.region.start == self.symbol.position
 
 
 class Corrector(object):

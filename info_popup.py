@@ -1,7 +1,6 @@
 import urllib.parse
 
 import webbrowser
-import json
 from xml.etree import ElementTree
 
 import sublime
@@ -13,17 +12,6 @@ import SublimeHaskell.symbols as symbols
 import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.parseoutput as ParseOutput
-
-
-# Unused module variable:
-# style_header = "<style>" \
-#     "a { text-decoration: underline; }" \
-#     ".type { color: red; }" \
-#     ".tyvar { color: blue; }" \
-#     ".operator { color: green; }" \
-#     ".comment { color: gray; font-style: italic; }" \
-#     ".docs { color: gray; }" \
-#     "</style>"
 
 
 class Styles(object):
@@ -52,7 +40,7 @@ class Styles(object):
             if scheme_res:
                 # Go through all styles and collect scope/foreground/fontStyle etc.
                 # Prefer ST3 'sublime-color-scheme' JSON over older TextMate XML.
-                self.schemes[scheme_path] = self.collect_sublime_scheme(json.loads(scheme_res)) \
+                self.schemes[scheme_path] = self.collect_sublime_scheme(sublime.decode_value(scheme_res)) \
                     if scheme_path.endswith('.sublime-color-scheme') \
                     else self.collect_textmate_scheme(ElementTree.fromstring(scheme_res))
 

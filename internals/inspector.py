@@ -4,16 +4,16 @@ import os.path
 import sublime
 
 import SublimeHaskell.internals.atomics as Atomics
-import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.sublime_haskell_common as Common
 
 
 # Show scan progress in status bar
-class ScanStatus(object):
-    def __init__(self, status_message):
+class ScanNotifer(object):
+    def __init__(self, status_message, banner):
         self.status_message = status_message
+        self.banner = banner
 
     def __call__(self, msgs):
         statuses = []
@@ -23,7 +23,17 @@ class ScanStatus(object):
             smsg = '{0} ({1}/{2})'.format(msg['name'], progress['current'], progress['total']) if progress else msg['name']
             statuses.append(smsg)
         smsg = ' / '.join(statuses)
-        self.status_message.change_message('Inspecting {0}'.format(smsg))
+        self.status_message.change_message('{0} {1}'.format(self.banner, smsg))
+
+
+class ScanStatus(ScanNotifer):
+    def __init__(self, status_message):
+        super().__init__(status_message, 'Inspecting')
+
+
+class DocScanStatus(ScanNotifer):
+    def __init__(self, status_message):
+        super().__init__(status_message, 'Scanning documentation for')
 
 
 def use_inspect_modules(inspect_fn):
@@ -107,10 +117,10 @@ class Inspector(object):
                 del cabals_to_load[:]
 
             for cabal in cand_cabals:
-                Utils.run_async('inspect cabal {0}'.format(cabal), self.inspect_cabal, cabal)
+                Utils.run_async('inspect cabal {0}'.format(cabal or 'cabal'), self.inspect_cabal, cabal)
 
-            if files_to_reinspect and Settings.PLUGIN.enable_hdocs:
-                self.backend.docs(files=files_to_reinspect)
+            if (files_to_reinspect or projects) and Settings.PLUGIN.enable_hdocs:
+                Utils.run_async('doc scan', self.documentation_scan, files_to_reinspect, cand_cabals)
         finally:
             self.busy = False
 
@@ -124,7 +134,8 @@ class Inspector(object):
             with self.dirty_files as dirty_files:
                 dirty_files.update([(f, None) for f in [v.file_name() for v in window.views()] \
                                       if f and (f.endswith('.hs') or f.endswith('.hsc')) and f not in dirty_files])
-                Logging.log("dirty files: : {0}".format(dirty_files), Logging.LOG_DEBUG)
+                if Settings.COMPONENT_DEBUG.inspection:
+                    print("dirty files: : {0}".format(dirty_files))
 
             with self.dirty_paths as dirty_paths:
                 dirty_paths.extend(window.folders())
@@ -226,6 +237,14 @@ class Inspector(object):
                               timeout=None,
                               ghc=Settings.PLUGIN.ghc_opts,
                               docs=Settings.PLUGIN.enable_hdocs)
+            smgr.result_ok()
+
+    def documentation_scan(self, filenames, projects):
+        with Common.status_message_process('Documentation scan', priority=1) as smgr:
+            self.backend.docs(files=filenames, projects=projects,
+                              on_notify=DocScanStatus(smgr),
+                              wait_complete=True,
+                              timeout=None)
             smgr.result_ok()
 
     def is_busy(self):

@@ -153,7 +153,7 @@
     //     host:        [defualt: "localhost"] Host name SublimeHaskell will connect to hsdev
     //     local:       [default: true]        Should SublimeHaskell create a local hsdev server process? Specify false if you
     //                                         want to connect to a remote hsdev server
-    //     exec-args:   [default: empty list]  Additional execution arguments to the "stack" or "cabal" execution wrapper.
+    //     wrapper-args:[default: empty list]  Additional execution arguments to the "stack" or "cabal" execution wrapper.
     //                                         Useful when you need to specify an alternate `stack.yaml` when starting the
     //                                         backend, e.g., `["--stack-yaml=stack-ghc-8.2.2.yaml"]`
     //     exec-with:   [default: ""]          Should SublimeHaskell use "stack" or "cabal" to when starting

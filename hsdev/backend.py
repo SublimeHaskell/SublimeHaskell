@@ -154,6 +154,7 @@ class HsDevBackend(Backend.HaskellBackend):
                 # which means less to maintain.
                 hsdev_proc.process.stdout = io.TextIOWrapper(hsdev_proc.process.stdout, 'utf-8')
                 hsdev_proc.process.stderr = io.TextIOWrapper(hsdev_proc.process.stderr, 'utf-8')
+                terminate_hsdev_early = False
 
                 # Read and wait for hsdev's startup messge. 15 seconds should be enough time for the message to appear.
                 # Otherwise, kill the thread because we don't want to get stuck waiting forever.
@@ -162,17 +163,23 @@ class HsDevBackend(Backend.HaskellBackend):
                 startup_reader.wait_startup(15.0)
                 if startup_reader.successful():
                     port = startup_reader.port()
-                    if port != self.port:
-                        Logging.log('hsdev: server port changed, was {0}, now {1}'.format(self.port, port), Logging.LOG_WARNING)
-                        self.port = port
-                    self.drain_stdout = OutputCollector.DescriptorDrain('hsdev stdout', hsdev_proc.process.stdout)
-                    self.drain_stderr = OutputCollector.DescriptorDrain('hsdev stderr', hsdev_proc.process.stderr)
-                    self.drain_stdout.start()
-                    self.drain_stderr.start()
-                    self.hsdev_process = hsdev_proc
+                    if port >= 0:
+                        if port != self.port:
+                            Logging.log('hsdev: server port changed, was {0}, now {1}'.format(self.port, port), Logging.LOG_WARNING)
+                            self.port = port
+                        self.drain_stdout = OutputCollector.DescriptorDrain('hsdev stdout', hsdev_proc.process.stdout)
+                        self.drain_stderr = OutputCollector.DescriptorDrain('hsdev stderr', hsdev_proc.process.stderr)
+                        self.drain_stdout.start()
+                        self.drain_stderr.start()
+                        self.hsdev_process = hsdev_proc
 
-                    Logging.log('Local \'hsdev\' server started successfully.', Logging.LOG_INFO)
+                        Logging.log('Local \'hsdev\' server started successfully.', Logging.LOG_INFO)
+                    else:
+                        terminate_hsdev_early = True
                 else:
+                    terminate_hsdev_early = True
+
+                if terminate_hsdev_early:
                     # This is a bit of a "Hail Mary!" because readline() could just hang forever. Just to make sure,
                     # kill the process too!
                     startup_reader.stop()
@@ -182,7 +189,11 @@ class HsDevBackend(Backend.HaskellBackend):
                     self.hsdev_process = None
                     retval = False
 
-                    sublime.error_message('Timed out waiting for \'hsdev\' to start up.')
+                    sublime.error_message('\n'.join(['Could not start \'hsdev\' server: Did not read startup',
+                                                     'message.',
+                                                     '',
+                                                     'Check to see that no other \'hsdev\' server is still',
+                                                     'running.']))
             else:
                 errmsg = 'Could not start local \'hsdev\' server because:\n\n' + hsdev_proc.process_err
                 sublime.error_message(errmsg)
@@ -366,11 +377,10 @@ class HsDevBackend(Backend.HaskellBackend):
         callbacks, backend_args = self.make_callbacks('set-file-contents', **backend_args)
         return self.command('set-file-contents', {'file': file, 'contents': contents}, callbacks, **backend_args)
 
-    def docs(self, projects=None, files=None, modules=None, **backend_args):
+    def docs(self, projects=None, files=None, modules=None, wait_complete=False, **backend_args):
+        action = self.command if wait_complete else self.async_command
         callbacks, backend_args = self.make_callbacks('docs', **backend_args)
-        return self.async_command('docs', {'projects': projects or [],
-                                           'files': files or []},
-                                  callbacks, **backend_args)
+        return action('docs', {'projects': projects or [], 'files': files or []}, callbacks, **backend_args)
 
     def infer(self, projects=None, files=None, modules=None, **backend_args):
         callbacks, backend_args = self.make_callbacks('infer', **backend_args)
@@ -671,7 +681,7 @@ class HsDevStartupReader(threading.Thread):
         return self.end_event.is_set()
 
     def stop(self):
-        self.end_event.clear()
+        self.end_event.set()
 
     def port(self):
         return self.hsdev_port
