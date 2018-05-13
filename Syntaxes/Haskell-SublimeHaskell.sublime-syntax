@@ -26,6 +26,9 @@ variables:
   qualified_id: '({{type_id}}\.)*{{var_id}}'
 
 contexts:
+  prototype:
+    - include: comments
+
   main:
     - match: ^(module)\b
       captures:
@@ -52,7 +55,6 @@ contexts:
           scope: keyword.other.haskell keyword.import.haskell
         - include: module_name
         - include: module_exports
-        - include: comments
     - match: ^\s*(#)\s*\w+
       comment: In addition to Haskell's "native" syntax, GHC permits the C preprocessor to be run on a source file.
       captures:
@@ -61,7 +63,6 @@ contexts:
         - meta_scope: meta.preprocessor.c pragma.preprocessor.haskell
         - match: $
           pop: true
-    - include: comments
     - match: '^(foreign)\s+(import|export)((\s+\w+))(\s+\"(\\.|[^\"])*\")?\s*'
       captures:
         1: keyword.declaration.foreign.haskell
@@ -119,16 +120,8 @@ contexts:
             0: comment.block.documentation.haskell
           pop: true
 
-    - match: '\{-'
-      # Ordinary block comment.
-      scope: punctuation.comment.haskell
-      push:
-        - meta_scope: comment.block.haskell
-        - match: '-\}'
-          captures:
-            0: punctuation.comment.haskell
-          pop: true
-        - include: comments
+    # Ordinary block comment.
+    - include: comments_ordinary_block
 
     # Haddock one-liners
     - match: '-- [\|\*\^].*$'
@@ -136,9 +129,20 @@ contexts:
 
     # Regular double-dash comment
     - match: '(---*(?!([!#\$%&\*\+\./<=>\?@\\\^\|\-~:]|[^[^\p{S}\p{P}]_"''\(\),;\[\]`\{}]))).*$'
-      scope: comment.line.double-dash comment.line.haskell
+      scope: comment.line.double-dash.haskell comment.line.haskell
       captures:
         1: punctuation.comment.haskell
+
+  comments_ordinary_block:
+    - match: '\{-'
+      scope: punctuation.comment.haskell
+      push:
+        - meta_include_prototype: false
+        - meta_scope: comment.block.haskell
+        - match: '-\}'
+          scope: punctuation.comment.haskell
+          pop: true
+        - include: comments_ordinary_block
 
   class_declaration:
     - match: '^(\s*)(class)(?:\s+({{type_id}}))?\b'
@@ -151,8 +155,8 @@ contexts:
           captures:
             1: keyword.declaration.class.haskell
           pop: true
-        - match: '(=>|\u21D2)\\s+({{type_id}})'
-          scope: meta.declaration.class.name
+        - match: '(=>|\u21D2)\s+({{type_id}})'
+          scope: meta.declaration.class.name.haskell
           captures:
             1: keyword.operator.haskell
             2: entity.name.type.haskell
@@ -194,13 +198,11 @@ contexts:
           scope: keyword.operator.haskell
           push:
             - match: '\b{{type_id}}\b'
-              scope: entity.name.function entity.name.constructor.haskell
+              scope: entity.name.function.haskell entity.name.constructor.haskell
               pop: true
-            - include: comments
         - include: deriving
         - include: constructor_signature
         - include: record_declaration
-        - include: comments
         - include: type
 
   deriving:
@@ -211,7 +213,7 @@ contexts:
     - match: '\b({{type_id}}\.)+'
       scope: storage.module.haskell entity.name.module.haskell
     - match: \b(error|undefined)\b
-      scope: support.function.prelude.haskell invalid.haskell
+      scope: support.function.prelude.haskell
     - include: infix_op
     - match: '\[|\]'
       comment: List
@@ -241,7 +243,6 @@ contexts:
       scope: constant.other.haskell entity.name.constructor.haskell
     - match: '\[\]'
       scope: constant.other.haskell entity.name.constructor.haskell
-    - include: comments
     - match: '[@|!%$?~+:.\-*=</>\\∘→⇒⇔←⤙⇐≤≥≡⋮\[\]]+'
       comment: In case this regex seems overly general, note that Haskell permits the definition of new operators which can be nearly any string of punctuation characters, such as $%^&*.
       scope: keyword.operator.haskell
@@ -263,7 +264,7 @@ contexts:
             2: keyword.other.double-colon.haskell
           push:
             - meta_scope: meta.declaration.field.signature.haskell
-            - match: "(?=[;}])"
+            - match: "(?=[,;}])"
               pop: true
             - include: type
         - match: '(\b{{var_id}}\b|\(\W+\))'
@@ -348,7 +349,6 @@ contexts:
             1: keyword.declaration.instance.haskell
           pop: true
         - include: type
-        - include: comments
 
   literals:
     - match: |-
@@ -364,9 +364,21 @@ contexts:
       scope: constant.numeric.haskell
     - match: '"'
       push:
+        - meta_include_prototype: false
         - meta_scope: string.quoted.double.haskell
         - match: '"'
           pop: true
+        - match: '(\\)\s*$'
+          captures:
+            1: constant.character.escape.multi-line.haskell
+          push:
+            - meta_include_prototype: false
+            - match: '\s+'
+            - match: '\\'
+              scope: constant.character.escape.multi-line.haskell
+              pop: true
+            - match: '(?=.)'
+              pop: true
         - match: '\\(NUL|SOH|STX|ETX|EOT|ENQ|ACK|BEL|BS|HT|LF|VT|FF|CR|SO|SI|DLE|DC1|DC2|DC3|DC4|NAK|SYN|ETB|CAN|EM|SUB|ESC|FS|GS|RS|US|SP|DEL|[abfnrtv\\\"''\&])'
           scope: constant.character.escape.haskell
         - match: '\\o{{octal}}|\\x{{hexadecimal}}|\\{{decimal}}'
@@ -426,7 +438,6 @@ contexts:
         - match: \(.*?\)
           comment: So named because I don't know what to call this.
           scope: meta.other.unknown.haskell
-        - include: comments
 
   module_name:
     - match: '({{type_id}})(\.{{type_id}})*'
@@ -465,7 +476,6 @@ contexts:
             1: keyword.operator.haskell punctuation.record.haskell
           pop: true
         - include: field_signature
-        - include: comments
   type:
     - match: \s*(->|\u2192)\s*
       scope: keyword.operator.arrow.haskell
@@ -501,7 +511,6 @@ contexts:
             1: keyword.operator.haskell
           pop: true
         - include: type
-    - include: comments
 
   type_declaration:
     - match: '^(\s*)(type)\s+([A-Z][\w'']*)?'
@@ -512,7 +521,6 @@ contexts:
         - meta_scope: meta.declaration.type.haskell
         - match: ^(?!\1\s)
           pop: true
-        - include: comments
         - match: "="
           scope: keyword.operator.haskell
         - include: type
