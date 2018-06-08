@@ -39,8 +39,8 @@ class HsDevBackend(Backend.HaskellBackend):
     HSDEV_DEFAULT_PORT = 4567
     HSDEV_DEFAULT_HOST = 'localhost'
     HSDEV_NOT_FOUND = [0, 0, 0, 0]
-    HSDEV_MIN_VER = [0, 3, 1, 0]  # minimum hsdev version
-    HSDEV_MAX_VER = [0, 3, 2, 0]  # maximum hsdev version
+    HSDEV_MIN_VER = [0, 3, 2, 0]  # minimum hsdev version
+    HSDEV_MAX_VER = [0, 3, 3, 0]  # maximum hsdev version
     HSDEV_CALL_TIMEOUT = 300.0 # second timeout for synchronous requests (5 minutes should be enough, no?)
 
     def __init__(self, backend_mgr, local=True, port=HSDEV_DEFAULT_PORT, host=HSDEV_DEFAULT_HOST, **kwargs):
@@ -245,9 +245,13 @@ class HsDevBackend(Backend.HaskellBackend):
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
     @staticmethod
-    def hsdev_version(exec_with, install_dir):
+    def hsdev_version(exec_with, install_dir, output_compiler_version=False):
         retval = [0, 0, 0, 0]
-        hsdev_proc = ProcHelper.exec_with_wrapper(exec_with, install_dir, ['hsdev', 'version'])
+        compiler_version = None
+        cmd = ['hsdev', 'version']
+        if output_compiler_version:
+            cmd.append('-c')
+        hsdev_proc = ProcHelper.exec_with_wrapper(exec_with, install_dir, cmd)
         if hsdev_proc.process is not None:
             exit_code, out, _ = hsdev_proc.wait()
             if exit_code == 0:
@@ -260,9 +264,10 @@ class HsDevBackend(Backend.HaskellBackend):
                         revision = int(hsver.group('revision'))
                         build = int(hsver.group('build'))
                         retval = [major, minor, revision, build]
+                        compiler_version = line.split()[1]
                         break
 
-        return retval
+        return (retval, compiler_version) if output_compiler_version else retval
 
 
     @staticmethod
@@ -359,6 +364,45 @@ class HsDevBackend(Backend.HaskellBackend):
                                'docs': docs,
                                'infer': infer},
                       callbacks, **backend_args)
+
+    def scan_project(self, project, build_tool=None, no_deps=False, wait_complete=False, **backend_args):
+        action = self.command if wait_complete else self.async_command
+        callbacks, backend_args = self.make_callbacks('scan project', **backend_args)
+        return action(
+            'scan project',
+            {
+                'project': project,
+                'build-tool': build_tool,
+                'scan-deps': not no_deps,
+            },
+            callbacks,
+            **backend_args
+        )
+
+    def scan_file(self, file, build_tool=None, no_project=False, no_deps=False, wait_complete=False, **backend_args):
+        action = self.command if wait_complete else self.async_command
+        callbacks, backend_args = self.make_callbacks('scan file', **backend_args)
+        return action(
+            'scan file',
+            {
+                'file': file,
+                'build-tool': build_tool,
+                'scan-project': not no_project,
+                'scan-deps': not no_deps,
+            },
+            callbacks,
+            **backend_args
+        )
+
+    def scan_package_dbs(self, package_dbs, wait_complete=False, **backend_args):
+        action = self.command if wait_complete else self.async_command
+        callbacks, backend_args = self.make_callbacks('scan package-dbs', **backend_args)
+        return action(
+            'scan package-dbs',
+            {'package-db-stack': [{'package-db': p} if p not in ['user-db', 'global-db'] else p for p in package_dbs]},
+            callbacks,
+            **backend_args
+        )
 
     def set_file_contents(self, file, contents=None, **backend_args):
         callbacks, backend_args = self.make_callbacks('set-file-contents', **backend_args)
@@ -583,6 +627,10 @@ class HsDevBackend(Backend.HaskellBackend):
         callbacks, backend_args = self.make_callbacks('ghc type', result_convert=ResultParse.parse_repl_results, **backend_args)
         action = self.list_command if wait_complete else self.async_list_command
         return action('ghc type', {'exprs': exprs, 'file': the_file}, callbacks, **backend_args)
+
+    def stop_ghc(self, **backend_args):
+        callbacks, backend_args = self.make_callbacks('stop-ghc', **backend_args)
+        return self.command('stop-ghc', {}, callbacks, **backend_args)
 
     def exit(self):
         return self.command('exit', {}, self.make_callbacks('exit')[0])
