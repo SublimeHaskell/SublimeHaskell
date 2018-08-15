@@ -160,7 +160,7 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
             self.do_hover(self.view, point, hover_zone)
 
         def on_query_completions(self, prefix, locations):
-            self.do_query_completions(self.view, prefix, locations)
+            return self.do_query_completions(self.view, prefix, locations)
     else:
         def __init__(self):
             super().__init__()
@@ -357,7 +357,7 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
         #     return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         # return comp
 
-        return (completions, completion_flags) # if completions else None
+        return (completions, completion_flags)  # if completions else None
 
 
     def rescan_source(self, project_name, filename, drop_all=True):
