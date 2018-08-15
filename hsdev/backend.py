@@ -264,7 +264,7 @@ class HsDevBackend(Backend.HaskellBackend):
                         revision = int(hsver.group('revision'))
                         build = int(hsver.group('build'))
                         retval = [major, minor, revision, build]
-                        compiler_version = line.split()[1]
+                        compiler_version = line.split()[1] if output_compiler_version else None
                         break
 
         return (retval, compiler_version) if output_compiler_version else retval

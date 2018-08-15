@@ -182,17 +182,37 @@ class Inspector(object):
                 print('  :: projects: {0}'.format(projects))
                 print('  :: files: {0}'.format(files))
 
+            build_tool = Settings.PLUGIN.haskell_build_tool
             with Common.status_message_process('Inspecting', priority=1) as smgr:
-                self.backend.scan(paths=paths,
-                                  projects=projects,
-                                  files=files,
-                                  contents=contents,
-                                  on_notify=ScanStatus(smgr),
-                                  wait_complete=True,
-                                  timeout=None,
-                                  ghc=Settings.PLUGIN.ghc_opts,
-                                  docs=Settings.PLUGIN.enable_hdocs)
-                smgr.result_ok()
+                for project in projects:
+                    self.backend.scan_project(
+                        project=project,
+                        build_tool=build_tool,
+                        wait_complete=True,
+                        timeout=None,
+                        on_notify=ScanStatus(smgr),
+                    )
+                    smgr.result_ok()
+            with Common.status_message_process('Inspecting', priority=1) as smgr:
+                for file in files:
+                    self.backend.scan_file(
+                        file=file,
+                        build_tool=build_tool,
+                        wait_complete=True,
+                        timeout=None,
+                        on_notify=ScanStatus(smgr),
+                    )
+                    smgr.result_ok()
+            # with Common.status_message_process('Inspecting', priority=1) as smgr:
+            #     self.backend.scan(paths=paths,
+            #                       files=files,
+            #                       contents=contents,
+            #                       on_notify=ScanStatus(smgr),
+            #                       wait_complete=True,
+            #                       timeout=None,
+            #                       ghc=Settings.PLUGIN.ghc_opts,
+            #                       docs=Settings.PLUGIN.enable_hdocs)
+            #     smgr.result_ok()
 
     @use_inspect_modules
     def inspect_path(self, path):
