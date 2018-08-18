@@ -172,7 +172,12 @@ class FlyCheckViewEventListener(sublime_plugin.ViewEventListener):
         def scan_err(_err, _details):
             status_msg.result_fail()
 
-        BackendManager.active_backend().scan(files=[current_file_name], on_response=scan_resp, on_error=scan_err)
+        BackendManager.active_backend().scan_file(
+            file=current_file_name,
+            build_tool=Settings.PLUGIN.haskell_build_tool,
+            on_response=scan_resp,
+            on_error=scan_err,
+        )
 
     def do_inspect(self, done_inspect):
         current_file_name = self.view.file_name()
