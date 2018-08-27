@@ -33,6 +33,8 @@ def sorted_completions(comps):
 
 
 def make_completions(suggestions):
+    if not isinstance(suggestions, list):
+        return []
     # return sorted_completions([s.suggest() for s in suggestions or []])
     return sorted([s.suggest() for s in suggestions or []])
 
