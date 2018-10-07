@@ -21,7 +21,7 @@ def encode_bytes(src):
 
 
 def head_of(lst):
-    return lst[0] if lst else None
+    return lst[0] if isinstance(lst, list) and lst else None
 
 
 def tool_enabled(feature):
