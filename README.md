@@ -107,6 +107,9 @@ Works in export list (showing symbols in scope), import list, expressions. Compl
 - It also shows inferred type when possible
 ![HoverTypes](Commands/HoverTypes.gif)
 
+- You can select all usages of symbol via link
+![HoverUsages](Commands/HoverUsages.gif)
+
 - And you can autofix warnings/hints on popup for warnings/hints
 ![AutoFixHover](Commands/AutoFixHover.gif)
 
@@ -137,6 +140,8 @@ Works in export list (showing symbols in scope), import list, expressions. Compl
 * `SublimeHaskell: Stylish` — stylish source with `stylish-haskell`
 * `SublimeHaskell: Scan docs and infer types` — as long as scanning docs for sources and inferring types is long process, it's disabled by default, but this command can be used to scan docs and infer types for currently opened view
 * `SublimeHaskell: Check & Lint` — check/lint/check & lint opened file. Enable option `check_lint_fly` to [check & lint](Commands/FlyCheck.gif) on idle, rescanning actual source, so that [completions are updated](Commands/ScanContents.gif)
+* `SublimeHaskell: Eval expression` — evaluate expression in context of current module
+* `SublimeHaskell: Expression type` — evaluate expression type in context of current module
 * Eval commands — see [animation](Commands/Eval.gif)
   * `SublimeHaskell: Eval selection` — eval selected expression, for example
     * `[1..10]` ⤇ `[1,2,3,4,5,6,7,8,9,10]`
@@ -157,6 +162,8 @@ Works in export list (showing symbols in scope), import list, expressions. Compl
 * Context menu commands
   * `Open package on Hackage` — works within symbol info panel, opens Hackage page
   * `Open module on Hackage` — words in symbol info panel and in sources, opens Hackage page for selected module
+  * `Show symbol usages` — show list of locations where symbol is used
+  * `Insert import for symbol` — try insert import for selected symbol
 * Build commands
   * `Build`, `Typecheck build (no codegen)`, `Clean`, `Configure`, `Rebuild`, `Install`, `Test`, `Run`
 * Error commands:
