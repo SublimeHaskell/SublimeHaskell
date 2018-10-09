@@ -163,7 +163,6 @@ Works in export list (showing symbols in scope), import list, expressions. Compl
   * `Open package on Hackage` — works within symbol info panel, opens Hackage page
   * `Open module on Hackage` — words in symbol info panel and in sources, opens Hackage page for selected module
   * `Show symbol usages` — show list of locations where symbol is used
-  * `Insert import for symbol` — try insert import for selected symbol
 * Build commands
   * `Build`, `Typecheck build (no codegen)`, `Clean`, `Configure`, `Rebuild`, `Install`, `Test`, `Run`
 * Error commands:
