@@ -27,6 +27,13 @@ import SublimeHaskell.types as types
 #     "</style>"
 
 
+def split_scopes(scopes):
+    """
+    Splits "foo, bar, baz" into ["foo", "bar", "baz"]
+    """
+    return list(map(lambda s: s.strip(), scopes.split(', ')))
+
+
 class Styles(object):
     """
     Loads and holds cache of scheme styles
@@ -72,7 +79,8 @@ class Styles(object):
                         cur_style[cur_tag] = elem.text
                         cur_tag = None
                 if 'scope' in cur_style:
-                    scheme[cur_style['scope']] = cur_style
+                    for scope_name in split_scopes(cur_style['scope']):
+                        scheme[scope_name] = cur_style
             except ValueError:
                 pass
         return scheme
@@ -82,7 +90,8 @@ class Styles(object):
         for rule in scheme_dict.get('rules', []):
             scope = rule.get('scope', '')
             if scope:
-                scheme[scope] = rule
+                for scope_name in split_scopes(scope):
+                    scheme[scope_name] = rule
 
         return scheme
 
