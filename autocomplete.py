@@ -33,6 +33,8 @@ def sorted_completions(comps):
 
 
 def make_completions(suggestions):
+    if not isinstance(suggestions, list):
+        return []
     # return sorted_completions([s.suggest() for s in suggestions or []])
     return sorted([s.suggest() for s in suggestions or []])
 
@@ -101,7 +103,7 @@ class AutoCompleter(object):
     def keyword_completions(self, query):
         return [(k + '\tkeyword', k) for k in self.keywords if k.startswith(query)] if isinstance(query, ''.__class__) else []
 
-    def generate_completions_cache(self, project_name, file_name, contents=None):
+    def generate_completions_cache(self, project_name, file_name, _contents=None):
         def log_result(result):
             retval = result or []
             if Settings.COMPONENT_DEBUG.completions:
@@ -134,7 +136,7 @@ class AutoCompleter(object):
                 print('preparing completions for {0} ({1})'.format(project_name, file_name))
 
             backend = BackendManager.active_backend()
-            comps = make_completions(backend.complete(Common.QualifiedSymbol(''), file_name, contents=contents))
+            comps = make_completions(backend.complete(Common.QualifiedSymbol(''), file_name))
             current_module = Utils.head_of(backend.module(project_name, file_name))
 
             if Settings.COMPONENT_DEBUG.completions:
@@ -209,14 +211,14 @@ class AutoCompleter(object):
                                                                    search_type='exact'))
                     if q_module is not None:
                         if q_module.by_source():
-                            proj_module = backend.resolve(file=q_module.location.filename, exports=True)
+                            proj_module = backend.module(None, file=q_module.location.filename)
                             if proj_module:
-                                suggestions = proj_module.declarations.values()
+                                suggestions = proj_module.exports
                         elif q_module.by_cabal():
                             cabal_module = Utils.head_of(backend.module(project_name, lookup=q_module.name, search_type='exact',
                                                                         package=q_module.location.package.name))
                             if cabal_module:
-                                suggestions = cabal_module.declarations.values()
+                                suggestions = cabal_module.exports
             else:
                 if Settings.COMPONENT_DEBUG.completions:
                     print('completions: querying module-specific completions')
@@ -248,12 +250,12 @@ class AutoCompleter(object):
             mods = backend.scope_modules(project_name, filename, lookup=module, search_type='exact') if filename else []
 
             mod_file = mods[0].location.filename if mods and mods[0].by_source() else None
-            cache_db = mods[0].location.db if mods and mods[0].by_cabal() else None
             package = mods[0].location.package.name if mods and mods[0].by_cabal() else None
+            mod_id = mods[0] if mods else None
 
-            mod_decls = Utils.head_of(backend.module(project_name, lookup=module, search_type='exact', file=mod_file,
-                                                     symdb=cache_db, package=package))
-            retval = make_completions(mod_decls.declarations.values()) if mod_decls else []
+            mod_decls = Utils.head_of([m for m in backend.module(project_name, lookup=module, search_type='exact',
+                                                                 file=mod_file, package=package) if mod_id == m])
+            retval = make_completions(mod_decls.exports) if mod_decls else []
 
         return retval
 
@@ -315,7 +317,7 @@ class AutoCompleter(object):
         return list(set((module_next_name(m) + '\tmodule', module_next_name(m))
                         for m in module_list if m.startswith(qualified_prefix)))
 
-    def get_current_module_completions(self, project_name, current_dir):
+    def get_current_module_completions(self, project_name, _current_dir):
         """
         Get modules, that are in scope of file/project
         In case of file we just return 'scope modules' result
@@ -326,16 +328,6 @@ class AutoCompleter(object):
         backend = BackendManager.active_backend()
         if self.current_filename:
             return set([m.name for m in backend.scope_modules(project_name, self.current_filename)])
-        elif current_dir:
-            proj = backend.project(path=current_dir)
-            if proj and 'path' in proj:
-                return set([m.name for m in backend.list_modules(deps=proj['path'])])
-            sbox = backend.sandbox(path=current_dir)
-            if sbox and isinstance(sbox, dict) and 'sandbox' in sbox:
-                sbox = sbox.get('sandbox')
-            if sbox:
-                mods = backend.list_modules(sandbox=sbox) or []
-                return set([m.name for m in mods])
-        else:
-            mods = backend.list_modules(cabal=True) or []
-            return set([m.name for m in mods])
+
+        mods = backend.module(None, installed=True, header=True) or []
+        return set([m.name for m in mods])

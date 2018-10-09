@@ -18,6 +18,7 @@ import SublimeHaskell.symbols as symbols
 
 # Extract the filename, line, column from symbol info
 SYMBOL_FILE_REGEX = r'^Defined at: (.*):(\d+):(\d+)$'
+FILE_REGEX = r'^(.*):(\d+):(\d+)'
 
 
 def show_declaration_info_panel(view, decl):
@@ -46,7 +47,6 @@ def show_declaration_info(view, decl):
                 info['filename'] = decl.defined_module().location.filename
             if decl.by_cabal() and decl.defined_module().location.package.name:
                 info['package_name'] = decl.module.location.package.name
-                info['db'] = decl.module.location.db.to_string()
 
         view.run_command('sublime_haskell_symbol_info', info)
     else:
@@ -108,7 +108,7 @@ class SublimeHaskellFindDeclarations(CommandWin.BackendWindowCommand):
         self.window.show_input_panel("Search string", "", self.on_done, self.on_change, self.on_cancel)
 
     def on_done(self, sym):
-        self.decls = BackendManager.active_backend().symbol(lookup=sym, search_type='regex')
+        self.decls = BackendManager.active_backend().symbol(lookup=sym, search_type='infix')
         self.decls.sort(key=lambda d: d.module.name)
         if self.decls:
             module_decls = [['{0}: {1}'.format(decl.module.name, decl.brief(use_unicode=True)),
@@ -216,16 +216,16 @@ class SublimeHaskellSearch(CommandWin.BackendWindowCommand):
 
 
 # General goto command
-class SublimeHaskellGoTo(CommandWin.BackendWindowCommand):
-    def __init__(self, win):
-        super().__init__(win)
-        self.view = win.active_view()
+class SublimeHaskellGoTo(CommandWin.BackendTextCommand):
+    def __init__(self, view):
+        super().__init__(view)
+        self.view = view
         self.decls = []
         self.declarations = []
         self.current_filename = self.view.file_name()
         self.line, self.column = self.view.rowcol(self.view.sel()[0].a)
 
-    def run(self, **kwargs):
+    def run(self, edit, **kwargs):
         project = kwargs.get('project') or False
         decls = []
 
@@ -245,13 +245,10 @@ class SublimeHaskellGoTo(CommandWin.BackendWindowCommand):
         self.decls = decls[:]
 
         if decls:
-            self.window.show_quick_panel(self.declarations,
-                                         self.on_done, 0,
-                                         self.closest_idx(decls),
-                                         self.on_highlighted if not project else None)
-
-    def qualified_decls(self, decls):
-        return [decl.make_qualified() for decl in decls]
+            self.view.window().show_quick_panel(self.declarations,
+                                                self.on_done, 0,
+                                                self.closest_idx(decls),
+                                                self.on_highlighted if not project else None)
 
     def sorted_decls_name(self, decls):
         return list(sorted(decls, key=lambda d: d.name))
@@ -272,8 +269,8 @@ class SublimeHaskellGoTo(CommandWin.BackendWindowCommand):
             self.open(self.decls[idx], True)
 
     def open(self, decl, transient=False):
-        self.window.open_file(decl.get_source_location(),
-                              sublime.ENCODED_POSITION | sublime.TRANSIENT if transient else sublime.ENCODED_POSITION)
+        posn = sublime.ENCODED_POSITION | sublime.TRANSIENT if transient else sublime.ENCODED_POSITION
+        self.view.window().open_file(decl.get_source_location(), posn)
 
 
 class SublimeHaskellGoToModule(CommandWin.BackendWindowCommand):
@@ -283,7 +280,7 @@ class SublimeHaskellGoToModule(CommandWin.BackendWindowCommand):
         self.window = win
 
     def run(self, **_kwargs):
-        self.modules = BackendManager.active_backend().list_modules(source=True)
+        self.modules = BackendManager.active_backend().module(None, source=True, header=True)
         mod_strings = [[m.name if m.name != 'Main' else 'Main in {0}'.format(m.location.to_string()),
                         m.location.to_string()] for m in self.modules]
         self.window.show_quick_panel(mod_strings, self.on_done, 0, 0, self.on_highlighted)
@@ -339,12 +336,14 @@ class SublimeHaskellGoToHackageModule(CommandWin.BackendTextCommand):
                                                                                         search_type='exact')
                                if m.by_cabal()]
                 else:
-                    modules = [m for m in BackendManager.active_backend().list_modules(symdb=m.location.db)
+                    modules = [m for m in BackendManager.active_backend().module(None, installed=True, header=True)
                                if m.name == qsymbol.module and m.by_cabal()]
             else:  # symbol
                 scope = self.view.file_name()
+                line, column = self.view.rowcol(self.view.sel()[0].a)
                 if scope:
-                    decls = BackendManager.active_backend().whois(qsymbol.qualified_name(), file=scope) or \
+                    decls = BackendManager.active_backend().whoat(line + 1, column + 1, file=scope) or \
+                            BackendManager.active_backend().whois(qsymbol.qualified_name(), file=scope) or \
                             BackendManager.active_backend().lookup(qsymbol.full_name(), file=scope) or \
                             BackendManager.active_backend().symbol(lookup=qsymbol.full_name(), search_type='exact')
                     if not decls:
@@ -407,6 +406,7 @@ class SublimeHaskellReinspectAll(CommandWin.BackendWindowCommand):
         with BackendManager.inspector() as insp:
             insp.start_inspect()
 
+
 class SublimeHaskellInferDocs(CommandWin.BackendTextCommand):
     """
     Infer types and scan docs for current module
@@ -415,35 +415,113 @@ class SublimeHaskellInferDocs(CommandWin.BackendTextCommand):
         super().__init__(view)
         self.current_file_name = None
         self.status_msg = None
+        self.docs = None
+        self.infer = None
 
     def run(self, _edit, **kwargs):
         self.current_file_name = kwargs.get('filename') or self.view.file_name()
+        self.docs = kwargs.pop('docs', True)
+        self.infer = kwargs.pop('infer', True)
+        self.scan_docs()
+
+    def scan_docs(self):
+        if not self.docs:
+            self.infer_types()
+            return
+
         self.status_msg = Common.status_message_process("Scanning docs for {0}".format(self.current_file_name), priority=3)
         self.status_msg.start()
 
-        def run_infer():
-            self.status_msg = Common.status_message_process("Inferring types for {0}".format(self.current_file_name),
-                                                            priority=3)
-            self.status_msg.start()
-
-            def infer_on_resp(_resp):
-                self.status_msg.result_ok()
-
-            def infer_on_err(_err, _details):
-                self.status_msg.result_fail()
-
-            BackendManager.active_backend().infer(files=[self.current_file_name], on_response=infer_on_resp,
-                                                  on_error=infer_on_err)
-
         def on_resp(_resp):
             self.status_msg.result_ok()
-            run_infer()
+            self.infer_types()
 
         def on_err(_err, _details):
             self.status_msg.result_fail()
-            run_infer()
+            self.infer_types()
 
         BackendManager.active_backend().docs(files=[self.current_file_name], on_response=on_resp, on_error=on_err)
+
+    def infer_types(self):
+        if not self.infer:
+            return
+
+        self.status_msg = Common.status_message_process("Inferring types for {0}".format(self.current_file_name),
+                                                        priority=3)
+        self.status_msg.start()
+
+        def infer_on_resp(_resp):
+            self.status_msg.result_ok()
+
+        def infer_on_err(_err, _details):
+            self.status_msg.result_fail()
+
+        BackendManager.active_backend().infer(files=[self.current_file_name], on_response=infer_on_resp,
+                                              on_error=infer_on_err)
+
+
+class SublimeHaskellSymbolUsages(CommandWin.BackendTextCommand):
+    """
+    Show where symbol is used
+    """
+    def __init__(self, view):
+        super().__init__(view)
+        self.current_file_name = None
+        self.line = -1
+        self.column = -1
+
+    def run(self, _edit, **kwargs):
+        self.current_file_name = kwargs.get('filename') or self.view.file_name()
+        self.line = kwargs.get('line')
+        self.column = kwargs.get('column')
+        if self.line is None or self.column is None:
+            self.line, self.column = self.view.rowcol(self.view.sel()[0].a)
+
+        usages = BackendManager.active_backend().usages(self.line + 1, self.column + 1, self.current_file_name)
+        if not usages:
+            Common.sublime_status_message("No usages found")
+            return
+
+        usages_msg = u'\n'.join([str(u) for u in sorted(usages, key=lambda u: (u.used_in.location.filename, u.region.start))])
+
+        panel = Common.output_panel(self.view.window(), usages_msg, 'sublime_haskell_symbol_usages_panel')
+        panel.settings().set('result_file_regex', FILE_REGEX)
+
+
+class SublimeHaskellSelectSymbolOccurrences(CommandWin.BackendTextCommand):
+    """
+    Select all occurrences of symbol in current view
+    """
+    def __init__(self, view):
+        super().__init__(view)
+        self.current_file_name = None
+        self.line = -1
+        self.column = -1
+
+    def run(self, _edit, **kwargs):
+        self.current_file_name = kwargs.get('filename') or self.view.file_name()
+        self.line = kwargs.get('line')
+        self.column = kwargs.get('column')
+        if self.line is None or self.column is None:
+            self.line, self.column = self.view.rowcol(self.view.sel()[0].a)
+
+        usages = BackendManager.active_backend().usages(self.line + 1, self.column + 1, self.current_file_name)
+        if usages:
+            usages = [u for u in usages if u.used_in.location == symbols.Location(self.current_file_name)]
+            for usg in usages:
+                usg.region.to_zero_based()
+        else:
+            Common.sublime_status_message("No usages found")
+            return
+
+        self.view.sel().clear()
+        self.view.sel().add_all([
+            sublime.Region(
+                self.view.text_point(u.region.start.line, u.region.start.column),
+                self.view.text_point(u.region.end.line, u.region.end.column)
+            )
+            for u in usages
+        ])
 
 
 class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
@@ -458,21 +536,25 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
         self.candidates = None
         self.candidate_selected = None
         self.whois_name = None
+        self.line = None
+        self.column = None
 
     def run(self, _edit, **kwargs):
         filename = kwargs.get('filename')
         module_name = kwargs.get('module_name')
         package_name = kwargs.get('package_name')
-        symdb = kwargs.get('db')
         name = kwargs.get('name')
         qname = kwargs.get('qname')
         no_browse = kwargs.get('no_browse') or False
+        line = kwargs.get('line')
+        column = kwargs.get('column')
 
         if qname:
             self.full_name = qname
             self.current_file_name = self.view.file_name()
             # Try whois it, followed by file symbol and wider module searches
-            self.candidates = self.collect_candidates(qname, name, filename, module_name, package_name, symdb)
+            self.candidates = self.collect_candidates(qname, name, filename, module_name, package_name,
+                                                      line=line, column=column)
         else:
             self.current_file_name = self.view.file_name()
 
@@ -536,21 +618,18 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
     def is_visible(self):
         return Common.view_is_haskell_source(self.view) or Common.view_is_haskell_repl(self.view)
 
-    def collect_candidates(self, qualified_name, unqualified_name, filename, module_name, package_name, symdb):
-        candidates = BackendManager.active_backend().whois(qualified_name, file=self.current_file_name)
+    def collect_candidates(self, qualified_name, unqualified_name, filename, module_name, package_name, line=None, column=None):
+        candidates = []
+        if line is not None and column is not None:
+            candidates = BackendManager.active_backend().whoat(line + 1, column + 1, file=self.current_file_name)
+        else:
+            candidates = BackendManager.active_backend().whois(qualified_name, file=self.current_file_name)
         if not candidates:
             if filename:
-                candidates = BackendManager.active_backend().symbol(lookup=unqualified_name, search_type='exact', file=filename)
+                candidates = BackendManager.active_backend().lookup(name=unqualified_name, file=self.current_file_name)
             else:
-                if module_name and package_name:
-                    symbol_db = symbols.PackageDb.from_string(symdb) if symdb else None
-                    candidates = BackendManager.active_backend().symbol(lookup=unqualified_name,
-                                                                        search_type='exact',
-                                                                        module=module_name,
-                                                                        symdb=symbol_db,
-                                                                        package=package_name)
-                else:
-                    candidates = []
+                candidates = BackendManager.active_backend().symbol(lookup=unqualified_name, search_type='exact',
+                                                                    module=module_name, package=package_name)
 
         return candidates
 
@@ -620,8 +699,9 @@ class SublimeHaskellBrowseModule(CommandWin.BackendTextCommand):
     def run(self, _edit, **kwargs):
         module_name = kwargs.get('module_name')
         filename = kwargs.get('filename')
-        symdb = kwargs.get('db')
         scope = kwargs.get('scope')
+        package_name = kwargs.get('package_name')
+        package_version = kwargs.get('package_version')
 
         self.candidates = []
         self.current_file_name = self.view.window().active_view().file_name()
@@ -635,7 +715,7 @@ class SublimeHaskellBrowseModule(CommandWin.BackendTextCommand):
                 Common.sublime_status_message('Module {0} not found'.format(filename))
                 return
         elif module_name:
-            cand_mods = self.candidate_modules(project_name, module_name, scope, symdb)
+            cand_mods = self.candidate_modules(project_name, module_name, scope, package_name, package_version)
             if not cand_mods:
                 Common.sublime_status_message('Module {0} not found'.format(module_name))
                 return
@@ -649,12 +729,11 @@ class SublimeHaskellBrowseModule(CommandWin.BackendTextCommand):
             if self.current_file_name:
                 cand_mods = BackendManager.active_backend().scope_modules(project_name, self.current_file_name)
             else:
-                symbol_db = symbols.PackageDb.from_string(symdb) if symdb else None
-                cand_mods = BackendManager.active_backend().list_modules(symdb=symbol_db)
+                cand_mods = BackendManager.active_backend().module(None, header=True)
             self.candidates.extend([(m, [m.name, m.location.to_string()]) for m in cand_mods])
 
         if the_module:
-            self.candidates = sorted(list(the_module.declarations.values()), key=lambda d: d.brief())
+            self.candidates = sorted(list(the_module.exports), key=lambda d: d.brief())
             results = [[decl.brief(use_unicode=False),
                         decl.docs.splitlines()[0] if decl.docs else ''] for decl in self.candidates]
             self.view.window().show_quick_panel(results, self.on_symbol_selected)
@@ -672,7 +751,7 @@ class SublimeHaskellBrowseModule(CommandWin.BackendTextCommand):
                 info['filename'] = the_module.location.filename
             if the_module.by_cabal() and the_module.location.package.name:
                 info['package_name'] = the_module.location.package.name
-                info['db'] = the_module.location.db.to_string()
+                info['package_version'] = the_module.location.package.version
 
             self.view.window().run_command('sublime_haskell_browse_module', info)
 
@@ -680,16 +759,20 @@ class SublimeHaskellBrowseModule(CommandWin.BackendTextCommand):
         if idx >= 0:
             show_declaration_info(self.view.window().active_view(), self.candidates[idx])
 
-    def candidate_modules(self, project_name, module_name, scope, symdb):
+    def candidate_modules(self, project_name, module_name, scope, package_name=None, package_version=None):
         retval = None
+        package = symbols.Package(package_name, package_version) if package_name is not None else None
+
         if scope is not None:
             retval = BackendManager.active_backend().scope_modules(project_name, scope, lookup=module_name, search_type='exact')
         elif self.current_file_name is not None:
             retval = BackendManager.active_backend().scope_modules(project_name, self.current_file_name, lookup=module_name,
                                                                    search_type='exact')
         else:
-            retval = BackendManager.active_backend().list_modules(module=module_name,
-                                                                  symdb=symbols.PackageDb.from_string(symdb) if symdb else None)
+            package_id = package.package_id() if package is not None else None
+            retval = BackendManager.active_backend().module(None, module=module_name, package=package_id, header=True)
+        if package is not None:
+            retval = list(filter(lambda m: package.match(symbols.location_package(m.location)), retval))
         return retval
 
     def get_module_info(self, project_name, module, module_name):
@@ -697,8 +780,7 @@ class SublimeHaskellBrowseModule(CommandWin.BackendTextCommand):
         if module.by_source():
             args = {'lookup': module_name, 'search_type': 'exact', 'file': module.location.filename}
         elif module.by_cabal():
-            args = {'lookup': module_name, 'search_type': 'exact', 'symdb': module.location.db,
-                    'package': module.location.package.name}
+            args = {'lookup': module_name, 'search_type': 'exact', 'package': module.location.package.name}
         else:
             args = {'lookup': module_name, 'search_type': 'exact'}
 
@@ -710,6 +792,7 @@ class SublimeHaskellGoToDeclaration(CommandWin.BackendTextCommand):
         self.select_candidates = None
 
     def run(self, _edit, **_kwargs):
+        line, column = self.view.rowcol(self.view.sel()[0].a)
         qsymbol = Common.get_qualified_symbol_at_region(self.view, self.view.sel()[0])
 
         if Common.view_is_haskell_symbol_info(self.view):  # Go to within symbol info window
@@ -727,7 +810,9 @@ class SublimeHaskellGoToDeclaration(CommandWin.BackendTextCommand):
             candidates = []
             module_candidates = []
             if not qsymbol.is_module():
-                candidates = [decl for decl in backend.whois(whois_name, current_file_name) if decl.by_source()]
+                candidates = [decl for decl in backend.whoat(line + 1, column + 1, current_file_name) if decl.by_source()]
+                if not candidates:
+                    candidates = [decl for decl in backend.whois(whois_name, current_file_name) if decl.by_source()]
                 if candidates:
                     if candidates[0].has_source_location():
                         self.view.window().open_file(candidates[0].get_source_location(), sublime.ENCODED_POSITION)
@@ -744,7 +829,8 @@ class SublimeHaskellGoToDeclaration(CommandWin.BackendTextCommand):
                 else:
                     candidates = backend.symbol(lookup=qsymbol.name, search_type='exact', source=True)
             else:
-                module_candidates = [m for m in backend.list_modules(source=True, module=full_name) if m.name == full_name]
+                module_candidates = [m for m in backend.module(None, source=True, module=full_name, header=True)
+                                     if m.name == full_name]
 
             if not candidates and not module_candidates:
                 Common.sublime_status_message('Declaration {0} not found'.format(qsymbol.name))
@@ -805,22 +891,109 @@ def ghc_eval_x(resps):
     # Drop 'fail' to be 'None' and unwrap strings
     # No idea how to call this function
     def process(i):
-        if isinstance(i, dict):
+        if i.failure():
             return None
         try:
-            resp_str = json.loads(i)
+            resp_str = json.loads(i.result)
             if isinstance(resp_str, str):
                 return resp_str
         except ValueError:
             pass
 
-        return i
+        return i.result
     return list(map(process, resps))
 
 
 def ghc_eval_merge_results(left, right):
     # Prefer result in 'l', but if there's 'fail' - use result from 'r'
     return [x or y for x, y in zip(left, right)]
+
+
+class SublimeHaskellEvalExpressionCommand(CommandWin.BackendTextCommand):
+    def __init__(self, view):
+        super().__init__(view)
+        self.args = []
+        self.exprs = None
+        self.results = None
+
+    def run(self, _edit, **_kwargs):
+        exprs = [self.view.substr(s) for s in self.view.sel() if not s.empty()]
+        if not exprs:
+            self.view.window().show_input_panel('Expression', '', self.on_done, None, self.on_cancel)
+        else:
+            self.eval_exprs(exprs)
+
+    def on_done(self, expr):
+        self.eval_exprs([expr])
+
+    def eval_exprs(self, exprs):
+        self.exprs = exprs
+        BackendManager.active_backend().ghc_eval(self.exprs, file=self.view.file_name(),
+                                                 on_response=self.on_response, on_error=self.on_error)
+
+    def on_response(self, results):
+        self.results = results
+        if self.results:
+            msgs = []
+            for expr, res in zip(self.exprs, self.results):
+                msgs.append(u'\n'.join([
+                    u'\u03BB> {0}'.format(expr),
+                    '⇒ {0}'.format('Error' if res.failure() else 'Ok'),
+                    '{0}'.format(res.result or res.error)
+                ]))
+            output_message = '\n\n'.join(msgs)
+
+            sublime.set_timeout(lambda: Common.output_panel(self.view.window(), output_message,
+                                                            'sublime_haskell_eval_expression_panel'), 0)
+
+    def on_error(self, error, _details):
+        sublime.set_timeout(lambda: Common.output_panel(self.view.window(), error, 'sublime_haskell_eval_expression_panel'), 0)
+
+    def on_cancel(self):
+        pass
+
+
+class SublimeHaskellExpressionTypeCommand(CommandWin.BackendTextCommand):
+    def __init__(self, view):
+        super().__init__(view)
+        self.args = []
+        self.exprs = []
+        self.results = None
+
+    def run(self, _edit, **_kwargs):
+        exprs = [self.view.substr(s) for s in self.view.sel() if not s.empty()]
+        if not exprs:
+            self.view.window().show_input_panel('Expression', '', self.on_done, None, self.on_cancel)
+        else:
+            self.type_exprs(exprs)
+
+    def on_done(self, expr):
+        self.type_exprs([expr])
+
+    def type_exprs(self, exprs):
+        self.exprs = exprs
+        BackendManager.active_backend().ghc_type(self.exprs, file=self.view.file_name(),
+                                                 on_response=self.on_response, on_error=self.on_error)
+
+    def on_response(self, results):
+        self.results = results
+        if self.results:
+            msgs = []
+            for expr, res in zip(self.exprs, self.results):
+                msgs.append(u'\n'.join([
+                    u'\u03BB> {0}'.format(expr),
+                    res.result if res.success() else 'Error: {0}'.format(res.error),
+                ]))
+            output_message = '\n\n'.join(msgs)
+
+            sublime.set_timeout(lambda: Common.output_panel(self.view.window(), output_message,
+                                                            'sublime_haskell_type_expression_panel'), 0)
+
+    def on_error(self, error, _details):
+        sublime.set_timeout(lambda: Common.output_panel(self.view.window(), error, 'sublime_haskell_type_expression_panel'), 0)
+
+    def on_cancel(self):
+        pass
 
 
 class SublimeHaskellEvalSelectionCommand(CommandWin.BackendTextCommand):
@@ -831,7 +1004,7 @@ class SublimeHaskellEvalSelectionCommand(CommandWin.BackendTextCommand):
 
     def run(self, _edit, **_kwargs):
         self.args = [self.view.substr(s) for s in self.view.sel()]
-        self.results = ghc_eval_x(BackendManager.active_backend().ghc_eval(self.args))
+        self.results = ghc_eval_x(BackendManager.active_backend().ghc_eval(self.args, wait_complete=True))
 
         self.view.run_command('sublime_haskell_eval_replace', {'results': self.results})
 
@@ -862,9 +1035,10 @@ class SublimeHaskellApplyToSelectionCommand(CommandWin.BackendTextCommand):
         return True
 
     def on_done(self, fname):
-        self.results = ghc_eval_x(BackendManager.active_backend().ghc_eval(["({0}) ({1})".format(fname, a) for a in self.args]))
+        self.results = ghc_eval_x(BackendManager.active_backend().ghc_eval(["({0}) ({1})".format(fname, a) for a in self.args],
+                                                                           wait_complete=True))
         ghc_eval_expr = ["({0}) ({1})".format(fname, json.dumps(a)) for a in self.args]
-        self.string_results = ghc_eval_x(BackendManager.active_backend().ghc_eval(ghc_eval_expr))
+        self.string_results = ghc_eval_x(BackendManager.active_backend().ghc_eval(ghc_eval_expr, wait_complete=True))
 
         self.view.run_command('sublime_haskell_eval_replace',
                               {'results': ghc_eval_merge_results(self.results, self.string_results)})
@@ -897,8 +1071,10 @@ class SublimeHaskellApplyToSelectionListCommand(CommandWin.BackendTextCommand):
         comma_delim_args = ", ".join(self.args)
         json_args = ", ".join([json.dumps(a) for a in self.args])
 
-        self.results = ghc_eval_x(BackendManager.active_backend().ghc_eval(['({0}) [{1}]'.format(fname, comma_delim_args)]))
-        self.string_results = ghc_eval_x(BackendManager.active_backend().ghc_eval(['({0}) [{1}]'.format(fname, json_args)]))
+        self.results = ghc_eval_x(BackendManager.active_backend().ghc_eval(['({0}) [{1}]'.format(fname, comma_delim_args)],
+                                                                           wait_complete=True))
+        self.string_results = ghc_eval_x(BackendManager.active_backend().ghc_eval(['({0}) [{1}]'.format(fname, json_args)],
+                                                                                  wait_complete=True))
         self.res = ghc_eval_merge_results(self.results, self.string_results)
 
         if self.res[0] is None:
@@ -992,9 +1168,10 @@ class AutoFixState(object):
         self.undo_history.append((self.corrections[:], self.selected))
         self.redo_history.clear()
         (cur, corrs) = self.get_corrections()
-        self.corrections = BackendManager.active_backend().autofix_fix(HsDevResultParse.encode_corrections([cur]),
-                                                                       rest=HsDevResultParse.encode_corrections(corrs),
-                                                                       pure=True)
+        self.corrections = BackendManager.active_backend().refactor(HsDevResultParse.encode_corrections([cur]),
+                                                                    rest=HsDevResultParse.encode_corrections(corrs),
+                                                                    wait_complete=True,
+                                                                    pure=True)
         if not self.corrections:
             self.selected = 0
             self.clear()
@@ -1053,11 +1230,12 @@ class SublimeHaskellAutoFix(CommandWin.BackendWindowCommand):
             self.status_msg.start()
             BackendManager.active_backend().check_lint(files=[self.window.active_view().file_name()],
                                                        ghc=Settings.PLUGIN.ghc_opts,
+                                                       hlint=Settings.PLUGIN.lint_opts,
                                                        on_response=on_resp,
                                                        on_error=on_err)
 
     def on_got_messages(self, msgs):
-        fixes = BackendManager.active_backend().autofix_show(msgs, wait_complete=True)
+        fixes = BackendManager.active_backend().autofixes(msgs, wait_complete=True)
         corrections = [corr for corr in fixes if os.path.samefile(corr.file, self.window.active_view().file_name())]
         if corrections:
             AUTOFIX_STATE.set(self.window.active_view(), corrections)

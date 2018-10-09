@@ -126,6 +126,14 @@
         "command": "sublime_haskell_go_to_module"
     },
     {
+        "caption": "SublimeHaskell: Eval expression",
+        "command": "sublime_haskell_eval_expression"
+    },
+    {
+        "caption": "SublimeHaskell: Expression type",
+        "command": "sublime_haskell_expression_type"
+    },
+    {
         "caption": "SublimeHaskell: Eval selection",
         "command": "sublime_haskell_eval_selection"
     },
@@ -168,6 +176,16 @@
     {
         "caption": "SublimeHaskell: Scan docs and infer types",
         "command": "sublime_haskell_infer_docs"
+    },
+    {
+        "caption": "SublimeHaskell: Scan docs in current view",
+        "command": "sublime_haskell_infer_docs",
+        "args": { "docs": true, "infer": false }
+    },
+    {
+        "caption": "SublimeHaskell: Infer types in current module",
+        "command": "sublime_haskell_infer_docs",
+        "args": { "docs": false, "infer": true }
     },
     {
         "caption": "SublimeHaskell: Go to next error",

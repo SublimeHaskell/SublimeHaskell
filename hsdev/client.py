@@ -23,7 +23,7 @@ def debug_recv():
     return Settings.COMPONENT_DEBUG.all_messages or Settings.COMPONENT_DEBUG.recv_messages
 
 class HsDevConnection(object):
-    MAX_SOCKET_READ = 10240
+    MAX_SOCKET_READ = 20480
     '''Byte stream length that the client receiver will read from a socket at one time.
     '''
 
@@ -52,18 +52,29 @@ class HsDevConnection(object):
             # Note: We could have read a lot from the socket, which could have resulted in multiple request responses
             # being read (this can happen when the 'scan' command sends status updates):
             pre, sep, post = self.read_decoded_req().partition('\n')
+            while not sep:
+                req_remain += pre
+                pre, sep, post = self.read_decoded_req().partition('\n')
+
             pre = ''.join([req_remain, pre])
             while sep:
                 resp = json.loads(pre)
                 self.client.dispatch_response(resp)
-                (pre, sep, post) = post.partition('\n')
+                pre, sep, post = post.partition('\n')
+
             req_remain = pre
 
     def read_decoded_req(self):
         raw_req = bytearray()
+        # raw_len = 0
         while self.socket is not None and not self.stop_event.is_set():
             try:
-                raw_req.extend(self.socket.recv(self.MAX_SOCKET_READ))
+                in_buf = self.socket.recv(self.MAX_SOCKET_READ)
+                # raw_len += len(in_buf)
+                # print('read_decoded_req {0}\n{1}'.format(raw_len,
+                #                                          in_buf if len(in_buf) < 120 \
+                #                                                 else str(in_buf[:20]) + ' ... ' + str(in_buf[-100:])))
+                raw_req.extend(in_buf)
                 return raw_req.decode('utf-8').replace('\r\n', '\n').replace('\r', '\n')
             except UnicodeDecodeError:
                 # Couldn't decode the string, so continue reading from the socket, accumulating
@@ -97,6 +108,8 @@ class HsDevConnection(object):
             self.send_queue.put(msg.encode('utf-8'))
 
     def close(self):
+        if debug_recv() or debug_send():
+            print('{0}.close'.format(type(self).__name__))
         try:
             self.stop_event.set()
 
@@ -116,6 +129,8 @@ class HsDevConnection(object):
 
     def __del__(self):
         # Paranoia.
+        if debug_recv() or debug_send():
+            print('{0}.__del__'.format(type(self).__name__))
         self.close()
 
 class HsDevClient(object):
@@ -137,6 +152,8 @@ class HsDevClient(object):
         self._request_map = Atomics.AtomicDuck()
 
     def __del__(self):
+        if debug_recv() or debug_send():
+            print('{0}.__del__'.format(type(self).__name__))
         self.close()
 
     @property
@@ -188,6 +205,8 @@ class HsDevClient(object):
         return None
 
     def close(self):
+        if debug_recv() or debug_send():
+            print('{0}.close'.format(type(self).__name__))
         self.rcvr_event.set()
 
         for sock in self.socket_pool:
@@ -204,6 +223,8 @@ class HsDevClient(object):
         return self.is_connected()
 
     def connection_lost(self, func_name, reason):
+        if debug_recv() or debug_send():
+            print('{0}.connection_lost'.format(type(self).__name__))
         self.close()
         Logging.log('{0}: connection to hsdev lost: {1}'.format(func_name, reason), Logging.LOG_ERROR)
 
@@ -279,7 +300,7 @@ class HsDevClient(object):
             retval = True
             if wait:
                 if debug_send():
-                    print(u'HsDevClient.call: waiting to receive, timeout = {0}.'.format(timeout))
+                    print(u'HsDevClient.call: waiting to receive {1}, timeout = {0}.'.format(timeout, callbacks.ident))
                 wait_receive.wait(timeout)
                 if debug_send():
                     print(u'HsDevClient.call: done waiting.')
@@ -288,6 +309,8 @@ class HsDevClient(object):
                     if wait_receive.is_set():
                         callbacks, _, resp = requests[callbacks.ident]
                         del requests[callbacks.ident]
+                        if debug_send():
+                            print(u'HsDevClient.call: received {0} bytes'.format(len(resp)))
 
                         retval = resp
                         if 'result' in resp:

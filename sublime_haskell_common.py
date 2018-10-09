@@ -530,10 +530,12 @@ def view_is_cabal_source(view):
 def settings_has_cabal_source(settings):
     return settings_has_syntax(settings, "Cabal.tmLanguage")
 
-HASKELL_SYNTAXES = ['Haskell-SublimeHaskell.sublime-syntax',
-                    'Haskell-SublimeHaskell.tmLanguage',
-                    'Haskell.tmLanguage',
-                    'Haskell.sublime-syntax']
+HASKELL_SYNTAXES = [
+    "Haskell-SublimeHaskell.sublime-syntax",
+    "Haskell-SublimeHaskell.tmLanguage",
+    "Haskell.tmLanguage",
+    "Haskell.sublime-syntax"
+]
 
 
 def view_is_haskell_source(view):

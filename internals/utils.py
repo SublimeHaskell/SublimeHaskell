@@ -10,6 +10,7 @@ import threading
 import traceback
 
 import SublimeHaskell.internals.logging as Logging
+import SublimeHaskell.internals.settings as Settings
 
 def decode_bytes(src):
     return src.decode('utf-8').replace('\r\n', '\n').replace('\r', '\n') if src else None
@@ -20,7 +21,7 @@ def encode_bytes(src):
 
 
 def head_of(lst):
-    return lst[0] if lst else None
+    return lst[0] if isinstance(lst, list) and lst else None
 
 
 def tool_enabled(feature):
@@ -52,23 +53,28 @@ class Worker(object, metaclass=Singleton):
     def __init__(self):
         super().__init__()
         self.jobs = queue.Queue()
-        self.inner_thread = threading.Thread(target=self.worker_run)
+        self.inner_thread = threading.Thread(name='utils.Worker', target=self.worker_run)
         self.inner_thread.start()
 
     def worker_run(self):
         while True:
             name, worker_fn, args, kwargs = self.jobs.get()
             try:
-                Logging.log('worker: {0}'.format(name), Logging.LOG_DEBUG)
+                if Settings.COMPONENT_DEBUG.util_worker:
+                    print('worker: exec \'{0}\''.format(name))
                 worker_fn(*args, **kwargs)
             except Exception:
                 Logging.log('worker: job {0} failed, see console window traceback'.format(name), Logging.LOG_ERROR)
                 traceback.print_exc()
             finally:
+                if Settings.COMPONENT_DEBUG.util_worker:
+                    print('worker: fin \'{0}\''.format(name))
                 self.jobs.task_done()
 
     def async(self, name, worker_fn, *args, **kwargs):
         self.jobs.put((name, worker_fn, args, kwargs))
 
 def run_async(name, worker_fn, *args, **kwargs):
+    if Settings.COMPONENT_DEBUG.util_worker:
+        print('run_async: {0}'.format(name))
     Worker().async(name, worker_fn, *args, **kwargs)

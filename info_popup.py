@@ -1,7 +1,6 @@
 import urllib.parse
 
 import webbrowser
-import json
 from xml.etree import ElementTree
 
 import sublime
@@ -11,19 +10,8 @@ import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.internals.unicode_opers as UnicodeOpers
 import SublimeHaskell.symbols as symbols
 import SublimeHaskell.internals.backend_mgr as BackendManager
+import SublimeHaskell.internals.settings as Settings
 import SublimeHaskell.parseoutput as ParseOutput
-import SublimeHaskell.types as types
-
-
-# Unused module variable:
-# style_header = "<style>" \
-#     "a { text-decoration: underline; }" \
-#     ".type { color: red; }" \
-#     ".tyvar { color: blue; }" \
-#     ".operator { color: green; }" \
-#     ".comment { color: gray; font-style: italic; }" \
-#     ".docs { color: gray; }" \
-#     "</style>"
 
 
 class Styles(object):
@@ -52,7 +40,7 @@ class Styles(object):
             if scheme_res:
                 # Go through all styles and collect scope/foreground/fontStyle etc.
                 # Prefer ST3 'sublime-color-scheme' JSON over older TextMate XML.
-                self.schemes[scheme_path] = self.collect_sublime_scheme(json.loads(scheme_res)) \
+                self.schemes[scheme_path] = self.collect_sublime_scheme(sublime.decode_value(scheme_res)) \
                     if scheme_path.endswith('.sublime-color-scheme') \
                     else self.collect_textmate_scheme(ElementTree.fromstring(scheme_res))
 
@@ -120,7 +108,7 @@ class SublimeHaskellHoverPopup(object):
         self.filename = filename
         self.point = point
         self.hover_zone = hover_zone
-        self.line = view.rowcol(point)[0]
+        self.line, self.column = view.rowcol(point)
         self.shown = False
 
 
@@ -130,6 +118,7 @@ class SublimeHaskellHoverPopup(object):
             ## print('hover: qualified symbol {0}'.format(qsymbol))
             module_word = qsymbol.module
             ident = qsymbol.name
+            project_dir = Common.locate_cabal_project_from_view(self.view)[0]
 
             if module_word is not None and ident is None:
                 # TODO: Any ideas for popup about module?
@@ -138,23 +127,38 @@ class SublimeHaskellHoverPopup(object):
                 whois_name = qsymbol.qualified_name()
                 full_name = qsymbol.full_name()
 
+                # Infer types in backgroup (if not any)
+                if Settings.PLUGIN.enable_infer_types:
+                    BackendManager.active_backend().infer(files=[self.filename])
+
                 # Try get type of hovered symbol
                 typed_expr = None
-                if types.SourceHaskellTypeCache().has(self.filename):
-                    typed_expr = self.get_type(types.SourceHaskellTypeCache().get(self.filename), whois_name)
-                else:
-                    project_name = Common.locate_cabal_project_from_view(self.view)[1]
-                    point_rgn = sublime.Region(self.point, self.point)
-                    typed_expr = self.get_type(types.get_type_view(self.view, project_name, point_rgn), whois_name)
+                # Getting type is slow, disabled for me
+
+                # if types.SourceHaskellTypeCache().has(self.filename):
+                #     typed_expr = self.get_type(types.SourceHaskellTypeCache().get(self.filename), whois_name)
+                # else:
+                #     project_name = Common.locate_cabal_project_from_view(self.view)[1]
+                #     point_rgn = sublime.Region(self.point, self.point)
+                #     typed_expr = self.get_type(types.get_type_view(self.view, project_name, point_rgn), whois_name)
 
                 # Try whois
                 suggest_import = False
-                decl = Utils.head_of(BackendManager.active_backend().whois(whois_name, self.filename))
+                whoat = BackendManager.active_backend().whoat(self.line + 1, self.column + 1, self.filename)
+                decl = Utils.head_of(whoat)
+                usages = BackendManager.active_backend().usages(self.line + 1, self.column + 1, self.filename) if decl else None
+                if usages:
+                    usages = [u for u in usages
+                              if not u.definition_usage() and \
+                              (u.used_in.location.filename == self.filename or u.used_in.location.project_path() == project_dir)
+                             ]
+                if not decl:
+                    decl = Utils.head_of(BackendManager.active_backend().whois(whois_name, self.filename))
                 if not decl:
                     suggest_import = True
                     decl = Utils.head_of(BackendManager.active_backend().lookup(full_name, self.filename))
 
-                self.create_symbol_popup(typed_expr, decl, suggest_import)
+                self.create_symbol_popup(typed_expr, decl, suggest_import, usages=usages)
 
         elif self.hover_zone == sublime.HOVER_GUTTER:
             errs = [err for err in ParseOutput.MARKER_MANAGER.marks_for_view(self.view) if err.region.start.line == self.line]
@@ -179,7 +183,7 @@ class SublimeHaskellHoverPopup(object):
                                      self.on_navigate, self.on_hide)
 
 
-    def create_symbol_popup(self, typed_expr, decl, suggest_import):
+    def create_symbol_popup(self, typed_expr, decl, suggest_import, usages=None):
         if typed_expr or decl:
             popup_parts = [self.STYLES.gen_style(self.view.settings().get('color_scheme'))]
             if typed_expr:
@@ -190,6 +194,33 @@ class SublimeHaskellHoverPopup(object):
                 popup_msg = [u'<a href="import:{0}">Add import</a>'.format(urllib.parse.quote_plus(decl.name))] \
                             if suggest_import else []
                 popup_parts.append(decl.popup(popup_msg))
+            if usages is not None:
+                source_symbol = decl.by_source()
+                used_total = len(usages)
+                used_here = len([u for u in usages if u.used_in.location.filename == self.filename])
+                used_defm = len([u for u in usages if u.internal_usage()])
+
+                usages_ref = '<a href="usages:{0}:{1}">Usages</a>'.format(self.line, self.column)
+
+                if used_total == 0:
+                    usages_tpl = 'Not used'
+                elif not source_symbol:
+                    usages_tpl = '{usages_ref}: {total} (<a href="select:{line}:{column}">{here} in this file</a>)'
+                else:
+                    if decl.module.location.filename == self.filename:
+                        usages_tpl = '{usages_ref}: {total} (<a href="select:{line}:{column}">{here} in this file</a>)'
+                    else:
+                        usages_tpl = '{usages_ref}: {total} (<a href="select:{line}:{column}">{here} in this file</a>, {defm} in def file)'
+                usages_msg = usages_tpl.format(
+                    usages_ref=usages_ref,
+                    total=used_total,
+                    here=used_here,
+                    defm=used_defm,
+                    line=self.line,
+                    column=self.column,
+                )
+
+                popup_parts.append(u'<span class="comment">{0}</span>'.format(usages_msg))
 
             popup_text = u''.join(popup_parts)
             if not self.shown:
@@ -219,8 +250,27 @@ class SublimeHaskellHoverPopup(object):
                 self.view.run_command('sublime_haskell_insert_import_for_symbol',
                                       {'filename': self.view.file_name(),
                                        'decl': decl_name})
+            elif url[0:7] == "usages:":
+                line, column = tuple(map(int, url.split(':')[1:]))
+                self.view.run_command(
+                    'sublime_haskell_symbol_usages',
+                    {
+                        'filename': self.view.file_name(),
+                        'line': line,
+                        'column': column,
+                    }
+                )
+            elif url[0:7] == "select:":
+                line, column = tuple(map(int, url.split(':')[1:]))
+                self.view.run_command(
+                    'sublime_haskell_select_symbol_occurrences',
+                    {
+                        'line': line,
+                        'column': column,
+                    }
+                )
             else:
-                self.view.window().open_file(url, sublime.ENCODED_POSITION | sublime.TRANSIENT)
+                self.view.window().open_file(url, sublime.ENCODED_POSITION)
 
     def on_hide(self):
         self.shown = False

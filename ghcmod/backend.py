@@ -120,39 +120,22 @@ class GHCModBackend(Backend.HaskellBackend):
     def ping(self):
         return True
 
-    def scan(self, cabal=False, sandboxes=None, projects=None, files=None, paths=None, ghc=None, contents=None,
-             docs=False, infer=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def docs(self, projects=None, files=None, modules=None, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def infer(self, projects=None, files=None, modules=None, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def remove(self, cabal=False, sandboxes=None, projects=None, files=None, packages=None, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def remove_all(self, **backend_args):
-        return self.dispatch_callbacks(None, None, **backend_args)
-
-    def list_modules(self, project=None, file=None, module=None, deps=None, sandbox=None, cabal=False, symdb=None,
-                     package=None, source=False, standalone=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def list_packages(self, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
+    scan = Backend.default_method_implementation()
+    set_file_contents = Backend.default_method_implementation()
+    docs = Backend.default_method_implementation()
+    infer = Backend.default_method_implementation()
+    remove = Backend.default_method_implementation()
+    remove_all = Backend.default_method_implementation()
+    list_packages = Backend.default_method_implementation()
+    list_sandboxes = Backend.default_method_implementation()
+    symbol = Backend.default_method_implementation()
 
     # Probably a little too explicit... useless call to super()
     # def list_projects(self, **backend_args):
     #     return super().list_projects(**backend_args)
 
-    def symbol(self, lookup='', search_type='prefix', project=None, file=None, module=None, deps=None, sandbox=None,
-               cabal=False, symdb=None, package=None, source=False, standalone=False, local_names=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def module(self, project_name, lookup='', search_type='prefix', project=None, file=None, module=None, deps=None,
-               sandbox=None, cabal=False, symdb=None, package=None, source=False, standalone=False, **backend_args):
+    def module(self, project_name, lookup='', search_type='prefix', _project=None, _file=None, _module=None, _package=None,
+               _installed=False, _source=False, _standalone=False, _header=False, **backend_args):
         modsyms = None
 
         if search_type == 'exact' and re.match(r'\w+(\.\w+)+', lookup):
@@ -170,21 +153,11 @@ class GHCModBackend(Backend.HaskellBackend):
 
         return self.dispatch_callbacks([modsyms] if modsyms else [], None, **backend_args)
 
-    def resolve(self, file, exports=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def project(self, project=None, path=None, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def sandbox(self, path, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def lookup(self, name, file, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def whois(self, name, file, **backend_args):
-        # backend = self.project_backends.get(project_name)
-        return self.dispatch_callbacks([], None, **backend_args)
+    project = Backend.default_method_implementation()
+    sandbox = Backend.default_method_implementation()
+    lookup = Backend.default_method_implementation()
+    whois = Backend.default_method_implementation()
+    whoat = Backend.default_method_implementation()
 
     def scope_modules(self, project_name, _filename, lookup='', search_type='prefix', **backend_args):
         def make_pkg(pkg):
@@ -211,9 +184,8 @@ class GHCModBackend(Backend.HaskellBackend):
 
         return self.dispatch_callbacks(filtered_mods, None, **backend_args)
 
-    def scope(self, file, lookup='', search_type='prefix', global_scope=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
+    scope = Backend.default_method_implementation()
+    usages = Backend.default_method_implementation()
 
     ## Regular expressions used by the completions "logic"
     MODNAME_RE = r'^module\s+([A-Z]\w+)'
@@ -269,11 +241,9 @@ class GHCModBackend(Backend.HaskellBackend):
 
         return self.dispatch_callbacks(filter(None, completions), None, **backend_args)
 
-    def hayoo(self, query, page=None, pages=None, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def cabal_list(self, packages, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
+    hayoo = Backend.default_method_implementation()
+    cabal_list = Backend.default_method_implementation()
+    unresolveds = Backend.default_method_implementation()
 
     def lint(self, files=None, contents=None, hlint=None, wait_complete=False, **backend_args):
         lint_cmd = ' '.join(['lint'] + (hlint or []))
@@ -326,6 +296,10 @@ class GHCModBackend(Backend.HaskellBackend):
 
         return self.dispatch_callbacks(type_output, None, **backend_args)
 
+    autofixes = Backend.default_method_implementation()
+    refactor = Backend.default_method_implementation()
+    rename = Backend.default_method_implementation()
+
     def langs(self, project_name, **backend_args):
         backend = self.project_backends.get(project_name)
         langs = backend.command_backend('lang') if backend is not None else []
@@ -343,15 +317,8 @@ class GHCModBackend(Backend.HaskellBackend):
 
         return self.dispatch_callbacks(flags, None, **backend_args)
 
-    def autofix_show(self, messages, **backend_args):
-        backend_args.pop('wait_complete', None)
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def autofix_fix(self, messages, rest=None, pure=False, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
-
-    def ghc_eval(self, exprs, file=None, source=None, **backend_args):
-        return self.dispatch_callbacks([], None, **backend_args)
+    ghc_eval = Backend.default_method_implementation()
+    ghc_type = Backend.default_method_implementation()
 
     def exit(self):
         return True
@@ -363,7 +330,7 @@ class GHCModBackend(Backend.HaskellBackend):
     def query_import(self, _symbol, _filename):
         return (False, ['ghc-mod does not support query_import used by \'Add Import\''])
 
-    def contents_to_module(self, contents):
+    def contents_to_module(self, file, contents):
         return None
 
     def clean_imports(self, filename):
@@ -536,19 +503,19 @@ class GHCModBackend(Backend.HaskellBackend):
         decl = None
         if declinfo.startswith('class '):
             ctx, args = self.split_context_args(name, declinfo[len('class '):])
-            decl = symbols.Class(name, ctx, args, imported=mod_imported)
+            decl = symbols.Class(name, mod_imported.module, ctx, args)
         elif declinfo.startswith('data '):
             ctx, args = self.split_context_args(name, declinfo[len('data '):])
-            decl = symbols.Data(name, ctx, args, imported=mod_imported)
+            decl = symbols.Data(name, mod_imported.module, ctx, args)
         elif declinfo.startswith('newtype '):
             ctx, args = self.split_context_args(name, declinfo[len('newtype '):])
-            decl = symbols.Newtype(name, ctx, args, imported=mod_imported)
+            decl = symbols.Newtype(name, mod_imported.module, ctx, args)
         elif declinfo.startswith('type '):
             ctx, args = self.split_context_args(name, declinfo[len('type '):])
-            decl = symbols.Type(name, ctx, args, imported=mod_imported)
+            decl = symbols.Type(name, mod_imported.module, ctx, args)
         else:
             # Default to function
-            decl = symbols.Function(name, declinfo, imported=mod_imported)
+            decl = symbols.Function(name, mod_imported.module, declinfo)
 
         return decl
 

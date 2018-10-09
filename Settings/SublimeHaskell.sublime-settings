@@ -25,6 +25,9 @@
     // Enable auto lint on save (as hints when building)
     "enable_auto_lint": true,
 
+    // Enable infer types on save
+    "enable_infer_types": true,
+
     // Show only: Limit what compiler or backend messages get marked or displayed
     "show_only": {
         "errors": true,
@@ -123,7 +126,7 @@
     "ghc_opts": [],
 
     // Additional HLint options, usually to specify a customi[sz]ed 'hlint.yaml' rule spec.
-    "lint_opts:": [],
+    "lint_opts": [],
 
     // ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
     // Backend selection:
@@ -150,6 +153,9 @@
     //     host:        [defualt: "localhost"] Host name SublimeHaskell will connect to hsdev
     //     local:       [default: true]        Should SublimeHaskell create a local hsdev server process? Specify false if you
     //                                         want to connect to a remote hsdev server
+    //     wrapper-args:[default: empty list]  Additional execution arguments to the "stack" or "cabal" execution wrapper.
+    //                                         Useful when you need to specify an alternate `stack.yaml` when starting the
+    //                                         backend, e.g., `["--stack-yaml=stack-ghc-8.2.2.yaml"]`
     //     exec-with:   [default: ""]          Should SublimeHaskell use "stack" or "cabal" to when starting
     //                                         the hsdev executable?
     //     install-dir: [default ""]           Used in conjunction with "exec-with"; this is the directory where SublimeHaskell
@@ -230,6 +236,12 @@
     // User interaction settings:
     // ~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
 
+    // reinspect modified & unsaved source
+    "inspect_modified": false,
+
+    // idle time in seconds before inspection modified & unsaved file
+    "inspect_modified_idle": 1,
+
     // lint & check on the fly
     "lint_check_fly": false,
 
@@ -290,6 +302,7 @@
     // inspired by hacking on the hsdev backend.
     //
     // "all_messages": Emit all messages (send and receive)
+    // "build_system": Diagnostics from check/lint/check_lint/build (build.py)
     // "callbacks": Show interesting information about 'hsdev' callbacks
     // "completions": Completion generator diagnostics and debug
     // "event_viewer": Event handling dignostics and debug
@@ -298,6 +311,7 @@
     // "recv_messages": Emit all received messages
     // "send_messages": Emit all sent messages
     // "socket_pool": Keep track of the socket pool avail/used sizes.
+    // "util_worker": Diagnostic output from the Util.worker thread.
     "component_debug": []
 
     // SublimeHaskell per-project settings (or "things you can put in your .sublime-project file")

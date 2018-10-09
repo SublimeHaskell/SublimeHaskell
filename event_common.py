@@ -34,5 +34,5 @@ def do_check_lint(view, continue_success=None, error_handler=None):
         return CheckAndLint.exec_check(view, continue_success=continue_success, error_handler=error_handler)
     elif Settings.PLUGIN.enable_auto_lint:
         return CheckAndLint.exec_lint(view, continue_success=continue_success, error_handler=error_handler)
-
-    return False
+    else:
+        continue_success(view)

@@ -219,6 +219,10 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
 
         EventCommon.assoc_to_project(view, self.backend_mgr, filename)
         _project_dir, project_name = Common.locate_cabal_project_from_view(view)
+
+        if Settings.PLUGIN.enable_infer_types:
+            BackendManager.active_backend().infer(files=[filename])
+
         Utils.run_async('rescan source {0}/{1}'.format(project_name, filename), self.rescan_source, project_name, filename,
                         {'drop_all': False})
 
@@ -261,9 +265,9 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
 
 
     def do_activated(self, view, filename):
-        if Settings.COMPONENT_DEBUG.event_viewer:
-            print('{0}.on_activated file: {1}.'.format(type(self).__name__, filename))
         if view and filename:
+            if Settings.COMPONENT_DEBUG.event_viewer:
+                print('{0}.on_activated file: {1}.'.format(type(self).__name__, filename))
             Utils.run_async('on_activated', self.activated_worker, view, filename)
 
 
@@ -285,6 +289,9 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
 
 
     def do_query_completions(self, view, prefix, locations):
+        if not Common.view_is_inspected_source(view):
+            return None
+
         # Defer starting the backend until as late as possible...
         if Settings.COMPONENT_DEBUG.event_viewer or Settings.COMPONENT_DEBUG.completions:
             print('{0} invoked (prefix: {1}).'.format(type(self).__name__ + '.on_query_completions', prefix))
@@ -343,6 +350,9 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
         if Settings.COMPONENT_DEBUG.inspection:
             print('{0}.rescan_source: {1}/{2}'.format(type(self).__name__, project_name, filename))
         with self.backend_mgr:
+            if self.backend_mgr.active_backend().auto_rescan():
+                if Utils.head_of(BackendManager.active_backend().module(None, file=filename, header=True)) is not None:
+                    return
             with self.backend_mgr.inspector() as insp:
                 if not filename.endswith('.cabal'):
                     insp.mark_file_dirty(filename)
@@ -357,20 +367,21 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
         if file_shown_in_view is None:
             return False
 
-        src_module = Utils.head_of(BackendManager.active_backend().module(file=file_shown_in_view))
+        src_module = Utils.head_of(BackendManager.active_backend().module(None, file=file_shown_in_view, header=True))
         return src_module is not None and src_module.location.project is not None
 
 
     def is_scanned_source(self, view):
         file_shown_in_view = Common.window_view_and_file(view)[2]
         return file_shown_in_view is not None and \
-               Utils.head_of(BackendManager.active_backend().module(file=file_shown_in_view)) is not None
+               Utils.head_of(BackendManager.active_backend().module(None, file=file_shown_in_view, header=True)) is not None
 
     def post_successful_check(self, view):
         if Settings.COMPONENT_DEBUG.event_viewer:
             print('{0}.post_successful_check invoked.'.format(type(self).__name__))
 
-        Types.refresh_view_types(view)
+        if Settings.PLUGIN.enable_infer_types:
+            BackendManager.active_backend().infer(files=[view.file_name()])
 
         if Settings.COMPONENT_DEBUG.event_viewer:
             print('{0}.post_successful_check: prettify_on_save {0}'.format(Settings.PLUGIN.prettify_on_save))
@@ -383,11 +394,24 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
 
 
     def activated_worker(self, view, filename):
+        if not Common.view_is_haskell_source(view):
+            return
+
+        if Settings.COMPONENT_DEBUG.event_viewer:
+            print('{0}.activated_worker {1}, acquiring backend manager.'.format(type(self).__name__, filename))
+
         with self.backend_mgr:
+            if Settings.COMPONENT_DEBUG.event_viewer:
+                print('{0}.activated_worker {1}, acquired backend manager.'.format(type(self).__name__, filename))
+
             EventCommon.assoc_to_project(view, self.backend_mgr, filename)
+
             _, project_name = Common.locate_cabal_project_from_view(view)
-            if Common.view_is_haskell_source(view):
-                self.autocompleter.generate_completions_cache(project_name, filename)
+            if Settings.COMPONENT_DEBUG.event_viewer:
+                print('{0}.activated_worker generating completions'.format(type(self).__name__))
+            self.autocompleter.generate_completions_cache(project_name, filename)
+            if Settings.COMPONENT_DEBUG.event_viewer:
+                print('{0}.activated_worker received completions'.format(type(self).__name__))
 
 
 ## Not needed at present.

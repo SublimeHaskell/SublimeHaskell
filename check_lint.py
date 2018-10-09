@@ -46,7 +46,9 @@ class ChainRunner(object):
         self.error_handler = error_handler
         self.status_msg = None
         if view.is_dirty() and self.filename:
-            self.contents[self.filename] = self.view.substr(sublime.Region(0, self.view.size()))
+            # self.contents[self.filename] = self.view.substr(sublime.Region(0, self.view.size()))
+            BackendMgr.active_backend().set_file_contents(file=self.filename,
+                                                          contents=self.view.substr(sublime.Region(0, self.view.size())))
 
 
     def run_chain(self, cmds, fly_mode=False):
@@ -74,7 +76,7 @@ class ChainRunner(object):
                        on_response=self.next_in_chain, on_error=self.chain_error, **kwargs)
         else:
             self.status_msg.result_ok()
-            BackendMgr.active_backend().autofix_show(self.msgs, wait_complete=False, on_response=self.process_corrections)
+            BackendMgr.active_backend().autofixes(self.msgs, wait_complete=False, on_response=self.process_corrections)
 
 
     def next_in_chain(self, resp):
@@ -83,7 +85,7 @@ class ChainRunner(object):
         if any([msg.get('level', '') in ['error'] for msg in resp]):
             self.status_msg.result_fail()
             ## Paranoia: Ensure that mark_response() executes in the UI thread
-            BackendMgr.active_backend().autofix_show(self.msgs, wait_complete=False, on_response=self.process_corrections)
+            BackendMgr.active_backend().autofixes(self.msgs, wait_complete=False, on_response=self.process_corrections)
         else:
             self.go_chain()
 

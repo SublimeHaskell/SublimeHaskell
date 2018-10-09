@@ -457,14 +457,15 @@ def parse_info(name, contents):
             if definition:
                 definition.strip()
 
+            # Set the module name in each of these class' constructors to something reasonable.
             if what == 'class':
-                return Symbols.Class(name, ctx, args)
+                return Symbols.Class(name, '<interactive>', ctx, args)
             elif what == 'data':
-                return Symbols.Data(name, ctx, args, definition)
+                return Symbols.Data(name, '<interactive>', ctx, args, definition)
             elif what == 'type':
-                return Symbols.Type(name, ctx, args, definition)
+                return Symbols.Type(name, '<interactive>', ctx, args, definition)
             elif what == 'newtype':
-                return Symbols.Newtype(name, ctx, args, definition)
+                return Symbols.Newtype(name, '<interactive>', ctx, args, definition)
             else:
                 raise RuntimeError('Unknown type of symbol: {0}'.format(what))
 
@@ -473,6 +474,6 @@ def parse_info(name, contents):
         function_regex = r'{0}\s+::\s+(?P<type>.*?)(\s+--(.*))?$'.format(name)
         matched = re.search(function_regex, contents, re.MULTILINE)
         if matched:
-            return Symbols.Function(name, matched.group('type'))
+            return Symbols.Function(name, '<interactive>', matched.group('type'))
 
     return None
