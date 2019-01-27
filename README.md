@@ -136,7 +136,7 @@ Works in export list (showing symbols in scope), import list, expressions. Compl
 ![AutoFix](Commands/AutoFix.gif)
 * `SublimeHaskell: Stylish` — stylish source with `stylish-haskell`
 * `SublimeHaskell: Scan docs and infer types` — as long as scanning docs for sources and inferring types is long process, it's disabled by default, but this command can be used to scan docs and infer types for currently opened view
-* `SublimeHaskell: Check & Lint` — check/lint/check & lint opened file. Enable option `check_lint_fly` to [check & lint](Commands/FlyCheck.gif) on idle, rescanning actual source, so that [completions are updated](Commands/ScanContents.gif)
+* `SublimeHaskell: Check & Lint` — check/lint/check & lint opened file. Enable option `lint_check_fly` to [check & lint](Commands/FlyCheck.gif) on idle, rescanning actual source, so that [completions are updated](Commands/ScanContents.gif)
 * Eval commands — see [animation](Commands/Eval.gif)
   * `SublimeHaskell: Eval selection` — eval selected expression, for example
     * `[1..10]` ⤇ `[1,2,3,4,5,6,7,8,9,10]`
