@@ -106,7 +106,7 @@
 				</dict>
 			</dict>
 			<key>match</key>
-			<string>^(?i)(executable|library|test-suite|benchmark|flag|source-repository)\s+([^\s,]+)\s*$</string>
+			<string>^(?i)(executable|library|test-suite|benchmark|flag|source-repository|custom-setup)\s+([^\s,]+)\s*$</string>
 			<key>name</key>
 			<string>entity.cabal</string>
 		</dict>
