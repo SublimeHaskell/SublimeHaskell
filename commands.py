@@ -1,3 +1,4 @@
+from collections import defaultdict
 import functools
 import json
 import os.path
@@ -1305,7 +1306,26 @@ class SublimeHaskellApplyRefactor(CommandWin.HaskellSourceBackendTextCommand):
         self.view.erase_regions('apply_refactor')
 
 
-def apply_refactor(view, corrections):
+def apply_refactor(view=None, window=None, file=None, corrections=[]):
+    if view is None and file is None:
+        raise ValueError("apply_refactor: either file or value must be specified")
+
+    if view is not None and file is not None and view.file_name() != file:
+        raise ValueError("apply_refactor: view's file name and file are different: {} and {}".format(view.file_name(), file))
+
+    if view is None:
+        view = window.find_open_file(file)
+        if view is None:
+            view = window.open_file(file)
+
+            def continue_refactor():
+                if view.is_loading():
+                    sublime.set_timeout(continue_refactor, 100)
+                else:
+                    apply_refactor(view=view, corrections=corrections)
+
+            sublime.set_timeout(continue_refactor, 100)
+
     replaces = []
     for c in corrections:
         rgn = c.to_region(view)
@@ -1466,10 +1486,16 @@ class SublimeHaskellRename(CommandWin.HaskellSourceBackendTextCommand):
         BackendManager.active_backend().rename(name, rename_to, line=line, column=column, file=self.view.file_name(), on_response=self.on_resp, on_error=self.on_err)
 
     def on_resp(self, renames):
-        current_file_renames = [r for r in renames if r.file == self.view.file_name()]
-        # other_files_renames = [r for r in renames if r.file != self.view.file_name()]
-        # other_files = set(r.file for r in other_files_renames)
-        apply_refactor(self.view, current_file_renames)
+        current_file_renames = []
+        other_files_renames = defaultdict(list)
+        for r in renames:
+            if r.file == self.view.file_name():
+                current_file_renames.append(r)
+            else:
+                other_files_renames[r.file].append(r)
+        apply_refactor(view=self.view, corrections=current_file_renames)
+        for file, file_renames in other_files_renames.items():
+            apply_refactor(window=self.view.window(), file=file, corrections=file_renames)
 
     def on_err(self, err, _details):
         Common.sublime_status_message('Rename: {0}'.format(err))
