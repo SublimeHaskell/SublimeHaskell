@@ -224,7 +224,7 @@ def parse_corrections(corr):
 def parse_correction(corr):
     return symbols.Correction(
         corr['source']['file'],
-        corr['level'],
+        corr.get('level'),
         corr['note']['message'],
         parse_corrector(corr['note']['action']),
         parse_region(corr.get('region')),

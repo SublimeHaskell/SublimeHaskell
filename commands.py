@@ -1290,6 +1290,31 @@ class SublimeHaskellAutoFixFix(SublimeHaskellAutoFixWindowBase):
         AUTOFIX_STATE.fix_current()
 
 
+class SublimeHaskellApplyRefactor(CommandWin.HaskellSourceBackendTextCommand):
+    def __init__(self, view):
+        super().__init__(view)
+
+    def run(self, edit, replaces):
+        rgns = [sublime.Region(start, end) for (start, end), _ in replaces]
+        for _, text in replaces:
+            self.view.add_regions('apply_refactor', rgns, 'warning', 'dot', sublime.HIDDEN)  # Sublime will track updated positions
+            self.view.replace(edit, rgns[0], text)
+            rgns = self.view.get_regions('apply_refactor')
+            rgns.pop(0)
+
+        self.view.erase_regions('apply_refactor')
+
+
+def apply_refactor(view, corrections):
+    replaces = []
+    for c in corrections:
+        rgn = c.to_region(view)
+        replaces.append(((rgn.a, rgn.b), c.corrector.contents))
+    replaces.sort(key=lambda r: r[0])  # sort by region
+
+    view.run_command('sublime_haskell_apply_refactor', {'replaces': replaces})
+
+
 class SublimeHaskellAutoFixFixIt(SublimeHaskellAutoFixTextBase):
     ## Uncomment if instance variables are needed.
     # def __init__(self, view):
@@ -1359,6 +1384,59 @@ class SublimeHaskellAutoFixStop(SublimeHaskellAutoFixWindowBase):
 
     def run(self, **_kwargs):
         AUTOFIX_STATE.clear()
+
+
+class SublimeHaskellRename(CommandWin.HaskellSourceBackendTextCommand):
+    def __init__(self, view):
+        super().__init__(view)
+        self.status_msg = None
+        self.symbol_name = None
+        self.rename_to = None
+
+    def run(self, edit, name=None, rename_to=None):
+        self.symbol_name = name
+        self.rename_to = rename_to
+
+        self.query_inputs()
+
+    def query_inputs(self):
+        if self.symbol_name is None:
+            self.view.window().show_input_panel("Name", "", self.on_name, self.empty, self.empty)
+            return
+        if self.rename_to is None:
+            self.view.window().show_input_panel("Rename to", "", self.on_rename_to, self.empty, self.empty)
+            return
+
+        self.rename(self.symbol_name, self.rename_to)
+
+    def on_name(self, name):
+        if not name:
+            return
+
+        self.symbol_name = name
+        self.query_inputs()  # continue
+
+    def on_rename_to(self, rename_to):
+        if not rename_to:
+            return
+
+        self.rename_to = rename_to
+        self.query_inputs()
+
+    def empty(self, *args, **kwargs):
+        pass
+
+    def rename(self, name, rename_to):
+        BackendManager.active_backend().rename(name, rename_to, self.view.file_name(), on_response=self.on_resp, on_error=self.on_err)
+
+    def on_resp(self, renames):
+        current_file_renames = [r for r in renames if r.file == self.view.file_name()]
+        # other_files_renames = [r for r in renames if r.file != self.view.file_name()]
+        # other_files = set(r.file for r in other_files_renames)
+        apply_refactor(self.view, current_file_renames)
+
+    def on_err(self, err, _details):
+        Common.sublime_status_message('Rename: {0}'.format(err))
 
 
 class SublimeHaskellReplaceRegions(sublime_plugin.TextCommand):

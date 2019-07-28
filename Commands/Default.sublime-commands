@@ -209,6 +209,10 @@
         "command": "sublime_haskell_auto_fix"
     },
     {
+        "caption": "SublimeHaskell: Rename",
+        "command": "sublime_haskell_rename"
+    },
+    {
         "caption": "SublimeHaskell: Choose/change backend",
         "command": "sublime_haskell_choose_backend"
     },
