@@ -7,6 +7,7 @@ from xml.etree import ElementTree
 import sublime
 
 import SublimeHaskell.sublime_haskell_common as Common
+import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.internals.unicode_opers as UnicodeOpers
 import SublimeHaskell.symbols as symbols
@@ -56,13 +57,15 @@ class Styles(object):
 
     def load_scheme(self, scheme_path):
         if scheme_path not in self.schemes:
-            scheme_res = sublime.load_resource(scheme_path)
-            if scheme_res:
+            try:
+                scheme_res = sublime.load_resource(scheme_path)
                 # Go through all styles and collect scope/foreground/fontStyle etc.
                 # Prefer ST3 'sublime-color-scheme' JSON over older TextMate XML.
                 self.schemes[scheme_path] = self.collect_sublime_scheme(json.loads(scheme_res)) \
                     if scheme_path.endswith('.sublime-color-scheme') \
                     else self.collect_textmate_scheme(ElementTree.fromstring(scheme_res))
+            except Exception as e:
+                Logging.log("Error loading scheme {}, exception: {}".format(scheme_path, e), Logging.LOG_DEBUG)
 
         return self.schemes.get(scheme_path, {})
 
