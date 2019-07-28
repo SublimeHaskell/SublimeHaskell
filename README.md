@@ -17,12 +17,28 @@ Setup
 
 ### Required (Before You Install SublimeHaskell)
 
-You will need to install the GHC Haskell compiler, the `cabal` build tool and a backend before you install SublimeHaskell.
+You will need to install either the GHC Haskell compiler and `cabal` either `stack` build tool and a backend before you install SublimeHaskell.
 
-* [The Glorious Haskell Computer (ghc)](https://www.haskell.org/downloads). Preferably, you should install the Haskell Platform if you don't already have a Haskell development and hacking environment set up.
-* [cabal](https://www.haskell.org/cabal/). Under normal circumstances, `cabal` should come pre-installed with your Haskell environment, e.g., if you installed the Haskell Platform.
+* `stack` will install ghc automatically, so there's no need to install GHC independently:
+  * [stack](https://docs.haskellstack.org/). 
+* or you may install Haskell Platform (includes `cabal` build tool):
+  * [The Glorious Haskell Computer (ghc)](https://www.haskell.org/downloads). Preferably, you should install the Haskell Platform if you don't already have a Haskell development and hacking environment set up.
+  * [cabal](https://www.haskell.org/cabal/). Under normal circumstances, `cabal` should come pre-installed with your Haskell environment, e.g., if you installed the Haskell Platform.
 * A backend. SublimeHaskell communicates with the backend to support the interesting editing features. The preferred backend is `hsdev`. You can use one of the deprecated backends, __but know that support for these backends may be dropped or removed in a future SublimeHaskell release.__
-  * [hsdev](http://hackage.haskell.org/package/hsdev) cabal package (`cabal install hsdev`) for inspection, enhanced completion, goto, symbol info etc.
+  * [hsdev](http://hackage.haskell.org/package/hsdev) cabal package for inspection, enhanced completion, goto, symbol info etc.  
+    Installation:
+      * with `cabal` — `cabal install hsdev`
+      * with `stack` — create config (for example, `hsdev.yaml`) with contents:
+        ```
+        packages: []
+        resolver: lts-13.29
+        extra-deps:
+        - hsdev-0.3.3.1
+        - haddock-api-2.21.0
+        - hdocs-0.5.3.1
+        - network-3.0.1.1
+        ```
+        And then run `stack install hsdev --stack-yaml hsdev.yaml`
   * Deprecated backends
     * [ghc-mod](http://hackage.haskell.org/package/ghc-mod) (for import and LANGUAGE completions and type inference, `cabal install ghc-mod`, not used if `hsdev` enabled, `ghc-mod` is used by `hsdev` as a library)
 
