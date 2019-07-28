@@ -6,7 +6,6 @@ import sublime
 import SublimeHaskell.internals.atomics as Atomics
 import SublimeHaskell.internals.logging as Logging
 import SublimeHaskell.internals.settings as Settings
-import SublimeHaskell.internals.utils as Utils
 import SublimeHaskell.sublime_haskell_common as Common
 
 
@@ -44,7 +43,7 @@ class Inspector(object):
         # (Re-)Inspection state:
         self.cabal_to_load = Atomics.AtomicList()
         self.dirty_files = Atomics.AtomicDuck()
-        self.dirty_paths = Atomics.AtomicList()
+        self.cabal_scanned = False
         self.busy = False
 
     def __enter__(self):
@@ -59,28 +58,21 @@ class Inspector(object):
         # Propagate the exception, if we have one.
         return False
 
-
     def do_inspection(self):
         self.busy = True
         try:
-            scan_paths = []
-            files_to_reinspect = []
             projects = []
             files = []
+            files_contents = {}
 
-            with self.dirty_paths as dirty_paths:
-                if Settings.COMPONENT_DEBUG.inspection:
-                    print('do_inspection: dirty_paths: {0}'.format(dirty_paths))
-
-                scan_paths = dirty_paths[:]
-                del dirty_paths[:]
+            if not self.cabal_scanned:
+                self.cabal_scanned = True
+                self.inspect_user_db()
 
             with self.dirty_files as dirty_files:
                 if Settings.COMPONENT_DEBUG.inspection:
                     print('do_inspection: dirty_files: {0}'.format(dirty_files))
 
-                projects = []
-                files = []
                 for finspect in dirty_files.keys() or []:
                     projdir = Common.get_cabal_project_dir_of_file(finspect)
                     if projdir is not None:
@@ -91,10 +83,8 @@ class Inspector(object):
                 projects = list(set(projects))
                 files = list(set(files))
 
-                file_contents = dict([(file, content) for file, content in dirty_files.items() if content])
+                files_contents = dict((file, content) for file, content in dirty_files.items() if content)
                 dirty_files.clear()
-
-                self.inspect(scan_paths, projects, files, file_contents)
 
             cand_cabals = []
             with self.cabal_to_load as cabals_to_load:
@@ -102,10 +92,19 @@ class Inspector(object):
                 del cabals_to_load[:]
 
             for cabal in cand_cabals:
-                Utils.run_async('inspect cabal {0}'.format(cabal), self.inspect_cabal, cabal)
+                projdir = Common.get_cabal_project_dir_of_file(cabal)
+                if projdir is not None:
+                    projects.append(projdir)
 
-            if files_to_reinspect and Settings.PLUGIN.enable_hdocs:
-                self.backend.docs(files=files_to_reinspect)
+            files = list(set(files))
+            projects = list(set(projects))
+
+            self.inspect(
+                paths=[],
+                files=list(set(files)),
+                projects=list(set(projects)),
+                contents=files_contents,
+            )
         finally:
             self.busy = False
 
@@ -117,12 +116,11 @@ class Inspector(object):
     def mark_all_files(self):
         for window in sublime.windows():
             with self.dirty_files as dirty_files:
-                dirty_files.update([(f, None) for f in [v.file_name() for v in window.views()] \
-                                      if f and (f.endswith('.hs') or f.endswith('.hsc')) and f not in dirty_files])
+                dirty_files.update([
+                    (f, None) for f in [v.file_name() for v in window.views()]
+                    if f and (f.endswith('.hs') or f.endswith('.hsc')) and f not in dirty_files
+                ])
                 Logging.log("dirty files: : {0}".format(dirty_files), Logging.LOG_DEBUG)
-
-            with self.dirty_paths as dirty_paths:
-                dirty_paths.extend(window.folders())
 
     @use_inspect_modules
     def mark_file_dirty(self, filename, contents=None):
@@ -141,6 +139,8 @@ class Inspector(object):
         '''Scam all open window views, adding actual cabal files  or those indirectly identified by the Haskell sources
         to the list of cabal files to inspect.
         '''
+        self.cabal_scanned = False
+
         with self.cabal_to_load as cand_cabals:
             cand_cabals = []
             for window in sublime.windows():
@@ -156,14 +156,14 @@ class Inspector(object):
             # Make the list of cabal files unique
             cand_cabals[:] = list(set(cand_cabals))
 
-    def inspect_cabal(self, cabal):
-        with Common.status_message_process('Inspecting {0}'.format(cabal or 'cabal'), priority=1) as smgr:
-            self.backend.scan(cabal=(cabal == 'cabal'),
-                              sandboxes=[] if cabal == 'cabal' else [cabal],
-                              on_notify=ScanStatus(smgr),
-                              wait_complete=True,
-                              timeout=None,
-                              docs=Settings.PLUGIN.enable_hdocs)
+    def inspect_user_db(self):
+        with Common.status_message_process('Inspecting user-db', priority=1) as smgr:
+            self.backend.scan_package_dbs(
+                ['global-db', 'user-db'],
+                on_notify=ScanStatus(smgr),
+                wait_complete=True,
+                timeout=None,
+            )
             smgr.result_ok()
 
     @use_inspect_modules
@@ -175,51 +175,37 @@ class Inspector(object):
                 print('  :: projects: {0}'.format(projects))
                 print('  :: files: {0}'.format(files))
 
+            build_tool = Settings.PLUGIN.haskell_build_tool
             with Common.status_message_process('Inspecting', priority=1) as smgr:
-                self.backend.scan(paths=paths,
-                                  projects=projects,
-                                  files=files,
-                                  contents=contents,
-                                  on_notify=ScanStatus(smgr),
-                                  wait_complete=True,
-                                  timeout=None,
-                                  ghc=Settings.PLUGIN.ghc_opts,
-                                  docs=Settings.PLUGIN.enable_hdocs)
-                smgr.result_ok()
+                for project in projects:
+                    self.backend.scan_project(
+                        project=project,
+                        build_tool=build_tool,
+                        wait_complete=True,
+                        timeout=None,
+                        on_notify=ScanStatus(smgr),
+                    )
+                    smgr.result_ok()
+            with Common.status_message_process('Inspecting', priority=1) as smgr:
+                for file in files:
+                    self.backend.scan_file(
+                        file=file,
+                        build_tool=build_tool,
+                        wait_complete=True,
+                        timeout=None,
+                        on_notify=ScanStatus(smgr),
+                    )
+                    file_contents = contents.get(file, None)
+                    if file_contents is not None:
+                        self.backend.set_file_contents(
+                            file,
+                            file_contents,
+                            wait_complete=True,
+                            timeout=None,
+                            on_notify=ScanStatus(smgr),
+                        )
 
-    @use_inspect_modules
-    def inspect_path(self, path):
-        with Common.status_message_process('Inspecting path {0}'.format(path), priority=1) as smgr:
-            self.backend.scan(paths=[path],
-                              on_notify=ScanStatus(smgr),
-                              wait_complete=True,
-                              timeout=None,
-                              ghc=Settings.PLUGIN.ghc_opts,
-                              docs=Settings.PLUGIN.enable_hdocs)
-            smgr.result_ok()
-
-    @use_inspect_modules
-    def inspect_project(self, cabal_dir):
-        (project_name, _) = Common.get_cabal_in_dir(cabal_dir)
-
-        with Common.status_message_process('Inspecting project {0}'.format(project_name), priority=1) as smgr:
-            self.backend.scan(projects=[cabal_dir],
-                              on_notify=ScanStatus(smgr),
-                              wait_complete=True,
-                              timeout=None,
-                              docs=Settings.PLUGIN.enable_hdocs)
-            smgr.result_ok()
-
-    @use_inspect_modules
-    def inspect_files(self, filenames):
-        with Common.status_message_process('Inspecting files', priority=1) as smgr:
-            self.backend.scan(files=filenames,
-                              on_notify=ScanStatus(smgr),
-                              wait_complete=True,
-                              timeout=None,
-                              ghc=Settings.PLUGIN.ghc_opts,
-                              docs=Settings.PLUGIN.enable_hdocs)
-            smgr.result_ok()
+                    smgr.result_ok()
 
     def is_busy(self):
         return self.busy

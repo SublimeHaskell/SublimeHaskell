@@ -15,6 +15,14 @@ def decode_bytes(src):
     return src.decode('utf-8').replace('\r\n', '\n').replace('\r', '\n') if src else None
 
 
+def try_decode_bytes(src):
+    try:
+        return decode_bytes(src)
+    except Exception as e:
+        Logging.log('Error decoding bytes from subprocess: {}'.format(src), Logging.LOG_ERROR)
+        return '\n'
+
+
 def encode_bytes(src):
     return src.replace('\r\n', os.linesep).replace('\n', os.linesep).encode('utf-8') if src else None
 

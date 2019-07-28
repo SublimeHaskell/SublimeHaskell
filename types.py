@@ -200,10 +200,10 @@ def get_type(view, project_name, filename, module_name, line, column):
 
         contents = {}
         if view.is_dirty():
-            contents[filename] = view.substr(sublime.Region(0, view.size()))
+            BackendManager.active_backend().set_file_contents(file=filename, contents=view.substr(sublime.Region(0, view.size())))
 
         res = BackendManager.active_backend().types(project_name, [filename], module_name, line, column,
-                                                    contents=contents, ghc_flags=Settings.PLUGIN.ghc_opts)
+                                                    ghc_flags=Settings.PLUGIN.ghc_opts)
         if res is not None:
             types = [to_region_type(r) for r in res]
         #     SourceHaskellTypeCache().set(filename, types, False)

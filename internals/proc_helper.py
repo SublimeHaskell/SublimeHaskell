@@ -43,8 +43,8 @@ class ProcHelper(object):
 
         # Allow caller to specify something different for stdout or stderr -- provide
         # the default here if unspecified.
-        popen_kwargs['stdout'] = popen_kwargs.get('stdout', subprocess.PIPE)
-        popen_kwargs['stderr'] = popen_kwargs.get('stderr', subprocess.PIPE)
+        popen_kwargs.setdefault('stdout', subprocess.PIPE)
+        popen_kwargs.setdefault('stderr', subprocess.PIPE)
 
         try:
             normcmd = Which.which(command, proc_env['PATH'])
@@ -98,11 +98,11 @@ class ProcHelper(object):
         """Wait for subprocess to complete and exit, collect and decode ``stdout`` and ``stderr``,
         returning the tuple ``(exit_code, stdout, stderr)```"""
         if self.process is not None:
-            stdout, stderr = self.process.communicate(Utils.encode_bytes(input_str if input_str else ''))
+            stdout, stderr = self.process.communicate(Utils.encode_bytes(input_str or ''))
             exit_code = self.process.wait()
             # Ensure that we reap the file descriptors.
             self.cleanup()
-            return (exit_code, Utils.decode_bytes(stdout), Utils.decode_bytes(stderr))
+            return (exit_code, Utils.try_decode_bytes(stdout), Utils.try_decode_bytes(stderr))
 
         return (-1, '', self.process_err or "?? unknown error -- no process.")
 

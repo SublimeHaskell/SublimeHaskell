@@ -82,6 +82,14 @@ class HaskellBackend(object):
         self.file_to_project.pop(filename)
 
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+    # Features
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+
+    def auto_rescan(self):
+        '''Supports auto rescan sources'''
+        return False
+
+    # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
     # API/action functions:
     # -~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
 
@@ -372,6 +380,18 @@ class NullHaskellBackend(HaskellBackend):
              docs=False, infer=False, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
+    def scan_project(self, project, build_tool=None, no_deps=False, wait_complete=False, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def scan_file(self, file, build_tool=None, no_project=False, no_deps=False, wait_complete=False, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def scan_package_dbs(self, package_dbs, wait_complete=False, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def set_file_contents(self, file, contents=None, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
     def docs(self, projects=None, files=None, modules=None, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
@@ -418,10 +438,16 @@ class NullHaskellBackend(HaskellBackend):
     def whois(self, name, file, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
+    def whoat(self, line, column, file, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
     def scope_modules(self, project_name, file, lookup='', search_type='prefix', **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def scope(self, file, lookup='', search_type='prefix', global_scope=False, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def usages(self, line, column, file, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def complete(self, _sym, _file, wide=False, **backend_args):
@@ -431,6 +457,9 @@ class NullHaskellBackend(HaskellBackend):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def cabal_list(self, packages, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def unresolveds(self, files, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def lint(self, files=None, contents=None, hlint=None, wait_complete=False, **backend_args):
@@ -443,6 +472,15 @@ class NullHaskellBackend(HaskellBackend):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def types(self, project_name, file, module_name, line, column, ghc_flags=None, contents=None, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def autofixes(self, messages, wait_complete=False, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def refactor(self, messages, rest=[], pure=True, wait_complete=False, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def rename(self, name, new_name, file, wait_complete=False, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def langs(self, _projectname, **backend_args):
@@ -459,6 +497,12 @@ class NullHaskellBackend(HaskellBackend):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def ghc_eval(self, exprs, file=None, source=None, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def ghc_type(self, exprs, file=None, source=None, wait_complete=False, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def stop_ghc(self, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def exit(self):

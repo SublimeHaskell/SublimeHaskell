@@ -133,6 +133,10 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
             self.autocompleter = Autocomplete.AutoCompleter()
             self.backend_mgr = BackendManager.BackendManager()
             self.type_cache = Types.SourceHaskellTypeCache()
+            # I get two calls of `on_post_save` after saving file
+            # To prevent extra calls to check/infer etc., we store here last updated time
+            # view => (view.update_count(), time.clock())
+            self.update_cache = {}
 
         def on_new(self):
             self.do_new(self.view)
@@ -156,13 +160,17 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
             self.do_hover(self.view, point, hover_zone)
 
         def on_query_completions(self, prefix, locations):
-            self.do_query_completions(self.view, prefix, locations)
+            return self.do_query_completions(self.view, prefix, locations)
     else:
         def __init__(self):
             super().__init__()
             self.autocompleter = Autocomplete.AutoCompleter()
             self.backend_mgr = BackendManager.BackendManager()
             self.type_cache = Types.SourceHaskellTypeCache()
+            # I get two calls of `on_post_save` after saving file
+            # To prevent extra calls to check/infer etc., we store here last updated time
+            # view => (view.update_count(), time.clock())
+            self.update_cache = {}
 
         def on_new(self, view):
             self.do_new(view)
@@ -219,6 +227,10 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
 
         EventCommon.assoc_to_project(view, self.backend_mgr, filename)
         _project_dir, project_name = Common.locate_cabal_project_from_view(view)
+
+        if Settings.PLUGIN.enable_infer_types:
+            BackendManager.active_backend().infer(files=[filename])
+
         Utils.run_async('rescan source {0}/{1}'.format(project_name, filename), self.rescan_source, project_name, filename,
                         {'drop_all': False})
 
@@ -226,6 +238,15 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
     def do_post_save(self, view):
         if not Common.view_is_inspected_source(view):
             return
+
+        current_time = time.clock()
+        last_update = self.update_cache.get(view.file_name())
+        if last_update is not None and last_update[0] == view.change_count() and (current_time - last_update[1]) < 0.2:
+            # view contents equals
+            # and last update was in less then 0.2s before, skipping
+            print('SublimeHaskellEventListener: duplicate save detected.')
+            return
+        self.update_cache[view.file_name()] = (view.change_count(), current_time)
 
         if Settings.COMPONENT_DEBUG.event_viewer:
             print('{0}.on_post_save invoked.'.format(type(self).__name__))
@@ -336,13 +357,16 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
         #     return (comp, sublime.INHIBIT_WORD_COMPLETIONS | sublime.INHIBIT_EXPLICIT_COMPLETIONS)
         # return comp
 
-        return (completions, completion_flags) # if completions else None
+        return (completions, completion_flags)  # if completions else None
 
 
     def rescan_source(self, project_name, filename, drop_all=True):
         if Settings.COMPONENT_DEBUG.inspection:
             print('{0}.rescan_source: {1}/{2}'.format(type(self).__name__, project_name, filename))
         with self.backend_mgr:
+            if self.backend_mgr.active_backend().auto_rescan():
+                if Utils.head_of(BackendManager.active_backend().module(None, file=filename, header=True)) is not None:
+                    return
             with self.backend_mgr.inspector() as insp:
                 if not filename.endswith('.cabal'):
                     insp.mark_file_dirty(filename)
@@ -357,20 +381,21 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
         if file_shown_in_view is None:
             return False
 
-        src_module = Utils.head_of(BackendManager.active_backend().module(file=file_shown_in_view))
+        src_module = Utils.head_of(BackendManager.active_backend().module(None, file=file_shown_in_view, header=True))
         return src_module is not None and src_module.location.project is not None
 
 
     def is_scanned_source(self, view):
         file_shown_in_view = Common.window_view_and_file(view)[2]
         return file_shown_in_view is not None and \
-               Utils.head_of(BackendManager.active_backend().module(file=file_shown_in_view)) is not None
+               Utils.head_of(BackendManager.active_backend().module(None, file=file_shown_in_view, header=True)) is not None
 
     def post_successful_check(self, view):
         if Settings.COMPONENT_DEBUG.event_viewer:
             print('{0}.post_successful_check invoked.'.format(type(self).__name__))
 
-        Types.refresh_view_types(view)
+        if Settings.PLUGIN.enable_infer_types:
+            BackendManager.active_backend().infer(files=[view.file_name()])
 
         if Settings.COMPONENT_DEBUG.event_viewer:
             print('{0}.post_successful_check: prettify_on_save {0}'.format(Settings.PLUGIN.prettify_on_save))

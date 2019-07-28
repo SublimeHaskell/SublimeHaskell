@@ -17,12 +17,28 @@ Setup
 
 ### Required (Before You Install SublimeHaskell)
 
-You will need to install the GHC Haskell compiler, the `cabal` build tool and a backend before you install SublimeHaskell.
+You will need to install either the GHC Haskell compiler and `cabal` either `stack` build tool and a backend before you install SublimeHaskell.
 
-* [The Glorious Haskell Computer (ghc)](https://www.haskell.org/downloads). Preferably, you should install the Haskell Platform if you don't already have a Haskell development and hacking environment set up.
-* [cabal](https://www.haskell.org/cabal/). Under normal circumstances, `cabal` should come pre-installed with your Haskell environment, e.g., if you installed the Haskell Platform.
+* `stack` will install ghc automatically, so there's no need to install GHC independently:
+  * [stack](https://docs.haskellstack.org/). 
+* or you may install Haskell Platform (includes `cabal` build tool):
+  * [The Glorious Haskell Computer (ghc)](https://www.haskell.org/downloads). Preferably, you should install the Haskell Platform if you don't already have a Haskell development and hacking environment set up.
+  * [cabal](https://www.haskell.org/cabal/). Under normal circumstances, `cabal` should come pre-installed with your Haskell environment, e.g., if you installed the Haskell Platform.
 * A backend. SublimeHaskell communicates with the backend to support the interesting editing features. The preferred backend is `hsdev`. You can use one of the deprecated backends, __but know that support for these backends may be dropped or removed in a future SublimeHaskell release.__
-  * [hsdev](http://hackage.haskell.org/package/hsdev) cabal package (`cabal install hsdev`) for inspection, enhanced completion, goto, symbol info etc.
+  * [hsdev](http://hackage.haskell.org/package/hsdev) cabal package for inspection, enhanced completion, goto, symbol info etc.  
+    Installation:
+      * with `cabal` — `cabal install hsdev`
+      * with `stack` — create config (for example, `hsdev.yaml`) with contents:
+        ```
+        packages: []
+        resolver: lts-13.29
+        extra-deps:
+        - hsdev-0.3.3.1
+        - haddock-api-2.21.0
+        - hdocs-0.5.3.1
+        - network-3.0.1.1
+        ```
+        And then run `stack install hsdev --stack-yaml hsdev.yaml`
   * Deprecated backends
     * [ghc-mod](http://hackage.haskell.org/package/ghc-mod) (for import and LANGUAGE completions and type inference, `cabal install ghc-mod`, not used if `hsdev` enabled, `ghc-mod` is used by `hsdev` as a library)
 
@@ -107,6 +123,9 @@ Works in export list (showing symbols in scope), import list, expressions. Compl
 - It also shows inferred type when possible
 ![HoverTypes](Commands/HoverTypes.gif)
 
+- You can select all usages of symbol via link
+![HoverUsages](Commands/HoverUsages.gif)
+
 - And you can autofix warnings/hints on popup for warnings/hints
 ![AutoFixHover](Commands/AutoFixHover.gif)
 
@@ -136,7 +155,9 @@ Works in export list (showing symbols in scope), import list, expressions. Compl
 ![AutoFix](Commands/AutoFix.gif)
 * `SublimeHaskell: Stylish` — stylish source with `stylish-haskell`
 * `SublimeHaskell: Scan docs and infer types` — as long as scanning docs for sources and inferring types is long process, it's disabled by default, but this command can be used to scan docs and infer types for currently opened view
-* `SublimeHaskell: Check & Lint` — check/lint/check & lint opened file. Enable option `lint_check_fly` to [check & lint](Commands/FlyCheck.gif) on idle, rescanning actual source, so that [completions are updated](Commands/ScanContents.gif)
+* `SublimeHaskell: Check & Lint` — check/lint/check & lint opened file. Enable option `check_lint_fly` to [check & lint](Commands/FlyCheck.gif) on idle, rescanning actual source, so that [completions are updated](Commands/ScanContents.gif)
+* `SublimeHaskell: Eval expression` — evaluate expression in context of current module
+* `SublimeHaskell: Expression type` — evaluate expression type in context of current module
 * Eval commands — see [animation](Commands/Eval.gif)
   * `SublimeHaskell: Eval selection` — eval selected expression, for example
     * `[1..10]` ⤇ `[1,2,3,4,5,6,7,8,9,10]`
@@ -157,6 +178,7 @@ Works in export list (showing symbols in scope), import list, expressions. Compl
 * Context menu commands
   * `Open package on Hackage` — works within symbol info panel, opens Hackage page
   * `Open module on Hackage` — words in symbol info panel and in sources, opens Hackage page for selected module
+  * `Show symbol usages` — show list of locations where symbol is used
 * Build commands
   * `Build`, `Typecheck build (no codegen)`, `Clean`, `Configure`, `Rebuild`, `Install`, `Test`, `Run`
 * Error commands:

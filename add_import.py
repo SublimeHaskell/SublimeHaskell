@@ -6,6 +6,7 @@ import SublimeHaskell.internals.backend_mgr as BackendManager
 import SublimeHaskell.internals.backend as Backend
 import SublimeHaskell.sublime_haskell_common as Common
 import SublimeHaskell.cmdwin_types as CommandWin
+import SublimeHaskell.symbols as Symbols
 
 
 class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
@@ -32,11 +33,10 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
             # If successful (flag == True), then invoke add_import to add the import to the module's existing
             # modules.
             (status, self.candidates) = self.backend.query_import(kw_decl, current_file_name)
+
             if status:
-                if len(self.candidates) == 1:
-                    self.add_import(edit, self.candidates[0].module.name)
-                else:
-                    self.view.window().show_quick_panel([[c.module.name] for c in self.candidates], self.on_done)
+                self.unique_candidates = set(self.candidates)
+                self.select_candidate()
             else:
                 if len(self.candidates) == 1:
                     Common.sublime_status_message(self.candidates[0])
@@ -45,22 +45,44 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
         else:
             self.add_import(edit, kw_module)
 
-    def on_done(self, idx):
+    def select_candidate(self):
+        self.unique_candidates = sorted(set(self.candidates))
+        if len(self.unique_candidates) == 1:
+            self.on_selected_candidate(0)
+        else:
+            self.view.window().show_quick_panel([[c.module.name + ': ' + c.brief()] for c in self.unique_candidates], self.on_selected_candidate)
+
+    def on_selected_candidate(self, idx):
+        if idx >= 0:
+            def proj_or_pkg(c):
+                proj = Symbols.location_project(c)
+                pkg = Symbols.location_package(c)
+                return proj or (pkg.name if pkg is not None else None)
+
+            selected_candidate = self.unique_candidates[idx]
+            self.candidates = sorted(
+                filter(lambda c: c == selected_candidate, self.candidates),
+                key=lambda c: (proj_or_pkg(c.imported_from.location) != proj_or_pkg(c.module.location), c.imported_from.name),
+            )
+            self.select_import()
+
+    def select_import(self):
+        if len(self.candidates) == 1:
+            self.on_selected_import(0)
+        else:
+            self.view.window().show_quick_panel([[c.imported_from.name, str(c.imported_from.location)] for c in self.candidates], self.on_selected_import)
+
+    def on_selected_import(self, idx):
         if idx >= 0:
             # By this point, the `run` method has exited, so the `edit` is no longer valid. Reinvoke the command
             # with the module name so that a fresh `edit` is created.
-            self.view.run_command('sublime_haskell_insert_import_for_symbol', {'module': self.candidates[idx].module.name})
+            self.view.run_command('sublime_haskell_insert_import_for_symbol', {'module': self.candidates[idx].imported_from.name})
 
     def add_import(self, edit, module_name):
         contents = self.view.substr(sublime.Region(0, self.view.size()))
 
-        # Truncate contents to the module declaration and the imports list, if present.
-        imports_list = list(re.finditer('^import.*$', contents, re.MULTILINE))
-        if imports_list:
-            contents = contents[0:imports_list[-1].end()]
-
         # Phase 2: Ask the backend to turn the contents into a list of Module objects:
-        imp_module = self.backend.contents_to_module(contents)
+        imp_module = self.backend.contents_to_module(self.view.file_name(), contents)
         if imp_module is not None:
             imports = sorted(imp_module.imports, key=lambda i: i.position.line)
             after = [imp for imp in imports if imp.module > module_name]
@@ -74,20 +96,23 @@ class SublimeHaskellInsertImportForSymbol(CommandWin.BackendTextCommand):
             elif imports:
                 # Insert after all imports
                 insert_line = imports[-1].position.line
-            elif imp_module.declarations:
-                # Insert before first declaration
-                insert_line = min([d.position.line for d in imp_module.declarations.values()]) - 1
-                insert_gap = True
             else:
-                # Try to add the import just after the "where" of the module declaration
-                contents = self.view.substr(sublime.Region(0, self.view.size()))
-                mod_decl = re.search('module.*where', contents, re.MULTILINE)
-                if mod_decl is not None:
-                    insert_line = mod_decl.end()
+                declarations = self.backend.symbol(file=self.view.file_name())
+                if declarations:
+                    # Insert before first declaration
+                    # HOWTO: Detect signature?
+                    insert_line = min([d.position.line for d in declarations]) - 2
                     insert_gap = True
                 else:
-                    # Punt! Insert at the end of the file
-                    insert_line = self.view.rowcol(self.view.size())[0]
+                    # Try to add the import just after the "where" of the module declaration
+                    contents = self.view.substr(sublime.Region(0, self.view.size()))
+                    mod_decl = re.search('module.*where', contents, re.MULTILINE)
+                    if mod_decl is not None:
+                        insert_line = self.view.rowcol(mod_decl.end())[0]
+                        insert_gap = True
+                    else:
+                        # Punt! Insert at the end of the file
+                        insert_line = self.view.rowcol(self.view.size())[0]
 
             insert_text = 'import {0}\n'.format(module_name) + ('\n' if insert_gap else '')
 

@@ -124,6 +124,18 @@ class GHCModBackend(Backend.HaskellBackend):
              docs=False, infer=False, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
+    def scan_project(self, project, build_tool=None, no_deps=False, wait_complete=False, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def scan_file(self, file, build_tool=None, no_project=False, no_deps=False, wait_complete=False, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def scan_package_dbs(self, package_dbs, wait_complete=False, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def set_file_contents(self, file, contents=None, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
     def docs(self, projects=None, files=None, modules=None, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
@@ -186,6 +198,9 @@ class GHCModBackend(Backend.HaskellBackend):
         # backend = self.project_backends.get(project_name)
         return self.dispatch_callbacks([], None, **backend_args)
 
+    def whoat(self, line, column, file, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
     def scope_modules(self, project_name, _filename, lookup='', search_type='prefix', **backend_args):
         def make_pkg(pkg):
             pkg_info = pkg.split('-', 2)
@@ -212,6 +227,9 @@ class GHCModBackend(Backend.HaskellBackend):
         return self.dispatch_callbacks(filtered_mods, None, **backend_args)
 
     def scope(self, file, lookup='', search_type='prefix', global_scope=False, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def usages(self, line, column, file, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
 
@@ -275,6 +293,9 @@ class GHCModBackend(Backend.HaskellBackend):
     def cabal_list(self, packages, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
+    def unresolveds(self, files, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
     def lint(self, files=None, contents=None, hlint=None, wait_complete=False, **backend_args):
         lint_cmd = ' '.join(['lint'] + (hlint or []))
         lint_output = self.translate_regex_output(lint_cmd, files, contents, GHC_LINT_REGEX, self.translate_lint)
@@ -326,6 +347,15 @@ class GHCModBackend(Backend.HaskellBackend):
 
         return self.dispatch_callbacks(type_output, None, **backend_args)
 
+    def autofixes(self, messages, wait_complete=False, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def refactor(self, messages, rest=[], pure=True, wait_complete=False, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def rename(self, name, new_name, file, wait_complete=False, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
     def langs(self, project_name, **backend_args):
         backend = self.project_backends.get(project_name)
         langs = backend.command_backend('lang') if backend is not None else []
@@ -351,6 +381,12 @@ class GHCModBackend(Backend.HaskellBackend):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def ghc_eval(self, exprs, file=None, source=None, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def ghc_type(self, exprs, file=None, source=None, wait_complete=False, **backend_args):
+        return self.dispatch_callbacks([], None, **backend_args)
+
+    def stop_ghc(self, **backend_args):
         return self.dispatch_callbacks([], None, **backend_args)
 
     def exit(self):

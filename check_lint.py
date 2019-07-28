@@ -46,7 +46,8 @@ class ChainRunner(object):
         self.error_handler = error_handler
         self.status_msg = None
         if view.is_dirty() and self.filename:
-            self.contents[self.filename] = self.view.substr(sublime.Region(0, self.view.size()))
+            # self.contents[self.filename] = self.view.substr(sublime.Region(0, self.view.size()))
+            BackendMgr.active_backend().set_file_contents(file=self.filename, contents=self.view.substr(sublime.Region(0, self.view.size())))
 
 
     def run_chain(self, cmds, fly_mode=False):
