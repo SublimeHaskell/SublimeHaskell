@@ -103,13 +103,18 @@ def repl_wrapper_cmd(exec_with, args):
     return wrapper + args
 
 
+def repl_command():
+    return ['stack', 'repl'] if Settings.PLUGIN.haskell_build_tool == 'stack' else ['ghci']
+
+
 class SublimeHaskellReplGhciCommand(CommandWin.SublimeHaskellWindowCommand):
     # def __init__(self, window):
     #     super().__init__(window)
 
     def run(self, **_kwargs):
         opts = Settings.PLUGIN.ghci_opts or []
-        self.window.run_command("repl_open", repl_args(cmd=["ghci"] + opts, loaded=None, caption="ghci"))
+
+        self.window.run_command("repl_open", repl_args(cmd=repl_command() + opts, loaded=None, caption="ghci"))
 
     def is_enabled(self):
         return HAS_SUBLIME_REPL
@@ -125,7 +130,7 @@ class SublimeHaskellReplGhciCurrentFileCommand(CommandWin.SublimeHaskellWindowCo
             Common.sublime_status_message("No file active")
         else:
             opts = Settings.PLUGIN.ghci_opts or []
-            self.window.run_command("repl_open", repl_args(cmd=["ghci", "$file"] + opts,
+            self.window.run_command("repl_open", repl_args(cmd=repl_command() + ["$file"] + opts,
                                                            loaded=view.file_name(),
                                                            caption="ghci: {0}".format(os.path.basename(view.file_name()))))
 
