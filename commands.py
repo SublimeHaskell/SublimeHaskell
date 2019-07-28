@@ -1386,6 +1386,40 @@ class SublimeHaskellAutoFixStop(SublimeHaskellAutoFixWindowBase):
         AUTOFIX_STATE.clear()
 
 
+class SublimeHaskellRenameSymbol(CommandWin.HaskellSourceBackendTextCommand):
+    def __init__(self, view):
+        super().__init__(view)
+
+    def run(self, edit, **kwargs):
+        sym = self.selected_symbol()
+        
+        if not self.is_current_file_symbol(sym):
+            return
+
+        self.view.run_command('sublime_haskell_rename', {
+            'name': sym.name,
+            'line': sym.position.line,
+            'column': sym.position.column
+        })
+
+    def is_enabled(self):
+        if not super().is_enabled():
+            return False
+        return self.is_current_file_symbol(self.selected_symbol())
+
+    def selected_symbol(self):
+        qsymbol = Common.get_qualified_symbol_at_region(self.view, self.view.sel()[0])
+        line, column = self.view.rowcol(self.view.sel()[0].a)
+
+        if qsymbol.name is None:
+            return None
+
+        return Utils.head_of(BackendManager.active_backend().whoat(line + 1, column + 1, file=self.view.file_name()))
+
+    def is_current_file_symbol(self, sym):
+        return sym is not None and sym.by_source() and sym.module.location.filename == self.view.file_name()
+
+
 class SublimeHaskellRename(CommandWin.HaskellSourceBackendTextCommand):
     def __init__(self, view):
         super().__init__(view)
