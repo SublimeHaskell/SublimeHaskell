@@ -599,10 +599,10 @@ class HsDevBackend(Backend.HaskellBackend):
         action = self.list_command if wait_complete else self.async_list_command
         return action('refactor', {'messages': messages, 'rest': rest, 'pure': pure}, callbacks, **backend_args)
 
-    def rename(self, name, new_name, file, wait_complete=False, **backend_args):
+    def rename(self, name, new_name, file, line=None, column=None, wait_complete=False, **backend_args):
         callbacks, backend_args = self.make_callbacks('rename', result_convert=ResultParse.parse_corrections, **backend_args)
         action = self.list_command if wait_complete else self.async_list_command
-        return action('rename', {'name': name, 'new-name': new_name, 'file': file}, callbacks, **backend_args)
+        return action('rename', {'name': name, 'new-name': new_name, 'file': file, 'line': line, 'column': column}, callbacks, **backend_args)
 
     def langs(self, _projectname, **backend_args):
         callbacks, backend_args = self.make_callbacks('langs', **backend_args)

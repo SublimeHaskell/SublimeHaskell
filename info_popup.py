@@ -225,6 +225,7 @@ class SublimeHaskellHoverPopup(object):
                 used_defm = len([u for u in usages if u.internal_usage()])
 
                 usages_ref = '<a href="usages:{0}:{1}">Usages</a>'.format(self.line, self.column)
+                rename_ref = '<a href="rename:{0}:{1}:{2}">Rename</a>'.format(decl.name, decl.position.line, decl.position.column) if source_symbol else None
 
                 if used_total == 0:
                     usages_tpl = 'Not used'
@@ -232,7 +233,7 @@ class SublimeHaskellHoverPopup(object):
                     usages_tpl = '{usages_ref}: {total} (<a href="select:{line}:{column}">{here} in this file</a>)'
                 else:
                     if decl.module.location.filename == self.filename:
-                        usages_tpl = '{usages_ref}: {total} (<a href="select:{line}:{column}">{here} in this file</a>)'
+                        usages_tpl = '{usages_ref}: {total} (<a href="select:{line}:{column}">{here} in this file</a>), {rename_ref}'
                     else:
                         usages_tpl = '{usages_ref}: {total} (<a href="select:{line}:{column}">{here} in this file</a>, {defm} in def file)'
                 usages_msg = usages_tpl.format(
@@ -242,6 +243,7 @@ class SublimeHaskellHoverPopup(object):
                     defm=used_defm,
                     line=self.line,
                     column=self.column,
+                    rename_ref=rename_ref,
                 )
 
                 popup_parts.append(u'<span class="comment">{0}</span>'.format(usages_msg))
@@ -282,6 +284,16 @@ class SublimeHaskellHoverPopup(object):
                         'filename': self.view.file_name(),
                         'line': line,
                         'column': column,
+                    }
+                )
+            elif url[0:7] == "rename:":
+                name, line, column = url.split(':')[1:]
+                self.view.run_command(
+                    'sublime_haskell_rename',
+                    {
+                        'name': name,
+                        'line': int(line),
+                        'column': int(column),
                     }
                 )
             elif url[0:7] == "select:":

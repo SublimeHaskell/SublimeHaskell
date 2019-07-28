@@ -1393,9 +1393,11 @@ class SublimeHaskellRename(CommandWin.HaskellSourceBackendTextCommand):
         self.symbol_name = None
         self.rename_to = None
 
-    def run(self, edit, name=None, rename_to=None):
+    def run(self, edit, name=None, rename_to=None, line=None, column=None):
         self.symbol_name = name
         self.rename_to = rename_to
+        self.line = line
+        self.column = column
 
         self.query_inputs()
 
@@ -1407,7 +1409,7 @@ class SublimeHaskellRename(CommandWin.HaskellSourceBackendTextCommand):
             self.view.window().show_input_panel("Rename to", "", self.on_rename_to, self.empty, self.empty)
             return
 
-        self.rename(self.symbol_name, self.rename_to)
+        self.rename(self.symbol_name, self.rename_to, self.line, self.column)
 
     def on_name(self, name):
         if not name:
@@ -1426,8 +1428,8 @@ class SublimeHaskellRename(CommandWin.HaskellSourceBackendTextCommand):
     def empty(self, *args, **kwargs):
         pass
 
-    def rename(self, name, rename_to):
-        BackendManager.active_backend().rename(name, rename_to, self.view.file_name(), on_response=self.on_resp, on_error=self.on_err)
+    def rename(self, name, rename_to, line, column):
+        BackendManager.active_backend().rename(name, rename_to, line=line, column=column, file=self.view.file_name(), on_response=self.on_resp, on_error=self.on_err)
 
     def on_resp(self, renames):
         current_file_renames = [r for r in renames if r.file == self.view.file_name()]
