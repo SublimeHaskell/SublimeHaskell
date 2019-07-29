@@ -566,6 +566,8 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
             module_word = qsymbol.module
             ident = qsymbol.name
 
+            line, column = self.view.rowcol(self.view.sel()[0].a)
+
             if ident is None:  # module
                 if not no_browse:
                     self.view.window().run_command('sublime_haskell_browse_module', {'module_name': module_word,
@@ -579,7 +581,10 @@ class SublimeHaskellSymbolInfoCommand(CommandWin.BackendTextCommand):
             self.whois_name = qsymbol.qualified_name()
             self.full_name = qsymbol.full_name()
 
-            self.candidates = (BackendManager.active_backend().whois(self.whois_name, self.current_file_name) or [])[:1]
+            self.candidates = (BackendManager.active_backend().whoat(line + 1, column + 1, file=self.current_file_name) or [])[:1]
+
+            if not self.candidates:
+                self.candidates = (BackendManager.active_backend().whois(self.whois_name, self.current_file_name) or [])[:1]
 
             if not self.candidates:
                 self.candidates = BackendManager.active_backend().lookup(self.full_name, self.current_file_name)
