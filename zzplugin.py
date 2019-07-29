@@ -310,7 +310,7 @@ class SublimeHaskellEventListener(EV_SUBCLASS):
         if Settings.COMPONENT_DEBUG.event_viewer or Settings.COMPONENT_DEBUG.completions:
             print('{0} invoked (prefix: {1}).'.format(type(self).__name__ + '.on_query_completions', prefix))
 
-        completions = None
+        completions = []
         with self.backend_mgr:
             begin_time = time.clock()
 
