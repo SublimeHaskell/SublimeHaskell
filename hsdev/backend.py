@@ -658,9 +658,9 @@ class HsDevBackend(Backend.HaskellBackend):
 
     def contents_to_module(self, file, contents):
         self.set_file_contents(file, contents)
-        m = self.module(file=file, header=True)
+        m = Utils.head_of(self.module(None, file=file, header=True))
         proj = self.project(path=m.location.project)
-        build_tool = proj['build-tool']
+        build_tool = proj['build-tool'] if proj and 'build-tool' in proj else Settings.PLUGIN.haskell_build_tool
         self.scan_file(file=file, build_tool=build_tool, wait_complete=True)
         return Utils.head_of(self.module(None, file=file))
 
