@@ -82,22 +82,29 @@ class SublimeHaskellBrowseDeclarations(CommandWin.BackendWindowCommand):
     def __init__(self, win):
         super().__init__(win)
         self.view = win.active_view()
-        self.decls = []
+        self.decls_ids = []
+        self.unique_decls = []
         self.current_file_name = self.view.file_name()
 
     def run(self, **_kwargs):
-        self.decls = BackendManager.active_backend().scope(self.current_file_name, on_error=self.on_err)
-        brief_decls = [[decl.brief(use_unicode=True),
-                        decl.docs.splitlines()[0] if decl.docs else ''] for decl in self.decls]
-        # pprint.pprint(brief_decls)
-        self.window.show_quick_panel(brief_decls, self.on_done)
+        self.decls_ids = BackendManager.active_backend().scope(file=self.current_file_name, on_error=self.on_err)
+
+        def get_qualifier(decl):
+            return (decl.qualifier is not None, decl.qualifier or '')
+
+        unique_decls = set(sorted(self.decls_ids, key=get_qualifier))  # prefer symbols without qualifier
+        self.unique_decls = sorted([
+            [decl.qualified_name(), '{} ({})'.format(decl.module.name, decl.module.location.to_string())]
+            for decl in unique_decls
+        ])
+        self.window.show_quick_panel(self.unique_decls, self.on_done)
 
     def on_err(self, err, _details):
         Common.sublime_status_message('Browse declarations: {0}'.format(err))
 
     def on_done(self, idx):
         if idx >= 0:
-            show_declaration_info(self.view, self.decls[idx])
+            show_declaration_info(self.view, self.unique_decls[idx])
 
 
 class SublimeHaskellFindDeclarations(CommandWin.BackendWindowCommand):
@@ -239,10 +246,11 @@ class SublimeHaskellGoTo(CommandWin.BackendTextCommand):
                 return
 
             decls = self.sorted_decls_name(BackendManager.active_backend().symbol(project=current_project))
-            self.declarations = [[decl.brief(True, use_unicode=False), decl.module.name] for decl in decls]
+            self.declarations = [[decl.brief(short=False, use_unicode=False), decl.module.name] for decl in decls]
         else:
             decls = self.sorted_decls_pos(BackendManager.active_backend().symbol(file=self.current_filename, local_names=True))
-            self.declarations = [[(decl.position.column * ' ') + decl.brief(True, use_unicode=False)] for decl in decls]
+            self.declarations = [decl.brief(short=True, use_unicode=False) for decl in decls]
+            # self.declarations = [[(decl.position.column * ' ') + decl.brief(True, use_unicode=False)] for decl in decls]
         self.decls = decls[:]
 
         if decls:

@@ -502,6 +502,21 @@ class SymbolId(object):
         return lt_impl(self, other, SymbolId)
 
 
+class ScopedSymbolId(SymbolId):
+    """
+    Symbol id in scope of some module
+    """
+    def __init__(self, name, module, qualifier=None):
+        super().__init__(name, module)
+        self.qualifier = qualifier
+
+    def qualified_name(self):
+        return '{}.{}'.format(self.qualifier, self.name) if self.qualifier else self.name
+
+    def __str__(self):
+        return u'ScopedSymbolId({0} in {1})'.format(self.qualified_name(), self.module)
+
+
 class Module(ModuleId):
     """
     Haskell module

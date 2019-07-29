@@ -517,7 +517,7 @@ class HsDevBackend(Backend.HaskellBackend):
                                  callbacks, **backend_args)
 
     def scope(self, file, lookup='', search_type='prefix', global_scope=False, **backend_args):
-        callbacks, backend_args = self.make_callbacks('scope', result_convert=ResultParse.parse_symbol_ids, **backend_args)
+        callbacks, backend_args = self.make_callbacks('scope', result_convert=ResultParse.parse_scoped_symbol_ids, **backend_args)
         return self.list_command('scope',
                                  {'query': {'input': lookup,
                                             'type': search_type

@@ -25,6 +25,10 @@ def parse_symbol_ids(symbol_ids):
     return parse_list(parse_symbol_id, symbol_ids)
 
 
+def parse_scoped_symbol_ids(symbol_ids):
+    return parse_list(parse_scoped_symbol_id, symbol_ids)
+
+
 def parse_symbol_usages(syms):
     return parse_list(parse_symbol_usage, syms)
 
@@ -45,6 +49,16 @@ def parse_symbol_id(sym):
     return symbols.SymbolId(
         sym['name'],
         parse_module_id(sym['module']),
+    )
+
+
+def parse_scoped_symbol_id(sym):
+    if not sym:
+        return None
+    return symbols.ScopedSymbolId(
+        sym['name'],
+        parse_module_id(sym['module']),
+        qualifier=sym.get('qualifier'),
     )
 
 
