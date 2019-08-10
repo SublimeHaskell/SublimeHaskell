@@ -71,7 +71,7 @@ class Builder(object):
     BUILD_TOOL = {
         'cabal':           {'command': 'cabal', 'name': 'cabal'},
         'cabal-new-build': {'command': 'cabal', 'name': 'cabal (Nix-local/new build)'},
-        'stack':           {'command': 'stack', 'name': 'stack'}
+        'stack':           {'command': 'stack', 'name': 'stack', 'extra-args': ['--color', 'never']}
     }
     '''Command and information associated with the various build tools.
     '''
@@ -316,6 +316,7 @@ class Builder(object):
         action_title = config['message']
         # Tool name: cabal
         tool_name = tool['command']
+        extra_args = tool.get('extra-args', [])
         # Tool arguments (commands): build, clean, etc.
         tool_steps = config['steps'][build_tool_name]
 
@@ -325,7 +326,7 @@ class Builder(object):
         if override_config:
             override_args = ['--stack-yaml', override_config]
         # Assemble command lines to run (possibly multiple steps)
-        commands = [[tool_name] + override_args + step if isinstance(step, list) else step for step in tool_steps]
+        commands = [[tool_name] + override_args + step + extra_args if isinstance(step, list) else step for step in tool_steps]
 
         Logging.log('running build commands: {0}'.format(commands), Logging.LOG_TRACE)
 
@@ -354,7 +355,7 @@ class Builder(object):
         try:
             for cmd in cmds:
                 if isinstance(cmd, list):
-                    Common.output_text(output_log, ' '.join(cmd) + '\u2026\n')
+                    Common.output_text(output_log, ' '.join(cmd) + '\u2026\n\n')
 
                     # Don't tie stderr to stdout, since we're interested in the error messages
                     out = OutputCollector.OutputCollector(output_log, cmd, cwd=cabal_project_dir)
@@ -372,8 +373,10 @@ class Builder(object):
                     break
 
             if exit_code == 0:
+                Common.output_text(output_log, '\nSuccess \u2713')
                 # Hide the build panel if successful
-                Common.hide_panel(view.window(), panel_name=BUILD_LOG_PANEL_NAME)
+                SECOND = 1000
+                sublime.set_timeout(lambda: Common.hide_panel(view.window(), panel_name=BUILD_LOG_PANEL_NAME), 2 * SECOND)
         finally:
             self.PROJECTS_BEING_BUILT.remove(cabal_project_name)
 

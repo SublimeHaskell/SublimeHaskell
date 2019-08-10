@@ -81,8 +81,8 @@ class FileObjectCollector(threading.Thread):
 
     def run(self):
         try:
-            for line in io.TextIOWrapper(self.fobject, encoding="utf-8"):
-                # l = Utils.decode_bytes(l)
+            for line in self.fobject:
+                line = Utils.try_decode_bytes(line, '<decode error>')
                 with self.lines_lock:
                     self.lines.append(line)
                 self.panel.run_command('insert', {'characters': line})
@@ -111,7 +111,7 @@ class DescriptorDrain(threading.Thread):
             try:
                 line = self.fobject.readline()
                 if not isinstance(line, ''.__class__):
-                    line = Utils.try_decode_bytes(line)
+                    line = Utils.try_decode_bytes(line, '<decode error>')
                 if line:
                     line = line.rstrip()
                     print('<{0}> {1}'.format(self.label, line))
