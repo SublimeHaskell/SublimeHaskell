@@ -69,7 +69,8 @@ class SettingsContainer(object):
         same_property_pref('show_output_window'),
         same_property_pref('stylish_options'),
         same_property_pref('unicode_symbol_info'),
-        same_property_pref('use_improved_syntax')
+        same_property_pref('use_improved_syntax'),
+        same_property_pref('warn_no_default_backend')
     ])
 
 
@@ -113,6 +114,7 @@ class SettingsContainer(object):
         self._stylish_options = []
         self._unicode_symbol_info = True
         self._use_improved_syntax = True
+        self._warn_no_default_backend = True
 
         # Additional change callbacks to propagate:
         self.changes = Atomics.AtomicDuck()
@@ -229,10 +231,9 @@ class SettingsContainer(object):
         with self.wlock:
             for (attr, preference) in self.config_properties.items():
                 value = settings.get(preference)
-                if value:
-                    ## Uncomment to debug. Do NOT use logging because it causes a circular dependency.
-                    ## print('Settings.load: {0} = {1}'.format(attr, value))
-                    setattr(self, attr, value)
+                ## Uncomment to debug. Do NOT use logging because it causes a circular dependency.
+                ## print('Settings.load: {0} = {1}'.format(attr, value))
+                setattr(self, attr, value)
 
                 install_updater(settings, self, attr)
         self.changes = Atomics.AtomicDuck()

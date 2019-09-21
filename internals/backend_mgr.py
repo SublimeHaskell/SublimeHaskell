@@ -146,7 +146,8 @@ class BackendManager(object, metaclass=Utils.Singleton):
 
             def_backend, n_defaults = self.get_default_backend(self.possible_backends)
             if n_defaults == 0:
-                sublime.message_dialog('\n'.join(['No default backend found. Using the \'none\' backend.']))
+                if Settings.PLUGIN.warn_no_default_backend:
+                    sublime.message_dialog('\n'.join(['No default backend found. Using the \'none\' backend.']))
                 self.current_backend_name = Backend.NullHaskellBackend.backend_name()
             else:
                 if n_defaults > 1:
