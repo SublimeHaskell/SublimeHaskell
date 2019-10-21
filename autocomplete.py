@@ -32,6 +32,20 @@ def sorted_completions(comps):
     return sorted(set(comps))  # unique
 
 
+def cut_completions_prefix(comps, prefix=''):
+    # sublime won't replace text, that preceedes completing word
+    # so we have to cut common part of qualifiers
+    if not prefix:
+        return comps
+
+    def drop_prefix(suggest):
+        text, replacement = suggest
+        cutted = replacement[len(prefix):] if replacement.startswith(prefix) else replacement
+        return (text, cutted)
+
+    return [drop_prefix(comp) for comp in comps]
+
+
 def make_completions(suggestions):
     # return sorted_completions([s.suggest() for s in suggestions or []])
     return sorted([s.suggest() for s in suggestions or []])
@@ -188,11 +202,14 @@ class AutoCompleter(object):
 
         line_contents = Common.get_line_contents(view, locations[0])
         qsymbol = Common.get_qualified_symbol(line_contents)
+        prefix_qsymbol = Common.QualifiedSymbol('', qsymbol.module, qsymbol.module_as, qsymbol.is_import_list, qsymbol.is_operator)
+        immutable_prefix = prefix_qsymbol.qualified_name()
         qualified_prefix = qsymbol.qualified_name()
 
         if Settings.COMPONENT_DEBUG.completions:
             print('qsymbol {0}'.format(qsymbol))
             print('current_file_name {0} qualified_prefix {1}'.format(current_file_name, qualified_prefix))
+            print('immutable prefix: {0}'.format(immutable_prefix))
 
         view_settings = view.settings()
         wide = view_settings.get('subhask_wide_completion')
@@ -220,7 +237,7 @@ class AutoCompleter(object):
             else:
                 if Settings.COMPONENT_DEBUG.completions:
                     print('completions: querying module-specific completions')
-                suggestions = backend.complete(qsymbol, current_file_name, wide=wide)
+                suggestions = backend.complete(prefix_qsymbol, current_file_name, wide=wide)
 
             completions = make_completions(suggestions)
         else:
@@ -235,6 +252,7 @@ class AutoCompleter(object):
                     completions += cache_.files.get(current_file_name, cache_.global_completions())
 
         completions += self.keyword_completions(qsymbol.name)
+        completions = cut_completions_prefix(completions, prefix=immutable_prefix)
         sort_completions(completions)
         return completions
 
