@@ -75,8 +75,8 @@ class Worker(object, metaclass=Singleton):
             finally:
                 self.jobs.task_done()
 
-    def async(self, name, worker_fn, *args, **kwargs):
+    def run_async(self, name, worker_fn, *args, **kwargs):
         self.jobs.put((name, worker_fn, args, kwargs))
 
 def run_async(name, worker_fn, *args, **kwargs):
-    Worker().async(name, worker_fn, *args, **kwargs)
+    Worker().run_async(name, worker_fn, *args, **kwargs)
