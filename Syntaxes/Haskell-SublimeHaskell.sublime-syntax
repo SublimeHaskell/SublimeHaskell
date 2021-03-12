@@ -461,6 +461,7 @@ contexts:
         4: entity.name.function.quasi-quoter.haskell
         5: keyword.operator.haskell punctuation.quasi-quoter.haskell
       push:
+        - meta_include_prototype: false
         - meta_scope: string.quoted.quasi.haskell
         - match: '(\|\])'
           captures:
