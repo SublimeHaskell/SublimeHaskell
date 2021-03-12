@@ -454,11 +454,12 @@ contexts:
           scope: entity.name.function.haskell
         - include: expression_stuff
   quasi_quote:
-    - match: '(\[)([a-z]\w*)?(\|)'
+    - match: '(\[)(([A-Z]\w*\.)*)([a-z]\w*)?(\|)'
       captures:
         1: punctuation.quasi-quoter.haskell keyword.operator.haskell
-        2: entity.name.function.haskell
-        3: punctuation.quasi-quoter.haskell keyword.operator.haskell
+        2: storage.module.haskell
+        4: entity.name.function.haskell
+        5: punctuation.quasi-quoter.haskell keyword.operator.haskell
       push:
         - meta_scope: string.quoted.quasi.haskell
         - match: '(\|\])'
