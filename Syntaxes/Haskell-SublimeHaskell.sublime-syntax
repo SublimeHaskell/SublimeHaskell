@@ -215,6 +215,7 @@ contexts:
     - match: \b(error|undefined)\b
       scope: support.function.prelude.haskell
     - include: infix_op
+    - include: quasi_quote
     - match: '\[|\]'
       comment: List
       scope: keyword.operator.haskell punctuation.list.haskell
@@ -249,7 +250,6 @@ contexts:
     - include: prelude_names
     - include: common_keywords
     - include: literals
-    - include: quasi_quote
     - include: ctor_names
 
   field_signature:
