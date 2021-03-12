@@ -456,15 +456,15 @@ contexts:
   quasi_quote:
     - match: '(\[)(([A-Z]\w*\.)*)([a-z]\w*)?(\|)'
       captures:
-        1: punctuation.quasi-quoter.haskell keyword.operator.haskell
+        1: keyword.operator.haskell punctuation.quasi-quoter.haskell
         2: storage.module.haskell
         4: entity.name.function.haskell
-        5: punctuation.quasi-quoter.haskell keyword.operator.haskell
+        5: keyword.operator.haskell punctuation.quasi-quoter.haskell
       push:
         - meta_scope: string.quoted.quasi.haskell
         - match: '(\|\])'
           captures:
-            1: punctuation.quasi-quoter.haskell keyword.operator.haskell
+            1: keyword.operator.haskell punctuation.quasi-quoter.haskell
           pop: true
   record_declaration:
     - match: '(\{)(?!-)'
