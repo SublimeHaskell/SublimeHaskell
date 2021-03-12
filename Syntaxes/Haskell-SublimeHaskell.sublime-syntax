@@ -457,8 +457,8 @@ contexts:
     - match: '(\[)(([A-Z]\w*\.)*)([a-z]\w*)?(\|)'
       captures:
         1: keyword.operator.haskell punctuation.quasi-quoter.haskell
-        2: storage.module.haskell
-        4: entity.name.function.haskell
+        2: storage.module.quasi-quoter.haskell
+        4: entity.name.function.quasi-quoter.haskell
         5: keyword.operator.haskell punctuation.quasi-quoter.haskell
       push:
         - meta_scope: string.quoted.quasi.haskell
