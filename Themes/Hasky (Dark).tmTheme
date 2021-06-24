@@ -410,7 +410,29 @@ Find more themes at : https://github.com/daylerees/colour-schemes
 			<key>settings</key>
 			<dict>
 				<key>foreground</key>
-				<string>#87B42D</string>
+				<string>#BFA72F</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>name</key>
+			<string>Quasi-quoter module qualifier</string>
+			<key>scope</key>
+			<string>storage.module.quasi-quoter.haskell</string>
+			<key>settings</key>
+			<dict>
+				<key>foreground</key>
+				<string>#BFA72F</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>name</key>
+			<string>Quasi-quoter function</string>
+			<key>scope</key>
+			<string>entity.name.function.quasi-quoter.haskell</string>
+			<key>settings</key>
+			<dict>
+				<key>foreground</key>
+				<string>#BFA72F</string>
 			</dict>
 		</dict>
 		<dict>
@@ -421,7 +443,7 @@ Find more themes at : https://github.com/daylerees/colour-schemes
 			<key>settings</key>
 			<dict>
 				<key>foreground</key>
-				<string>#87B42D</string>
+				<string>#BF5FBF</string>
 			</dict>
 		</dict>
 		<dict>
