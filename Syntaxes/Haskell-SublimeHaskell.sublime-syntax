@@ -293,9 +293,9 @@ contexts:
     - include: fixity_declaration
 
   function_definition:
-    - match: '^\s*(?!let|in)({{var_id}}|\({{type_id}}\))\s+(?![^\w\s=''"\(\[])(?=((([\w\.,''"_]+|(?:\w+\@)?\(.*\)|\[.*\])\s+)*))'
+    - match: '^\s*(?!\b(let|in)\b)({{var_id}}|\({{type_id}}\))\s+(?![^\w\s=''"\(\[])(?=((([\w\.,''"_]+|(?:\w+\@)?\(.*\)|\[.*\])\s+)*))'
       captures:
-        1: entity.name.function.haskell
+        2: entity.name.function.haskell
       push:
         - meta_scope: meta.definition.function.haskell
         - match: '=|\|'
@@ -304,9 +304,9 @@ contexts:
         - include: expression_stuff
 
   function_signature:
-    - match: '^(\s*)(?!--|let|in)(?:(\(\W\)|[\w'']+)|[\(\[])(?=[\w'',\s\[\]\(\)]*(?:\s*)((?:::)|\u2237))'
+    - match: '^(\s*)(?!--|\b(let|in)\b)(?:(\(\W\)|[\w'']+)|[\(\[])(?=[\w'',\s\[\]\(\)]*(?:\s*)((?:::)|\u2237))'
       captures:
-        2: entity.name.function.haskell
+        3: entity.name.function.haskell
       push:
         - meta_scope: meta.declaration.function.haskell
         - match: '^(?!\1\s)|(?=})'
