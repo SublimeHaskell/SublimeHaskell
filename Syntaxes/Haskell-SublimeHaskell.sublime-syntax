@@ -339,9 +339,10 @@ contexts:
       scope: keyword.operator.haskell
 
   instance_declaration:
-    - match: ^(\s*)(instance)\b
+    - match: ^(\s*)(deriving )?(instance)\b
       captures:
         2: keyword.declaration.instance.haskell
+        3: keyword.declaration.instance.haskell
       push:
         - meta_scope: meta.declaration.instance.haskell
         - match: \b(where)\b|(^(?!\1\s))
