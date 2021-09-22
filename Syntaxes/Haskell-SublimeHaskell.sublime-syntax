@@ -339,10 +339,35 @@ contexts:
       scope: keyword.operator.haskell
 
   instance_declaration:
-    - match: ^(\s*)(deriving )?(instance)\b
+    - match: ^(\s*)(deriving)\b
       captures:
         2: keyword.declaration.instance.haskell
-        3: keyword.declaration.instance.haskell
+      push:
+        - match: \b(via)\s+(\()\b
+          captures:
+            1: keyword.declaration.instance.haskell
+            2: keyword.operator.haskell
+          push:
+            - meta_scope: meta.type_signature.brace.haskell
+            - match: (\))
+              captures:
+                1: keyword.operator.haskell
+              pop: true
+            - include: type
+        - match: \b(instance)\s+(\()\b
+          captures:
+            1: keyword.declaration.instance.haskell
+            2: keyword.operator.haskell
+          push:
+            - meta_scope: meta.type_signature.brace.haskell
+            - match: (\))
+              captures:
+                1: keyword.operator.haskell
+              pop: 2
+            - include: type
+    - match: ^(\s*)(instance)\b
+      captures:
+        2: keyword.declaration.instance.haskell
       push:
         - meta_scope: meta.declaration.instance.haskell
         - match: \b(where)\b|(^(?!\1\s))
