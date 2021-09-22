@@ -343,28 +343,15 @@ contexts:
       captures:
         2: keyword.declaration.instance.haskell
       push:
-        - match: \b(via)\s+(\()\b
+        - match: \b(via)\b
           captures:
             1: keyword.declaration.instance.haskell
-            2: keyword.operator.haskell
-          push:
-            - meta_scope: meta.type_signature.brace.haskell
-            - match: (\))
-              captures:
-                1: keyword.operator.haskell
-              pop: true
-            - include: type
-        - match: \b(instance)\s+(\()\b
+        - match: \b(instance)\b
           captures:
             1: keyword.declaration.instance.haskell
-            2: keyword.operator.haskell
-          push:
-            - meta_scope: meta.type_signature.brace.haskell
-            - match: (\))
-              captures:
-                1: keyword.operator.haskell
-              pop: 2
-            - include: type
+        - match: ^(?!\1\s)
+          pop: true
+        - include: type
     - match: ^(\s*)(instance)\b
       captures:
         2: keyword.declaration.instance.haskell
