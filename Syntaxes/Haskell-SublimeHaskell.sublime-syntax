@@ -207,7 +207,7 @@ contexts:
 
   deriving:
     - match: \b(deriving)\b
-      scope: keyword.other.haskell keyword.declaration.data.haskell
+      scope: keyword.other.haskell keyword.declaration.deriving.haskell
 
   expression_stuff:
     - match: '\b({{type_id}}\.)+'
@@ -478,6 +478,23 @@ contexts:
             1: keyword.operator.haskell punctuation.record.haskell
           pop: true
         - include: field_signature
+
+  standalone_deriving_declaration:
+    - match: ^(\s*)(deriving)\b
+      captures:
+        2: keyword.declaration.deriving.haskell
+      push:
+        - meta_scope: meta.declaration.deriving.haskell
+        - match: ^(?!\1\s)
+          pop: true
+        - match: \b(via)\b
+          captures:
+            1: keyword.declaration.deriving.haskell
+        - match: \b(instance)\b
+          captures:
+            1: keyword.declaration.deriving.haskell
+        - include: type
+
   type:
     - match: \s*(->|\u2192)\s*
       scope: keyword.operator.arrow.haskell
@@ -531,6 +548,7 @@ contexts:
     - include: type_declaration
     - include: class_declaration
     - include: instance_declaration
+    - include: standalone_deriving_declaration
 
   prelude_names:
     # Prelude type and variable names...(which could be optimized for faster pattern matching)
