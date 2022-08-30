@@ -304,7 +304,7 @@ contexts:
         - include: expression_stuff
 
   function_signature:
-    - match: '^(\s*)(?!--|\b(let|in|case|where)\b)(?:(\(\W+\)|[\w'']+)|[\(\[])(?=[\w'',\s\[\]\(\)]*(?:\s*)((?:::)|\u2237))'
+    - match: '^(\s*)(?!--|\b(let|in|case|where)\b)(?:(\(\W+\)|[\w'']+))(?=[\w'',\s\[\]\(\)]*(?:\s*)((?:::)|\u2237))'
       captures:
         3: entity.name.function.haskell
       push:
