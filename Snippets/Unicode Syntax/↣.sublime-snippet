@@ -1,0 +1,7 @@
+<snippet>
+  <content><![CDATA[
+↣
+]]></content>
+  <tabTrigger>&gt;-</tabTrigger>
+  <scope>source.haskell</scope>
+</snippet>
