@@ -87,7 +87,33 @@ contexts:
         - match: '#-\}'
           scope: punctuation.pragma.haskell comment.pragma.haskell
           pop: true
+        # make sure we pop off even if only there is a partial end match
+        # because hash # is used in LANGUAGE/OPTIONS_GHC below
+        - match: '-\}'
+          scope: punctuation.pragma.haskell comment.pragma.haskell
+          pop: true
         # GHC pragmas: https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#pragmas
+        - match: 'LANGUAGE '
+          scope: keyword.preprocessor.haskell
+          push:
+            - meta_scope: pragma.support.language.haskell
+            - match: ' '
+              scope: pragma.support.language.haskell
+              pop: true
+            - match: '#'
+              scope: punctuation.pragma.haskell comment.pragma.haskell
+              pop: true
+        - match: 'OPTIONS_GHC '
+          scope: keyword.preprocessor.haskell
+          push:
+            - meta_scope: pragma.support.flag.haskell
+            - match: ' '
+              scope: pragma.support.flag.haskell
+              pop: true
+            - match: '#'
+              scope: punctuation.pragma.haskell comment.pragma.haskell
+              pop: true
+
         - match: |-
             (?x)
             \b
