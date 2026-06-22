@@ -520,13 +520,9 @@ contexts:
     - match: \(\)
       scope: storage.type.haskell
     - match: (\()
-      captures:
-        1: keyword.operator.haskell
       push:
         - meta_scope: meta.type_signature.brace.haskell
         - match: (\))
-          captures:
-            1: keyword.operator.haskell
           pop: true
         - include: type
     - match: '(\[)'
