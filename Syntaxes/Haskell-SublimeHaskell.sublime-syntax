@@ -79,6 +79,9 @@ contexts:
     - include: expression_stuff
 
   comments:
+    - match: '\{-#.*?#-\}'
+      scope: constant.other.pragma.haskell
+
     - match: '\{-#\s+'
       # GHC pragma
       scope: punctuation.pragma.haskell comment.pragma.haskell
@@ -441,7 +444,7 @@ contexts:
 
   module_name:
     - match: '({{type_id}})(\.{{type_id}})*'
-      scope: storage.module.haskell
+      scope: entity.name.namespace.haskell storage.module.haskell
 
   pattern_function_definition:
     - match: '^\s*(?=\(.*\)|\[.*\]|([A-Z][\w'']*(\s+([\w\s,'']*|\(.*\)|\[.*\]|\{.*\}))*)\s*=)'
@@ -496,6 +499,12 @@ contexts:
         - include: type
 
   type:
+    - match: "(')({{type_id}})"
+      captures:
+        1: punctuation.definition.promoted.haskell
+        2: storage.type.haskell support.type.haskell
+    - match: \s*((::)|\u2237)\s*
+      scope: keyword.operator.double-colon.haskell
     - match: \s*(->|\u2192)\s*
       scope: keyword.operator.arrow.haskell
     - match: \s*(=>|\u21D2)\s*
@@ -532,6 +541,20 @@ contexts:
         - include: type
 
   type_declaration:
+    - match: '^(\s*)(type)\s+(family)\s+([A-Z][\w'']*)?'
+      captures:
+        2: keyword.declaration.data.haskell
+        3: keyword.declaration.family.haskell
+        4: entity.name.type.haskell
+      push:
+        - meta_scope: meta.declaration.type.family.haskell
+        - match: ^(?!\1\s)
+          pop: true
+        - match: \b(where)\b
+          scope: keyword.declaration.type.family.haskell
+        - match: "="
+          scope: keyword.operator.haskell
+        - include: type
     - match: '^(\s*)(type)\s+([A-Z][\w'']*)?'
       captures:
         2: keyword.declaration.data.haskell
