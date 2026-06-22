@@ -183,9 +183,9 @@ contexts:
 
   ctor_names:
     - match: '\b{{type_id}}\b'
-      scope: constant.other.haskell entity.name.constructor.haskell
+      scope: constant.other.haskell entity.name.function.haskell entity.name.constructor.haskell
     - match: \(\)
-      scope: constant.other.haskell entity.name.constructor.haskell
+      scope: constant.other.haskell entity.name.function.haskell entity.name.constructor.haskell
 
   data_declaration:
     - match: '^(\s*)(data)\s+(family)\s+({{type_id}})?'
