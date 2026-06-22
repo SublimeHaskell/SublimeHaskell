@@ -292,7 +292,7 @@ contexts:
           pop: true
         - match: \b(\w+)\b\s*((::)|\u2237)
           captures:
-            1: storage.type.haskell support.type.haskell
+            1: variable.other.member.haskell
             2: keyword.other.double-colon.haskell
           push:
             - meta_scope: meta.declaration.field.signature.haskell
@@ -545,7 +545,7 @@ contexts:
     - match: \b(Applicative|Bounded|Enum|Eq|Ord|Foldable|Fractional|Functor|Monoid|Num|Read|Real|RealFrac|Show)\b
       scope: storage.type.haskell support.class.haskell
     - match: '\b{{var_id}}\b'
-      scope: variable.generic.haskell
+      scope: storage.type.haskell support.type.haskell
     - match: '\b{{type_id}}\b'
       scope: storage.type.haskell support.type.haskell
     - match: \(\)
