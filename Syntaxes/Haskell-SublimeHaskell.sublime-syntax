@@ -231,6 +231,15 @@ contexts:
   deriving:
     - match: \b(deriving)\b
       scope: keyword.other.haskell keyword.declaration.deriving.haskell
+      push:
+        - meta_scope: meta.declaration.deriving.haskell
+        - match: '(?=$|[=;\|\}])'
+          pop: true
+        - match: \b(stock|anyclass|newtype)\b
+          scope: keyword.declaration.deriving.strategy.haskell
+        - match: \b(via)\b
+          scope: keyword.declaration.deriving.strategy.haskell
+        - include: type
 
   expression_stuff:
     - match: '\b({{type_id}}\.)+'
@@ -510,7 +519,7 @@ contexts:
         - meta_scope: meta.declaration.deriving.haskell
         - match: ^(?!\1\s)
           pop: true
-        - match: \b(via)\b
+        - match: \b(stock|anyclass|newtype|via)\b
           captures:
             1: keyword.declaration.deriving.haskell
         - match: \b(instance)\b
