@@ -34,7 +34,6 @@ contexts:
       captures:
         1: keyword.other.haskell keyword.module.haskell
       push:
-        - meta_scope: meta.declaration.module.haskell
         - match: \b(where)\b|(^(?!\s))
           captures:
             1: keyword.module.haskell
@@ -48,13 +47,12 @@ contexts:
       captures:
         1: keyword.other.haskell keyword.import.haskell
       push:
-        - meta_scope: meta.import.haskell
         - match: (^(?!\s))
           pop: true
         - match: \b(qualified|as|hiding)\b
           scope: keyword.other.haskell keyword.import.haskell
-        - include: module_name
-        - include: module_exports
+        - include: import_list
+        - include: import_module_name
     - match: ^\s*(#)\s*\w+
       comment: In addition to Haskell's "native" syntax, GHC permits the C preprocessor to be run on a source file.
       captures:
@@ -79,6 +77,9 @@ contexts:
     - include: expression_stuff
 
   comments:
+    - match: '\{-#.*?#-\}'
+      scope: constant.other.pragma.haskell
+
     - match: '\{-#\s+'
       # GHC pragma
       scope: punctuation.pragma.haskell comment.pragma.haskell
@@ -97,11 +98,14 @@ contexts:
             |L(ANGUAGE|INE)
             |MINIMAL
             |NO(INLINE|UNPACK)
-            |O(PTIONS_GHC|VERLAP(PING|PABLE|S))
+            |O(PAQUE|PTIONS_GHC|VERLAP(PING|PABLE|S))
             |RULES
-            |S(OURCE|PECIALI[SZ]E)
+            |S(CC|OURCE|PECIALI[SZ]E(_INLINE)?)
             |UNPACK
             |WARNING
+            |ANN
+            |CTYPE
+            |COMPLETE
             )
             \b
           scope: keyword.preprocessor.haskell
@@ -163,7 +167,7 @@ contexts:
         - include: type
 
   common_keywords:
-    - match: \b(where|case|of|let|in|default|do|mdo|if|then|else|rec|proc)\b
+    - match: \b(where|case|of|let|in|default|do|mdo|if|then|else|rec|proc|forall|pattern|static|by|using)\b
       scope: keyword.other.haskell
 
   constructor_signature:
@@ -179,11 +183,28 @@ contexts:
 
   ctor_names:
     - match: '\b{{type_id}}\b'
-      scope: constant.other.haskell entity.name.constructor.haskell
+      scope: constant.other.haskell entity.name.function.haskell entity.name.constructor.haskell
     - match: \(\)
-      scope: constant.other.haskell entity.name.constructor.haskell
+      scope: constant.other.haskell entity.name.function.haskell entity.name.constructor.haskell
 
   data_declaration:
+    - match: '^(\s*)(data)\s+(family)\s+({{type_id}})?'
+      captures:
+        2: keyword.declaration.data.haskell
+        3: keyword.declaration.family.haskell
+        4: constant.other.haskell entity.name.class.haskell
+      push:
+        - meta_scope: meta.declaration.data.family.haskell
+        - match: ^(?!\1\s)
+          pop: true
+        - match: \b(where)\b
+          scope: keyword.declaration.data.family.haskell
+        - match: '[=\|]'
+          scope: keyword.operator.haskell
+        - include: deriving
+        - include: constructor_signature
+        - include: record_declaration
+        - include: type
     - match: '^(\s*)(data|newtype)\s+({{type_id}})?'
       captures:
         2: keyword.declaration.data.haskell
@@ -208,6 +229,15 @@ contexts:
   deriving:
     - match: \b(deriving)\b
       scope: keyword.other.haskell keyword.declaration.deriving.haskell
+      push:
+        - meta_scope: meta.declaration.deriving.haskell
+        - match: '(?=$|[=;\|\}])'
+          pop: true
+        - match: \b(stock|anyclass|newtype)\b
+          scope: keyword.declaration.deriving.strategy.haskell
+        - match: \b(via)\b
+          scope: keyword.declaration.deriving.strategy.haskell
+        - include: type
 
   expression_stuff:
     - match: '\b({{type_id}}\.)+'
@@ -260,7 +290,7 @@ contexts:
           pop: true
         - match: \b(\w+)\b\s*((::)|\u2237)
           captures:
-            1: storage.type.haskell support.type.haskell
+            1: variable.other.member.haskell
             2: keyword.other.double-colon.haskell
           push:
             - meta_scope: meta.declaration.field.signature.haskell
@@ -338,6 +368,50 @@ contexts:
     - match: '(\([^\w \)]+\)|\(,+\))'
       scope: keyword.operator.haskell
 
+  import_list:
+    - match: \(
+      scope: punctuation.section.import-list.begin.haskell
+      push:
+        - meta_scope: meta.import.list.haskell
+        - match: \)
+          scope: punctuation.section.import-list.end.haskell
+          pop: true
+        - match: '\.\.'
+          scope: keyword.operator.wildcard.haskell
+        - match: \b(pattern)\b
+          scope: keyword.other.haskell keyword.import.haskell
+        - match: '({{type_id}})\s*(\()'
+          captures:
+            1: storage.type.haskell support.type.haskell
+            2: punctuation.section.import-list.begin.haskell
+          push:
+            - meta_scope: meta.import.data.haskell
+            - match: \)
+              scope: punctuation.section.import-list.end.haskell
+              pop: true
+            - match: '\.\.'
+              scope: keyword.operator.wildcard.haskell
+            - match: '\b{{type_id}}\b'
+              scope: constant.other.haskell entity.name.constructor.haskell
+            - match: '\b{{var_id}}\b'
+              scope: entity.name.function.haskell
+            - match: ','
+              scope: punctuation.separator.comma.haskell
+            - include: infix_op
+        - match: '\b{{type_id}}\b'
+          scope: storage.type.haskell support.type.haskell
+        - match: '\b{{var_id}}\b'
+          scope: entity.name.function.haskell
+        - match: ','
+          scope: punctuation.separator.comma.haskell
+        - include: infix_op
+
+  import_module_name:
+    - match: '\b{{type_id}}\b'
+      scope: entity.name.namespace.haskell storage.type.haskell support.type.haskell
+    - match: '\.'
+      scope: punctuation.accessor.module.haskell
+
   instance_declaration:
     - match: ^(\s*)(instance)\b
       captures:
@@ -407,31 +481,37 @@ contexts:
 
   module_exports:
     - match: \(
-      scope: storage.module.haskell
+      scope: punctuation.section.exports.begin.haskell
       push:
-        - meta_scope: meta.declaration.exports.haskell
         - match: \)
-          scope: storage.module.haskell
+          scope: punctuation.section.exports.end.haskell
           pop: true
         - match: \\\s*$
           push:
             - meta_scope: constant.character.escape.multilinestring.haskell
             - match: \\
               pop: true
+        - match: \b(module)\b
+          scope: keyword.other.haskell keyword.module.haskell
+          push:
+            - meta_scope: meta.declaration.export.module.haskell
+            - match: (?=[,\)])
+              pop: true
+            - include: module_name
         - match: '\b{{var_id}}\b'
           scope: entity.name.function.haskell
         - match: '({{type_id}})\s*(\()'
           captures:
-            1: storage.type.haskell storage.data.haskell
-            2: keyword.operator.haskell
+            1: storage.type.haskell support.type.haskell
+            2: punctuation.section.exports.begin.haskell
           push:
             - meta_scope: meta.declaration.export.data.haskell
             - match: \)
-              scope: keyword.operator.haskell
+              scope: punctuation.section.exports.end.haskell
               pop: true
             - include: expression_stuff
         - match: '\b{{type_id}}\b'
-          scope: storage.type.haskell storage.data.haskell
+          scope: storage.type.haskell support.type.haskell
         - match: ','
           scope: punctuation.separator.comma.haskell
         - include: infix_op
@@ -440,8 +520,10 @@ contexts:
           scope: meta.other.unknown.haskell
 
   module_name:
-    - match: '({{type_id}})(\.{{type_id}})*'
-      scope: storage.module.haskell
+    - match: '\b{{type_id}}\b'
+      scope: entity.name.namespace.haskell storage.type.haskell support.type.haskell
+    - match: '\.'
+      scope: punctuation.accessor.module.haskell
 
   pattern_function_definition:
     - match: '^\s*(?=\(.*\)|\[.*\]|([A-Z][\w'']*(\s+([\w\s,'']*|\(.*\)|\[.*\]|\{.*\}))*)\s*=)'
@@ -487,7 +569,7 @@ contexts:
         - meta_scope: meta.declaration.deriving.haskell
         - match: ^(?!\1\s)
           pop: true
-        - match: \b(via)\b
+        - match: \b(stock|anyclass|newtype|via)\b
           captures:
             1: keyword.declaration.deriving.haskell
         - match: \b(instance)\b
@@ -496,6 +578,14 @@ contexts:
         - include: type
 
   type:
+    - match: \b(forall)\b
+      scope: keyword.other.haskell
+    - match: "(')({{type_id}})"
+      captures:
+        1: punctuation.definition.promoted.haskell
+        2: storage.type.haskell support.type.haskell
+    - match: \s*((::)|\u2237)\s*
+      scope: keyword.operator.double-colon.haskell
     - match: \s*(->|\u2192)\s*
       scope: keyword.operator.arrow.haskell
     - match: \s*(=>|\u21D2)\s*
@@ -505,19 +595,15 @@ contexts:
     - match: \b(Applicative|Bounded|Enum|Eq|Ord|Foldable|Fractional|Functor|Monoid|Num|Read|Real|RealFrac|Show)\b
       scope: storage.type.haskell support.class.haskell
     - match: '\b{{var_id}}\b'
-      scope: variable.generic.haskell
+      scope: storage.type.haskell support.type.haskell
     - match: '\b{{type_id}}\b'
       scope: storage.type.haskell support.type.haskell
     - match: \(\)
       scope: storage.type.haskell
     - match: (\()
-      captures:
-        1: keyword.operator.haskell
       push:
         - meta_scope: meta.type_signature.brace.haskell
         - match: (\))
-          captures:
-            1: keyword.operator.haskell
           pop: true
         - include: type
     - match: '(\[)'
@@ -532,6 +618,33 @@ contexts:
         - include: type
 
   type_declaration:
+    - match: '^(\s*)(type)\s+(role)\s+([A-Z][\w'']*)?'
+      captures:
+        2: keyword.declaration.data.haskell
+        3: keyword.declaration.role.haskell
+        4: entity.name.type.haskell
+      push:
+        - meta_scope: meta.declaration.type.role.haskell
+        - match: ^(?!\1\s)
+          pop: true
+        - match: \b(nominal|representational|phantom)\b
+          scope: storage.modifier.role.haskell
+        - match: _
+          scope: keyword.other.wildcard.haskell
+    - match: '^(\s*)(type)\s+(family)\s+([A-Z][\w'']*)?'
+      captures:
+        2: keyword.declaration.data.haskell
+        3: keyword.declaration.family.haskell
+        4: entity.name.type.haskell
+      push:
+        - meta_scope: meta.declaration.type.family.haskell
+        - match: ^(?!\1\s)
+          pop: true
+        - match: \b(where)\b
+          scope: keyword.declaration.type.family.haskell
+        - match: "="
+          scope: keyword.operator.haskell
+        - include: type
     - match: '^(\s*)(type)\s+([A-Z][\w'']*)?'
       captures:
         2: keyword.declaration.data.haskell
