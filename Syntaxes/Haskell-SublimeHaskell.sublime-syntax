@@ -559,6 +559,19 @@ contexts:
         - include: type
 
   type_declaration:
+    - match: '^(\s*)(type)\s+(role)\s+([A-Z][\w'']*)?'
+      captures:
+        2: keyword.declaration.data.haskell
+        3: keyword.declaration.role.haskell
+        4: entity.name.type.haskell
+      push:
+        - meta_scope: meta.declaration.type.role.haskell
+        - match: ^(?!\1\s)
+          pop: true
+        - match: \b(nominal|representational|phantom)\b
+          scope: storage.modifier.role.haskell
+        - match: _
+          scope: keyword.other.wildcard.haskell
     - match: '^(\s*)(type)\s+(family)\s+([A-Z][\w'']*)?'
       captures:
         2: keyword.declaration.data.haskell
