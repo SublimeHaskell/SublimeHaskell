@@ -48,7 +48,6 @@ contexts:
       captures:
         1: keyword.other.haskell keyword.import.haskell
       push:
-        - meta_scope: meta.import.haskell
         - match: (^(?!\s))
           pop: true
         - match: \b(qualified|as|hiding)\b
@@ -384,7 +383,7 @@ contexts:
           scope: keyword.other.haskell keyword.import.haskell
         - match: '({{type_id}})\s*(\()'
           captures:
-            1: storage.type.haskell storage.data.haskell
+            1: storage.type.haskell support.type.haskell
             2: punctuation.section.import-list.begin.haskell
           push:
             - meta_scope: meta.import.data.haskell
@@ -401,7 +400,7 @@ contexts:
               scope: punctuation.separator.comma.haskell
             - include: infix_op
         - match: '\b{{type_id}}\b'
-          scope: storage.type.haskell storage.data.haskell
+          scope: storage.type.haskell support.type.haskell
         - match: '\b{{var_id}}\b'
           scope: entity.name.function.haskell
         - match: ','
@@ -410,7 +409,7 @@ contexts:
 
   import_module_name:
     - match: '\b{{type_id}}\b'
-      scope: entity.name.namespace.haskell storage.module.haskell
+      scope: entity.name.namespace.haskell storage.type.haskell support.type.haskell
     - match: '\.'
       scope: punctuation.accessor.module.haskell
 
