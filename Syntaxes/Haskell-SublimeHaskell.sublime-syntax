@@ -100,11 +100,14 @@ contexts:
             |L(ANGUAGE|INE)
             |MINIMAL
             |NO(INLINE|UNPACK)
-            |O(PTIONS_GHC|VERLAP(PING|PABLE|S))
+            |O(PAQUE|PTIONS_GHC|VERLAP(PING|PABLE|S))
             |RULES
-            |S(OURCE|PECIALI[SZ]E)
+            |S(CC|OURCE|PECIALI[SZ]E(_INLINE)?)
             |UNPACK
             |WARNING
+            |ANN
+            |CTYPE
+            |COMPLETE
             )
             \b
           scope: keyword.preprocessor.haskell
@@ -166,7 +169,7 @@ contexts:
         - include: type
 
   common_keywords:
-    - match: \b(where|case|of|let|in|default|do|mdo|if|then|else|rec|proc)\b
+    - match: \b(where|case|of|let|in|default|do|mdo|if|then|else|rec|proc|forall|pattern|static|by|using)\b
       scope: keyword.other.haskell
 
   constructor_signature:
@@ -187,6 +190,23 @@ contexts:
       scope: constant.other.haskell entity.name.constructor.haskell
 
   data_declaration:
+    - match: '^(\s*)(data)\s+(family)\s+({{type_id}})?'
+      captures:
+        2: keyword.declaration.data.haskell
+        3: keyword.declaration.family.haskell
+        4: constant.other.haskell entity.name.class.haskell
+      push:
+        - meta_scope: meta.declaration.data.family.haskell
+        - match: ^(?!\1\s)
+          pop: true
+        - match: \b(where)\b
+          scope: keyword.declaration.data.family.haskell
+        - match: '[=\|]'
+          scope: keyword.operator.haskell
+        - include: deriving
+        - include: constructor_signature
+        - include: record_declaration
+        - include: type
     - match: '^(\s*)(data|newtype)\s+({{type_id}})?'
       captures:
         2: keyword.declaration.data.haskell
@@ -499,6 +519,8 @@ contexts:
         - include: type
 
   type:
+    - match: \b(forall)\b
+      scope: keyword.other.haskell
     - match: "(')({{type_id}})"
       captures:
         1: punctuation.definition.promoted.haskell
